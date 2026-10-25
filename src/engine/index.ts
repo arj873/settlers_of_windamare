@@ -10,3 +10,5 @@ export * from './rules/placement';
 export { generateBoard, beginnerBoard, randomBoard, redNumbersSeparated } from './board';
 export { createGame, type GameConfig, type PlayerConfig } from './createGame';
 export { applyAction, legalActions } from './engine';
+export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';
+export { bankTradeRatio } from './actions/trade';
