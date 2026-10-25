@@ -8,7 +8,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 ## 🏃 In Progress
 
 - **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · tab `s1-render` · branch `s1/render`
-- **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · tab `s1-ui-hud` · branch `s1/ui-hud`
 - **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · tab `s1-qa` · branch `s1/qa`
 
 ## ✅ Ready
@@ -42,6 +41,9 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - Export canBuildRoad/canBuildSettlement/stealCandidates/discardAmounts for UI highlights (from T2)
 - Keep log out of the per-action state clone (from T2) → T8
 
+- HUD: phone layout + keyboard shortcuts (from T6)
+- Dev-card play animations + sound hook (from T6) → Stage 2
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -55,3 +57,4 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · merged `71b5aba` · 119 tests total
 - **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1 · merged `8875279` · 198 tests total on main
 - **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1 · merged `723e10f` · ⚠️ 1 coverage test red on main (sim: 0 errors, but random games never finish) → T8
+- **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · merged `3a6e392` · 349 tests on main (1 known red → T8)
