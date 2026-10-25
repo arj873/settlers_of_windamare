@@ -2,6 +2,7 @@
 
 Browser Catan clone (base game, 3–4 players). TypeScript strict, PixiJS v8, Vite, Vitest, pnpm.
 **If you change a public type in `src/engine/types.ts`, update this file in the same commit.**
+Game rules (sourced, with engine status per rule): `docs/RULES.md`.
 
 ## 1. Layers
 
@@ -259,8 +260,8 @@ files (a selector, a constant) are fine — mention them in your report.
 
 ## 12. Decisions and open questions
 
-- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left), spaced 2,2,3 coastal edges apart with 3-fold symmetry. This matches the standard frame's spacing; exact edge choice is our own. Unverified against a physical board.
-- **Beginner layout** (`board.ts`): terrain/tokens from the rulebook's beginner setup, reproduced from memory; beginner port kinds are an approximation. Starting settlements of the beginner setup are not encoded. → T8 should verify.
+- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12.
+- **Beginner layout** (`board.ts`): terrain, tokens and harbor kinds verified (T8) against the rulebook's Illustration A. Starting settlements of the beginner setup are not encoded (see RULES.md §12 for them).
 - **Random layout:** terrain shuffled, tokens rejection-sampled until no 6/8 are adjacent, port kinds shuffled (positions fixed).
 - **Turn order:** config order; player 0 starts (no "highest roll starts"). The controller may shuffle players before `createGame`.
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.

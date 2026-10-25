@@ -18,7 +18,7 @@ docs/ARCHITECTURE.md   the contract. Read it first. Update it if you change a pu
 - `applyAction(state, action)` returns `{ ok: true, state }` or `{ ok: false, error }`.
 - `legalActions(state)` must only return actions that `applyAction` accepts.
 - All randomness goes through the seeded RNG stored in state.
-- Follow official Catan base-game rules (3–4 players). When unsure, say so in your report.
+- Follow official Catan base-game rules (3–4 players). The rules reference is `docs/RULES.md` (sourced, with engine status per rule). When unsure, say so in your report.
 
 ## Working rules
 - Stay inside your task's module(s). If you must touch another module, keep it minimal and mention it in your report.
