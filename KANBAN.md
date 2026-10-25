@@ -10,7 +10,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1 · tab `s1-rules-core` · branch `s1/rules-core`
 - **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1 · tab `s1-rules-trade` · branch `s1/rules-trade`
 - **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · tab `s1-render` · branch `s1/render`
-- **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · tab `s1-bots-sim` · branch `s1/bots-sim`
+- **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · tab `s1-ui-hud` · branch `s1/ui-hud`
 
 ## ✅ Ready
 
@@ -19,7 +19,6 @@ _(none — Wave 3 opens as Wave 2 merges)_
 ## 📋 Backlog — Stage 1
 
 ### Wave 3 (after T2–T5)
-- **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4
 - **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6
 - **T8** · QA: rules audit vs official base game, 10k-game sim, bug fixes, review T6/T7 · `s1-qa` 🟦 · deps: T2–T5
 
@@ -33,6 +32,11 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - Debug: force dice rolls (tests + UI) (from T1)
 - Verify beginner port kinds/positions against the rulebook → T8 (from T1)
 
+- Track played non-knight dev cards in state so the 25-card total is exact (from T5)
+- Engine fuzz test: every legal action is accepted (from T5)
+- Heuristic bot so sims reach game end (from T5) → Stage 2 smarter AI
+- CI: `pnpm sim --games 200 --bias 0.7` after T2/T3 (from T5)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -43,3 +47,4 @@ _(none — Wave 3 opens as Wave 2 merges)_
 ## ✔️ Done
 
 - **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · merged `b6a4937` · 67 tests
+- **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · merged `71b5aba` · 119 tests total
