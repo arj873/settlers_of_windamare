@@ -189,14 +189,16 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 8. Shared helpers (already implemented + tested)
 
-| Module               | Exports                                                                                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`       | `RESOURCES, DEV_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DISCARD_THRESHOLD, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, tokenPips` …                                   |
-| `resources.ts`       | `emptyResources, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                   |
-| `rules/placement.ts` | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces |
-| `selectors.ts`       | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                      |
-| `board.ts`           | `generateBoard, beginnerBoard, randomBoard, redNumbersSeparated`                                                                                                                       |
-| `createGame.ts`      | `createGame({ seed, players: {name,color}[], layout, vpToWin? })` → setup phase, player 0 first                                                                                        |
+| Module                 | Exports                                                                                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DISCARD_THRESHOLD, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, tokenPips` …                                   |
+| `resources.ts`         | `emptyResources, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                   |
+| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces |
+| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                      |
+| `board.ts`             | `generateBoard, beginnerBoard, randomBoard, redNumbersSeparated`                                                                                                                       |
+| `createGame.ts`        | `createGame({ seed, players: {name,color}[], layout, vpToWin? })` → setup phase, player 0 first                                                                                        |
+| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                   |
+| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                        |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -252,3 +254,7 @@ files (a selector, a constant) are fine — mention them in your report.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
 - **Victory:** only checked for the current player (official: you win on your own turn).
+- **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
+- **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
+- **Player trade details (T3):** `to` = distinct other players, non-empty. Only `'pending'` responders may respond (no changing your mind). Acceptor must hold `want` when accepting; both sides are re-checked at confirm. Offer auto-closes to `main` when every addressee rejected. The legal sample of `offerTrade` = 1-for-1 offers to all opponents for each held resource.
+- **Longest Road ties (T3):** holder keeps it while tied for longest; otherwise the unique leader (≥ 5) gets it; a tie without the holder → nobody. Largest Army uses the same rule with ≥ 3 knights.
