@@ -3,5 +3,6 @@ dist/
 coverage/
 .vite/
 *.log
+sim-failures/
 .DS_Store
 .claude/settings.local.json

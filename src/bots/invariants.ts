@@ -1,0 +1,376 @@
+/**
+ * Game-state invariants, checked by the simulator after every step (and usable from tests).
+ * Pure: reads a GameState, returns a list of violations (empty = healthy). Never throws on a
+ * malformed state; a broken state is exactly what this module exists to describe.
+ */
+import {
+  AWARD_VP,
+  BANK_PER_RESOURCE,
+  DEV_CARD_TYPES,
+  DEV_DECK_COMPOSITION,
+  LARGEST_ARMY_MIN,
+  LONGEST_ROAD_MIN,
+  PIECE_LIMITS,
+  RESOURCES,
+  actingPlayers,
+  edgeVertices,
+  isBoardEdge,
+  isBoardVertex,
+  isLandHex,
+  setupPlayerAt,
+  vertexNeighbors,
+  victoryPoints,
+  type EdgeId,
+  type GameState,
+  type PlayerId,
+  type VertexId,
+} from '../engine';
+
+export type ViolationCode =
+  | 'structure'
+  | 'resource-conservation'
+  | 'dev-conservation'
+  | 'piece-limit'
+  | 'board-id'
+  | 'building-adjacent'
+  | 'road-disconnected'
+  | 'robber-position'
+  | 'vp-mismatch'
+  | 'award-holder'
+  | 'award-mismatch'
+  | 'winner'
+  | 'phase-actor';
+
+export interface Violation {
+  code: ViolationCode;
+  message: string;
+  player?: PlayerId;
+}
+
+const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+
+/** Longest continuous road of `player`; an opponent's building on a junction cuts the road. */
+export function longestRoadLength(state: GameState, player: PlayerId): number {
+  const byVertex = new Map<VertexId, EdgeId[]>();
+  for (const [edge, owner] of Object.entries(state.pieces.roads) as [EdgeId, PlayerId][]) {
+    if (owner !== player || !isBoardEdge(edge)) continue;
+    for (const v of edgeVertices(edge)) byVertex.set(v, [...(byVertex.get(v) ?? []), edge]);
+  }
+  const used = new Set<EdgeId>();
+  const walk = (at: VertexId): number => {
+    let best = 0;
+    for (const edge of byVertex.get(at) ?? []) {
+      if (used.has(edge)) continue;
+      const next = edgeVertices(edge).find((v) => v !== at);
+      if (next === undefined) continue;
+      used.add(edge);
+      const blocked = (state.pieces.buildings[next]?.owner ?? player) !== player;
+      best = Math.max(best, 1 + (blocked ? 0 : walk(next)));
+      used.delete(edge);
+    }
+    return best;
+  };
+  let best = 0;
+  for (const v of byVertex.keys()) best = Math.max(best, walk(v));
+  return best;
+}
+
+export function checkInvariants(state: GameState): Violation[] {
+  const out: Violation[] = [];
+  const add = (code: ViolationCode, message: string, player?: PlayerId) =>
+    out.push(player === undefined ? { code, message } : { code, message, player });
+  const n = state.players.length;
+  const validPlayer = (p: unknown): p is PlayerId => isCount(p) && p < n;
+
+  // --- structure -----------------------------------------------------------------------------
+  if (n < 3 || n > 4) add('structure', `expected 3-4 players, got ${n}`);
+  state.players.forEach((p, i) => {
+    if (p.id !== i) add('structure', `players[${i}].id is ${p.id}`, i);
+  });
+  if (!validPlayer(state.turn.current)) add('structure', `turn.current ${state.turn.current}`);
+
+  // --- resources: bank + hands = 19 each ------------------------------------------------------
+  for (const r of RESOURCES) {
+    const counts = [state.bank[r], ...state.players.map((p) => p.resources[r])];
+    if (!counts.every((c) => isCount(c))) {
+      add('resource-conservation', `${r}: negative or fractional count in ${counts.join(',')}`);
+      continue;
+    }
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total !== BANK_PER_RESOURCE) {
+      add('resource-conservation', `${r}: bank + hands = ${total}, expected ${BANK_PER_RESOURCE}`);
+    }
+  }
+
+  // --- dev cards -----------------------------------------------------------------------------
+  // The state does not remember played Road Building / Year of Plenty / Monopoly cards (only
+  // knightsPlayed), so "deck + hands = 25" is exact only while none of those were played. Checked
+  // exactly where the state allows it: knights (incl. played) and VP cards; bounded elsewhere.
+  const held = (t: (typeof DEV_CARD_TYPES)[number]) =>
+    state.players.reduce((s, p) => s + p.devCards[t] + p.newDevCards[t], 0);
+  const inDeck = (t: (typeof DEV_CARD_TYPES)[number]) =>
+    state.devDeck.filter((c) => c === t).length;
+  const heldCounts = state.players.flatMap((p) => [
+    ...DEV_CARD_TYPES.map((t) => p.devCards[t]),
+    ...DEV_CARD_TYPES.map((t) => p.newDevCards[t]),
+    p.knightsPlayed,
+  ]);
+  if (!heldCounts.every(isCount)) add('dev-conservation', 'negative or fractional dev card count');
+  for (const t of DEV_CARD_TYPES) {
+    const total = held(t) + inDeck(t);
+    const cap = DEV_DECK_COMPOSITION[t];
+    if (t === 'knight') {
+      const all = total + state.players.reduce((s, p) => s + p.knightsPlayed, 0);
+      if (all !== cap)
+        add('dev-conservation', `knight: deck + hands + played = ${all}, expected ${cap}`);
+    } else if (t === 'victoryPoint' ? total !== cap : total > cap) {
+      add(
+        'dev-conservation',
+        `${t}: deck + hands = ${total}, ${t === 'victoryPoint' ? 'expected' : 'max'} ${cap}`,
+      );
+    }
+  }
+  if (state.devDeck.some((c) => !DEV_CARD_TYPES.includes(c))) {
+    add('dev-conservation', 'unknown card type in devDeck');
+  }
+
+  // --- board ids, robber ---------------------------------------------------------------------
+  const buildings = Object.entries(state.pieces.buildings) as [VertexId, { owner: PlayerId }][];
+  const roads = Object.entries(state.pieces.roads) as [EdgeId, PlayerId][];
+  for (const [v, b] of buildings) {
+    if (!isBoardVertex(v)) add('board-id', `building on off-board vertex ${v}`);
+    if (!validPlayer(b.owner)) add('structure', `building ${v} has owner ${b.owner}`);
+  }
+  for (const [e, owner] of roads) {
+    if (!isBoardEdge(e)) add('board-id', `road on off-board edge ${e}`);
+    if (!validPlayer(owner)) add('structure', `road ${e} has owner ${owner}`);
+  }
+  if (!isLandHex(state.robber)) add('robber-position', `robber on non-land hex ${state.robber}`);
+
+  // --- piece limits --------------------------------------------------------------------------
+  for (const p of state.players) {
+    const mine = buildings.filter(([, b]) => b.owner === p.id);
+    const counts = {
+      road: roads.filter(([, o]) => o === p.id).length,
+      settlement: mine.filter(([v]) => state.pieces.buildings[v]?.kind === 'settlement').length,
+      city: mine.filter(([v]) => state.pieces.buildings[v]?.kind === 'city').length,
+    };
+    for (const kind of ['road', 'settlement', 'city'] as const) {
+      if (counts[kind] > PIECE_LIMITS[kind]) {
+        add(
+          'piece-limit',
+          `player ${p.id} has ${counts[kind]} ${kind}s (max ${PIECE_LIMITS[kind]})`,
+          p.id,
+        );
+      }
+    }
+  }
+
+  // --- distance rule -------------------------------------------------------------------------
+  for (const [v] of buildings) {
+    if (!isBoardVertex(v)) continue;
+    for (const nb of vertexNeighbors(v)) {
+      if (v < nb && state.pieces.buildings[nb])
+        add('building-adjacent', `buildings on adjacent ${v} and ${nb}`);
+    }
+  }
+
+  // --- every road touches its owner's network ------------------------------------------------
+  // Lenient on purpose: a road may legitimately be cut off from the rest of the owner's network
+  // by an opponent's later settlement, so we only require a neighbouring own road or own building.
+  for (const [e, owner] of roads) {
+    if (!isBoardEdge(e)) continue;
+    const linked = edgeVertices(e).some(
+      (v) =>
+        state.pieces.buildings[v]?.owner === owner ||
+        Object.entries(state.pieces.roads).some(
+          ([e2, o2]) =>
+            e2 !== e &&
+            o2 === owner &&
+            isBoardEdge(e2 as EdgeId) &&
+            edgeVertices(e2 as EdgeId).includes(v),
+        ),
+    );
+    if (!linked)
+      add('road-disconnected', `road ${e} of player ${owner} touches nothing of theirs`, owner);
+  }
+
+  // --- awards ---------------------------------------------------------------------------------
+  const { longestRoad, largestArmy } = state.awards;
+  if (longestRoad !== null && !validPlayer(longestRoad))
+    add('award-holder', `longestRoad holder ${longestRoad}`);
+  if (largestArmy !== null && !validPlayer(largestArmy))
+    add('award-holder', `largestArmy holder ${largestArmy}`);
+  if (state.players.every((p) => validPlayer(p.id))) {
+    const lengths = state.players.map((p) => longestRoadLength(state, p.id));
+    const maxLen = Math.max(...lengths);
+    const leaders = lengths.flatMap((l, p) => (l === maxLen ? [p] : []));
+    if (maxLen < LONGEST_ROAD_MIN) {
+      if (longestRoad !== null)
+        add(
+          'award-mismatch',
+          `longestRoad held by ${longestRoad} but longest road is only ${maxLen}`,
+        );
+    } else if (leaders.length === 1 && longestRoad !== leaders[0]) {
+      add(
+        'award-mismatch',
+        `longestRoad is ${String(longestRoad)} but player ${leaders[0]} has unique longest (${maxLen})`,
+      );
+    } else if (longestRoad !== null && lengths[longestRoad] !== maxLen) {
+      add(
+        'award-mismatch',
+        `longestRoad holder ${longestRoad} has ${lengths[longestRoad]}, longest is ${maxLen}`,
+      );
+    }
+    const knights = state.players.map((p) => p.knightsPlayed);
+    const maxK = Math.max(...knights);
+    const kLeaders = knights.flatMap((k, p) => (k === maxK ? [p] : []));
+    if (maxK < LARGEST_ARMY_MIN) {
+      if (largestArmy !== null)
+        add('award-mismatch', `largestArmy held by ${largestArmy} with only ${maxK} knights`);
+    } else if (kLeaders.length === 1 && largestArmy !== kLeaders[0]) {
+      add(
+        'award-mismatch',
+        `largestArmy is ${String(largestArmy)} but player ${kLeaders[0]} has unique most knights (${maxK})`,
+      );
+    } else if (largestArmy !== null && knights[largestArmy] !== maxK) {
+      add(
+        'award-mismatch',
+        `largestArmy holder ${largestArmy} has ${knights[largestArmy]} knights, most is ${maxK}`,
+      );
+    }
+  }
+
+  // --- victory points: recomputed from raw pieces, compared to the selector -------------------
+  for (const p of state.players) {
+    const mine = buildings.filter(([, b]) => b.owner === p.id);
+    const vp =
+      mine.reduce((s, [v]) => s + (state.pieces.buildings[v]?.kind === 'city' ? 2 : 1), 0) +
+      (longestRoad === p.id ? AWARD_VP : 0) +
+      (largestArmy === p.id ? AWARD_VP : 0) +
+      p.devCards.victoryPoint +
+      p.newDevCards.victoryPoint;
+    const reported = victoryPoints(state, p.id);
+    if (vp !== reported)
+      add(
+        'vp-mismatch',
+        `player ${p.id}: recomputed ${vp} VP, victoryPoints() says ${reported}`,
+        p.id,
+      );
+  }
+
+  // --- winner / game over --------------------------------------------------------------------
+  const over = state.phase.kind === 'gameOver';
+  if (over !== (state.winner !== null)) {
+    add('winner', `phase ${state.phase.kind} but winner = ${String(state.winner)}`);
+  } else if (state.winner !== null) {
+    if (!validPlayer(state.winner)) add('winner', `winner ${state.winner} is not a player`);
+    else if (victoryPoints(state, state.winner) < state.settings.vpToWin) {
+      add(
+        'winner',
+        `winner ${state.winner} has ${victoryPoints(state, state.winner)} VP < ${state.settings.vpToWin}`,
+        state.winner,
+      );
+    }
+  } else if (
+    validPlayer(state.turn.current) &&
+    victoryPoints(state, state.turn.current) >= state.settings.vpToWin
+  ) {
+    // Contract: every successful action runs checkVictory for the current player.
+    add(
+      'winner',
+      `current player ${state.turn.current} has ${victoryPoints(state, state.turn.current)} VP but game is not over`,
+    );
+  }
+
+  checkPhase(state, add, validPlayer);
+  return out;
+}
+
+function checkPhase(
+  state: GameState,
+  add: (code: ViolationCode, message: string, player?: PlayerId) => void,
+  validPlayer: (p: unknown) => p is PlayerId,
+): void {
+  const phase = state.phase;
+  const n = state.players.length;
+  const hand = (p: PlayerId) =>
+    RESOURCES.reduce((s, r) => s + (state.players[p]?.resources[r] ?? 0), 0);
+  const setupPhase = phase.kind === 'setup';
+  if (setupPhase !== (state.turn.number === 0)) {
+    add('phase-actor', `phase ${phase.kind} with turn.number ${state.turn.number}`);
+  }
+  const actors = actingPlayers(state);
+  if (actors.some((p) => !validPlayer(p)))
+    add('phase-actor', `acting players ${actors.join(',')} not valid`);
+  if (phase.kind !== 'gameOver' && actors.length === 0)
+    add('phase-actor', `no one can act in ${phase.kind}`);
+
+  switch (phase.kind) {
+    case 'setup': {
+      if (!isCount(phase.index) || phase.index >= 2 * n) {
+        add('phase-actor', `setup index ${phase.index} out of range`);
+        break;
+      }
+      if (state.turn.current !== setupPlayerAt(phase.index, n)) {
+        add(
+          'phase-actor',
+          `setup index ${phase.index}: current ${state.turn.current}, expected ${setupPlayerAt(phase.index, n)}`,
+        );
+      }
+      const last = phase.lastSettlement;
+      if (phase.step === 'road') {
+        if (last === null || state.pieces.buildings[last]?.owner !== state.turn.current) {
+          add(
+            'phase-actor',
+            `setup road step without the current player's lastSettlement (${String(last)})`,
+          );
+        }
+      } else if (last !== null) {
+        add('phase-actor', `setup settlement step but lastSettlement = ${last}`);
+      }
+      break;
+    }
+    case 'discard': {
+      if (phase.pending.length !== n || !phase.pending.every(isCount)) {
+        add('phase-actor', `discard.pending malformed: [${phase.pending.join(',')}]`);
+        break;
+      }
+      if (phase.pending.every((c) => c === 0))
+        add('phase-actor', 'discard phase with nothing pending');
+      phase.pending.forEach((c, p) => {
+        if (c > hand(p))
+          add('phase-actor', `player ${p} must discard ${c} but holds ${hand(p)}`, p);
+      });
+      break;
+    }
+    case 'steal': {
+      if (phase.candidates.length === 0) add('phase-actor', 'steal phase with no candidates');
+      for (const c of phase.candidates) {
+        if (!validPlayer(c) || c === state.turn.current)
+          add('phase-actor', `bad steal candidate ${c}`);
+        else if (hand(c) === 0) add('phase-actor', `steal candidate ${c} has no cards`, c);
+      }
+      break;
+    }
+    case 'roadBuilding':
+      if (phase.remaining < 1 || phase.remaining > 2) {
+        add('phase-actor', `roadBuilding.remaining = ${phase.remaining}`);
+      }
+      break;
+    case 'trade': {
+      const o = phase.offer;
+      if (o.from !== state.turn.current)
+        add('phase-actor', `offer from ${o.from}, current is ${state.turn.current}`);
+      if (o.responses.length !== n)
+        add('phase-actor', `offer.responses has ${o.responses.length} entries`);
+      else if (o.responses[o.from] !== null) add('phase-actor', 'offerer has a response entry');
+      if (!RESOURCES.every((r) => isCount(o.give[r]) && isCount(o.want[r]))) {
+        add('phase-actor', 'offer give/want malformed');
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
