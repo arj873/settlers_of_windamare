@@ -7,7 +7,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-_(none)_
+- **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · tab `s1-architect` · branch `s1/architect`
 
 ## 🔍 Review
 
@@ -15,7 +15,7 @@ _(none)_
 
 ## ✅ Ready
 
-- **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: —
+_(none — Wave 2 opens when T1 merges)_
 
 ## 📋 Backlog — Stage 1
 
