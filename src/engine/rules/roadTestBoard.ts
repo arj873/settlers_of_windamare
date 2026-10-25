@@ -7,7 +7,7 @@ import type { EdgeId, GameState, PlayerId, VertexId } from '../types';
 export function emptyBoard(): GameState {
   const s = freshGame();
   s.pieces = { buildings: {}, roads: {} };
-  s.turn = { number: 5, current: 0, devCardPlayed: false };
+  s.turn = { number: 5, current: 0, devCardPlayed: false, tradeOffers: 0 };
   s.phase = { kind: 'main' };
   return s;
 }

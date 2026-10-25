@@ -58,7 +58,12 @@ function checkConsistent(s: GameState) {
     expect(s.bank[r] + held).toBe(BANK_PER_RESOURCE);
   }
   const devHeld = s.players.reduce(
-    (sum, p) => sum + totalDevCards(p.devCards) + totalDevCards(p.newDevCards) + p.knightsPlayed,
+    (sum, p) =>
+      sum +
+      totalDevCards(p.devCards) +
+      totalDevCards(p.newDevCards) +
+      p.knightsPlayed +
+      Object.values(p.progressCardsPlayed).reduce((a, b) => a + b, 0),
     0,
   );
   expect(s.devDeck.length + devHeld).toBe(25);

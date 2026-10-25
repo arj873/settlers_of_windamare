@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_TRADE_OFFERS_PER_TURN } from '../constants';
 import { applyAction, legalActions } from '../engine';
 import { midGame, tradeOfferGame } from '../fixtures';
 import { emptyResources } from '../resources';
@@ -143,6 +144,31 @@ describe('offerTrade', () => {
     pre.phase = { kind: 'preRoll' };
     expect(err(pre, offer({ ore: 1 }, { brick: 1 }))).toMatch(/main phase/);
     expect(err(tradeOfferGame(), offer({ ore: 1 }, { brick: 1 }))).toMatch(/main phase/);
+  });
+
+  it(`house rule: at most ${MAX_TRADE_OFFERS_PER_TURN} offers per turn, counted in turn.tradeOffers`, () => {
+    let s = midGame();
+    for (let i = 1; i <= MAX_TRADE_OFFERS_PER_TURN; i++) {
+      s = apply(s, offer({ ore: 1 }, { brick: 1 }, [0]));
+      expect(s.turn.tradeOffers).toBe(i);
+      s = apply(s, { type: 'cancelTrade', player: 1 });
+    }
+    expect(err(s, offer({ ore: 1 }, { brick: 1 }, [0]))).toMatch(/at most/);
+    expect(legalActions(s).some((a) => a.type === 'offerTrade')).toBe(false);
+    // Bank trades are not limited.
+    expect(legalActions(s).some((a) => a.type === 'bankTrade')).toBe(true);
+    // The count resets for the next player's turn.
+    s = apply(s, { type: 'endTurn', player: 1 });
+    expect(s.turn.tradeOffers).toBe(0);
+  });
+
+  it('every offer counts, whether it is confirmed, cancelled or rejected by all', () => {
+    const rejected = apply(apply(midGame(), offer({ ore: 1 }, { brick: 1 }, [2])), {
+      type: 'rejectTrade',
+      player: 2,
+    });
+    expect(rejected.phase.kind).toBe('main');
+    expect(rejected.turn.tradeOffers).toBe(1);
   });
 });
 

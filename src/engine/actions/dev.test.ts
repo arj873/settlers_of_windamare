@@ -123,6 +123,7 @@ describe('Knight', () => {
     const out = apply(blue(), { type: 'playKnight', player: 1 });
     expect(out.players[1]!.knightsPlayed).toBe(1);
     expect(out.players[1]!.devCards.knight).toBe(0);
+    expect(out.players[1]!.progressCardsPlayed).toEqual(blue().players[1]!.progressCardsPlayed);
     expect(out.turn.devCardPlayed).toBe(true);
     expect(out.phase).toEqual({ kind: 'moveRobber', resume: 'main' });
     expect(out.log.at(-1)?.text).toBe('Blue played a Knight');
@@ -300,6 +301,30 @@ describe('Monopoly', () => {
     const s = withCard(blue(), 'monopoly');
     const a = { type: 'playMonopoly', player: 1, resource: 'gold' } as unknown as Action;
     expect(err(s, a)).toBe('invalid resource');
+  });
+});
+
+describe('played progress cards', () => {
+  it('Road Building, Year of Plenty and Monopoly are recorded in progressCardsPlayed', () => {
+    const plays: Action[] = [
+      { type: 'playRoadBuilding', player: 1 },
+      { type: 'playYearOfPlenty', player: 1, resources: ['ore', 'wool'] },
+      { type: 'playMonopoly', player: 1, resource: 'ore' },
+    ];
+    const cards = ['roadBuilding', 'yearOfPlenty', 'monopoly'] as const;
+    plays.forEach((a, i) => {
+      const card = cards[i]!;
+      const s = withCard(blue(), card);
+      const out = apply(s, a);
+      expect(out.players[1]!.devCards[card]).toBe(s.players[1]!.devCards[card] - 1);
+      expect(out.players[1]!.progressCardsPlayed).toEqual({
+        roadBuilding: 0,
+        yearOfPlenty: 0,
+        monopoly: 0,
+        [card]: 1,
+      });
+      expect(out.players[1]!.knightsPlayed).toBe(s.players[1]!.knightsPlayed);
+    });
   });
 });
 

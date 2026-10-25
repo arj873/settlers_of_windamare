@@ -244,4 +244,36 @@ describe('random bot', () => {
   it('rejects a bias outside [0, 1]', () => {
     expect(() => createRandomBot({ progressBias: 2 })).toThrow();
   });
+
+  // One buyDevCard against 30 offerTrade variants.
+  const flooded: Action[] = [
+    { type: 'buyDevCard', player: 0 },
+    ...Array.from({ length: 30 }, (_, i): Action => ({
+      type: 'offerTrade',
+      player: 0,
+      give: { ore: i + 1 },
+      want: { brick: 1 },
+      to: [1],
+    })),
+  ];
+  const share = (bot: ReturnType<typeof createRandomBot>) => {
+    const rng = new Rng(11);
+    let dev = 0;
+    for (let i = 0; i < 2000; i++)
+      if (bot(midGame(), 0, rng, flooded)?.type === 'buyDevCard') dev++;
+    return dev / 2000;
+  };
+
+  it('byType (default) picks a type uniformly first, so many variants do not flood the choice', () => {
+    expect(share(createRandomBot())).toBeGreaterThan(0.4);
+    expect(share(createRandomBot())).toBeLessThan(0.6);
+  });
+
+  it("mode 'uniform' picks uniformly over all actions", () => {
+    expect(share(createRandomBot({ mode: 'uniform' }))).toBeLessThan(0.08);
+  });
+
+  it('rejects an unknown mode', () => {
+    expect(() => createRandomBot({ mode: 'nope' as 'uniform' })).toThrow();
+  });
 });

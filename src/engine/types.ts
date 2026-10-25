@@ -33,6 +33,9 @@ export type Terrain = Resource | 'desert';
 
 export type DevCardType = 'knight' | 'victoryPoint' | 'roadBuilding' | 'yearOfPlenty' | 'monopoly';
 export type DevCardCounts = Record<DevCardType, number>;
+/** Dev cards other than knights and VP cards (the rulebook's "progress cards"). */
+export type ProgressCardType = 'roadBuilding' | 'yearOfPlenty' | 'monopoly';
+export type ProgressCardCounts = Record<ProgressCardType, number>;
 
 // ---------------------------------------------------------------------------
 // Board (fixed after createGame) and pieces (change during play)
@@ -98,6 +101,8 @@ export interface Player {
   newDevCards: DevCardCounts;
   /** Knights played so far (for Largest Army). */
   knightsPlayed: number;
+  /** Progress cards played so far (face up, out of the game). Deck + hands + played = 25. */
+  progressCardsPlayed: ProgressCardCounts;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +156,8 @@ export interface TurnState {
   current: PlayerId;
   /** A dev card (other than revealing VP) was played this turn. Max one per turn. */
   devCardPlayed: boolean;
+  /** Player trade offers made this turn (max MAX_TRADE_OFFERS_PER_TURN). Reset on endTurn. */
+  tradeOffers: number;
 }
 
 export interface LogEntry {

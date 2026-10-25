@@ -6,7 +6,7 @@
  *     If the bank can't pay a resource to everyone owed, nobody gets it — unless only one player
  *     is owed, who then gets what's left.
  *   -> main
- * endTurn (phase main): merge newDevCards into devCards, devCardPlayed=false,
+ * endTurn (phase main): merge newDevCards into devCards, devCardPlayed=false, tradeOffers=0,
  *   advance current, turn.number++, dice stay as last roll, phase = preRoll.
  */
 import { DEV_CARD_TYPES, DISCARD_THRESHOLD } from '../constants';
@@ -70,6 +70,7 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn'> = {
       number: draft.turn.number + 1,
       current: (draft.turn.current + 1) % draft.players.length,
       devCardPlayed: false,
+      tradeOffers: 0,
     };
     draft.phase = { kind: 'preRoll' };
     return ok(draft);

@@ -38,8 +38,27 @@ function checkInvariants(s: GameState) {
   }
 }
 
-/** Biased random playout: prefers anything over endTurn so the board fills up. */
-function playout(start: GameState, seed: number, steps: number, checkAll = true) {
+/**
+ * A uniformly random action TYPE, then a random action of that type. Picking straight from the
+ * flat list lets types with many variants (discard combos, trade offers, road spots) dominate,
+ * so turns drag on and rolls (hence 7s and discards) become rare.
+ */
+function pickByType(actions: Action[], rng: Rng): Action {
+  const types = [...new Set(actions.map((a) => a.type))];
+  const type = rng.pick(types);
+  return rng.pick(actions.filter((a) => a.type === type));
+}
+
+/**
+ * Biased random playout: prefers anything over endTurn so the board fills up.
+ * `checkAll`: apply every legal action at every state (true), or only in the listed phases.
+ */
+function playout(
+  start: GameState,
+  seed: number,
+  steps: number,
+  checkAll: boolean | readonly PhaseKind[] = true,
+) {
   const rng = new Rng(seed);
   const phases = new Set<PhaseKind>();
   let s = start;
@@ -47,10 +66,12 @@ function playout(start: GameState, seed: number, steps: number, checkAll = true)
     phases.add(s.phase.kind);
     const actions = legalActions(s);
     expect(actions.length, `stuck in ${s.phase.kind}`).toBeGreaterThan(0);
-    if (checkAll) expectAllAccepted(s, actions);
+    if (checkAll === true || (checkAll !== false && checkAll.includes(s.phase.kind))) {
+      expectAllAccepted(s, actions);
+    }
     const busy = actions.filter((a) => a.type !== 'endTurn');
     const pool = busy.length > 0 && rng.float() < 0.8 ? busy : actions;
-    s = expectOk(applyAction(s, rng.pick(pool)));
+    s = expectOk(applyAction(s, pickByType(pool, rng)));
     checkInvariants(s);
   }
   phases.add(s.phase.kind);
@@ -95,17 +116,18 @@ describe('legalActions soundness', () => {
     });
   }
 
-  it('playouts reach discard, steal and gameOver somewhere', () => {
+  it('full games to 10 VP finish, passing through discard and steal on the way', () => {
+    // Real target: low targets end the game before anyone holds > 7 cards, so 7s never cause a
+    // discard. Every legal action is still checked in the rare phases (discard, steal).
     const seen = new Set<PhaseKind>();
     for (let seed = 10; seed < 14; seed++) {
-      const start = createGame({
-        seed,
-        players: FIXTURE_PLAYERS,
-        layout: 'random',
-        vpToWin: 3, // no trading yet (T3), so random play builds slowly
-      });
-      for (const k of playout(start, seed, 800, false).phases) seen.add(k);
+      const start = createGame({ seed, players: FIXTURE_PLAYERS, layout: 'random' });
+      const { s, phases } = playout(start, seed, 5000, ['discard', 'steal']);
+      expect(s.phase.kind, `seed ${seed}`).toBe('gameOver');
+      for (const k of phases) seen.add(k);
     }
-    for (const k of ['discard', 'steal', 'gameOver'] as const) expect(seen.has(k), k).toBe(true);
+    for (const k of ['discard', 'steal', 'roadBuilding', 'trade'] as const) {
+      expect(seen.has(k), k).toBe(true);
+    }
   });
 });
