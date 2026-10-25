@@ -7,17 +7,19 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-- **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6 · tab `s1-integration` · branch `s1/integration`
-- **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · tab `s1-qa` · branch `s1/qa`
+_(none — stage 1 build complete)_
 
 ## ✅ Ready
 
-_(none — Wave 3 opens as Wave 2 merges)_
+- **T9** · Human playtest → file issues as cards · you · deps: T7, T8 · run `pnpm dev`, open http://localhost:5173
 
-## 📋 Backlog — Stage 1
+## 📋 Backlog — Stage 1 polish (pick after playtest)
 
-### Wave 4
-- **T9** · Human playtest → file issues as cards · you · deps: T7, T8
+- HUD log: detect new entries by last entry, not length (log is capped at 200) (from T8)
+- Spectator flag: hide hand + "you" tag in all-bot games (from T7)
+- Starting player: roll / shuffle seat order (official rule) (from T8)
+- In-game menu (new game / save / speed) + undo last human action (from T7)
+- Beginner start option: pre-place the rulebook starting pieces (from T8)
 
 ## 💡 Ideas from agents
 - Beginner layout suggested starting positions as a setup option (from T1)
@@ -46,6 +48,10 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - Colour-blind-friendly player patterns (from T4)
 - Playwright smoke test with fixture screenshot diffs (from T4)
 
+- Counter-offers on player trades (from T8)
+- Spiral (A–R) token layout option (from T8)
+- Smarter bot: weight by action type, ask for needed resources (from T7)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -61,3 +67,5 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1 · merged `723e10f` · ⚠️ 1 coverage test red on main (sim: 0 errors, but random games never finish) → T8
 - **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · merged `3a6e392` · 349 tests on main (1 known red → T8)
 - **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · merged `1ce185a` · 365 tests on main (1 known red → T8)
+- **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · merged `f803a4e` · 10k sim: 98.4% finish, 0 errors, 28.7k steps/s
+- **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6 · merged `c8a8934` · 413 tests, all green · verified in browser
