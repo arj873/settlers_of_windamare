@@ -24,6 +24,7 @@ docs/ARCHITECTURE.md   the contract. Read it first. Update it if you change a pu
 - Stay inside your task's module(s). If you must touch another module, keep it minimal and mention it in your report.
 - Do NOT edit `KANBAN.md`. List new card ideas in your final report.
 - Engine code: write tests first or alongside; every rule gets a test.
+- Change files with the Edit/Write tools, not sed/mv/python/heredocs in Bash (those need manual approval and stall you). Use `git mv` only when renaming.
 - Prefix heavy commands with `nice -n 19` (installs, builds, test suites, sims).
 - Before reporting done, all must pass:
   `nice -n 19 pnpm typecheck && nice -n 19 pnpm lint && nice -n 19 pnpm test`
