@@ -22,6 +22,7 @@ import type {
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 
 type Piece = 'road' | 'settlement' | 'city';
+const PLURAL: Record<Piece, string> = { road: 'roads', settlement: 'settlements', city: 'cities' };
 
 /** Phase, turn, cost and supply checks shared by all builds. Returns an error or null. */
 function buildPrecheck(state: GameState, player: PlayerId, piece: Piece): string | null {
@@ -29,7 +30,7 @@ function buildPrecheck(state: GameState, player: PlayerId, piece: Piece): string
   if (!isCurrent(state, player)) return 'not your turn';
   const hand = state.players[player]?.resources;
   if (!hand || !hasResources(hand, COSTS[piece])) return `cannot afford a ${piece}`;
-  if (piecesLeft(state, player)[piece] <= 0) return `no ${piece}s left`;
+  if (piecesLeft(state, player)[piece] <= 0) return `no ${PLURAL[piece]} left`;
   return null;
 }
 

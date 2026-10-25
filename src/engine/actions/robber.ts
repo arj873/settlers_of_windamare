@@ -139,9 +139,11 @@ export const robberLegal: LegalGenerator = (state: GameState): Action[] => {
       return phase.pending.flatMap((count, p) => {
         const hand = state.players[p]?.resources;
         if (count <= 0 || !hand) return [];
-        return discardOptions(hand, count).map(
-          (resources): Action => ({ type: 'discard', player: p, resources }),
-        );
+        return discardOptions(hand, count).map((resources): Action => ({
+          type: 'discard',
+          player: p,
+          resources,
+        }));
       });
     case 'moveRobber':
       return TOPOLOGY.landHexes

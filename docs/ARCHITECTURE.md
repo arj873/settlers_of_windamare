@@ -251,4 +251,5 @@ files (a selector, a constant) are fine — mention them in your report.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
-- **Victory:** only checked for the current player (official: you win on your own turn).
+- **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
+- **Steal log:** says who stole from whom, never which card (the log is public).
