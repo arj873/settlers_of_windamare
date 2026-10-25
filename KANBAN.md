@@ -9,7 +9,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · tab `s1-render` · branch `s1/render`
 - **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · tab `s1-ui-hud` · branch `s1/ui-hud`
-- **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim · `s1-qa` 🟦 · deps: T2–T5 · tab `s1-qa` · branch `s1/qa`
+- **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · tab `s1-qa` · branch `s1/qa`
 
 ## ✅ Ready
 
