@@ -7,7 +7,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-- **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · tab `s1-render` · branch `s1/render`
+- **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6 · tab `s1-integration` · branch `s1/integration`
 - **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · tab `s1-qa` · branch `s1/qa`
 
 ## ✅ Ready
@@ -15,9 +15,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 _(none — Wave 3 opens as Wave 2 merges)_
 
 ## 📋 Backlog — Stage 1
-
-### Wave 3 (after T2–T5)
-- **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6
 
 ### Wave 4
 - **T9** · Human playtest → file issues as cards · you · deps: T7, T8
@@ -44,6 +41,11 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - HUD: phone layout + keyboard shortcuts (from T6)
 - Dev-card play animations + sound hook (from T6) → Stage 2
 
+- Ghost piece preview on hover (from T4)
+- Turn / award markers on the board (from T4)
+- Colour-blind-friendly player patterns (from T4)
+- Playwright smoke test with fixture screenshot diffs (from T4)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -58,3 +60,4 @@ _(none — Wave 3 opens as Wave 2 merges)_
 - **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1 · merged `8875279` · 198 tests total on main
 - **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1 · merged `723e10f` · ⚠️ 1 coverage test red on main (sim: 0 errors, but random games never finish) → T8
 - **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4 · merged `3a6e392` · 349 tests on main (1 known red → T8)
+- **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · merged `1ce185a` · 365 tests on main (1 known red → T8)
