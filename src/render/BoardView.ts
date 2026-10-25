@@ -43,7 +43,7 @@ import {
   type ViewTransform,
 } from './geometry';
 import { BEACH, HIGHLIGHT, INK, SEA, TERRAIN_PALETTE, TOKEN, portColor } from './theme';
-import { Viewport } from './viewport';
+import { Viewport, type Insets } from './viewport';
 
 export interface Highlights extends PickCandidates {
   /** Tint for the glow (CSS colour), e.g. the acting player's colour. Default: warm white. */
@@ -209,6 +209,11 @@ export class BoardView {
   /** Reset pan/zoom to fit the whole board. */
   fit(): void {
     this.viewport.fit();
+  }
+
+  /** Screen margins covered by HTML overlays (HUD panels); the fitted board avoids them. */
+  setInsets(insets: Insets): void {
+    this.viewport.setInsets(insets);
   }
 
   destroy(): void {

@@ -1,5 +1,6 @@
 /** Render layer (T4): PixiJS board view + hit-testing. Reads GameState, never mutates it. */
 export { BoardView, type BoardEvents, type Highlights } from './BoardView';
+export type { Insets } from './viewport';
 export {
   HEX_SIZE,
   boardBounds,

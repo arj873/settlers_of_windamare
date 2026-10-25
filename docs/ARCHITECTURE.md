@@ -252,6 +252,7 @@ view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} cle
 view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
+view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
@@ -279,6 +280,34 @@ hud.showNewGame();                                            // open the new-ga
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
 - Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+
+## 13b. Game controller (`src/game`, T7)
+
+```ts
+const c = new GameController({ board, hud, storage, speed, toast, onRender });
+c.start(state, seats); // seats: ('human'|'bot')[] indexed by PlayerId
+c.newGame(cfg);
+c.resume(saved);
+c.setSpeed(ms);
+c.snapshot();
+c.destroy();
+```
+
+- Only path to a new state: `dispatch(action)` → `applyAction`. Rejections toast and change nothing.
+  After every change: `legalActions` → viewer → `board.render` + `hud.render` → highlights → autosave → schedule bot.
+- Pure decisions live in `game/logic.ts` (unit-tested): `pickViewer` (owed responses — discards,
+  pending trade replies — first, then the current human; previous viewer kept during bot turns;
+  all-bot = spectator viewer 0), `boardActions`/`highlightsFor`/`actionForClick` (implied prompts
+  or HUD place mode), `nextBot` (bots owing a response first; a bot offerer waits for human replies).
+- Bots: `defaultBot = createRandomBot({ progressBias: 0.5 })`, private `Rng` seeded `bots:<seed>`
+  (saved with the session), one move per tick (`speed` ms, ×0.4 for discards / trade replies;
+  speed 0 = batches of moves per 12 ms slice). The controller hides `offerTrade` from a bot after
+  `BOT_OFFERS_PER_TURN` (1) offers in a turn. Nobody able to act → error toast + state on console.
+- Autosave: `localStorage['catan:save:v1']` = `{ version, state, seats, viewer, botRng }`, every
+  access in try/catch. On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`,
+  `?seed`, `?layout`, `?autoplay`) never autosave.
+- Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?seats=hbbb`, `?vp=`, `?speed=ms`,
+  `?autoplay=4bots|3bots` (all bots), `?hl=`. `window.catan` = `{ controller, board, hud }`.
 
 ## 14. Decisions and open questions
 
