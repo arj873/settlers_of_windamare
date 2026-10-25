@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HUD dev page</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0f2a44;
+      }
+      #bg {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 50%, #1b4f7a 0%, #0f2a44 70%), #0f2a44;
+      }
+      #bg::after {
+        content: 'board goes here';
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: rgba(255, 255, 255, 0.12);
+        font:
+          700 48px system-ui,
+          sans-serif;
+      }
+      #dev-bar {
+        position: fixed;
+        z-index: 100;
+        left: 50%;
+        top: 62px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #cdd9e5;
+        font:
+          12px system-ui,
+          sans-serif;
+      }
+      #dev-bar select,
+      #dev-bar button {
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bg"></div>
+    <div id="hud-root"></div>
+    <div id="dev-bar">
+      <label
+        >Fixture
+        <select id="fixture"></select
+      ></label>
+      <label
+        >Viewer
+        <select id="viewer"></select
+      ></label>
+      <label><input id="bot" type="checkbox" /> bot turn</label>
+      <button id="new-game" type="button">New game screen</button>
+    </div>
+    <script type="module" src="/src/ui/dev.ts"></script>
+  </body>
+</html>

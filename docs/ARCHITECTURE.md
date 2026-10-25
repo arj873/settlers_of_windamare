@@ -241,6 +241,26 @@ Each returns a fresh, internally consistent state on the beginner board (checked
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
 files (a selector, a constant) are fine — mention them in your report.
 
+## 13. UI contract (`src/ui`, T6)
+
+```ts
+import { Hud } from './ui';
+const hud = new Hud(document.getElementById('ui')!);          // overlay; only its panels take pointer events
+hud.render(state, { viewer, legal, isBotTurn });              // call after every state change / viewer change
+hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
+hud.on('newGame', (cfg: NewGameConfig) => …);                 // { players: {name,color,controller:'human'|'bot'}[], layout, seed? }
+hud.on('placeMode', (m: 'road'|'settlement'|'city'|null) => …); // build button toggled: board shows targets, click -> buildX
+hud.showNewGame();                                            // open the new-game screen (also the winner screen's button)
+```
+
+- The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
+- Build buttons emit nothing but `placeMode`. HUD leaves the mode itself when pieces/turn/phase change or the build stops being legal (it emits `placeMode(null)`); Esc cancels.
+- Implied board clicks (setup placement, robber, free roads) have no HUD button: use `boardPrompt(view)` (`'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | null`) to know what to highlight.
+- `offerTrade` is open-ended, so the composer builds its own action; the HUD enables the Trade button when any `offerTrade` is in `legal`.
+- Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
+- Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
+- Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+
 ## 12. Decisions and open questions
 
 - **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left), spaced 2,2,3 coastal edges apart with 3-fold symmetry. This matches the standard frame's spacing; exact edge choice is our own. Unverified against a physical board.
