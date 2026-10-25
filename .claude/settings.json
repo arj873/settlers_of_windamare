@@ -27,8 +27,6 @@
     ],
     "deny": [
       "Bash(git push:*)",
-      "Bash(git rebase:*)",
-      "Bash(git merge:*)",
       "Bash(git reset --hard:*)"
     ]
   }
