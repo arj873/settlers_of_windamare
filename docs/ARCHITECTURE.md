@@ -253,7 +253,8 @@ files (a selector, a constant) are fine — mention them in your report.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
-- **Victory:** only checked for the current player (official: you win on your own turn).
+- **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
+- **Steal log:** says who stole from whom, never which card (the log is public).
 - **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
 - **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
 - **Player trade details (T3):** `to` = distinct other players, non-empty. Only `'pending'` responders may respond (no changing your mind). Acceptor must hold `want` when accepting; both sides are re-checked at confirm. Offer auto-closes to `main` when every addressee rejected. The legal sample of `offerTrade` = 1-for-1 offers to all opponents for each held resource.
