@@ -25,10 +25,20 @@ export interface ViewportOptions {
   onHover: (p: Point | null) => void;
 }
 
+/** Screen margins (CSS px) covered by overlays; the fitted board stays inside them. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 const TAP_SLOP = 6;
 const MIN_ZOOM = 0.55; // relative to the fitted scale
 const MAX_ZOOM = 7;
 const PADDING = 12;
+/** Ignore insets that would shrink the board below this fraction of the full-screen fit. */
+const MIN_INSET_FIT = 0.6;
 
 export class Viewport {
   view: ViewTransform = { x: 0, y: 0, scale: 1 };
@@ -54,13 +64,44 @@ export class Viewport {
     this.fit();
   }
 
+  private insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
   /** Reset to the fitted framing. */
   fit() {
     const { width, height } = this.o.getSize();
-    const v = fitView(this.o.bounds, width, height, PADDING);
+    const v = this.fitFor(width, height);
     this.fitScale = v.scale;
     this.fitted = true;
     this.set(v);
+  }
+
+  /** Keep the fitted board clear of overlays; refits unless the user has moved the view. */
+  setInsets(insets: Insets) {
+    const i = this.insets;
+    if (
+      i.top === insets.top &&
+      i.right === insets.right &&
+      i.bottom === insets.bottom &&
+      i.left === insets.left
+    ) {
+      return;
+    }
+    this.insets = { ...insets };
+    this.resize();
+  }
+
+  /** Fitted view for a screen size, inside the insets when they leave enough room. */
+  private fitFor(width: number, height: number): ViewTransform {
+    const full = fitView(this.o.bounds, width, height, PADDING);
+    const { top, right, bottom, left } = this.insets;
+    const inner = fitView(
+      this.o.bounds,
+      Math.max(1, width - left - right),
+      Math.max(1, height - top - bottom),
+      PADDING,
+    );
+    if (inner.scale < full.scale * MIN_INSET_FIT) return full;
+    return { scale: inner.scale, x: inner.x + left, y: inner.y + top };
   }
 
   /** Call when the screen size changed. */
@@ -74,7 +115,7 @@ export class Viewport {
     const relZoom = this.view.scale / this.fitScale;
     const old = this.lastSize;
     const center = screenToUnit(this.view, { x: old.width / 2, y: old.height / 2 });
-    const f = fitView(this.o.bounds, width, height, PADDING);
+    const f = this.fitFor(width, height);
     this.fitScale = f.scale;
     const scale = f.scale * relZoom;
     this.set({ scale, x: width / 2 - center.x * scale, y: height / 2 - center.y * scale });

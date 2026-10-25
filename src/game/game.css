@@ -1,0 +1,116 @@
+/* Controller-owned overlays: toasts, resume prompt, bot speed. Matches the HUD look. */
+.game-toasts {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font:
+    14px/1.35 'Segoe UI',
+    system-ui,
+    sans-serif;
+}
+.game-toast {
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 9px 16px;
+  border-radius: 10px;
+  color: #eef3f8;
+  background: rgba(13, 29, 46, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  animation: game-toast-in 0.2s ease;
+}
+.game-toast.is-error {
+  border-color: #ff7a6b;
+  color: #ffd0c9;
+}
+.game-toast.is-leaving {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+@keyframes game-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.game-resume {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  color: #eef3f8;
+  font:
+    14px/1.35 'Segoe UI',
+    system-ui,
+    sans-serif;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(58, 123, 213, 0.35), transparent 60%),
+    linear-gradient(180deg, #0f2a44, #08121e);
+}
+.game-resume-card {
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.game-resume h1 {
+  margin: 0;
+  font:
+    700 34px 'Palatino Linotype',
+    Palatino,
+    Georgia,
+    serif;
+}
+.game-resume p {
+  margin: 0;
+  color: #9fb2c5;
+}
+.game-resume-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.game-speed {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 10px;
+  color: #9fb2c5;
+  background: rgba(13, 29, 46, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  font:
+    600 11px 'Segoe UI',
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.game-speed[hidden] {
+  display: none;
+}
+.game-speed select {
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #eef3f8;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 7px;
+  padding: 3px 6px;
+}
