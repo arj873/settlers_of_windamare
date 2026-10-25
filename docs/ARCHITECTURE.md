@@ -241,7 +241,24 @@ Each returns a fresh, internally consistent state on the beginner board (checked
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
 files (a selector, a constant) are fine — mention them in your report.
 
-## 12. Decisions and open questions
+## 12. Board view API (`src/render`, T4)
+
+```ts
+const view = new BoardView(app);          // adds itself to app.stage; app must already be init'd
+view.render(state);                       // cheap; call after every state change
+view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} clears
+view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
+view.on('hover', (hit | null) => …);
+view.resize(); view.fit(); view.destroy();
+```
+
+- The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
+- While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
+- Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit. Refits on renderer resize until the user moves it.
+- Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
+- Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
+
+## 13. Decisions and open questions
 
 - **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left), spaced 2,2,3 coastal edges apart with 3-fold symmetry. This matches the standard frame's spacing; exact edge choice is our own. Unverified against a physical board.
 - **Beginner layout** (`board.ts`): terrain/tokens from the rulebook's beginner setup, reproduced from memory; beginner port kinds are an approximation. Starting settlements of the beginner setup are not encoded. → T8 should verify.
