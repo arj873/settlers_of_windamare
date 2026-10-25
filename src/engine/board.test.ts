@@ -37,8 +37,30 @@ describe('beginner board', () => {
         .filter((h) => h?.r === r)
         .map((h) => `${h?.terrain}${h?.token ?? ''}`);
     expect(row(-2)).toEqual(['ore10', 'wool2', 'lumber9']);
+    expect(row(-1)).toEqual(['grain12', 'brick6', 'wool4', 'brick10']);
     expect(row(0)).toEqual(['grain9', 'lumber11', 'desert', 'lumber3', 'ore8']);
+    expect(row(1)).toEqual(['lumber8', 'ore3', 'grain4', 'wool5']);
     expect(row(2)).toEqual(['brick5', 'grain6', 'wool11']);
+  });
+
+  it('has the rulebook harbors: kind, and the land hex each one faces', () => {
+    const { board } = beginnerBoard();
+    const faced = board.ports.map((p) => {
+      const land = TOPOLOGY.edge[p.edge]?.hexes[0];
+      const h = land ? board.hexes[land] : undefined;
+      return `${p.kind}@${h?.terrain}${h?.token ?? ''}`;
+    });
+    expect(faced).toEqual([
+      'generic@ore10',
+      'grain@wool2',
+      'ore@brick10',
+      'generic@ore8',
+      'wool@wool5',
+      'generic@grain6',
+      'generic@brick5',
+      'brick@lumber8',
+      'lumber@grain12',
+    ]);
   });
 });
 

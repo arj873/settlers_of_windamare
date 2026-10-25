@@ -189,9 +189,9 @@ function buildTopology(radius: number): Topology {
     water[hexId(q, r)] = { id: hexId(q, r), q, r, x: c.x, y: c.y };
   }
 
-  // Port slots: every other water hex starting at index 0 (the standard frame alternates).
-  // A water hex touching two land hexes needs one of its two coastal edges; we pick so the
-  // 9 ports are spread 2,2,3 coastal edges apart with 3-fold symmetry (see ARCHITECTURE.md).
+  // Port slots: every other water hex starting at index 0, as on the official 5th-edition frame
+  // (verified against the rulebook's beginner map, Illustration A). A water hex touching two land
+  // hexes faces the one that is NOT a corner of the land hexagon (see ARCHITECTURE.md §12).
   const isRingCorner = (q: number, r: number) =>
     hexDistance({ q, r }, origin) === radius &&
     SIDES.filter((s) => {
@@ -205,10 +205,7 @@ function buildTopology(radius: number): Topology {
       isLand(n.q, n.r),
     );
     let pick = shared[0];
-    if (shared.length === 2) {
-      const wantCorner = i % 6 === 4;
-      pick = shared.find(({ n }) => isRingCorner(n.q, n.r) === wantCorner);
-    }
+    if (shared.length === 2) pick = shared.find(({ n }) => !isRingCorner(n.q, n.r));
     if (!pick) throw new Error('port slot construction failed');
     const e = sideEdge(w.q, w.r, pick.s);
     portSlots.push({
