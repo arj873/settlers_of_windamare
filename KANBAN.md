@@ -7,23 +7,19 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-- **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · tab `s1-architect` · branch `s1/architect`
-
-## 🔍 Review
+- **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1 · tab `s1-rules-core` · branch `s1/rules-core`
+- **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1 · tab `s1-rules-trade` · branch `s1/rules-trade`
+- **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · tab `s1-render` · branch `s1/render`
+- **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · tab `s1-bots-sim` · branch `s1/bots-sim`
 
 _(none)_
 
 ## ✅ Ready
 
-_(none — Wave 2 opens when T1 merges)_
+_(none — Wave 3 opens as Wave 2 merges)_
 
 ## 📋 Backlog — Stage 1
 
-### Wave 2 (parallel, after T1)
-- **T2** · Rules core: setup snake, dice/production, build road/settlement/city, robber/7/discard/steal, turn flow, win at 10 · `s1-rules-core` 🟦 · deps: T1
-- **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1
-- **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1
-- **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1
 
 ### Wave 3 (after T2–T5)
 - **T6** · HTML HUD: setup screen, player panels, hand, buttons, trade, dev cards, discard, log, winner · `s1-ui-hud` 🟩 · deps: T4
@@ -32,6 +28,13 @@ _(none — Wave 2 opens when T1 merges)_
 
 ### Wave 4
 - **T9** · Human playtest → file issues as cards · you · deps: T7, T8
+
+## 💡 Ideas from agents
+- Beginner layout suggested starting positions as a setup option (from T1)
+- Per-player hidden-info view of state: hands, deck order (needed for online + fair bots) (from T1)
+- "Roll to decide who starts" option (from T1)
+- Debug: force dice rolls (tests + UI) (from T1)
+- Verify beginner port kinds/positions against the rulebook → T8 (from T1)
 
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
@@ -42,4 +45,4 @@ _(none — Wave 2 opens when T1 merges)_
 
 ## ✔️ Done
 
-_(none)_
+- **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · merged `b6a4937` · 67 tests
