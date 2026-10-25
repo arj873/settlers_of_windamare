@@ -2,6 +2,7 @@
 
 Browser Catan clone (base game, 3–4 players). TypeScript strict, PixiJS v8, Vite, Vitest, pnpm.
 **If you change a public type in `src/engine/types.ts`, update this file in the same commit.**
+Game rules (sourced, with engine status per rule): `docs/RULES.md`.
 
 ## 1. Layers
 
@@ -74,14 +75,14 @@ GameState {
   board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[9] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
   robber:  HexId
-  players: Player[]   // {id,name,color,resources,devCards,newDevCards,knightsPlayed}
+  players: Player[]   // {id,name,color,resources,devCards,newDevCards,knightsPlayed,progressCardsPlayed}
   bank:    ResourceCounts            // starts 19 each
   devDeck: DevCardType[]             // shuffled; draw with pop()
-  turn:    { number, current, devCardPlayed }   // number: 0 in setup, 1 = first real turn
+  turn:    { number, current, devCardPlayed, tradeOffers }   // number: 0 in setup, 1 = first real turn
   phase:   Phase                     // see §5
   dice:    [d1, d2] | null           // last roll
   awards:  { longestRoad: PlayerId|null, largestArmy: PlayerId|null }
-  log:     { turn, player, text }[]
+  log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
 }
@@ -91,6 +92,9 @@ GameState {
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
 - Pieces left are **derived**, not stored: `piecesLeft(state, p)` (limits 15 roads / 5 settlements / 4 cities).
 - `devCards` = playable; `newDevCards` = bought this turn (not playable until next turn; merged on `endTurn`). VP cards in either count toward `victoryPoints()`.
+- Played cards: knights in `knightsPlayed`, Road Building / Year of Plenty / Monopoly in `progressCardsPlayed` (`ProgressCardCounts`). So per type, deck + hands + played = `DEV_DECK_COMPOSITION` exactly (checked by the sim's invariants).
+- `turn.tradeOffers`: player trade offers made this turn; `offerTrade` is rejected once it reaches `MAX_TRADE_OFFERS_PER_TURN` (3). Reset on `endTurn`. House rule, see §12.
+- `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
 - Hidden info (hands, deck order) lives in state. Fine for hotseat; an online server would redact.
 
 ## 5. Phase state machine
@@ -117,7 +121,7 @@ preRoll ──playKnight──► moveRobber{resume:preRoll} ──► [steal] �
 main ──build*/buyDevCard/bankTrade──► main
      ──playKnight──► moveRobber{resume:main} ─► [steal] ─► main
      ──playRoadBuilding──► roadBuilding{remaining, resume:main} ─► main
-     ──offerTrade──► trade{offer} ─accept/reject…─► confirmTrade | cancelTrade ─► main
+     ──offerTrade (max 3/turn)──► trade{offer} ─accept/reject…─► confirmTrade | cancelTrade ─► main
      ──endTurn──► preRoll (next player)
 
 any successful action ─► updateAwards ─► checkVictory ─(current player ≥ vpToWin)─► gameOver
@@ -164,13 +168,23 @@ applyAction(state, action):
   phase gameOver?          → { ok:false, error:'game is over' }
   unknown action.type?     → error
   action.player not 0..n-1 → error
-  draft = structuredClone(state)
+  draft = cloneState(state)                         // clone.ts, see below
   result = HANDLERS[action.type](draft, action)     // handler mutates draft, returns ok(draft) | fail(msg)
-  if ok: updateAwards(draft) (T3, rules/awards.ts); checkVictory(draft) (T2, rules/victory.ts)
+  if ok: updateAwards(draft, { roads: changesRoads(type) }) (rules/awards.ts)
+         checkVictory(draft) (rules/victory.ts)
+         trim draft.log to the newest LOG_LIMIT entries
   return result
 ```
 
 - **Pure:** the input state is never mutated (tested with a deep-frozen state).
+- **Structural sharing (`cloneState`)**: `board` and `settings` are shared between states, and so are
+  log entries (the `log` array itself is copied). Everything else is copied. So handlers must
+  **never mutate `board`, `settings` or an existing log entry** (append with `log()` only). A new
+  GameState field must be copied in `clone.ts` (`clone.test.ts` fails otherwise). This replaced
+  `structuredClone`, which was ~85% of sim time.
+- **Longest Road** is recomputed only after actions that add a road or occupy a vertex
+  (`changesRoads`: setup settlement/road, buildRoad, buildSettlement, placeFreeRoad). A new action
+  that changes roads or building occupancy must be added there. Largest Army is always recomputed.
 - `legalActions(state, player?)` = concat of every area's `LegalGenerator`, optionally filtered by actor.
   **Sound** (everything returned is accepted by applyAction — tested) and **complete**, except
   `offerTrade`, which is open-ended: return a bounded sample (e.g. 1-for-1 offers).
@@ -189,16 +203,17 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 8. Shared helpers (already implemented + tested)
 
-| Module                 | Exports                                                                                                                                                                                |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DISCARD_THRESHOLD, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, tokenPips` …                                   |
-| `resources.ts`         | `emptyResources, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                   |
-| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces |
-| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                      |
-| `board.ts`             | `generateBoard, beginnerBoard, randomBoard, redNumbersSeparated`                                                                                                                       |
-| `createGame.ts`        | `createGame({ seed, players: {name,color}[], layout, vpToWin? })` → setup phase, player 0 first                                                                                        |
-| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                   |
-| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                        |
+| Module                 | Exports                                                                                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DISCARD_THRESHOLD, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, tokenPips` … |
+| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                         |
+| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                            |
+| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                          |
+| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                               |
+| `board.ts`             | `generateBoard, beginnerBoard, randomBoard, redNumbersSeparated`                                                                                                                                                |
+| `createGame.ts`        | `createGame({ seed, players: {name,color}[], layout, vpToWin? })` → setup phase, player 0 first                                                                                                                 |
+| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                            |
+| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                 |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -282,8 +297,8 @@ hud.showNewGame();                                            // open the new-ga
 
 ## 14. Decisions and open questions
 
-- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left), spaced 2,2,3 coastal edges apart with 3-fold symmetry. This matches the standard frame's spacing; exact edge choice is our own. Unverified against a physical board.
-- **Beginner layout** (`board.ts`): terrain/tokens from the rulebook's beginner setup, reproduced from memory; beginner port kinds are an approximation. Starting settlements of the beginner setup are not encoded. → T8 should verify.
+- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12.
+- **Beginner layout** (`board.ts`): terrain, tokens and harbor kinds verified (T8) against the rulebook's Illustration A. Starting settlements of the beginner setup are not encoded (see RULES.md §12 for them).
 - **Random layout:** terrain shuffled, tokens rejection-sampled until no 6/8 are adjacent, port kinds shuffled (positions fixed).
 - **Turn order:** config order; player 0 starts (no "highest roll starts"). The controller may shuffle players before `createGame`.
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.
@@ -295,4 +310,8 @@ hud.showNewGame();                                            // open the new-ga
 - **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
 - **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
 - **Player trade details (T3):** `to` = distinct other players, non-empty. Only `'pending'` responders may respond (no changing your mind). Acceptor must hold `want` when accepting; both sides are re-checked at confirm. Offer auto-closes to `main` when every addressee rejected. The legal sample of `offerTrade` = 1-for-1 offers to all opponents for each held resource.
+- **Trade offer cap (T8, house rule):** at most `MAX_TRADE_OFFERS_PER_TURN` (3) `offerTrade`s per
+  turn, counted whether confirmed, cancelled or rejected by all. Bank trades are unlimited. The
+  official rules set no limit; without one, random bots loop offer → all reject → offer and games
+  never end. Raise the constant if humans find it tight.
 - **Longest Road ties (T3):** holder keeps it while tied for longest; otherwise the unique leader (≥ 5) gets it; a tie without the holder → nobody. Largest Army uses the same rule with ≥ 3 knights.

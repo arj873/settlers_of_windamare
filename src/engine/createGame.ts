@@ -8,7 +8,7 @@ import {
   MIN_PLAYERS,
   RESOURCES,
 } from './constants';
-import { emptyDevCards, emptyResources } from './resources';
+import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
 import type { DevCardType, GameState, Layout, Player } from './types';
 
@@ -50,6 +50,7 @@ export function createGame(config: GameConfig): GameState {
     devCards: emptyDevCards(),
     newDevCards: emptyDevCards(),
     knightsPlayed: 0,
+    progressCardsPlayed: emptyProgressCards(),
   }));
 
   const bank = emptyResources();
@@ -68,7 +69,7 @@ export function createGame(config: GameConfig): GameState {
     players,
     bank,
     devDeck,
-    turn: { number: 0, current: 0, devCardPlayed: false },
+    turn: { number: 0, current: 0, devCardPlayed: false, tradeOffers: 0 },
     phase: { kind: 'setup', index: 0, step: 'settlement', lastSettlement: null },
     dice: null,
     awards: { longestRoad: null, largestArmy: null },

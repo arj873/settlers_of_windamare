@@ -7,7 +7,7 @@
  */
 import { LARGEST_ARMY_MIN, LONGEST_ROAD_MIN } from '../constants';
 import { log } from '../actions/common';
-import type { GameState, PlayerId } from '../types';
+import type { ActionType, GameState, PlayerId } from '../types';
 import { longestRoadLengths } from './longestRoad';
 
 /**
@@ -29,10 +29,34 @@ export function awardHolder(
   return leaders.length === 1 ? (leaders[0] ?? null) : null;
 }
 
-export function updateAwards(draft: GameState): void {
+/**
+ * The only actions that change road lengths: they add a road, or occupy a vertex (which can break
+ * an opponent's road). buildCity keeps owner and occupancy, so it cannot change any length.
+ */
+const ROAD_CHANGING: ReadonlySet<ActionType> = new Set<ActionType>([
+  'placeSetupSettlement',
+  'placeSetupRoad',
+  'buildRoad',
+  'buildSettlement',
+  'placeFreeRoad',
+]);
+
+/** True if Longest Road must be recomputed after a successful `type` action. */
+export function changesRoads(type: ActionType): boolean {
+  return ROAD_CHANGING.has(type);
+}
+
+/**
+ * `roads: false` skips the (comparatively costly) Longest Road recomputation; pass it only when
+ * the action could not have changed any road length (see changesRoads).
+ */
+export function updateAwards(draft: GameState, opts: { roads?: boolean } = {}): void {
   const name = (p: PlayerId) => draft.players[p]?.name ?? `Player ${p}`;
 
-  const road = awardHolder(longestRoadLengths(draft), draft.awards.longestRoad, LONGEST_ROAD_MIN);
+  const road =
+    opts.roads === false
+      ? draft.awards.longestRoad
+      : awardHolder(longestRoadLengths(draft), draft.awards.longestRoad, LONGEST_ROAD_MIN);
   if (road !== draft.awards.longestRoad) {
     const prev = draft.awards.longestRoad;
     draft.awards.longestRoad = road;

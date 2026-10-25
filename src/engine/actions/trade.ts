@@ -6,6 +6,8 @@
  *   offerTrade   -> phase trade{offer}; responses[p] = 'pending' for addressed p, else null.
  *                   give/want non-empty, disjoint resources, offerer must hold `give`.
  *                   `to`: non-empty, distinct, other players.
+ *                   House rule: at most MAX_TRADE_OFFERS_PER_TURN offers per turn
+ *                   (turn.tradeOffers, reset on endTurn), so offer/reject loops end.
  *   acceptTrade  -> addressed pending player marks 'accepted' (must hold `want` at accept time)
  *   rejectTrade  -> addressed pending player marks 'rejected'; when every addressed player
  *                   has rejected, the offer closes automatically -> main
@@ -14,7 +16,7 @@
  *   cancelTrade  -> offerer withdraws -> main
  * legalActions note: offerTrade is open-ended; we return 1:1 offers to all other players.
  */
-import { RESOURCES } from '../constants';
+import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../constants';
 import {
   addResources,
   hasResources,
@@ -65,6 +67,11 @@ function describe(counts: ResourceCounts): string {
   return parts.join(', ');
 }
 
+/** House rule: the current player may make MAX_TRADE_OFFERS_PER_TURN offers per turn. */
+function canOfferMore(state: GameState): boolean {
+  return state.turn.tradeOffers < MAX_TRADE_OFFERS_PER_TURN;
+}
+
 function tradePhase(state: GameState): TradeOffer | null {
   return state.phase.kind === 'trade' ? state.phase.offer : null;
 }
@@ -111,6 +118,9 @@ export const tradeHandlers: HandlerMap<
   offerTrade: (draft, { player, give, want, to }) => {
     if (draft.phase.kind !== 'main') return fail('can only trade in the main phase');
     if (!isCurrent(draft, player)) return fail('not your turn');
+    if (!canOfferMore(draft)) {
+      return fail(`at most ${MAX_TRADE_OFFERS_PER_TURN} trade offers per turn`);
+    }
     if (!isValidBundle(give) || !isValidBundle(want)) return fail('invalid resources');
     const giveC = toCounts(give);
     const wantC = toCounts(want);
@@ -136,6 +146,7 @@ export const tradeHandlers: HandlerMap<
       to.includes(p.id) ? 'pending' : null,
     );
     draft.phase = { kind: 'trade', offer: { from: player, give: giveC, want: wantC, responses } };
+    draft.turn.tradeOffers += 1;
     log(
       draft,
       player,
@@ -218,12 +229,13 @@ export const tradeLegal: LegalGenerator = (state: GameState): Action[] => {
   const player = state.turn.current;
   const hand = getPlayer(state, player).resources;
   const others = state.players.filter((p) => p.id !== player).map((p) => p.id);
+  const offers = canOfferMore(state);
   for (const give of RESOURCES) {
     for (const receive of RESOURCES) {
       if (canBankTrade(state, player, give, receive) === null) {
         out.push({ type: 'bankTrade', player, give, receive });
       }
-      if (give !== receive && hand[give] > 0) {
+      if (offers && give !== receive && hand[give] > 0) {
         out.push({
           type: 'offerTrade',
           player,

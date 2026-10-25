@@ -131,7 +131,7 @@ export function midGame(): GameState {
 
   s.awards = { longestRoad: 0, largestArmy: 2 };
   s.robber = 'h:1,-1';
-  s.turn = { number: 12, current: 1, devCardPlayed: false };
+  s.turn = { number: 12, current: 1, devCardPlayed: false, tradeOffers: 0 };
   s.dice = [5, 3];
   s.phase = { kind: 'main' };
   s.log.push(

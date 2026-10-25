@@ -7,9 +7,12 @@ import {
   parseEdgeId,
   parseHexId,
   parseVertexId,
+  sideEdge,
   vertexId,
+  type Side,
 } from './hex';
 import { TOPOLOGY as T } from './topology';
+import type { HexId } from './types';
 
 describe('topology counts', () => {
   it('has the standard board sizes', () => {
@@ -181,9 +184,30 @@ describe('port slots', () => {
     }
   });
 
-  it('are spaced 2,2,3 coastal edges apart (standard frame)', () => {
+  it('have 2,3,2 free coastal edges between them, 3-fold symmetric (5th-edition frame)', () => {
     const idx = T.portSlots.map((p) => T.coastalEdges.indexOf(p.edge));
     const gaps = idx.map((i, k) => ((idx[(k + 1) % 9] ?? 0) - i + 30) % 30);
-    expect(gaps).toEqual([3, 3, 4, 3, 3, 4, 3, 3, 4]);
+    expect(gaps).toEqual([3, 4, 3, 3, 4, 3, 3, 4, 3]);
+  });
+
+  it('match the rulebook frame: each port faces this land hex, on this side', () => {
+    // Rulebook 2020, Illustration A. A port between two land hexes faces the non-corner one.
+    const expected: [HexId, Side][] = [
+      ['h:0,-2', 'NW'], // above mountains 10
+      ['h:1,-2', 'NE'], // pasture 2
+      ['h:2,-1', 'NE'], // hills 10
+      ['h:2,0', 'E'], // mountains 8
+      ['h:1,1', 'SE'], // pasture 5
+      ['h:-1,2', 'SE'], // fields 6
+      ['h:-2,2', 'SW'], // hills 5
+      ['h:-2,1', 'W'], // forest 8
+      ['h:-1,-1', 'W'], // fields 12
+    ];
+    expect(T.portSlots.map((p) => p.edge)).toEqual(
+      expected.map(([h, side]) => {
+        const { q, r } = parseHexId(h);
+        return sideEdge(q, r, side);
+      }),
+    );
   });
 });

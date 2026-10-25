@@ -20,6 +20,7 @@ import {
   setupPlayerAt,
   vertexNeighbors,
   victoryPoints,
+  type DevCardType,
   type EdgeId,
   type GameState,
   type PlayerId,
@@ -49,13 +50,26 @@ export interface Violation {
 
 const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
 
-/** Longest continuous road of `player`; an opponent's building on a junction cuts the road. */
-export function longestRoadLength(state: GameState, player: PlayerId): number {
+/** Each vertex's incident on-board roads of `player`. */
+function roadsByVertex(state: GameState, player: PlayerId): Map<VertexId, EdgeId[]> {
   const byVertex = new Map<VertexId, EdgeId[]>();
   for (const [edge, owner] of Object.entries(state.pieces.roads) as [EdgeId, PlayerId][]) {
     if (owner !== player || !isBoardEdge(edge)) continue;
-    for (const v of edgeVertices(edge)) byVertex.set(v, [...(byVertex.get(v) ?? []), edge]);
+    for (const v of edgeVertices(edge)) {
+      const list = byVertex.get(v);
+      if (list) list.push(edge);
+      else byVertex.set(v, [edge]);
+    }
   }
+  return byVertex;
+}
+
+/**
+ * Longest continuous road of `player`; an opponent's building on a junction cuts the road.
+ * Deliberately independent of the engine's rules/longestRoad.ts (a cross-check).
+ */
+export function longestRoadLength(state: GameState, player: PlayerId): number {
+  const byVertex = roadsByVertex(state, player);
   const used = new Set<EdgeId>();
   const walk = (at: VertexId): number => {
     let best = 0;
@@ -102,31 +116,26 @@ export function checkInvariants(state: GameState): Violation[] {
     }
   }
 
-  // --- dev cards -----------------------------------------------------------------------------
-  // The state does not remember played Road Building / Year of Plenty / Monopoly cards (only
-  // knightsPlayed), so "deck + hands = 25" is exact only while none of those were played. Checked
-  // exactly where the state allows it: knights (incl. played) and VP cards; bounded elsewhere.
-  const held = (t: (typeof DEV_CARD_TYPES)[number]) =>
-    state.players.reduce((s, p) => s + p.devCards[t] + p.newDevCards[t], 0);
-  const inDeck = (t: (typeof DEV_CARD_TYPES)[number]) =>
-    state.devDeck.filter((c) => c === t).length;
+  // --- dev cards: deck + hands + played = composition, exactly, per type (25 in all) ----------
+  // Played knights live in knightsPlayed, played progress cards in progressCardsPlayed; VP cards
+  // are never played.
+  const played = (p: (typeof state.players)[number], t: DevCardType): number =>
+    t === 'knight' ? p.knightsPlayed : t === 'victoryPoint' ? 0 : p.progressCardsPlayed[t];
   const heldCounts = state.players.flatMap((p) => [
     ...DEV_CARD_TYPES.map((t) => p.devCards[t]),
     ...DEV_CARD_TYPES.map((t) => p.newDevCards[t]),
-    p.knightsPlayed,
+    ...DEV_CARD_TYPES.map((t) => played(p, t)),
   ]);
   if (!heldCounts.every(isCount)) add('dev-conservation', 'negative or fractional dev card count');
   for (const t of DEV_CARD_TYPES) {
-    const total = held(t) + inDeck(t);
+    const inDeck = state.devDeck.filter((c) => c === t).length;
+    const held = state.players.reduce((s, p) => s + p.devCards[t] + p.newDevCards[t], 0);
+    const out = state.players.reduce((s, p) => s + played(p, t), 0);
     const cap = DEV_DECK_COMPOSITION[t];
-    if (t === 'knight') {
-      const all = total + state.players.reduce((s, p) => s + p.knightsPlayed, 0);
-      if (all !== cap)
-        add('dev-conservation', `knight: deck + hands + played = ${all}, expected ${cap}`);
-    } else if (t === 'victoryPoint' ? total !== cap : total > cap) {
+    if (inDeck + held + out !== cap) {
       add(
         'dev-conservation',
-        `${t}: deck + hands = ${total}, ${t === 'victoryPoint' ? 'expected' : 'max'} ${cap}`,
+        `${t}: deck ${inDeck} + hands ${held} + played ${out} = ${inDeck + held + out}, expected ${cap}`,
       );
     }
   }
@@ -178,18 +187,13 @@ export function checkInvariants(state: GameState): Violation[] {
   // --- every road touches its owner's network ------------------------------------------------
   // Lenient on purpose: a road may legitimately be cut off from the rest of the owner's network
   // by an opponent's later settlement, so we only require a neighbouring own road or own building.
+  const roadsAt = state.players.map((p) => roadsByVertex(state, p.id));
   for (const [e, owner] of roads) {
     if (!isBoardEdge(e)) continue;
     const linked = edgeVertices(e).some(
       (v) =>
         state.pieces.buildings[v]?.owner === owner ||
-        Object.entries(state.pieces.roads).some(
-          ([e2, o2]) =>
-            e2 !== e &&
-            o2 === owner &&
-            isBoardEdge(e2 as EdgeId) &&
-            edgeVertices(e2 as EdgeId).includes(v),
-        ),
+        (roadsAt[owner]?.get(v) ?? []).some((e2) => e2 !== e),
     );
     if (!linked)
       add('road-disconnected', `road ${e} of player ${owner} touches nothing of theirs`, owner);

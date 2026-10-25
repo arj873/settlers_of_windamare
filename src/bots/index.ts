@@ -20,7 +20,17 @@ export type Bot = (
   legal?: readonly Action[],
 ) => Action | null;
 
+/**
+ * How the random bot picks among its legal actions:
+ *  - 'byType'  (default): an action type uniformly, then an action of that type uniformly, so
+ *    types with many variants (discard combos, trade offers, road spots) don't flood the choice.
+ *  - 'uniform': one action uniformly from the whole list.
+ */
+export type PickMode = 'byType' | 'uniform';
+
 export interface RandomBotOptions {
+  /** Default 'byType'. */
+  mode?: PickMode;
   /**
    * Probability in [0, 1] that this decision drops the "stalling" actions (see `avoid`) whenever
    * something else is legal. 0 (default) = pure uniform choice. Raise it so simulated games
@@ -31,28 +41,46 @@ export interface RandomBotOptions {
   avoid?: readonly ActionType[];
 }
 
-/** Uniform random bot, with an optional bias away from `endTurn`. Uses the bot's own `rng`. */
+/** Uniform pick of a type, then of an action of that type. */
+function pickByType(options: readonly Action[], rng: Rng): Action {
+  const byType = new Map<ActionType, Action[]>();
+  for (const a of options) {
+    const group = byType.get(a.type);
+    if (group) group.push(a);
+    else byType.set(a.type, [a]);
+  }
+  return rng.pick(rng.pick([...byType.values()]));
+}
+
+/** Random bot (see PickMode), with an optional bias away from `endTurn`. Uses the bot's own `rng`. */
 export function createRandomBot(options: RandomBotOptions = {}): Bot {
   const bias = options.progressBias ?? 0;
   const avoid = options.avoid ?? ['endTurn'];
+  const mode = options.mode ?? 'byType';
   if (!(bias >= 0 && bias <= 1)) throw new Error(`progressBias must be in [0, 1], got ${bias}`);
+  if (mode !== 'byType' && mode !== 'uniform') throw new Error(`unknown pick mode ${String(mode)}`);
+  const pick = (from: readonly Action[], rng: Rng) =>
+    mode === 'uniform' ? rng.pick(from) : pickByType(from, rng);
   return (state, player, rng, legal) => {
     const all = legal ?? legalActions(state, player);
     const options = all.filter((a) => a.player === player);
     if (options.length === 0) return null;
-    // Only consume randomness for the bias when it is enabled, so pure mode is plain rng.pick.
+    // Only consume randomness for the bias when it is enabled, so bias 0 is a plain pick.
     if (bias > 0 && rng.float() < bias) {
       const progress = options.filter((a) => !avoid.includes(a.type));
-      if (progress.length > 0) return rng.pick(progress);
+      if (progress.length > 0) return pick(progress, rng);
     }
-    return rng.pick(options);
+    return pick(options, rng);
   };
 }
 
-/** Pure-uniform default bot. */
+/** Default bot: type-first random pick, no bias. */
 export const randomBot: Bot = createRandomBot();
 
-/** `chooseAction(state, player, rng)`: uniform pick from legalActions(state, player). */
+/** Pure-uniform bot: uniform pick from legalActions(state, player), no bias. */
+export const uniformBot: Bot = createRandomBot({ mode: 'uniform' });
+
+/** `chooseAction(state, player, rng)`: the default bot. */
 export const chooseAction: Bot = randomBot;
 
 /**

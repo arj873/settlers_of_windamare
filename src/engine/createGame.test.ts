@@ -16,7 +16,10 @@ describe('createGame', () => {
       expect(s.devDeck.filter((c) => c === type)).toHaveLength(n);
     }
     expect(s.phase).toEqual({ kind: 'setup', index: 0, step: 'settlement', lastSettlement: null });
-    expect(s.turn).toEqual({ number: 0, current: 0, devCardPlayed: false });
+    expect(s.turn).toEqual({ number: 0, current: 0, devCardPlayed: false, tradeOffers: 0 });
+    for (const p of s.players) {
+      expect(p.progressCardsPlayed).toEqual({ roadBuilding: 0, yearOfPlenty: 0, monopoly: 0 });
+    }
     expect(s.board.hexes[s.robber]?.terrain).toBe('desert');
     expect(s.pieces).toEqual({ buildings: {}, roads: {} });
     expect(s.winner).toBeNull();

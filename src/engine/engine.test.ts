@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HANDLERS } from './actions';
 import { applyAction, legalActions } from './engine';
-import { freshGame, gameOverGame, midGame } from './fixtures';
+import { LOG_LIMIT } from './constants';
+import { discardGame, freshGame, gameOverGame, midGame, tradeOfferGame } from './fixtures';
 import type { Action, ActionType } from './types';
 
 function deepFreeze<T>(o: T): T {
@@ -51,6 +52,30 @@ describe('applyAction', () => {
       for (const action of Object.values(SAMPLES)) applyAction(state, action);
       expect(JSON.stringify(state)).toBe(before);
     }
+  });
+
+  it('never mutates the input state when applying any legal action (structural sharing)', () => {
+    for (const make of [freshGame, midGame, discardGame, tradeOfferGame]) {
+      const state = deepFreeze(make());
+      const before = JSON.stringify(state);
+      for (const action of legalActions(state)) expect(applyAction(state, action).ok).toBe(true);
+      expect(JSON.stringify(state)).toBe(before);
+    }
+  });
+
+  it(`keeps only the newest ${LOG_LIMIT} log entries`, () => {
+    const s = midGame();
+    s.log = Array.from({ length: LOG_LIMIT + 5 }, (_, i) => ({
+      turn: 1,
+      player: null,
+      text: `${i}`,
+    }));
+    const r = applyAction(s, { type: 'endTurn', player: 1 });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.state.log).toHaveLength(LOG_LIMIT);
+    expect(r.state.log.at(-1)?.text).toBe('Blue ended the turn');
+    expect(r.state.log[0]?.text).toBe('6');
+    expect(s.log).toHaveLength(LOG_LIMIT + 5);
   });
 
   it('rejects unknown action types', () => {

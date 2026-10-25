@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Action, Layout } from '../engine';
-import { createRandomBot } from './index';
+import { createRandomBot, type PickMode } from './index';
 import {
   botSeedFor,
   makeDump,
@@ -28,6 +28,7 @@ export interface SimArgs {
   verbose: boolean;
   trace: boolean;
   bias: number;
+  pick: PickMode;
   layout: Layout;
   outDir: string;
   maxDumps: number;
@@ -41,6 +42,7 @@ export const USAGE = `pnpm sim -- [options]
   --players 3|4   (default 4)
   --max-steps M   per-game step cap (default 5000)
   --bias P        0..1: chance per move of skipping endTurn when possible (default 0 = pure uniform)
+  --pick MODE     byType (an action type first, then an action of it) | uniform (default byType)
   --layout L      random | beginner (default random)
   --verbose       one line per game
   --trace         print every action (use with few games)
@@ -58,6 +60,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     verbose: false,
     trace: false,
     bias: 0,
+    pick: 'byType',
     layout: 'random',
     outDir: 'sim-failures',
     maxDumps: 5,
@@ -103,6 +106,11 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         break;
       case '--bias':
         args.bias = num(0, 1, false);
+        break;
+      case '--pick':
+        if (value !== 'byType' && value !== 'uniform')
+          throw new Error(`--pick: "${String(value)}"`);
+        args.pick = value;
         break;
       case '--layout':
         if (value !== 'random' && value !== 'beginner')
@@ -215,7 +223,7 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   }
   if (args.replay !== null) return replay(args, out);
 
-  const bot = createRandomBot({ progressBias: args.bias });
+  const bot = createRandomBot({ progressBias: args.bias, mode: args.pick });
   const stats = emptyStats(args.players);
   let dumps = 0;
   const started = performance.now();
@@ -252,7 +260,7 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const violations = stats.stalls + stats.errors + stats.invariantFailures;
   const avgTurns = stats.finished ? (stats.totalTurnsFinished / stats.finished).toFixed(1) : 'n/a';
   out(
-    `\n=== sim: ${stats.games} games, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias} ===`,
+    `\n=== sim: ${stats.games} games, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
   );
   out(`finished:             ${stats.finished}`);
   out(`hit --max-steps:      ${stats.maxSteps}`);

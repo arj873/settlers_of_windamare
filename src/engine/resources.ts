@@ -1,5 +1,11 @@
 import { DEV_CARD_TYPES, RESOURCES } from './constants';
-import type { DevCardCounts, Resource, ResourceBundle, ResourceCounts } from './types';
+import type {
+  DevCardCounts,
+  ProgressCardCounts,
+  Resource,
+  ResourceBundle,
+  ResourceCounts,
+} from './types';
 
 export function emptyResources(): ResourceCounts {
   return { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
@@ -7,6 +13,10 @@ export function emptyResources(): ResourceCounts {
 
 export function emptyDevCards(): DevCardCounts {
   return { knight: 0, victoryPoint: 0, roadBuilding: 0, yearOfPlenty: 0, monopoly: 0 };
+}
+
+export function emptyProgressCards(): ProgressCardCounts {
+  return { roadBuilding: 0, yearOfPlenty: 0, monopoly: 0 };
 }
 
 export function isResource(x: unknown): x is Resource {

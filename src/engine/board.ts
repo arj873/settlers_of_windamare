@@ -8,9 +8,9 @@ import { TOPOLOGY, hexNeighbors } from './topology';
 import type { Board, HexId, HexTile, Layout, Port, PortKind, Terrain } from './types';
 
 /**
- * Beginner layout from the base-game rulebook ("Starting Set-up for Beginners"),
- * in TOPOLOGY.landHexes order (rows of 3,4,5,4,3, top to bottom, left to right).
- * Reproduced from memory of the 4th/5th-edition rulebook; T8 should double-check.
+ * Beginner layout from the base-game rulebook ("Starting Map for Beginners", Illustration A of the
+ * 2020 5th-edition rules), in TOPOLOGY.landHexes order (rows of 3,4,5,4,3, top to bottom, left
+ * to right). Verified by T8 against the rulebook image (see docs/RULES.md §12).
  */
 // prettier-ignore
 const BEGINNER_HEXES: readonly [Terrain, number | null][] = [
@@ -21,7 +21,7 @@ const BEGINNER_HEXES: readonly [Terrain, number | null][] = [
   ['brick', 5], ['grain', 6], ['wool', 11],
 ];
 
-/** Port kinds for slots 0..8 in the beginner layout (approximation of the printed frame). */
+/** Port kinds for slots 0..8 in the beginner layout (verified against Illustration A). */
 // prettier-ignore
 const BEGINNER_PORTS: readonly PortKind[] = [
   'generic', 'grain', 'ore', 'generic', 'wool', 'generic', 'generic', 'brick', 'lumber',

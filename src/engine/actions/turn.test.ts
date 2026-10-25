@@ -196,14 +196,15 @@ describe('rolling a 7', () => {
 });
 
 describe('endTurn', () => {
-  it('merges new dev cards, resets devCardPlayed, advances the turn, keeps dice', () => {
+  it('merges new dev cards, resets devCardPlayed + tradeOffers, advances the turn, keeps dice', () => {
     const s = midGame();
     s.turn.devCardPlayed = true;
+    s.turn.tradeOffers = 3;
     const after = expectOk(applyAction(s, { type: 'endTurn', player: 1 }));
     expect(after.players[1]!.devCards.monopoly).toBe(1);
     expect(after.players[1]!.devCards.knight).toBe(1);
     expect(after.players[1]!.newDevCards).toEqual(emptyDevCards());
-    expect(after.turn).toEqual({ number: 13, current: 2, devCardPlayed: false });
+    expect(after.turn).toEqual({ number: 13, current: 2, devCardPlayed: false, tradeOffers: 0 });
     expect(after.phase).toEqual({ kind: 'preRoll' });
     expect(after.dice).toEqual(s.dice);
   });

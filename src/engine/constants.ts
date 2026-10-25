@@ -1,9 +1,21 @@
-import type { DevCardCounts, DevCardType, Resource, ResourceCounts, Terrain } from './types';
+import type {
+  DevCardCounts,
+  DevCardType,
+  ProgressCardType,
+  Resource,
+  ResourceCounts,
+  Terrain,
+} from './types';
 
 export const RESOURCES: readonly Resource[] = ['brick', 'lumber', 'wool', 'grain', 'ore'];
 export const DEV_CARD_TYPES: readonly DevCardType[] = [
   'knight',
   'victoryPoint',
+  'roadBuilding',
+  'yearOfPlenty',
+  'monopoly',
+];
+export const PROGRESS_CARD_TYPES: readonly ProgressCardType[] = [
   'roadBuilding',
   'yearOfPlenty',
   'monopoly',
@@ -34,6 +46,15 @@ export const DEV_DECK_COMPOSITION: DevCardCounts = {
   yearOfPlenty: 2,
   monopoly: 2,
 };
+
+/**
+ * Player trade offers (offerTrade) the current player may make per turn. Not an official rule:
+ * it bounds the offer -> reject -> offer loop so turns always end (house rule, see ARCHITECTURE).
+ */
+export const MAX_TRADE_OFFERS_PER_TURN = 3;
+
+/** GameState.log keeps only the newest LOG_LIMIT entries (older ones are dropped). */
+export const LOG_LIMIT = 200;
 
 /** On a 7, players holding MORE than this many cards discard half (rounded down). */
 export const DISCARD_THRESHOLD = 7;

@@ -1,12 +1,15 @@
 import { HANDLERS, LEGAL_GENERATORS } from './actions';
 import type { Handler } from './actions/common';
-import { updateAwards } from './rules/awards';
+import { cloneState } from './clone';
+import { LOG_LIMIT } from './constants';
+import { changesRoads, updateAwards } from './rules/awards';
 import { checkVictory } from './rules/victory';
 import type { Action, ActionResult, ActionType, GameState, PlayerId } from './types';
 
 /**
  * Pure transition: never mutates `state`. Pipeline:
- *   generic checks -> deep copy -> HANDLERS[type](draft, action) -> updateAwards -> checkVictory
+ *   generic checks -> cloneState -> HANDLERS[type](draft, action) -> updateAwards -> checkVictory
+ *   -> trim log to LOG_LIMIT
  */
 export function applyAction(state: GameState, action: Action): ActionResult {
   if (state.phase.kind === 'gameOver') return { ok: false, error: 'game is over' };
@@ -18,12 +21,19 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     return { ok: false, error: `invalid player: ${String(action.player)}` };
   }
 
-  const draft = structuredClone(state);
+  const draft = cloneState(state);
   const result = handler(draft, action);
   if (!result.ok) return result;
-  updateAwards(result.state);
+  updateAwards(result.state, { roads: changesRoads(action.type) });
   checkVictory(result.state);
+  trimLog(result.state);
   return result;
+}
+
+/** Keep only the newest LOG_LIMIT log entries, so state size and copy cost stay bounded. */
+function trimLog(draft: GameState): void {
+  const extra = draft.log.length - LOG_LIMIT;
+  if (extra > 0) draft.log.splice(0, extra);
 }
 
 /**

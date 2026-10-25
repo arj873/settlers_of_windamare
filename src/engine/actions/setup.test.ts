@@ -45,7 +45,7 @@ describe('full setup round', () => {
         const order = [...Array(n).keys()];
         expect(settlers).toEqual([...order, ...order.slice().reverse()]);
         expect(s.phase).toEqual({ kind: 'preRoll' });
-        expect(s.turn).toEqual({ number: 1, current: 0, devCardPlayed: false });
+        expect(s.turn).toEqual({ number: 1, current: 0, devCardPlayed: false, tradeOffers: 0 });
         expect(s.dice).toBeNull();
         expect(s.winner).toBeNull();
         for (const p of s.players) {

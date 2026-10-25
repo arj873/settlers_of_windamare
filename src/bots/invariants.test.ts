@@ -56,12 +56,20 @@ describe('checkInvariants on deliberately broken states', () => {
   it('dev cards: knight count inflated by played knights', () => {
     expectOnly('dev-conservation', (s) => void (s.players[3]!.knightsPlayed += 1));
   });
-  it('dev cards: a played Monopoly may vanish (not tracked), but one may not appear', () => {
+  it('dev cards: a progress card is exact too: it may move deck -> played, never vanish', () => {
     const s = midGame();
     s.devDeck.splice(s.devDeck.indexOf('monopoly'), 1);
-    expect(codes(s)).toEqual([]);
-    s.players[0]!.devCards.monopoly += 2;
     expect(codes(s)).toEqual(['dev-conservation']);
+    s.players[0]!.progressCardsPlayed.monopoly += 1;
+    expect(codes(s)).toEqual([]);
+    s.players[0]!.progressCardsPlayed.yearOfPlenty += 1;
+    expect(codes(s)).toEqual(['dev-conservation']);
+  });
+  it('dev cards: negative played count', () => {
+    expectOnly('dev-conservation', (s) => {
+      s.players[0]!.progressCardsPlayed.roadBuilding = -1;
+      s.devDeck.push('roadBuilding');
+    });
   });
   it('piece limit: 6 settlements', () => {
     const s = midGame();

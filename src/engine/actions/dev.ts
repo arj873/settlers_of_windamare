@@ -3,6 +3,7 @@
  * buyDevCard (main): pay COSTS.devCard, pop devDeck into newDevCards.
  * play* (preRoll or main): at most one per turn (turn.devCardPlayed), only from devCards
  *   (never newDevCards). VP cards are never "played"; they count automatically.
+ *   Played cards are recorded (knightsPlayed / progressCardsPlayed) so deck + hands + played = 25.
  *   playKnight        -> knightsPlayed++, phase moveRobber{resume: <phase it was played in>}
  *   playRoadBuilding  -> phase roadBuilding{remaining: min(2, roads left), resume}
  *                        Rejected when no road could be placed (no pieces / no legal edge).
@@ -73,9 +74,12 @@ function canPlaceAnyRoad(state: GameState, player: PlayerId): boolean {
   return piecesLeft(state, player).road > 0 && roadSpots(state, player).length > 0;
 }
 
-/** Mark the card as played. */
+/** Mark the card as played (knights count in knightsPlayed, the rest in progressCardsPlayed). */
 function spend(draft: GameState, player: PlayerId, card: PlayableCard): void {
-  getPlayer(draft, player).devCards[card] -= 1;
+  const p = getPlayer(draft, player);
+  p.devCards[card] -= 1;
+  if (card === 'knight') p.knightsPlayed += 1;
+  else p.progressCardsPlayed[card] += 1;
   draft.turn.devCardPlayed = true;
   log(draft, player, `${getPlayer(draft, player).name} played ${CARD_NAMES[card]}`);
 }
@@ -113,7 +117,6 @@ export const devHandlers: HandlerMap<
     const check = canPlay(draft, player, 'knight');
     if ('error' in check) return fail(check.error);
     spend(draft, player, 'knight');
-    getPlayer(draft, player).knightsPlayed += 1;
     draft.phase = { kind: 'moveRobber', resume: check.resume };
     return ok(draft);
   },

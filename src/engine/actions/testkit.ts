@@ -41,7 +41,7 @@ export function run(state: GameState, ...actions: Action[]): GameState {
 /** Beginner board, no pieces, turn 1, player 0 to roll. */
 export function emptyBoardGame(n: 3 | 4 = 4): GameState {
   const s = freshGame(n);
-  s.turn = { number: 1, current: 0, devCardPlayed: false };
+  s.turn = { number: 1, current: 0, devCardPlayed: false, tradeOffers: 0 };
   s.phase = { kind: 'preRoll' };
   return s;
 }
