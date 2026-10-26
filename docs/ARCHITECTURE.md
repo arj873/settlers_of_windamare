@@ -96,7 +96,7 @@ Plain JSON. `JSON.parse(JSON.stringify(s))` must equal `s`. Never mutate a state
 
 ```ts
 GameState {
-  schemaVersion: 2
+  schemaVersion: 3
   settings: GameSettings             // see below; fixed after createGame
   board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
@@ -107,6 +107,7 @@ GameState {
   turn:    { number, current, devCardPlayed, tradeOffers }   // number: 0 in setup, 1 = first real turn
   phase:   Phase                     // see §5
   dice:    [d1, d2] | null           // last roll
+  diceDeck: number[]                 // balanced dice: undrawn cards 0..35 = (d1-1)*6+(d2-1); [] otherwise
   awards:  { longestRoad: PlayerId|null, largestArmy: PlayerId|null }
   log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
   rng:     number                    // uint32 RNG state
@@ -122,14 +123,15 @@ GameState {
 | `map`               | `MapId`              | `defaultMapFor` | board, topology, supply, player range                      |
 | `vpToWin`           | int 3..20            | 10              | victory check                                              |
 | `discardLimit`      | int 5..20            | 7               | on a 7, hands **above** it discard half                    |
-| `balancedDice`      | boolean              | false           | stored only (T13)                                          |
-| `specialBuildPhase` | boolean              | players ≥ 5     | stored only (T13)                                          |
+| `balancedDice`      | boolean              | false           | rolls drawn from `diceDeck` (§9, RULES.md §17)             |
+| `specialBuildPhase` | boolean              | players ≥ 5     | `specialBuild` phase between turns (§5, RULES.md §16.10)   |
 | `hideBankCards`     | boolean              | false           | client-side only (UI hides bank counts); engine ignores it |
 | `turnTimerSec`      | positive int \| null | null            | client-side only; engine ignores it                        |
 
-**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v2 state from a v1 or v2 one, or null.
+**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v3 state from a v1, v2 or v3 one, or null.
 v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new fields get their defaults
-(`specialBuildPhase: false`). Bump `schemaVersion` and add a step there whenever GameState changes shape.
+(`specialBuildPhase: false`). v2 → v3 (T13): `diceDeck: []` (the next balanced roll shuffles).
+Bump `schemaVersion` and add a step there whenever GameState changes shape.
 
 - `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. `token` is `null` only on the desert.
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
@@ -165,42 +167,51 @@ main ──build*/buyDevCard/bankTrade──► main
      ──playKnight──► moveRobber{resume:main} ─► [steal] ─► main
      ──playRoadBuilding──► roadBuilding{remaining, resume:main} ─► main
      ──offerTrade (max 3/turn)──► trade{offer} ─accept/reject…─► confirmTrade | cancelTrade ─► main
-     ──endTurn──► preRoll (next player)
+     ──endTurn──► preRoll (next player)                         settings.specialBuildPhase off
+     ──endTurn──► specialBuild{builder, owner} ...► preRoll       on (T13), see below
+
+specialBuild{builder, owner}   owner = who just ended; turn.current = builder; turn.number unchanged
+     ──buildRoad/buildSettlement/buildCity/buyDevCard──► specialBuild (same builder)
+     ──passSpecialBuild──► specialBuild{next builder} | preRoll (owner+1, turn.number+1)
+   builders: owner+1 … owner-1 clockwise; anyone who can neither build nor buy is skipped
+   (if nobody can, endTurn goes straight to preRoll). No trade, no dev card play, no roll.
 
 any successful action ─► updateAwards ─► checkVictory ─(current player ≥ vpToWin)─► gameOver
+                                         (skipped in setup and specialBuild)
 ```
 
-Who may act (`actingPlayers(state)`): the current player, except
+Who may act (`actingPlayers(state)`): the current player (in `specialBuild` that is the builder), except
 `discard` (every player with `pending[p] > 0`, in any order) and `trade` (offerer + responders still `'pending'`).
 
 ## 6. Actions
 
 Every action carries `player` (the actor). Full union in `types.ts`.
 
-| Action                 | Payload                      | Phase(s)         | Actor            | File        | Task |
-| ---------------------- | ---------------------------- | ---------------- | ---------------- | ----------- | ---- |
-| `placeSetupSettlement` | `vertex`                     | setup/settlement | current          | `setup.ts`  | T2   |
-| `placeSetupRoad`       | `edge`                       | setup/road       | current          | `setup.ts`  | T2   |
-| `rollDice`             | —                            | preRoll          | current          | `turn.ts`   | T2   |
-| `endTurn`              | —                            | main             | current          | `turn.ts`   | T2   |
-| `buildRoad`            | `edge`                       | main             | current          | `build.ts`  | T2   |
-| `buildSettlement`      | `vertex`                     | main             | current          | `build.ts`  | T2   |
-| `buildCity`            | `vertex`                     | main             | current          | `build.ts`  | T2   |
-| `discard`              | `resources: ResourceBundle`  | discard          | any pending      | `robber.ts` | T2   |
-| `moveRobber`           | `hex`                        | moveRobber       | current          | `robber.ts` | T2   |
-| `steal`                | `victim`                     | steal            | current          | `robber.ts` | T2   |
-| `buyDevCard`           | —                            | main             | current          | `dev.ts`    | T3   |
-| `playKnight`           | —                            | preRoll, main    | current          | `dev.ts`    | T3   |
-| `playRoadBuilding`     | —                            | preRoll, main    | current          | `dev.ts`    | T3   |
-| `placeFreeRoad`        | `edge`                       | roadBuilding     | current          | `dev.ts`    | T3   |
-| `playYearOfPlenty`     | `resources: [R, R]`          | preRoll, main    | current          | `dev.ts`    | T3   |
-| `playMonopoly`         | `resource`                   | preRoll, main    | current          | `dev.ts`    | T3   |
-| `bankTrade`            | `give, receive` (1 unit out) | main             | current          | `trade.ts`  | T3   |
-| `offerTrade`           | `give, want, to[]`           | main             | current          | `trade.ts`  | T3   |
-| `acceptTrade`          | —                            | trade            | addressed player | `trade.ts`  | T3   |
-| `rejectTrade`          | —                            | trade            | addressed player | `trade.ts`  | T3   |
-| `cancelTrade`          | —                            | trade            | offerer          | `trade.ts`  | T3   |
-| `confirmTrade`         | `partner`                    | trade            | offerer          | `trade.ts`  | T3   |
+| Action                 | Payload                          | Phase(s)           | Actor            | File        | Task |
+| ---------------------- | -------------------------------- | ------------------ | ---------------- | ----------- | ---- |
+| `placeSetupSettlement` | `vertex`                         | setup/settlement   | current          | `setup.ts`  | T2   |
+| `placeSetupRoad`       | `edge`                           | setup/road         | current          | `setup.ts`  | T2   |
+| `rollDice`             | —                                | preRoll            | current          | `turn.ts`   | T2   |
+| `endTurn`              | —                                | main               | current          | `turn.ts`   | T2   |
+| `passSpecialBuild`     | —                                | specialBuild       | builder          | `turn.ts`   | T13  |
+| `buildRoad`            | `edge`                           | main, specialBuild | current          | `build.ts`  | T2   |
+| `buildSettlement`      | `vertex`                         | main, specialBuild | current          | `build.ts`  | T2   |
+| `buildCity`            | `vertex`                         | main, specialBuild | current          | `build.ts`  | T2   |
+| `discard`              | `resources: ResourceBundle`      | discard            | any pending      | `robber.ts` | T2   |
+| `moveRobber`           | `hex`                            | moveRobber         | current          | `robber.ts` | T2   |
+| `steal`                | `victim`                         | steal              | current          | `robber.ts` | T2   |
+| `buyDevCard`           | — (in specialBuild → `devCards`) | main, specialBuild | current          | `dev.ts`    | T3   |
+| `playKnight`           | —                                | preRoll, main      | current          | `dev.ts`    | T3   |
+| `playRoadBuilding`     | —                                | preRoll, main      | current          | `dev.ts`    | T3   |
+| `placeFreeRoad`        | `edge`                           | roadBuilding       | current          | `dev.ts`    | T3   |
+| `playYearOfPlenty`     | `resources: [R, R]`              | preRoll, main      | current          | `dev.ts`    | T3   |
+| `playMonopoly`         | `resource`                       | preRoll, main      | current          | `dev.ts`    | T3   |
+| `bankTrade`            | `give, receive` (1 unit out)     | main               | current          | `trade.ts`  | T3   |
+| `offerTrade`           | `give, want, to[]`               | main               | current          | `trade.ts`  | T3   |
+| `acceptTrade`          | —                                | trade              | addressed player | `trade.ts`  | T3   |
+| `rejectTrade`          | —                                | trade              | addressed player | `trade.ts`  | T3   |
+| `cancelTrade`          | —                                | trade              | offerer          | `trade.ts`  | T3   |
+| `confirmTrade`         | `partner`                        | trade              | offerer          | `trade.ts`  | T3   |
 
 All files above live in `src/engine/actions/`. Each file's header comment lists the expected rules.
 
@@ -248,7 +259,7 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 | Module                 | Exports                                                                                                                                                                                                                                                                                             |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, PLAYER_COLORS (8 default seat colours), tokenPips` …                                         |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, DICE_DECK_SIZE, DICE_DECK_RESHUFFLE_AT, PLAYER_COLORS (8 default seat colours), tokenPips` … |
 | `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                               |
 | `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                               |
 | `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                             |
@@ -272,6 +283,9 @@ draft.rng = rng.state; // always write back
 ```
 
 `Rng` also has `int(n)`, `float()`, `pick(arr)`, `shuffle(arr)` (returns a copy). `createGame` seeds from `settings.seed` (number or string), generates the board, shuffles the deck, and stores the continuing state.
+`rollDice` goes through `rollTwoDice(draft)` (`rules/dice.ts`): two `die()` calls, or with
+`balancedDice` a `pop()` from `diceDeck`, refilled with `rng.shuffle(DICE_CARDS)` when
+`DICE_DECK_RESHUFFLE_AT` (5) or fewer cards remain (the deck starts empty).
 Bots should use their **own** `Rng` so bot choices don't perturb game randomness.
 
 ## 10. Fixtures (`src/engine/fixtures.ts`)
@@ -377,13 +391,15 @@ c.destroy();
 - **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12. The 37-hex frame uses the same rule (ties: the clockwise hex); the 30-hex frame lists its 11 spots explicitly, read from the 5-6 rulebook (RULES.md §16.B).
 - **Beginner layout** (`board.ts`): terrain, tokens and harbor kinds verified (T8) against the rulebook's Illustration A. Starting settlements of the beginner setup are not encoded (see RULES.md §12 for them).
 - **Random layout:** terrain shuffled, tokens rejection-sampled until no 6/8 are adjacent, port kinds shuffled (positions fixed). Same for every random map; with several deserts the robber starts on a random one (one extra RNG draw only then, so 19-hex boards are unchanged per seed).
-- **Bigger maps (T10):** `base56` follows the official 5-6 extension; `base78` is our own design because no official 7-8 rules could be found (RULES.md §16). Map player ranges are hard limits in `createGame`. The sim's default `--max-steps 5000` is too low for some 8-bot games (13% hit it); 20000 finishes all.
+- **Bigger maps (T10):** `base56` follows the official 5-6 extension; `base78` is our own design because no official 7-8 rules could be found (RULES.md §16). Map player ranges are hard limits in `createGame`. The sim's default `--max-steps` now grows with the player count (T13: 5000 / 15000 / 30000 for 3-4 / 5-6 / 7-8); `--sbp on|off` and `--balanced-dice` pick the T13 rules.
+- **Special Building Phase (T13):** implemented instead of catan.com's 2021 "paired players" turn (RULES.md §16.D; paired turns are a backlog idea). `turn.current` is the builder during the phase, so `actingPlayers`, the controller and bots need no special case; `phase.owner` says whose turn ended. Nobody wins during it (FAQ). Players who can do nothing are skipped (RULES.md 16.10h). Dev cards bought in it go to `devCards` (playable on the buyer's next turn). UI: the End turn button becomes "Pass".
+- **Balanced dice (T13):** reshuffle at ≤ 5 cards left, so a cycle is 31 rolls and the last rolls stay unpredictable (RULES.md §17).
 - **Turn order:** config order; player 0 starts (no "highest roll starts"). The controller may shuffle players before `createGame`.
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
-- **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
+- **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup or the special building phase. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
 - **Steal log:** says who stole from whom, never which card (the log is public).
 - **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
 - **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
