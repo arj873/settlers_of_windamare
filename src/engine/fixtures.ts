@@ -184,6 +184,10 @@ export function gameOverGame(): GameState {
   const s = midGame();
   settle(s, 0, [0, -1, 'S'], 'city');
   for (let i = 0; i < 3; i++) giveDev(s, 0, 'victoryPoint');
+  // Blue's turn is over: the Monopoly bought on it is no longer "new".
+  const blue = pl(s, 1);
+  blue.devCards.monopoly += blue.newDevCards.monopoly;
+  blue.newDevCards.monopoly = 0;
   s.turn.current = 0;
   s.winner = 0;
   s.phase = { kind: 'gameOver' };

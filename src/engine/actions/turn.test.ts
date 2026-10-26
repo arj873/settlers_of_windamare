@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction } from '../engine';
+import { PLAYER_COLORS } from '../constants';
+import { createGame } from '../createGame';
+import { applyAction, legalActions } from '../engine';
 import { discardGame, midGame, moveRobberGame } from '../fixtures';
-import { emptyDevCards, emptyResources } from '../resources';
+import { emptyDevCards, emptyResources, toCounts, totalResources } from '../resources';
+import { handSize } from '../selectors';
 import { hexVertices, TOPOLOGY, vertexHexes } from '../topology';
 import type { GameState, HexId, Resource } from '../types';
 import {
@@ -14,7 +17,7 @@ import {
   rollTotal,
   setHand,
 } from './testkit';
-import { turnLegal } from './turn';
+import { discardAmounts, turnLegal } from './turn';
 
 /** A token rolled by two land hexes of different terrain: [token, hexA, hexB]. */
 function tokenPair(s: GameState): [number, HexId, HexId] {
@@ -212,6 +215,43 @@ describe('rolling a 7', () => {
     setHand(s, 1, { ore: 5 });
     expect(rollTotal(s, 7).phase).toEqual({ kind: 'moveRobber', resume: 'main' });
   });
+
+  // The limit comes from createGame's settings (range 5..20) and is only read by discardAmounts.
+  for (const limit of [5, 20]) {
+    it(`discardLimit ${limit} (range end): limit cards keep, limit+1 discard half, end to end`, () => {
+      const created = createGame({
+        seed: 3,
+        players: PLAYER_COLORS.slice(0, 4),
+        discardLimit: limit,
+      });
+      expect(created.settings.discardLimit).toBe(limit);
+      const s = emptyBoardGame();
+      s.settings = created.settings;
+      // Split over two resources each so the 19-card bank can cover limit 20.
+      const half = Math.floor(limit / 2);
+      setHand(s, 0, { ore: half, brick: limit - half }); // at the limit: keeps
+      setHand(s, 1, { grain: half + 1, lumber: limit - half }); // limit + 1: discards half
+      setHand(s, 2, { wool: limit - 1 });
+      const owed = Math.floor((limit + 1) / 2);
+      const rolled = rollTotal(s, 7);
+      expect(rolled.phase).toEqual({ kind: 'discard', pending: [0, owed, 0, 0] });
+      expect(discardAmounts(s)).toEqual([0, owed, 0, 0]);
+      const legal = legalActions(rolled);
+      expect(legal.length).toBeGreaterThan(0);
+      for (const a of legal) {
+        expect(a).toMatchObject({ type: 'discard', player: 1 });
+        if (a.type === 'discard') expect(totalResources(toCounts(a.resources))).toBe(owed);
+      }
+      expectFail(
+        applyAction(rolled, { type: 'discard', player: 1, resources: { grain: owed - 1 } }),
+        /exactly/,
+      );
+      const done = expectOk(applyAction(rolled, legal[0]!));
+      expect(done.phase).toEqual({ kind: 'moveRobber', resume: 'main' });
+      expect(handSize(done.players[1]!)).toBe(limit + 1 - owed);
+      expectConserved(done);
+    });
+  }
 });
 
 describe('endTurn', () => {

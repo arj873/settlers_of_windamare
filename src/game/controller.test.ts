@@ -385,7 +385,7 @@ describe('GameController: autosave', () => {
     warn.mockRestore();
   });
 
-  it('loads a stage-1 save (schemaVersion 1) upgraded to v2', () => {
+  it('loads a stage-1 save (schemaVersion 1) upgraded to the current schema', () => {
     const v1 = {
       ...midGame(),
       schemaVersion: 1,
@@ -394,7 +394,7 @@ describe('GameController: autosave', () => {
     const seats = ['human', 'bot', 'bot', 'bot'];
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: v1, seats, viewer: 0, botRng: 5 }));
     const saved = loadSession(store);
-    expect(saved?.state.schemaVersion).toBe(2);
+    expect(saved?.state.schemaVersion).toBe(3);
     expect(saved?.state.settings).toMatchObject({ map: 'base', discardLimit: 7, vpToWin: 10 });
     expect(saved?.state.pieces).toEqual(midGame().pieces);
   });

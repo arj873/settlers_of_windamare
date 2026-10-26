@@ -139,8 +139,14 @@ describe('buildRoad', () => {
     expectFail(applyAction(s, { type: 'buildRoad', player: 1, edge: e }), /not your turn/);
     const pre = structuredClone(s);
     pre.phase = { kind: 'preRoll' };
-    expectFail(applyAction(pre, { type: 'buildRoad', player: 0, edge: e }), /main phase/);
-    expectFail(applyAction(freshGame(), { type: 'buildRoad', player: 0, edge: e }), /main phase/);
+    expectFail(
+      applyAction(pre, { type: 'buildRoad', player: 0, edge: e }),
+      /main or special building phase/,
+    );
+    expectFail(
+      applyAction(freshGame(), { type: 'buildRoad', player: 0, edge: e }),
+      /main or special building phase/,
+    );
   });
 });
 

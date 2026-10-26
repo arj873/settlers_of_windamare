@@ -417,13 +417,21 @@ export class Hud {
         active: this.dialog === 'trade',
       }),
       h('span', { class: 'sep' }),
-      actionBtn(
-        'End turn',
-        '⏭️',
-        av.endTurn,
-        () => this.send({ type: 'endTurn', player: view.viewer }),
-        { primary: av.endTurn && !av.roll },
-      ),
+      av.passSpecialBuild
+        ? actionBtn(
+            'Pass',
+            '⏭️',
+            true,
+            () => this.send({ type: 'passSpecialBuild', player: view.viewer }),
+            { primary: true, title: 'End your special build step' },
+          )
+        : actionBtn(
+            'End turn',
+            '⏭️',
+            av.endTurn,
+            () => this.send({ type: 'endTurn', player: view.viewer }),
+            { primary: av.endTurn && !av.roll },
+          ),
     );
 
     const ratios = bestRatios(state, view.viewer);

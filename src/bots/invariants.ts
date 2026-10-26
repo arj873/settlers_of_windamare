@@ -6,6 +6,8 @@
 import {
   AWARD_VP,
   DEV_CARD_TYPES,
+  DICE_DECK_RESHUFFLE_AT,
+  DICE_DECK_SIZE,
   LARGEST_ARMY_MIN,
   LONGEST_ROAD_MIN,
   MAPS,
@@ -42,7 +44,8 @@ export type ViolationCode =
   | 'award-holder'
   | 'award-mismatch'
   | 'winner'
-  | 'phase-actor';
+  | 'phase-actor'
+  | 'dice-deck';
 
 export interface Violation {
   code: ViolationCode;
@@ -158,6 +161,15 @@ export function checkInvariants(state: GameState): Violation[] {
   if (state.devDeck.some((c) => !DEV_CARD_TYPES.includes(c))) {
     add('dev-conservation', 'unknown card type in devDeck');
   }
+  // Cards bought this turn are merged on endTurn (special-build purchases go straight to
+  // devCards), so only the current player can hold any.
+  state.players.forEach((p) => {
+    if (p.id !== state.turn.current && DEV_CARD_TYPES.some((t) => p.newDevCards[t] > 0)) {
+      add('dev-conservation', `player ${p.id} holds this turn's dev cards off turn`, p.id);
+    }
+  });
+
+  checkDiceDeck(state, add);
 
   // --- board ids, robber ---------------------------------------------------------------------
   const buildings = Object.entries(state.pieces.buildings) as [VertexId, { owner: PlayerId }][];
@@ -293,10 +305,12 @@ export function checkInvariants(state: GameState): Violation[] {
       );
     }
   } else if (
+    state.phase.kind !== 'specialBuild' &&
     validPlayer(state.turn.current) &&
     victoryPoints(state, state.turn.current) >= state.settings.vpToWin
   ) {
-    // Contract: every successful action runs checkVictory for the current player.
+    // Contract: every successful action runs checkVictory for the current player (except in
+    // the special building phase, where nobody can win).
     add(
       'winner',
       `current player ${state.turn.current} has ${victoryPoints(state, state.turn.current)} VP but game is not over`,
@@ -390,7 +404,47 @@ function checkPhase(
       }
       break;
     }
+    case 'specialBuild':
+      if (!state.settings.specialBuildPhase) add('phase-actor', 'specialBuild phase but SBP off');
+      if (phase.builder !== state.turn.current)
+        add('phase-actor', `specialBuild builder ${phase.builder}, current ${state.turn.current}`);
+      if (!validPlayer(phase.owner) || phase.owner === phase.builder)
+        add('phase-actor', `specialBuild owner ${phase.owner}, builder ${phase.builder}`);
+      break;
     default:
       break;
   }
+}
+
+/**
+ * Balanced dice: the deck holds distinct cards 0..35, never the card just rolled, and after the
+ * first roll at least DICE_DECK_RESHUFFLE_AT of them (empty is allowed for upgraded saves).
+ * Without balanced dice it stays empty.
+ */
+function checkDiceDeck(
+  state: GameState,
+  add: (code: ViolationCode, message: string, player?: PlayerId) => void,
+): void {
+  const deck = state.diceDeck;
+  if (!Array.isArray(deck)) {
+    add('dice-deck', 'diceDeck missing');
+    return;
+  }
+  if (!state.settings.balancedDice) {
+    if (deck.length > 0)
+      add('dice-deck', `diceDeck has ${deck.length} cards without balanced dice`);
+    return;
+  }
+  if (deck.some((c) => !isCount(c) || c >= DICE_DECK_SIZE) || new Set(deck).size !== deck.length) {
+    add('dice-deck', `diceDeck malformed: [${deck.join(',')}]`);
+    return;
+  }
+  if (state.dice === null) {
+    if (deck.length > 0) add('dice-deck', 'diceDeck filled before the first roll');
+    return;
+  }
+  if (deck.length > 0 && (deck.length < DICE_DECK_RESHUFFLE_AT || deck.length >= DICE_DECK_SIZE))
+    add('dice-deck', `diceDeck has ${deck.length} cards after a roll`);
+  const last = (state.dice[0] - 1) * 6 + (state.dice[1] - 1);
+  if (deck.includes(last)) add('dice-deck', `rolled card ${last} is still in the dice deck`);
 }

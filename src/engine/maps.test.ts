@@ -257,7 +257,7 @@ describe('player counts and setup snake', () => {
 describe('settings v2', () => {
   it('defaults', () => {
     const s = createGame({ seed: 1, players: players(4), map: 'baseRandom' });
-    expect(s.schemaVersion).toBe(2);
+    expect(s.schemaVersion).toBe(3);
     expect(s.settings).toEqual({
       seed: 1,
       map: 'baseRandom',
@@ -331,9 +331,10 @@ describe('upgradeState (saves)', () => {
     return { ...s, schemaVersion: 1, settings: { seed: 'fixture', layout, vpToWin: 8 } };
   }
 
-  it('upgrades v1 -> v2 with defaults', () => {
+  it('upgrades v1 -> v3 with defaults', () => {
     const up = upgradeState(v1Save('beginner'));
-    expect(up?.schemaVersion).toBe(2);
+    expect(up?.schemaVersion).toBe(3);
+    expect(up?.diceDeck).toEqual([]);
     expect(up?.settings).toEqual({
       seed: 'fixture',
       map: 'base',
@@ -354,12 +355,12 @@ describe('upgradeState (saves)', () => {
     expect(applyAction(up, a!).ok).toBe(true);
   });
 
-  it('passes v2 through and rejects garbage', () => {
+  it('passes v3 through and rejects garbage', () => {
     const s = freshGame();
     expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(upgradeState(null)).toBeNull();
     expect(upgradeState({})).toBeNull();
-    expect(upgradeState({ ...s, schemaVersion: 3 })).toBeNull();
+    expect(upgradeState({ ...s, schemaVersion: 4 })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, map: 'moon' } })).toBeNull();
     expect(
       upgradeState({ ...s, schemaVersion: 1, settings: { seed: 1, layout: 'x', vpToWin: 10 } }),

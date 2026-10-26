@@ -32,9 +32,9 @@ export interface GameConfig {
   vpToWin?: number;
   /** 5..20, default 7. */
   discardLimit?: number;
-  /** Default false. Stored only (T13). */
+  /** Default false. Rolls come from a 36-card dice deck. */
   balancedDice?: boolean;
-  /** Default: true with 5+ players. Stored only (T13). */
+  /** Default: true with 5+ players. Special build steps between turns. */
   specialBuildPhase?: boolean;
   /** Default false. Client-side only. */
   hideBankCards?: boolean;
@@ -111,7 +111,7 @@ export function createGame(config: GameConfig): GameState {
   for (const r of RESOURCES) bank[r] = def.bankPerResource;
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     settings,
     board,
     pieces: { buildings: {}, roads: {} },
@@ -122,6 +122,7 @@ export function createGame(config: GameConfig): GameState {
     turn: { number: 0, current: 0, devCardPlayed: false, tradeOffers: 0 },
     phase: { kind: 'setup', index: 0, step: 'settlement', lastSettlement: null },
     dice: null,
+    diceDeck: [],
     awards: { longestRoad: null, largestArmy: null },
     log: [
       {

@@ -24,7 +24,11 @@ export interface SimArgs {
   games: number;
   seed: number;
   players: number;
-  maxSteps: number;
+  /** null = defaultMaxSteps(players). */
+  maxSteps: number | null;
+  /** null = createGame's default (on with 5+ players). */
+  sbp: boolean | null;
+  balancedDice: boolean;
   verbose: boolean;
   trace: boolean;
   bias: number;
@@ -41,7 +45,9 @@ export const USAGE = `pnpm sim -- [options]
   --games N       games to play (default 10)
   --seed S        seed of the first game; game i uses S+i (default 1)
   --players N     3..8, must fit the map (default 4)
-  --max-steps M   per-game step cap (default 5000)
+  --max-steps M   per-game step cap (default by players: 3-4 5000, 5-6 15000, 7-8 30000)
+  --sbp on|off    special building phase (default: on with 5+ players)
+  --balanced-dice draw rolls from the 36-card dice deck
   --bias P        0..1: chance per move of skipping endTurn when possible (default 0 = pure uniform)
   --pick MODE     byType (an action type first, then an action of it) | uniform (default byType)
   --map M         ${MAP_IDS.join(' | ')}
@@ -59,7 +65,9 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     games: 10,
     seed: 1,
     players: 4,
-    maxSteps: 5000,
+    maxSteps: null,
+    sbp: null,
+    balancedDice: false,
     verbose: false,
     trace: false,
     bias: 0,
@@ -70,7 +78,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     replay: null,
     help: false,
   };
-  const flags = new Set(['--verbose', '--trace', '--help']);
+  const flags = new Set(['--verbose', '--trace', '--help', '--balanced-dice']);
   for (let i = 0; i < argv.length; i++) {
     const raw = argv[i] as string;
     if (raw === '--') continue;
@@ -133,6 +141,13 @@ export function parseArgs(argv: readonly string[]): SimArgs {
       case '--replay':
         args.replay = value as string;
         break;
+      case '--sbp':
+        if (value !== 'on' && value !== 'off') throw new Error(`--sbp: "${String(value)}"`);
+        args.sbp = value === 'on';
+        break;
+      case '--balanced-dice':
+        args.balancedDice = true;
+        break;
       case '--verbose':
         args.verbose = true;
         break;
@@ -147,6 +162,14 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     }
   }
   return args;
+}
+
+/**
+ * Default per-game step cap. Bigger tables need more steps per round (more players, and with
+ * the special building phase extra steps between turns); T10 saw 13% of 8-bot games hit 5000.
+ */
+export function defaultMaxSteps(players: number): number {
+  return players <= 4 ? 5000 : players <= 6 ? 15000 : 30000;
 }
 
 export interface SimStats {
@@ -232,7 +255,9 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
 
   const bot = createRandomBot({ progressBias: args.bias, mode: args.pick });
   const stats = emptyStats(args.players);
+  const maxSteps = args.maxSteps ?? defaultMaxSteps(args.players);
   let dumps = 0;
+  let sbp = false;
   const started = performance.now();
   for (let i = 0; i < args.games; i++) {
     const seed = args.seed + i;
@@ -240,11 +265,15 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
       seed,
       players: args.players,
       map: args.map ?? defaultMapFor(args.players),
+      ...(args.sbp === null ? {} : { specialBuildPhase: args.sbp }),
+      ...(args.balancedDice ? { balancedDice: true } : {}),
     };
     const t0 = performance.now();
+    const initial = newGame(setup);
+    sbp = initial.settings.specialBuildPhase;
     const result = runGame({
-      initial: newGame(setup),
-      maxSteps: args.maxSteps,
+      initial,
+      maxSteps,
       source: randomSource(bot, botSeedFor(seed)),
       ...(args.trace
         ? { onStep: ({ step, action }) => out(`  #${step} ${fmtAction(action)}`) }
@@ -272,6 +301,9 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const avgTurns = stats.finished ? (stats.totalTurnsFinished / stats.finished).toFixed(1) : 'n/a';
   out(
     `\n=== sim: ${stats.games} games, map ${args.map ?? defaultMapFor(args.players)}, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
+  );
+  out(
+    `rules: SBP ${sbp ? 'on' : 'off'}, balanced dice ${args.balancedDice ? 'on' : 'off'}, max steps ${maxSteps}`,
   );
   out(`finished:             ${stats.finished}`);
   out(`hit --max-steps:      ${stats.maxSteps}`);

@@ -153,6 +153,13 @@ export type Phase =
   | { kind: 'roadBuilding'; remaining: number; resume: ResumePhase }
   /** Current player has an open trade offer to other players. Always resumes to main. */
   | { kind: 'trade'; offer: TradeOffer }
+  /**
+   * Special Building Phase (settings.specialBuildPhase, RULES.md §16.10) after `owner` ended
+   * their turn. `builder` (= turn.current) may build and buy dev cards, then passSpecialBuild.
+   * Builders run clockwise from owner+1 to owner-1; players with nothing they could do are
+   * skipped. After the last one, owner+1 starts their turn (preRoll). Nobody wins in this phase.
+   */
+  | { kind: 'specialBuild'; builder: PlayerId; owner: PlayerId }
   | { kind: 'gameOver' };
 
 export type PhaseKind = Phase['kind'];
@@ -160,7 +167,10 @@ export type PhaseKind = Phase['kind'];
 export interface TurnState {
   /** 0 during setup, 1 for the first regular turn, +1 per endTurn. */
   number: number;
-  /** Whose turn it is (in setup: the player placing). */
+  /**
+   * Whose turn it is (in setup: the player placing; in specialBuild: the builder, while
+   * `number` still counts the turn that just ended).
+   */
   current: PlayerId;
   /** A dev card (other than revealing VP) was played this turn. Max one per turn. */
   devCardPlayed: boolean;
@@ -174,7 +184,7 @@ export interface LogEntry {
   text: string;
 }
 
-/** Schema v2. Fixed after createGame. */
+/** Settings (schema v2+). Fixed after createGame. */
 export interface GameSettings {
   seed: number | string;
   map: MapId;
@@ -182,9 +192,9 @@ export interface GameSettings {
   vpToWin: number;
   /** 5..20, default 7. On a 7, players holding MORE than this many cards discard half. */
   discardLimit: number;
-  /** Not implemented yet (T13): stored only. */
+  /** Rolls are drawn from a 36-card deck of all two-dice outcomes (`GameState.diceDeck`). */
   balancedDice: boolean;
-  /** Not implemented yet (T13): stored only. Default true with 5+ players. */
+  /** After each turn, the other players get a special build step. Default true with 5+ players. */
   specialBuildPhase: boolean;
   /** Client-side only (UI hides the bank's card counts); the engine ignores it. */
   hideBankCards: boolean;
@@ -193,7 +203,7 @@ export interface GameSettings {
 }
 
 export interface GameState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   settings: GameSettings;
   board: Board;
   pieces: Pieces;
@@ -206,6 +216,12 @@ export interface GameState {
   phase: Phase;
   /** Last roll, null before the first roll of the game. */
   dice: [number, number] | null;
+  /**
+   * Balanced dice only: the undrawn cards of the dice deck, drawn with pop(). A card is
+   * `(d1 - 1) * 6 + (d2 - 1)` (0..35). Empty until the first roll, and always empty without
+   * balancedDice. Reshuffled to all 36 when DICE_DECK_RESHUFFLE_AT or fewer remain.
+   */
+  diceDeck: number[];
   awards: { longestRoad: PlayerId | null; largestArmy: PlayerId | null };
   log: LogEntry[];
   /** Seeded RNG state (uint32). Only touch through `Rng` in rng.ts. */
@@ -224,6 +240,7 @@ export type Action =
   // turn.ts
   | { type: 'rollDice'; player: PlayerId }
   | { type: 'endTurn'; player: PlayerId }
+  | { type: 'passSpecialBuild'; player: PlayerId }
   // build.ts
   | { type: 'buildRoad'; player: PlayerId; edge: EdgeId }
   | { type: 'buildSettlement'; player: PlayerId; vertex: VertexId }

@@ -163,7 +163,70 @@ describe('checkInvariants on deliberately broken states', () => {
   it('phase/actor: turn.number 0 outside setup', () => {
     expectOnly('phase-actor', (s) => void (s.turn.number = 0));
   });
+  it('phase/actor: special build builder is not turn.current', () => {
+    expectOnly('phase-actor', (s) => void (s.turn.current = 3), specialBuildGame);
+  });
+  it('phase/actor: special build phase with the setting off', () => {
+    expectOnly(
+      'phase-actor',
+      (s) => void (s.settings = { ...s.settings, specialBuildPhase: false }),
+      specialBuildGame,
+    );
+  });
+  it('dev cards: this turn’s cards held by a player whose turn it is not', () => {
+    expectOnly('dev-conservation', (s) => {
+      s.devDeck.splice(s.devDeck.lastIndexOf('knight'), 1);
+      s.players[0]!.newDevCards.knight += 1;
+    });
+  });
+  it('dice deck: cards without balanced dice', () => {
+    expectOnly('dice-deck', (s) => void (s.diceDeck = [3]));
+  });
+  it('dice deck: duplicate card, or the rolled card still in the deck', () => {
+    expectOnly('dice-deck', (s) => void (s.diceDeck = [1, 1, 2, 3, 4, 5]), balancedGame);
+    expectOnly(
+      'dice-deck',
+      (s) => void s.diceDeck.push((s.dice![0] - 1) * 6 + (s.dice![1] - 1)),
+      balancedGame,
+    );
+    expectOnly('dice-deck', (s) => void (s.diceDeck = [0, 1]), balancedGame);
+  });
 });
+
+describe('checkInvariants on T13 states', () => {
+  it('a special build step is healthy, even with the builder at vpToWin (no win in SBP)', () => {
+    expect(checkInvariants(specialBuildGame())).toEqual([]);
+    const s = specialBuildGame();
+    s.settings = { ...s.settings, vpToWin: 3 };
+    expect(codes(s)).toEqual([]);
+  });
+  it('a balanced-dice state mid-deck is healthy', () => {
+    expect(checkInvariants(balancedGame())).toEqual([]);
+  });
+});
+
+/** midGame after Blue (1) ended the turn: White (2) has the special build step. */
+function specialBuildGame(): GameState {
+  const s = midGame();
+  const blue = s.players[1]!;
+  blue.devCards.monopoly += blue.newDevCards.monopoly;
+  blue.newDevCards.monopoly = 0;
+  s.settings = { ...s.settings, specialBuildPhase: true };
+  s.turn.current = 2;
+  s.phase = { kind: 'specialBuild', builder: 2, owner: 1 };
+  return s;
+}
+
+/** midGame with balanced dice, 20 cards left (not including the last roll). */
+function balancedGame(): GameState {
+  const s = midGame();
+  s.settings = { ...s.settings, balancedDice: true };
+  const rolled = (s.dice![0] - 1) * 6 + (s.dice![1] - 1);
+  s.diceDeck = Array.from({ length: 36 }, (_, i) => i)
+    .filter((c) => c !== rolled)
+    .slice(0, 20);
+  return s;
+}
 
 describe('longestRoadLength', () => {
   it('counts Red’s 5-road loop in midGame, and an opponent building cuts it', () => {
