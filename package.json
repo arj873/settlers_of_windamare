@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sim": "tsx src/bots/sim.ts"
+    "sim": "tsx src/bots/sim.ts",
+    "pt:serve": "tsx scripts/playtest/serve.ts",
+    "pt": "tsx scripts/playtest/cli.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
@@ -24,6 +26,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
     "jsdom": "^30.1.3",
+    "playwright": "1.63.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",

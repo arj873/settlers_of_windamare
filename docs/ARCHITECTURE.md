@@ -313,6 +313,7 @@ view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an 
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
 view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
+view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
@@ -368,9 +369,13 @@ c.destroy();
   access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
   `?layout`, `?map`, `?autoplay`) never autosave.
-- `newGame(cfg)` uses `cfg.map` when the new-game config carries one (stage-2 setup screen), else `layoutToMap(cfg.layout)`.
+- `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`.
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
-  `?autoplay=4bots` (3–8 bots), `?hl=`. `window.catan` = `{ controller, board, hud }`.
+  `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games). `window.catan` = `{ controller, board, hud }`.
+- Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
+  `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
+  `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
+  (`pnpm pt:serve`, `pnpm pt`; see `playtest/PLAYBOOK.md`), which acts only through real clicks.
 
 ## 14. Decisions and open questions
 

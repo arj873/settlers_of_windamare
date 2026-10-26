@@ -6,3 +6,8 @@ coverage/
 sim-failures/
 .DS_Store
 .claude/settings.local.json
+playtest/shots/
+playtest/session.json
+playtest/dist/
+playtest/bugs/*
+!playtest/bugs/.gitkeep
