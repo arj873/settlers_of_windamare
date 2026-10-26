@@ -8,9 +8,8 @@
 import {
   LONGEST_ROAD_MIN,
   buildingsOf,
-  expansionVictoryPoints,
   hasRobber,
-  isBoardVertex,
+  vertexInfo,
   isLandHex,
   longestRoadLengths,
   topologyOf,
@@ -33,6 +32,7 @@ import {
   PROGRESS_CARDS,
   TRACKS,
   WALLS_PER_PLAYER,
+  ckModule,
   ckVictoryPoints,
   commoditySupply,
   phaseOf,
@@ -106,7 +106,8 @@ function check(state: GameState): Violation[] {
   const perLevel = new Map<string, number>();
   for (const [v, k] of Object.entries(s.knights) as [VertexId, (typeof s.knights)[VertexId]][]) {
     if (!k) continue;
-    if (!isBoardVertex(t, v)) bad(`knight on off-board vertex ${v}`);
+    // (Seafarers + C&K: an active knight may stand on a sea vertex, on its owner's ship.)
+    if (!vertexInfo(t, v)) bad(`knight on off-board vertex ${v}`);
     if (state.pieces.buildings[v]) bad(`knight and building on ${v}`);
     if (!KNIGHT_LEVELS.includes(k.level)) bad(`knight level ${k.level}`);
     const key = `${k.owner}:${k.level}`;
@@ -166,9 +167,9 @@ function check(state: GameState): Violation[] {
     bad(`Longest Road holder ${holder} is not the longest`);
   if (state.awards.largestArmy !== null) bad('Largest Army exists in Cities & Knights');
 
-  // VP: the hook equals the slice's own count.
+  // VP: the C&K hook equals the slice's own count (other modules may add their own VP).
   for (let p = 0; p < n; p++) {
-    if (expansionVictoryPoints(state, p).public !== ckVictoryPoints(state, p))
+    if (ckModule.hooks?.victoryPoints?.(state, p).public !== ckVictoryPoints(state, p))
       bad('C&K VP mismatch', p);
     if (buildingsOf(state, p).length === 0 && state.phase.kind !== 'setup')
       bad('player without buildings', p);

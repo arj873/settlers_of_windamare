@@ -158,7 +158,8 @@ export const ckDrawer: BoardDrawer = {
       draw: (state, ctx) =>
         layer((g) => {
           for (const [v, k] of Object.entries(ckSlice(state).knights) as [VertexId, Knight][]) {
-            const info = ctx.topo.vertex[v];
+            // A knight may stand on a sea vertex (on its owner's ship, Seafarers + C&K).
+            const info = ctx.topo.vertex[v] ?? ctx.topo.seaVertex[v];
             if (!info) continue;
             const [x, y] = ctx.pt(info);
             drawKnight(g, x, y, ctx.S, k, ctx.colorOf(k.owner), ctx.art.shade);

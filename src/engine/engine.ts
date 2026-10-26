@@ -29,10 +29,20 @@ type AnyHandler = (draft: GameState, action: Action) => ActionResult;
 function handlerFor(state: GameState, type: string): AnyHandler | undefined {
   const ns = namespaceOf(type);
   if (ns !== null) {
-    const m = activeModules(state).find((x) => x.id === ns);
+    const active = activeModules(state);
+    const m = active.find((x) => x.id === ns);
     const actions = m?.actions;
     if (!actions || !Object.hasOwn(actions, type)) return undefined;
-    return actions[type as ExpansionActionType] as ExtHandler as AnyHandler;
+    let h = actions[type as ExpansionActionType] as ExtHandler as AnyHandler;
+    // Another module's wraps (a combination module), the first module listed innermost.
+    for (const x of active) {
+      const wrap = x.wraps?.[type as ExpansionActionType];
+      if (wrap) {
+        const next = h;
+        h = (d, a) => wrap(d, a as never, next as ExtHandler);
+      }
+    }
+    return h;
   }
   if (!Object.hasOwn(HANDLERS, type)) return undefined;
   let h = HANDLERS[type as BaseActionType] as Handler<ActionType> as AnyHandler;

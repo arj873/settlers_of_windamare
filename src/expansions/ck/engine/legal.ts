@@ -8,7 +8,7 @@ import { buildingsOf } from '../../../engine/selectors';
 import type { Action, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { playBlocker } from './cards';
 import { choiceAction, promptFor } from './prompts';
-import { networkOf, touchesRoad, isEmptyVertex } from './routes';
+import { isRecruitSpot, networkOf } from './routes';
 import {
   activateBlocker,
   buildKnightBlocker,
@@ -41,7 +41,7 @@ function builds(state: GameState, p: PlayerId, out: Action[]): void {
   const s = ckSlice(state);
   if (buildKnightBlocker(state, p, null) === null) {
     for (const v of networkOf(state, p)) {
-      if (isEmptyVertex(state, v) && touchesRoad(state, p, v)) {
+      if (isRecruitSpot(state, p, v)) {
         out.push(act({ type: 'ck/buildKnight', player: p, vertex: v }));
       }
     }
