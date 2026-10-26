@@ -500,7 +500,7 @@ export class Hud {
     layer.replaceChildren(
       h(
         'div',
-        { class: `scrim${built.modal ? ' is-modal' : ''}` },
+        { class: `scrim${built.modal ? ' is-modal' : ''}${built.side ? ' is-side' : ''}` },
         h(
           'div',
           {
@@ -518,7 +518,15 @@ export class Hud {
     state: GameState,
     view: HudView,
     legal: Action[],
-  ): { key: string; title: string; body: Child[]; modal: boolean; wide?: boolean } | null {
+  ): {
+    key: string;
+    title: string;
+    body: Child[];
+    modal: boolean;
+    wide?: boolean;
+    /** Non-blocking card docked at the side instead of centred over the board. */
+    side?: boolean;
+  } | null {
     const phase = state.phase;
     const me = getPlayer(state, view.viewer);
 
@@ -816,6 +824,7 @@ export class Hud {
       key: 'trade-offerer',
       title: 'Your trade offer',
       modal: false,
+      side: true,
       body: [
         h(
           'div',
@@ -852,7 +861,8 @@ export class Hud {
     return {
       key: `trade-incoming-${view.viewer}`,
       title: `${from.name} offers a trade`,
-      modal: true,
+      modal: false,
+      side: true,
       body: [
         h(
           'div',

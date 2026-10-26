@@ -118,6 +118,19 @@ describe('Hud', () => {
     expect(actions).toEqual([{ type: 'rejectTrade', player: 2 }]);
   });
 
+  it('trade offers are a non-blocking side card, not a modal', () => {
+    const s = tradeOfferGame();
+    // A fresh Hud per viewer: switching viewers on one Hud shows the hotseat cover instead.
+    for (const viewer of [1, 2]) {
+      root.replaceChildren();
+      hud = new Hud(root);
+      hud.render(s, { viewer, legal: fakeLegal(s, viewer), isBotTurn: false });
+      const scrim = root.querySelector('.scrim')!;
+      expect(scrim.classList.contains('is-side')).toBe(true);
+      expect(scrim.classList.contains('is-modal')).toBe(false);
+    }
+  });
+
   it('offerer confirms with the accepted partner or cancels', () => {
     const s = tradeOfferGame();
     hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });

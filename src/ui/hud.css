@@ -653,6 +653,23 @@
 .scrim.is-modal .dialog {
   max-height: calc(100vh - 32px);
 }
+/* Side card (trade offers): docked right, board and HUD stay usable. */
+.scrim.is-side {
+  place-items: center end;
+  padding: 0 16px 120px 0;
+}
+.scrim.is-side .dialog {
+  width: min(340px, calc(100vw - 32px));
+}
+.scrim.is-side .dialog h2 {
+  font-size: 18px;
+}
+@media (max-width: 720px) {
+  .scrim.is-side {
+    place-items: end center;
+    padding: 0 16px 200px;
+  }
+}
 .dialog.wide {
   width: min(560px, calc(100vw - 32px));
 }
