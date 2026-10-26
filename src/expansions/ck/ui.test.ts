@@ -192,7 +192,7 @@ describe('C&K HUD', () => {
     build(s, 0, V(2, 0, 'S'), 'city');
     s.phase = { kind: 'ck/pillage', queue: [0] } as never;
     const targets = boardActions(legalActions(s, 0), 0, null);
-    expect(highlightsFor(targets).vertices?.sort()).toEqual(
+    expect([...(highlightsFor(targets).vertices ?? [])].sort()).toEqual(
       [V(0, 0, 'S'), V(2, 0, 'S')].sort() as VertexId[],
     );
   });
