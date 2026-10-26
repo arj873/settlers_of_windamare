@@ -11,6 +11,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
 - **M4b** · 3 Haiku agents play one ONLINE game (room on wrangler dev, headed windows, seat 2 tests drop/reconnect) · `s4-haiku-1..3` (Haiku)
+- **UX2** · End-of-game **Game Statistics** (your Colonist screenshot): winner/turns/duration + tabs Overview · Dice · Resources · Activity · Dev Cards; engine stats slice, online-safe · `s4-game-stats` 🟦
 - **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
 - **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
