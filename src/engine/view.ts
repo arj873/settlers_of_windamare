@@ -17,17 +17,20 @@
  *  - stats (UX2: stolen card types, dev cards bought, hidden VP over time) -> absent
  * Once the game is over every hand and dev card is revealed (final scores show VP cards), and
  * so are the stats; decks, rng and seed stay hidden.
+ * Expansion secrets (progress cards, fog stacks, face-down tiles, ...) are masked by each active
+ * module's `maskFor` hook (docs/EXPANSIONS.md §5), chained after the base masks above.
  *
  * Pure and deterministic. The view shares unchanged parts (board, pieces, log entries...) with
  * `state`: treat it as read-only. Never pass a view to applyAction / legalActions.
  */
 import { specialBuildQueue } from './actions/turn';
+import { hookMaskFor } from './expansions/hooks';
 import { emptyDevCards, emptyResources, totalDevCards, totalResources } from './resources';
 import { getPlayer } from './selectors';
 import type { DevCardType, GameState, LogEntry, Player, PlayerId } from './types';
+import { hiddenFrom, type Viewer } from './viewer';
 
-/** A seat, or 'spectator' (sees only public information). */
-export type Viewer = PlayerId | 'spectator';
+export { hiddenFrom, type Viewer };
 
 export const HIDDEN_SEED = 'hidden';
 /** Placeholder for every face-down dev card; only `devDeck.length` is meaningful in a view. */
@@ -82,9 +85,9 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
   const seat = viewer === 'spectator' ? null : viewer;
   if (seat !== null && !state.players[seat]) throw new Error(`no player ${seat}`);
   const revealAll = state.phase.kind === 'gameOver';
-  const masked = state.players.map((p) => !revealAll && p.id !== seat);
+  const masked = state.players.map((p) => hiddenFrom(state, viewer, p.id));
   const { stats, ...rest } = state;
-  return {
+  const base: GameState = {
     ...rest,
     ...(revealAll && stats ? { stats } : {}),
     settings: { ...state.settings, seed: HIDDEN_SEED },
@@ -103,6 +106,9 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
     ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => HIDDEN_EVENT_CARD) } : {}),
     log: state.log.map(maskLogEntry),
     rng: 0,
+  };
+  return {
+    ...hookMaskFor(base, viewer, state),
     view: {
       viewer: seat,
       handCounts: state.players.map((p) => totalResources(p.resources)),

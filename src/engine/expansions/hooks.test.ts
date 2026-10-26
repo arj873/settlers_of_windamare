@@ -20,6 +20,8 @@ import { cloneState } from '../clone';
 import { EVENT_CARDS } from '../rules/events';
 import { emptyStats, statsOf } from '../stats';
 import type { Action, EventKind, GameState, VertexId } from '../types';
+import { viewFor } from '../view';
+import { hiddenFrom } from '../viewer';
 import { costOf, extraRouteEdges, pieceLimit, terrainKind } from './hooks';
 import { registerExpansion } from './registry';
 import type { ExpansionHooks, ExpansionModule, ProductionContext } from './types';
@@ -551,6 +553,45 @@ describe('V1/V2 variants through the hooks (main x expansions merge)', () => {
     const s = { ...withTst(emptyBoardGame()), phase: { kind: 'main' as const } };
     const after = run({ ...s, stats: emptyStats(4) }, { type: 'tst/freeRoad', player: 0 });
     expect(statsOf(after).players[0]?.built.road).toBe(1);
+  });
+});
+
+describe('maskFor (online views)', () => {
+  type Slice = { hands: string[][]; deck: string[] };
+  const slice: Slice = { hands: [['a1'], ['b1', 'b2'], [], []], deck: ['d1', 'd2', 'd3'] };
+
+  it('viewFor chains it after the base masks; hiddenFrom decides per seat', () => {
+    hooks.maskFor = (view, viewer, state) => {
+      expect(view.rng).toBe(0); // base masks already applied
+      expect(state.rng).not.toBe(0);
+      const s = view.ext['tst'] as Slice;
+      return {
+        ...view,
+        ext: {
+          ...view.ext,
+          tst: {
+            hands: s.hands.map((h, p) => (hiddenFrom(state, viewer, p) ? h.map(() => '?') : h)),
+            deck: s.deck.map(() => '?'),
+          },
+        },
+      };
+    };
+    const state = { ...withTst(midGame()), rng: 42 };
+    (state.ext as Record<string, unknown>)['tst'] = slice;
+    const v1 = viewFor(state, 1).ext['tst'] as Slice;
+    expect(v1).toEqual({ hands: [['?'], ['b1', 'b2'], [], []], deck: ['?', '?', '?'] });
+    const spec = viewFor(state, 'spectator').ext['tst'] as Slice;
+    expect(spec.hands).toEqual([['?'], ['?', '?'], [], []]);
+    expect(state.ext['tst']).toBe(slice); // not mutated
+    const over = viewFor({ ...state, phase: { kind: 'gameOver' } }, 'spectator');
+    expect((over.ext['tst'] as Slice).hands).toEqual(slice.hands);
+  });
+
+  it('is not called in base games', () => {
+    hooks.maskFor = () => {
+      throw new Error('called');
+    };
+    expect(() => viewFor(midGame(), 0)).not.toThrow();
   });
 });
 
