@@ -10,7 +10,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5
 - **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
 - **BUG-B1** · 🔴 BLOCKER: board camera zooms in over a long game (6 Haiku reports, turns 59-75); spots off-screen/under HUD · `s3-camera-bug` 🟦
-- **D1** · UI theme refresh (you: like the format, less wood, "unique yet familiar"): 3 directions behind ?theme= → you pick → polish · `s3-ui-theme` 🟦
+- **D1** · UI theme refresh: Sunfired (default) / Chartroom / Parlour / Wood with a theme picker in the menu (your pick: keep all) · `s3-ui-theme` 🟦
 
 ## 🏃 In Progress — Stage 2
 
