@@ -5,7 +5,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { COSTS, RESOURCES } from '../constants';
 import { applyAction, legalActions } from '../engine';
-import { createGame } from '../createGame';
+import { composeOrder, createGame } from '../createGame';
 import { midGame } from '../fixtures';
 import { cornerVertex, sideEdge } from '../hex';
 import { supplyOf } from '../mapLookup';
@@ -20,7 +20,7 @@ import { cloneState } from '../clone';
 import { EVENT_CARDS } from '../rules/events';
 import { emptyStats, statsOf } from '../stats';
 import type { Action, EventKind, GameState, VertexId } from '../types';
-import { costOf, pieceLimit, terrainKind } from './hooks';
+import { costOf, extraRouteEdges, pieceLimit, terrainKind } from './hooks';
 import { registerExpansion } from './registry';
 import type { ExpansionHooks, ExpansionModule, ProductionContext } from './types';
 
@@ -56,6 +56,7 @@ afterEach(() => {
   for (const k of Object.keys(hooks)) delete hooks[k as keyof ExpansionHooks];
   delete mod.actions;
   delete mod.overrides;
+  delete mod.wraps;
   delete mod.legal;
   delete mod.filterLegal;
   delete mod.actors;
@@ -100,6 +101,29 @@ describe('dispatch: actions, overrides, legal, filterLegal, actors', () => {
     expectFail(applyAction(s, { type: 'endTurn', player: 1 }), 'not today');
     const later = { ...s, turn: { ...s.turn, number: 13 } };
     expect(applyAction(later, { type: 'endTurn', player: 1 }).ok).toBe(true);
+  });
+
+  it('wraps run around a module action (combination modules), innermost first', () => {
+    mod.actions = {
+      'tst/ping': (d, a) => {
+        d.log.push({ turn: d.turn.number, player: a.player, text: 'pong' });
+        return { ok: true, state: d };
+      },
+    };
+    mod.wraps = {
+      'tst/ping': (d, a, next) => (a.player === 2 ? { ok: false, error: 'no' } : next(d, a)),
+    };
+    const s = withTst(midGame());
+    expectFail(applyAction(s, { type: 'tst/ping', player: 2 }), 'no');
+    expect(expectOk(applyAction(s, { type: 'tst/ping', player: 1 })).log.at(-1)?.text).toBe('pong');
+  });
+
+  it("routeEdges collects every module's extra route edges", () => {
+    hooks.routeEdges = (_state, p) => (p === 1 ? [sideEdge(0, 0, 'E')] : []);
+    const s = withTst(midGame());
+    expect(extraRouteEdges(s, 1)).toEqual([sideEdge(0, 0, 'E')]);
+    expect(extraRouteEdges(s, 0)).toEqual([]);
+    expect(extraRouteEdges(midGame(), 1)).toEqual([]);
   });
 
   it('legal adds actions; filterLegal removes them', () => {
@@ -527,5 +551,28 @@ describe('V1/V2 variants through the hooks (main x expansions merge)', () => {
     const s = { ...withTst(emptyBoardGame()), phase: { kind: 'main' as const } };
     const after = run({ ...s, stats: emptyStats(4) }, { type: 'tst/freeRoad', player: 0 });
     expect(statsOf(after).players[0]?.built.road).toBe(1);
+  });
+});
+
+describe('composition order (ExpansionModule.before)', () => {
+  const m = (id: string, before?: string[]): ExpansionModule => ({
+    id,
+    name: id,
+    ...(before ? { before } : {}),
+  });
+
+  it('keeps registry order without `before`', () => {
+    expect(composeOrder([m('a'), m('b'), m('c')]).map((x) => x.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('moves a module in front of the first module it names', () => {
+    const order = composeOrder([m('ck'), m('sea'), m('x'), m('combo', ['ck', 'sea'])]);
+    expect(order.map((x) => x.id)).toEqual(['combo', 'ck', 'sea', 'x']);
+    const late = composeOrder([m('a'), m('sea'), m('combo', ['sea'])]);
+    expect(late.map((x) => x.id)).toEqual(['a', 'combo', 'sea']);
+  });
+
+  it('ignores names that are not active', () => {
+    expect(composeOrder([m('a'), m('combo', ['zzz'])]).map((x) => x.id)).toEqual(['a', 'combo']);
   });
 });

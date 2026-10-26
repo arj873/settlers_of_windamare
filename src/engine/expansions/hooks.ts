@@ -187,6 +187,16 @@ export function hookTradeRatio(
   return n;
 }
 
+/** Extra route edges of `player` (routeEdges hooks; [] in games without them). */
+export function extraRouteEdges(state: GameState, player: PlayerId): EdgeId[] {
+  const out: EdgeId[] = [];
+  for (const m of activeModules(state)) {
+    const f = m.hooks?.routeEdges;
+    if (f) out.push(...f(state, player));
+  }
+  return out;
+}
+
 export function hookRoadLength(state: GameState, player: PlayerId, base: number): number {
   let n = base;
   for (const m of activeModules(state)) {
