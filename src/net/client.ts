@@ -44,6 +44,8 @@ export interface GameSnapshot {
   view: GameView;
   legal: Action[];
   timer: TimerInfo | null;
+  /** UX2: game over only — how long the game lasted (room clock). */
+  durationMs?: number;
   /** clock.now() when the message arrived (the timer counts down from here). */
   receivedAt: number;
 }
@@ -369,6 +371,7 @@ export class RoomClient {
           view: msg.view,
           legal: msg.legal,
           timer: msg.timer,
+          ...(typeof msg.durationMs === 'number' ? { durationMs: msg.durationMs } : {}),
           receivedAt: this.opts.clock.now(),
         };
         this.gameValue = game;

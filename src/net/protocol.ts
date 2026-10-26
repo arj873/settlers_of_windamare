@@ -279,6 +279,8 @@ export type ServerMessage = V &
         /** The recipient's legal actions, computed by the server from the full state. */
         legal: Action[];
         timer: TimerInfo | null;
+        /** UX2: game over only — the room clock from start to the end (stats screen). */
+        durationMs?: number;
       }
     | { type: 'chat'; entry: ChatEntry }
     | { type: 'reaction'; member: MemberId; seat: PlayerId | null; reaction: Reaction }

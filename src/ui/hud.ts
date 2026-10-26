@@ -49,6 +49,8 @@ import {
   type BuildKind,
 } from './model';
 import { bankPanel, logList, playersList } from './sidebar';
+import { statsFor, type StatsTab } from './stats/model';
+import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
 import type {
   BotSpeedControl,
@@ -131,6 +133,11 @@ export class Hud {
   /** Phone layout: the sidebar is a drawer. */
   private drawerOpen = false;
   private collapsed = new Set<Section>();
+  /** Game over (UX2): the statistics panel instead of the winner card; collapsed = the board shows. */
+  private statsOpen = false;
+  private statsCollapsed = false;
+  private statsTab: StatsTab = 'overview';
+  private statsPlayer: PlayerId | null = null;
   private botSpeed: BotSpeedControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
@@ -255,6 +262,14 @@ export class Hud {
 
     if (this.unlockedViewer === null) this.unlockedViewer = view.viewer;
 
+    // A game in progress: the next game over starts on the winner card again.
+    if (state.phase.kind !== 'gameOver') {
+      this.statsOpen = false;
+      this.statsCollapsed = false;
+      this.statsTab = 'overview';
+      this.statsPlayer = null;
+    }
+
     // Leave build mode after anything was placed, or when it stops being legal.
     const sig = `${Object.keys(state.pieces.buildings).length}/${Object.keys(state.pieces.roads).length}/${state.turn.number}/${state.phase.kind}`;
     const sigChanged = sig !== this.pieceSig;
@@ -366,8 +381,71 @@ export class Hud {
       r.controls.replaceChildren(...this.controls(state, view, av));
       this.renderDialog(state, view, legal);
     }
-    r.overlay.replaceChildren(
-      ...(state.phase.kind === 'gameOver' ? [this.winnerScreen(state)] : []),
+    r.overlay.replaceChildren(...this.gameOverScreen(state, view));
+  }
+
+  /** Winner card, or (UX2) the statistics panel; nothing before game over. */
+  private gameOverScreen(state: GameState, view: HudView): HTMLElement[] {
+    const stats = statsFor(state);
+    if (state.phase.kind !== 'gameOver') return [];
+    if (!this.statsOpen || !stats) return [this.winnerScreen(state, stats !== null)];
+    const panel = statsPanel(state, stats, {
+      tab: this.statsTab,
+      player: this.statsPlayer ?? state.winner ?? 0,
+      collapsed: this.statsCollapsed,
+      durationMs: view.gameDurationMs ?? null,
+      onTab: (tab) => {
+        this.statsTab = tab;
+        this.refresh();
+      },
+      onPlayer: (p) => {
+        this.statsPlayer = p;
+        this.refresh();
+      },
+      onToggle: () => {
+        this.statsCollapsed = !this.statsCollapsed;
+        this.refresh();
+      },
+      actions: [
+        h(
+          'button',
+          {
+            class: 'btn btn-ghost',
+            on: {
+              click: () => {
+                this.statsOpen = false;
+                this.refresh();
+              },
+            },
+          },
+          'Results',
+        ),
+        ...this.endActions(''),
+      ],
+    });
+    return [h('div', { class: this.statsCollapsed ? 'gs-dock' : 'gs-overlay' }, panel)];
+  }
+
+  /** "New game" (hotseat) or the online session actions, as buttons. */
+  private endActions(size: string): HTMLElement[] {
+    if (!this.sessionActions) {
+      return [
+        h(
+          'button',
+          { class: `btn btn-primary ${size}`, on: { click: () => this.showNewGame() } },
+          'New game',
+        ),
+      ];
+    }
+    return this.sessionActions.map((a) =>
+      h(
+        'button',
+        {
+          class: `btn ${a.primary ? 'btn-primary' : 'btn-ghost'} ${size}`,
+          on: { click: () => a.onClick() },
+        },
+        a.label,
+      ),
     );
   }
 
@@ -1652,7 +1730,7 @@ export class Hud {
     );
   }
 
-  private winnerScreen(state: GameState): HTMLElement {
+  private winnerScreen(state: GameState, hasStats: boolean): HTMLElement {
     const ranked = state.players
       // Final scores reveal hidden VP cards.
       .map((p) => ({ p, vp: victoryPoints(state, p.id) }))
@@ -1684,26 +1762,26 @@ export class Hud {
             ),
           ),
         ),
-        this.sessionActions
-          ? h(
-              'div',
-              { class: 'winner-actions' },
-              ...this.sessionActions.map((a) =>
-                h(
-                  'button',
-                  {
-                    class: `btn ${a.primary ? 'btn-primary' : 'btn-ghost'} btn-lg`,
-                    on: { click: () => a.onClick() },
-                  },
-                  a.label,
-                ),
-              ),
-            )
-          : h(
+        h(
+          'div',
+          { class: 'winner-actions' },
+          hasStats &&
+            h(
               'button',
-              { class: 'btn btn-primary btn-lg', on: { click: () => this.showNewGame() } },
-              'New game',
+              {
+                class: 'btn btn-ghost btn-lg winner-stats',
+                on: {
+                  click: () => {
+                    this.statsOpen = true;
+                    this.statsCollapsed = false;
+                    this.refresh();
+                  },
+                },
+              },
+              'Game stats',
             ),
+          ...this.endActions('btn-lg'),
+        ),
       ),
     );
   }

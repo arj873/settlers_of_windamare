@@ -61,6 +61,8 @@ export interface ControllerOptions {
   bot?: Bot;
   /** Called after every render (main.ts re-measures the HUD to keep the board clear of it). */
   onRender?: () => void;
+  /** Wall clock in ms for the game duration (UX2 stats); default Date.now. */
+  wallClock?: () => number;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -84,6 +86,7 @@ export class GameController {
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly bot: Bot;
   private readonly onRender: () => void;
+  private readonly wallClock: () => number;
   private speedMs: number;
 
   private current: GameState | null = null;
@@ -109,6 +112,10 @@ export class GameController {
   /** Slot key whose timeout was announced (one toast per timeout). */
   private timedOutKey: string | null = null;
   private timeoutRng = new Rng(1);
+  /** Game duration (UX2): wall-clock start, shifted on resume so time between sessions does not count; null = unknown. */
+  private startedAt: number | null = null;
+  /** Set once the game is over. */
+  private durationMs: number | null = null;
 
   constructor(opts: ControllerOptions) {
     this.board = opts.board;
@@ -117,6 +124,7 @@ export class GameController {
     this.toast = opts.toast ?? ((m, k) => (k === 'error' ? console.error(m) : console.info(m)));
     this.bot = opts.bot ?? defaultBot;
     this.onRender = opts.onRender ?? (() => undefined);
+    this.wallClock = opts.wallClock ?? (() => Date.now());
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
 
     this.hud.on('action', (a) => this.dispatch(a));
@@ -165,7 +173,13 @@ export class GameController {
   start(
     state: GameState,
     seats: Seats,
-    opts: { viewer?: PlayerId | null; botRng?: number; banks?: unknown } = {},
+    opts: {
+      viewer?: PlayerId | null;
+      botRng?: number;
+      banks?: unknown;
+      /** Time already played (a resumed save); null = unknown; absent = a game starting now. */
+      playedMs?: number | null;
+    } = {},
   ) {
     if (seats.length !== state.players.length) {
       throw new Error(`seats (${seats.length}) must match players (${state.players.length})`);
@@ -183,6 +197,9 @@ export class GameController {
     this.banks = restoreBanks(opts.banks, state.settings, state.players.length);
     this.timedOutKey = null;
     this.timeoutRng = Rng.fromSeed(`timer:${String(state.settings.seed)}`);
+    const played = opts.playedMs === undefined ? 0 : opts.playedMs;
+    this.startedAt = played === null ? null : this.wallClock() - played;
+    this.durationMs = state.phase.kind === 'gameOver' ? played : null;
     this.refresh();
   }
 
@@ -204,12 +221,15 @@ export class GameController {
       viewer: saved.viewer,
       botRng: saved.botRng,
       banks: saved.banks,
+      playedMs: saved.playedMs ?? null,
     });
   }
 
   /** The current session in save format (null before the first game). */
   snapshot(): SavedSession | null {
     if (!this.current) return null;
+    const played =
+      this.durationMs ?? (this.startedAt === null ? null : this.wallClock() - this.startedAt);
     return {
       version: 1,
       state: this.current,
@@ -219,6 +239,7 @@ export class GameController {
       ...(timerOf(this.current.settings).kind === 'bank'
         ? { banks: flushBank(this.clock, this.banks) }
         : {}),
+      ...(played === null ? {} : { playedMs: played }),
     };
   }
 
@@ -290,6 +311,9 @@ export class GameController {
     if (!state) return;
     this.legal = legalActions(state);
     this.viewerId = pickViewer(state, this.seatList, this.legal, this.viewerId);
+    if (state.phase.kind === 'gameOver' && this.durationMs === null && this.startedAt !== null) {
+      this.durationMs = this.wallClock() - this.startedAt;
+    }
     this.syncClock(state);
     const turn = this.seatList[state.turn.current];
     const turnTimer = clockView(this.clock);
@@ -301,6 +325,7 @@ export class GameController {
       isBotTurn: turn === 'bot',
       bots: this.seatList.map((s) => s === 'bot'),
       turnTimer,
+      gameDurationMs: this.durationMs,
     });
     this.updateHighlights();
     this.persist();
