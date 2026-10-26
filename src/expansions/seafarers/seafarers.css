@@ -1,0 +1,134 @@
+/* Seafarers HUD (classes are prefixed sea-). Colours come from the theme tokens. */
+.sea-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sea-goal {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-strong, var(--ink));
+}
+.sea-facts {
+  margin: 0;
+  font-size: 12px;
+}
+.sea-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sea-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px;
+  border-left: 4px solid var(--pc, #888);
+  font-size: 13px;
+}
+.sea-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sea-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-num, inherit);
+}
+.sea-cloth {
+  display: inline-block;
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  background: #9b3d8f;
+  border: 1.5px solid #2a1708;
+  vertical-align: middle;
+}
+.sea-wonders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.15));
+}
+.sea-wonder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 64px;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  border-left: 4px solid var(--pc, transparent);
+  font-size: 12px;
+}
+.sea-wonder > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sea-cost {
+  display: inline-flex;
+  gap: 1px;
+}
+.sea-owner,
+.sea-wonder > .btn {
+  justify-self: end;
+  white-space: nowrap;
+}
+.sea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sea-res {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.sea-resbtn {
+  border: 2px solid transparent;
+  border-radius: var(--radius, 6px);
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+}
+.sea-resbtn:hover:not(:disabled) {
+  border-color: var(--accent, var(--ink));
+}
+.sea-resbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sea-picked {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  min-height: 40px;
+  align-items: center;
+  margin: 8px 0;
+}
+.sea-slot {
+  display: inline-block;
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
+  border: 2px dashed var(--ink-dim, #999);
+}
+.sea-victim {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-left: 4px solid var(--pc, #888);
+}
+.sea-victim > b {
+  flex: 1;
+}

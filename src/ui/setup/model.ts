@@ -456,7 +456,8 @@ export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
   if (draft.rules56 && draft.seats.length >= RULES56_SEATS) v.rules56 = true;
   const mapRules: MapRules = {};
   for (const o of MAP_RULE_OPTIONS) if (draft[o.key]) mapRules[o.rule] = true;
-  if (Object.keys(mapRules).length > 0) v.mapRules = mapRules;
+  // Expansion modes play scenario maps: the balance rules do not apply (and are not shown).
+  if (draft.mode === 'base' && Object.keys(mapRules).length > 0) v.mapRules = mapRules;
   const mapSelection = mapSelectionOf(draft);
   if (mapSelection !== 'fixed') v.mapSelection = mapSelection;
   const p = draft.setupPlacement;

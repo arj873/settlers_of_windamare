@@ -29,7 +29,7 @@ export interface DevParams {
   debug: boolean;
   /** `?mode=demo`: start an expansion mode at once (its first scenario; docs/EXPANSIONS.md). */
   mode: string | null;
-  /** `?scenario=tb/traders`: with `?mode=`, one of the mode's scenarios (E4). */
+  /** `?scenario=tb/traders` / `seafarers/fogIslands`: with `?mode=`, one of its scenarios. */
   scenario: string | null;
 }
 

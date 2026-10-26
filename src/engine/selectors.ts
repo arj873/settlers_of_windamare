@@ -4,8 +4,10 @@ import {
   expansionActors,
   expansionVictoryPoints,
   hookHandSize,
+  hookSetupOrder,
   pieceLimit,
 } from './expansions/hooks';
+import type { SetupOrder } from './expansions/types';
 import { totalResources } from './resources';
 import type {
   BuildingKind,
@@ -24,6 +26,21 @@ import type {
 export function setupPlayerAt(index: number, playerCount: number, first: PlayerId = 0): PlayerId {
   const seat = index < playerCount ? index : 2 * playerCount - 1 - index;
   return (seat + first) % playerCount;
+}
+
+/**
+ * Every setup placement of the game: who places step i, and whether that settlement pays
+ * starting resources. Default: the snake order (setupPlayerAt), the second round pays; an
+ * expansion's setupOrder hook may change it (Cloth for Catan: a third round, which pays).
+ */
+export function setupOrderOf(state: GameState): SetupOrder {
+  const custom = hookSetupOrder(state);
+  if (custom) return custom;
+  const n = state.players.length;
+  const order = Array.from({ length: 2 * n }, (_, i) =>
+    setupPlayerAt(i, n, state.settings.startingPlayer),
+  );
+  return { order, pays: order.map((_, i) => i >= n) };
 }
 
 export function getPlayer(state: GameState, id: PlayerId): Player {

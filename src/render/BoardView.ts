@@ -15,6 +15,7 @@ import { Color, Container, Graphics, Text, type Application } from 'pixi.js';
 import {
   TOPOLOGY,
   edgeInfo,
+  terrainKind,
   tokenPips,
   topologyOf,
   vertexInfo,
@@ -461,7 +462,8 @@ export class BoardView {
     for (const id of this.topo.landHexes) {
       const tile = state.board.hexes[id];
       const info = this.topo.hex[id];
-      if (!tile || !info) continue;
+      // Board hexes that are sea or fog (scenario boards) get no beach.
+      if (!tile || !info || terrainKind(tile.terrain) !== 'land') continue;
       const cx = info.x * S;
       const cy = info.y * S;
       shallow.poly(hexPoints(cx, cy, S * 1.2)).fill({ color: 0x5fb1e0, alpha: 0.35 });
@@ -499,7 +501,8 @@ export class BoardView {
     const badges = new Container();
     const R = 0.37 * S;
     for (const port of state.board.ports) {
-      const w = this.topo.water[port.waterHex];
+      // A harbour lies on a frame water hex, or on a board hex revealed as sea (New World).
+      const w = this.topo.water[port.waterHex] ?? this.topo.hex[port.waterHex];
       if (!w) continue;
       const [cx, cy] = [w.x * S, w.y * S];
       for (const v of port.vertices) {
@@ -736,7 +739,8 @@ export class BoardView {
   }
 
   private syncRobber(state: GameState) {
-    // settings.robberMode 'none': there is no robber piece; NO_ROBBER (off the board): hidden.
+    // settings.robberMode 'none': there is no robber piece; NO_ROBBER (off the board, e.g. the
+    // Seafarers robber waiting beside the board, T&B without a robber): hidden.
     const info = this.topo.hex[state.robber];
     this.robber.visible = state.settings.robberMode !== 'none' && info !== undefined;
     if (!info) return;

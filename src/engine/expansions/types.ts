@@ -19,9 +19,9 @@ import type {
   ExpansionId,
   GainSource,
   GameSettings,
-  LossSink,
   GameState,
   HexId,
+  LossSink,
   MapId,
   ModeId,
   Phase,
@@ -148,10 +148,22 @@ export interface ModeDef {
   scenarioVp?: Readonly<Record<ScenarioId, number>>;
 }
 
+/**
+ * The setup placements of a game: `order[i]` places setup step i (a settlement, then its road);
+ * `pays[i]` = that settlement pays starting resources. Default: the snake order of 2n steps,
+ * the second round pays.
+ */
+export interface SetupOrder {
+  order: readonly PlayerId[];
+  pays: readonly boolean[];
+}
+
 /** Pure functions the core rules call (docs/EXPANSIONS.md §5). All optional. */
 export interface ExpansionHooks {
   /** first-wins. Kind of building placed at setup step `index` (default settlement). */
   setupBuilding?(state: GameState, index: number): BuildingKind | undefined;
+  /** first-wins. Setup placement order and paying steps (Cloth for Catan: a third round). */
+  setupOrder?(state: GameState): SetupOrder | undefined;
   /** first-wins. The two numbered dice of a roll (store any extra die in your slice). */
   rollDice?(draft: GameState): [number, number] | undefined;
   /**
@@ -205,26 +217,31 @@ export interface ExpansionHooks {
   supply?(state: Pick<GameState, 'settings'>, base: Supply): Supply;
   /**
    * additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. `parts`
-   * (optional) names where the public VP come from, for the statistics screen.
+   * (optional) names where the VP come from, for the statistics screen's chips (C&K: metropolis,
+   * defender; Seafarers: new land, gifts, cloth). Unnamed VP show as "Other".
    */
   victoryPoints?(
     state: GameState,
     player: PlayerId,
   ): { public: number; hidden?: number; parts?: VictoryPointPart[] };
   /**
-   * first-wins. Statistics (UX2): which source / sink a hand change of `player` made by one of
-   * your actions counts as (default 'other'). `gain` for cards received, `loss` for cards given.
-   * `state` is the state the action was applied to (its phase says what was being resolved).
+   * first-wins. Statistics (UX2): which source / sink a hand change of `player` made by `action`
+   * counts as. `gain` for cards received, `loss` for cards given. `state` is the state the action
+   * was applied to (its phase says what was being resolved). Called for module actions (default
+   * 'other') and base actions (default: the base classification, e.g. Seafarers' fleet taking
+   * cards at a `rollDice` = 'stolen'); a missing side keeps the default.
    */
   statsCategory?(
     state: GameState,
-    action: ExpansionAction,
+    action: Action,
     player: PlayerId,
   ): { gain?: GainSource; loss?: LossSink } | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /** chained. Length for Longest Road (Seafarers: trade route). */
   roadLength?(state: GameState, player: PlayerId, base: number): number;
+  /** chained. Army size for Largest Army, base = knights played (Pirate Islands: no award, 0). */
+  armySize?(state: GameState, player: PlayerId, base: number): number;
   /** additive. `player` ended their turn (before the special build phase / next turn). */
   onEndTurn?(draft: GameState, player: PlayerId): void;
   /** additive. `player`'s turn starts (preRoll). Not called for the first turn after setup. */
@@ -237,6 +254,12 @@ export interface ExpansionHooks {
    * checked at the end of the turn, after the disaster phase).
    */
   deferVictory?(state: GameState): boolean;
+  /**
+   * first-wins. Does `player` (whose turn it is) win now? Replaces the core "VP ≥ target" test
+   * in checkVictory, which runs after the awards are updated (Seafarers: Pirate Islands needs the
+   * captured fortress too; Wonders a completed wonder or the highest one). undefined = default.
+   */
+  wins?(state: GameState, player: PlayerId): boolean | undefined;
 }
 
 export interface ExpansionModule {

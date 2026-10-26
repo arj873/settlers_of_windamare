@@ -394,6 +394,8 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
 // ---------------------------------------------------------------------------
 
 function statsCategory(state: GameState, action: Action, p: PlayerId) {
+  // C&K classifies its own actions only; base actions keep the base classification.
+  if (!action.type.startsWith('ck/')) return undefined;
   const phase = phaseOf(state);
   const mine = p === action.player;
   switch (action.type) {
@@ -732,6 +734,6 @@ export const ckModule: ExpansionModule = {
       if (s.trade && draft.phase.kind !== 'trade') s.trade = null;
     },
 
-    statsCategory: (state, action, p) => statsCategory(state, action as Action, p),
+    statsCategory,
   },
 };

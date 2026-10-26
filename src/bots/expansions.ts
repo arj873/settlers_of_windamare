@@ -7,6 +7,7 @@ import { cropBots } from '../expansions/crop/bots';
 import { demoBots } from '../expansions/demo/bots';
 import { oilBots } from '../expansions/oil/bots';
 import { ckBots } from '../expansions/ck/bots';
+import { seafarersBots } from '../expansions/seafarers/bots';
 import { tbBots } from '../expansions/tb/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
@@ -18,9 +19,10 @@ export interface BotExtension {
   /** Base invariant codes that do not hold under this module (e.g. 'award-mismatch'). */
   relax?: readonly ViolationCode[];
   /**
-   * The random bot's sense of progress in this module (T&B wagons, knights): an action from
-   * `options` to play instead of a random pick, or null for no opinion. Asked only when the
-   * bot's progress bias triggers (bias 0 stays a plain random pick). Use `rng`, never the game's.
+   * The random bot's sense of progress in this module: an action from `options` to play instead
+   * of a random pick, or null for no opinion. Asked only when the bot's progress bias triggers
+   * (bias 0 stays a plain random pick). Use `rng`, never the game's. T&B: wagons and knights
+   * that head somewhere; Seafarers: skip its no-progress moves (`steerAway`).
    */
   steer?(state: GameState, player: PlayerId, options: readonly Action[], rng: Rng): Action | null;
 }
@@ -30,9 +32,25 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   oilBots,
   cropBots,
   ckBots,
+  seafarersBots,
   tbBots,
   // new modules go here, one per line
 ];
+
+/**
+ * A `steer` that only keeps the bot away from a module's no-progress actions (and from ending the
+ * turn): when any of `types` is on offer, a type-first random pick among the other options.
+ */
+export function steerAway(types: readonly string[]): NonNullable<BotExtension['steer']> {
+  const skip = new Set<string>([...types, 'endTurn', 'passSpecialBuild']);
+  return (_state, _player, options, rng) => {
+    if (!options.some((a) => types.includes(a.type))) return null;
+    const rest = options.filter((a) => !skip.has(a.type));
+    if (rest.length === 0) return null;
+    const type = rng.pick([...new Set(rest.map((a) => a.type))]);
+    return rng.pick(rest.filter((a) => a.type === type));
+  };
+}
 
 /** The bot extensions of the expansions active in `state`, in settings order. */
 export function botExtensionsFor(state: Pick<GameState, 'settings'>): BotExtension[] {

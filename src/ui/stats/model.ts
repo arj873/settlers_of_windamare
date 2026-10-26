@@ -74,7 +74,7 @@ export interface VpBreakdown {
   vpCards: number;
   longestRoad: boolean;
   largestArmy: boolean;
-  /** Named expansion VP (victoryPoints hook `parts`), e.g. "Metropolis". */
+  /** Named expansion VP (victoryPoints hook `parts`), e.g. "Metropolis", "New land". */
   parts: VictoryPointPart[];
   /** VP from anything else (unnamed expansion / variant VP); 0 in the base game. */
   other: number;

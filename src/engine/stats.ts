@@ -28,7 +28,6 @@ import { hexVertices, topologyOf } from './topology';
 import type {
   Action,
   DevCardType,
-  ExpansionAction,
   GainSource,
   GameState,
   GameStats,
@@ -246,9 +245,10 @@ export function recordProduction(
 
 /** Where a positive hand change of `p` caused by `action` came from. */
 function gainSource(state: GameState, action: Action, p: PlayerId): GainSource {
-  if (namespaceOf(action.type) !== null) {
-    return hookStatsCategory(state, action as ExpansionAction, p)?.gain ?? 'other';
-  }
+  // An expansion may classify any action's hand changes (statsCategory hook).
+  const ext = hookStatsCategory(state, action, p)?.gain;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'placeSetupSettlement':
       return 'setup';
@@ -272,9 +272,9 @@ function gainSource(state: GameState, action: Action, p: PlayerId): GainSource {
 
 /** Where a negative hand change of `p` caused by `action` went. */
 function lossSink(state: GameState, action: Action, p: PlayerId): LossSink {
-  if (namespaceOf(action.type) !== null) {
-    return hookStatsCategory(state, action as ExpansionAction, p)?.loss ?? 'other';
-  }
+  const ext = hookStatsCategory(state, action, p)?.loss;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'buildRoad':
     case 'buildSettlement':

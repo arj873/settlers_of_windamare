@@ -8,7 +8,6 @@ import type {
   Action,
   BuildingKind,
   EdgeId,
-  ExpansionAction,
   GainSource,
   GameState,
   LossSink,
@@ -21,7 +20,7 @@ import type {
 } from '../types';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
-import type { ProductionContext, Supply, VictoryPointPart } from './types';
+import type { ProductionContext, SetupOrder, Supply, VictoryPointPart } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -201,6 +200,23 @@ export function hasRoadLengthHook(state: State): boolean {
   return activeModules(state).some((m) => m.hooks?.roadLength !== undefined);
 }
 
+export function hookArmySize(state: GameState, player: PlayerId, base: number): number {
+  let n = base;
+  for (const m of activeModules(state)) {
+    const f = m.hooks?.armySize;
+    if (f) n = f(state, player, n);
+  }
+  return n;
+}
+
+export function hookSetupOrder(state: GameState): SetupOrder | undefined {
+  for (const m of activeModules(state)) {
+    const o = m.hooks?.setupOrder?.(state);
+    if (o !== undefined) return o;
+  }
+  return undefined;
+}
+
 export function runOnEndTurn(draft: GameState, player: PlayerId): void {
   for (const m of activeModules(draft)) m.hooks?.onEndTurn?.(draft, player);
 }
@@ -213,15 +229,24 @@ export function runAfterAction(draft: GameState, action: Action): void {
   for (const m of activeModules(draft)) m.hooks?.afterAction?.(draft, action);
 }
 
-/** The named parts of the expansions' public VP (statistics screen), in module order. */
+/** A module's own win test for `player` (`wins` hook), or undefined for the VP target. */
+export function hookWins(state: GameState, player: PlayerId): boolean | undefined {
+  for (const m of activeModules(state)) {
+    const w = m.hooks?.wins?.(state, player);
+    if (w !== undefined) return w;
+  }
+  return undefined;
+}
+
+/** The named parts of the expansions' VP (statistics screen chips), in module order. */
 export function expansionVictoryParts(state: GameState, player: PlayerId): VictoryPointPart[] {
   return activeModules(state).flatMap((m) => m.hooks?.victoryPoints?.(state, player).parts ?? []);
 }
 
-/** Stats category of a hand change made by an expansion action (statsCategory hook). */
+/** Stats category of a hand change made by an action (statsCategory hook), or undefined. */
 export function hookStatsCategory(
   state: GameState,
-  action: ExpansionAction,
+  action: Action,
   player: PlayerId,
 ): { gain?: GainSource; loss?: LossSink } | undefined {
   for (const m of activeModules(state)) {

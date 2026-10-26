@@ -11,7 +11,7 @@
 import { RESOURCES } from '../constants';
 import { canPlaceRoad, canPlaceSettlement, touchesLand } from '../rules/placement';
 import { describeBundle, playerName } from '../rules/text';
-import { piecesLeft, setupPlayerAt } from '../selectors';
+import { piecesLeft, setupOrderOf } from '../selectors';
 import { isBoardEdge, isBoardVertex, topologyOf, vertexEdges, vertexHexes } from '../topology';
 import { setupBuildingKind, vertexBlocked } from '../expansions/hooks';
 import { emptyResources, isResource } from '../resources';
@@ -68,9 +68,10 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
 
     draft.pieces.buildings[action.vertex] = { owner: action.player, kind: round.building };
     let text = `${playerName(draft, action.player)} placed a ${round.building}`;
-    // Round 2 pays starting resources (Turbo Mode: both rounds). A setup city pays like a
-    // settlement, 1 per hex (C&K's second-placement city does the same).
-    if (phase.index >= draft.players.length || draft.settings.turboMode) {
+    // Round 2 pays starting resources (Turbo Mode: both rounds; an expansion's setupOrder may
+    // say otherwise). A setup city pays like a settlement, 1 per hex (C&K's second-placement
+    // city does the same).
+    if (setupOrderOf(draft).pays[phase.index] === true || draft.settings.turboMode) {
       const gain = emptyResources();
       for (const h of vertexHexes(topologyOf(draft), action.vertex)) {
         const terrain = draft.board.hexes[h]?.terrain;
@@ -117,15 +118,15 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
 export function advanceSetup(draft: GameState): void {
   const phase = draft.phase;
   if (phase.kind !== 'setup') return;
-  const n = draft.players.length;
+  const { order } = setupOrderOf(draft);
   const next = phase.index + 1;
-  if (next >= 2 * n) {
+  if (next >= order.length) {
     draft.turn.number = 1;
     draft.turn.current = draft.settings.startingPlayer;
     log(draft, null, 'Setup complete');
     beginTurn(draft);
   } else {
-    draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
+    draft.turn.current = order[next] as PlayerId;
     draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
   }
 }
