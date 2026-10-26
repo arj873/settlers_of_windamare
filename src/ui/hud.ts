@@ -48,13 +48,20 @@ import {
 } from './model';
 import { bankPanel, logList, playersList } from './sidebar';
 import { themePicker } from './theme';
-import type { BotSpeedControl, HudEventName, HudEvents, HudView, PlaceMode } from './types';
+import type {
+  BotSpeedControl,
+  HudEventName,
+  HudEvents,
+  HudView,
+  PlaceMode,
+  SessionAction,
+} from './types';
 import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
 
 type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
-type Section = 'log' | 'bank' | 'players';
+type Section = 'log' | 'bank' | 'players' | 'chat';
 type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
 
 const BUILD_LABEL: Record<BuildKind, string> = {
@@ -80,6 +87,7 @@ const SECTION_TITLE: Record<Section, string> = {
   log: 'Game Events',
   bank: 'Bank',
   players: 'Players',
+  chat: 'Chat',
 };
 
 /** How long a tapped "why is this disabled" bubble stays open. */
@@ -119,6 +127,10 @@ export class Hud {
   private drawerOpen = false;
   private collapsed = new Set<Section>();
   private botSpeed: BotSpeedControl | null = null;
+  /** Online: replaces "New game" in the menu and on the winner screen. */
+  private sessionActions: SessionAction[] | null = null;
+  /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
+  private chatSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
   private whyKind: BuildKind | null = null;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -167,6 +179,22 @@ export class Hud {
   /** Show a bot-speed picker in the menu (null hides it). The HUD keeps the chosen value. */
   setBotSpeed(control: BotSpeedControl | null): void {
     this.botSpeed = control;
+    this.refresh();
+  }
+
+  /** Online play: menu / winner-screen actions instead of "New game" (null = hotseat). */
+  setSessionActions(actions: SessionAction[] | null): void {
+    this.sessionActions = actions;
+    this.refresh();
+  }
+
+  /**
+   * Online play: show `panel` as a Chat section at the bottom of the sidebar (null removes it).
+   * The node is kept as is across renders.
+   */
+  setChat(panel: HTMLElement | null): void {
+    this.chatSec?.remove();
+    this.chatSec = panel ? this.section('chat', panel, true) : null;
     this.refresh();
   }
 
@@ -321,9 +349,17 @@ export class Hud {
     r.menu.replaceChildren(...this.menu(view));
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
-    r.bottom.replaceChildren(...this.handBar(state, view, av));
-    r.controls.replaceChildren(...this.controls(state, view, av));
-    this.renderDialog(state, view, legal);
+    if (view.spectator) {
+      // Public info only: no hand, no buttons, no dialogs; the dice stay visible.
+      r.bottom.replaceChildren();
+      r.controls.replaceChildren(this.diceBox(state));
+      r.dialog.replaceChildren();
+      this.lastDialogKey = '';
+    } else {
+      r.bottom.replaceChildren(...this.handBar(state, view, av));
+      r.controls.replaceChildren(...this.controls(state, view, av));
+      this.renderDialog(state, view, legal);
+    }
     r.overlay.replaceChildren(
       ...(state.phase.kind === 'gameOver' ? [this.winnerScreen(state)] : []),
     );
@@ -355,19 +391,23 @@ export class Hud {
       h(
         'div',
         { class: 'menu-panel wood', attrs: { role: 'menu' } },
-        h(
-          'button',
-          {
-            class: 'menu-item',
-            attrs: { role: 'menuitem' },
-            on: {
-              click: () => {
-                this.menuOpen = false;
-                this.showNewGame();
+        ...(this.sessionActions ?? [{ label: 'New game', onClick: () => this.showNewGame() }]).map(
+          (a) =>
+            h(
+              'button',
+              {
+                class: 'menu-item',
+                attrs: { role: 'menuitem' },
+                on: {
+                  click: () => {
+                    this.menuOpen = false;
+                    this.refresh();
+                    a.onClick();
+                  },
+                },
               },
-            },
-          },
-          'New game',
+              a.label,
+            ),
         ),
         showSpeed &&
           h(
@@ -415,6 +455,18 @@ export class Hud {
 
   private turnPill(state: GameState, view: HudView): HTMLElement[] {
     if (state.phase.kind === 'gameOver') return [];
+    const spectating =
+      view.spectator &&
+      h(
+        'span',
+        {
+          class: 'spectate-pill',
+          attrs: { role: 'status' },
+          title: 'You are watching: only public information is shown',
+        },
+        glyph('eye', 16),
+        'Spectating',
+      );
     const info = turnInfo(state, view, this.placeMode);
     const p = getPlayer(state, info.player);
     const timer = view.turnTimer;
@@ -447,6 +499,7 @@ export class Hud {
             'Cancel',
           ),
       ),
+      ...(spectating ? [spectating] : []),
     ];
   }
 
@@ -479,6 +532,7 @@ export class Hud {
       this.section('bank', bankPanel(state)),
       this.section('players', playersList(state, view)),
     );
+    if (this.chatSec) side.append(this.chatSec);
     const grew = state.log.length !== this.lastLogLength;
     this.lastLogLength = state.log.length;
     list.scrollTop = grew && wasAtBottom ? list.scrollHeight : prevTop;
@@ -502,9 +556,10 @@ export class Hud {
     );
   }
 
-  private section(key: Section, body: HTMLElement): HTMLElement {
+  /** `persistent`: the section is reused across renders, so collapsing toggles it in place. */
+  private section(key: Section, body: HTMLElement, persistent = false): HTMLElement {
     const closed = this.collapsed.has(key);
-    return h(
+    const sec: HTMLElement = h(
       'section',
       { class: `side-sec sec-${key}${closed ? ' is-collapsed' : ''}` },
       h(
@@ -521,10 +576,22 @@ export class Hud {
               'aria-expanded': String(!closed),
             },
             on: {
-              click: () => {
-                if (closed) this.collapsed.delete(key);
+              click: (e) => {
+                if (this.collapsed.has(key)) this.collapsed.delete(key);
                 else this.collapsed.add(key);
-                this.refresh();
+                if (!persistent) {
+                  this.refresh();
+                  return;
+                }
+                const now = this.collapsed.has(key);
+                sec.classList.toggle('is-collapsed', now);
+                const btn = e.currentTarget as HTMLElement;
+                btn.title = now ? 'Expand' : 'Collapse';
+                btn.setAttribute(
+                  'aria-label',
+                  `${now ? 'Expand' : 'Collapse'} ${SECTION_TITLE[key]}`,
+                );
+                btn.setAttribute('aria-expanded', String(!now));
               },
             },
           },
@@ -533,6 +600,7 @@ export class Hud {
       ),
       h('div', { class: 'sec-body' }, body),
     );
+    return sec;
   }
 
   // --- bottom-left: hand, trade, build bar ------------------------------------
@@ -1395,11 +1463,26 @@ export class Hud {
             ),
           ),
         ),
-        h(
-          'button',
-          { class: 'btn btn-primary btn-lg', on: { click: () => this.showNewGame() } },
-          'New game',
-        ),
+        this.sessionActions
+          ? h(
+              'div',
+              { class: 'winner-actions' },
+              ...this.sessionActions.map((a) =>
+                h(
+                  'button',
+                  {
+                    class: `btn ${a.primary ? 'btn-primary' : 'btn-ghost'} btn-lg`,
+                    on: { click: () => a.onClick() },
+                  },
+                  a.label,
+                ),
+              ),
+            )
+          : h(
+              'button',
+              { class: 'btn btn-primary btn-lg', on: { click: () => this.showNewGame() } },
+              'New game',
+            ),
       ),
     );
   }
