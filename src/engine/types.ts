@@ -134,7 +134,8 @@ export interface TradeOffer {
 
 export type Phase =
   /**
-   * Initial placement. `index` walks the snake order 0..2n-1 (player = setupPlayerAt(index, n)).
+   * Initial placement. `index` walks the snake order 0..2n-1
+   * (player = setupPlayerAt(index, n, settings.startingPlayer)).
    * Each index places one settlement, then one road touching `lastSettlement`.
    * index >= n is round 2: the settlement produces starting resources.
    */
@@ -200,10 +201,15 @@ export interface GameSettings {
   hideBankCards: boolean;
   /** Client-side only (seconds per turn, null = no timer); the engine ignores it. */
   turnTimerSec: number | null;
+  /**
+   * Seat that places first in setup and takes the first turn (schema v4; earlier saves: 0).
+   * createGame draws it from the seed unless the config fixes it (RULES.md 2.7).
+   */
+  startingPlayer: PlayerId;
 }
 
 export interface GameState {
-  schemaVersion: 3;
+  schemaVersion: 4;
   settings: GameSettings;
   board: Board;
   pieces: Pieces;

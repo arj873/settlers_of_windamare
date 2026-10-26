@@ -1,6 +1,7 @@
 /**
  * Playtest session server:
- *   `pnpm pt:serve [--seats 3..8] [--map base|baseRandom|base56|base78] [--seed S] [--vp N] [--headed]`
+ *   `pnpm pt:serve [--seats 3..8] [--map base|baseRandom|base56|base78] [--seed S] [--vp N]
+ *    [--timer SEC] [--headed]`
  *
  * Builds the app, serves it with `vite preview`, opens ONE Chromium page with an all-human
  * hotseat game (Seat1..SeatN, `?debug=1`) and keeps running. Headless by default (CI);

@@ -30,6 +30,7 @@ import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
   availability,
   bestRatios,
+  blockReasons,
   buildCards,
   devCardRows,
   DEV_CARD_INFO,
@@ -38,6 +39,7 @@ import {
   findYearOfPlenty,
   ofType,
   placeModeAvailable,
+  TIMER_WARN_SEC,
   turnInfo,
   viewerLegal,
   type Availability,
@@ -78,6 +80,9 @@ const SECTION_TITLE: Record<Section, string> = {
   players: 'Players',
 };
 
+/** How long a tapped "why is this disabled" bubble stays open. */
+const WHY_MS = 3500;
+
 /** Regions emptied while a full-screen cover is up. */
 const GAME_REGIONS = ['menu', 'turn', 'side', 'drawer', 'bottom', 'controls', 'dialog'] as const;
 
@@ -112,6 +117,9 @@ export class Hud {
   private drawerOpen = false;
   private collapsed = new Set<Section>();
   private botSpeed: BotSpeedControl | null = null;
+  /** Disabled build button whose reason was tapped open. */
+  private whyKind: BuildKind | null = null;
+  private whyTimer: ReturnType<typeof setTimeout> | null = null;
   private onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.menuOpen) {
@@ -147,6 +155,7 @@ export class Hud {
 
   /** Remove listeners and DOM. */
   destroy(): void {
+    if (this.whyTimer !== null) clearTimeout(this.whyTimer);
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('click', this.onDocClick, true);
     this.root.replaceChildren();
@@ -186,6 +195,19 @@ export class Hud {
     this.view = view;
     this.syncLocalState(state, view);
     this.refresh();
+  }
+
+  /** The hotseat cover or the new-game screen hides the game (the controller pauses the turn timer). */
+  isCovered(): boolean {
+    return this.root.classList.contains('is-covered');
+  }
+
+  /** Update only the turn timer (between renders; redraws just the turn pill). */
+  setTurnTimer(timer: HudView['turnTimer']): void {
+    if (!this.view || !this.state) return;
+    this.view = { ...this.view, turnTimer: timer };
+    if (this.isCovered()) return;
+    this.regions.turn.replaceChildren(...this.turnPill(this.state, this.view));
   }
 
   // -------------------------------------------------------------------------
@@ -231,6 +253,20 @@ export class Hud {
     this.placeMode = mode;
     this.emit('placeMode', mode);
     if (this.view) this.refresh();
+  }
+
+  /** Tap on a disabled build button: show its reason for a few seconds. */
+  private showWhy(kind: BuildKind): void {
+    if (this.whyTimer !== null) clearTimeout(this.whyTimer);
+    this.whyKind = this.whyKind === kind ? null : kind;
+    this.whyTimer = this.whyKind
+      ? setTimeout(() => {
+          this.whyKind = null;
+          this.whyTimer = null;
+          this.refresh();
+        }, WHY_MS)
+      : null;
+    this.refresh();
   }
 
   private send(a: Action): void {
@@ -379,11 +415,12 @@ export class Hud {
     const info = turnInfo(state, view, this.placeMode);
     const p = getPlayer(state, info.player);
     const timer = view.turnTimer;
+    const low = timer ? Math.ceil(timer.remainingSec) <= TIMER_WARN_SEC : false;
     return [
       h(
         'div',
         {
-          class: `turn-pill${info.hint?.tone === 'action' ? ' is-action' : ''}`,
+          class: `turn-pill${info.hint?.tone === 'action' ? ' is-action' : ''}${low ? ' is-timer-low' : ''}`,
           style: playerStyle(p.color),
           attrs: { role: 'status' },
         },
@@ -391,7 +428,12 @@ export class Hud {
         h(
           'div',
           { class: 'turn-text' },
-          h('span', { class: 'turn-title' }, info.title),
+          h(
+            'span',
+            { class: 'turn-title' },
+            info.title,
+            info.next && h('span', { class: 'turn-next' }, info.next),
+          ),
           info.hint && h('span', { class: `hint hint-${info.hint.tone}` }, info.hint.text),
         ),
         timer && this.timerBadge(timer.remainingSec, timer.totalSec),
@@ -411,9 +453,9 @@ export class Hud {
     return h(
       'span',
       {
-        class: `turn-timer${left <= 10 ? ' is-low' : ''}`,
+        class: `turn-timer${left <= TIMER_WARN_SEC ? ' is-low' : ''}`,
         style: { '--frac': String(frac) },
-        title: 'Time left this turn',
+        title: 'Time left; when it runs out the minimum moves are made for you',
       },
       `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
     );
@@ -570,13 +612,16 @@ export class Hud {
     const build = h(
       'div',
       { class: 'build-bar wood', style: playerStyle(me.color) },
-      ...buildCards(state, view.viewer, av).map((c) =>
-        h(
+      ...buildCards(state, view.viewer, av).map((c) => {
+        const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
+        const button = h(
           'button',
           {
             class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
             disabled: !c.enabled || over,
-            title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
+            ...(why.length > 0
+              ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
+              : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
             on: {
               click:
                 c.kind === 'dev'
@@ -598,8 +643,38 @@ export class Hud {
               Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
             ),
           ),
-        ),
-      ),
+        );
+        if (why.length === 0) return h('span', { class: 'bslot' }, button);
+        // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
+        return h(
+          'span',
+          {
+            class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
+            on: { click: () => this.showWhy(c.kind) },
+          },
+          button,
+          h(
+            'span',
+            { class: 'why', attrs: { role: 'tooltip' } },
+            h('b', {}, BUILD_LABEL[c.kind]),
+            ...why.map((w) =>
+              h(
+                'span',
+                { class: 'why-line' },
+                w.text,
+                w.missing &&
+                  h(
+                    'span',
+                    { class: 'why-cards' },
+                    ...Object.entries(w.missing).flatMap(([r, n]) =>
+                      Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        );
+      }),
     );
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";

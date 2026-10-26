@@ -23,6 +23,7 @@ export function freshGame(playerCount: 3 | 4 = 4): GameState {
     seed: 'fixture',
     players: FIXTURE_PLAYERS.slice(0, playerCount),
     map: 'base',
+    startingPlayer: 0,
   });
 }
 

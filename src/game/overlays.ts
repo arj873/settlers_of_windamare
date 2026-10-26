@@ -1,4 +1,4 @@
-/** Small DOM pieces the controller owns: toasts, the resume prompt and the bot-speed picker. */
+/** Small DOM pieces the controller owns: toasts, the resume prompt, bot-speed presets (HUD menu). */
 import type { ToastKind } from './controller';
 import './game.css';
 
@@ -65,32 +65,3 @@ export const SPEED_PRESETS: { label: string; ms: number }[] = [
   { label: 'Fast', ms: 150 },
   { label: 'Instant', ms: 0 },
 ];
-
-/** Bot speed picker (bottom-right). Returns a function that shows/hides it. */
-export function mountSpeedPicker(
-  initial: number,
-  onChange: (ms: number) => void,
-): (visible: boolean) => void {
-  const box = document.createElement('label');
-  box.className = 'game-speed';
-  box.textContent = 'Bots';
-  const select = document.createElement('select');
-  select.setAttribute('aria-label', 'Bot speed');
-  const presets = SPEED_PRESETS.some((p) => p.ms === initial)
-    ? SPEED_PRESETS
-    : [...SPEED_PRESETS, { label: `${initial} ms`, ms: initial }];
-  for (const p of presets) {
-    const o = document.createElement('option');
-    o.value = String(p.ms);
-    o.textContent = p.label;
-    o.selected = p.ms === initial;
-    select.append(o);
-  }
-  select.addEventListener('change', () => onChange(Number(select.value)));
-  box.append(select);
-  box.hidden = true;
-  document.body.append(box);
-  return (visible) => {
-    box.hidden = !visible;
-  };
-}

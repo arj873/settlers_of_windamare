@@ -36,6 +36,9 @@ describe('serveOptions', () => {
     expect(serveOptions({ seats: '2' }, 'x')).toHaveProperty('error');
     expect(serveOptions({ seats: '9' }, 'x')).toHaveProperty('error');
     expect(serveOptions({ vp: '50' }, 'x')).toHaveProperty('error');
+    expect(serveOptions({ timer: '2' }, 'x')).toHaveProperty('error');
+    const timed = serveOptions({ timer: '30' }, 'x');
+    expect('query' in timed && timed.query.timer).toBe('30');
     expect(serveOptions({ map: 'moon' }, 'x')).toHaveProperty('error');
   });
 });

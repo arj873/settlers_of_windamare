@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import type { Action } from '../engine';
-import { cornerVertex, createGame, PLAYER_COLORS, TOPOLOGY } from '../engine';
-import { discardGame, freshGame, midGame, tradeOfferGame } from '../engine/fixtures';
+import type { Action, GameState, VertexId } from '../engine';
+import { cornerVertex, createGame, legalActions, PLAYER_COLORS, TOPOLOGY } from '../engine';
+import {
+  discardGame,
+  freshGame,
+  midGame,
+  moveRobberGame as moveRobberGameState,
+  tradeOfferGame,
+} from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
 import {
   availability,
   bankCardsHidden,
   bankView,
   bestRatios,
+  blockReasons,
   boardPrompt,
   buildCards,
   inkFor,
@@ -185,6 +192,96 @@ describe('bank, build bar, players (redesigned HUD)', () => {
       title: "Blue's turn",
       hint: { text: 'thinking…', tone: 'wait' },
     });
+  });
+});
+
+describe('why a build button is disabled', () => {
+  const reasons = (s: GameState, viewer: number) => {
+    const av = availability(legalActions(s, viewer));
+    return Object.fromEntries(
+      buildCards(s, viewer, av).map((c) => [c.kind, blockReasons(s, viewer, c)]),
+    );
+  };
+
+  it('shows the missing cards; nothing for what is possible', () => {
+    // Blue: 2 wool, 3 grain, 3 ore, 1 lumber.
+    const r = reasons(midGame(), 1);
+    expect(r.road).toEqual([{ text: 'Missing 1 brick', missing: { brick: 1 } }]);
+    // Blue's roads are too short for a settlement too: both reasons, cost first.
+    expect(r.settlement).toEqual([
+      { text: 'Missing 1 brick', missing: { brick: 1 } },
+      { text: 'No legal spot (needs your road, no building next to it)' },
+    ]);
+    expect(r.city).toEqual([]);
+    expect(r.dev).toEqual([]);
+  });
+
+  it('not your turn / roll first / finish the step first', () => {
+    expect(reasons(midGame(), 0).road).toEqual([{ text: 'Not your turn' }]);
+    const pre = midGame();
+    pre.phase = { kind: 'preRoll' };
+    expect(reasons(pre, 1).city).toEqual([{ text: 'Roll the dice first' }]);
+    expect(reasons(moveRobberGameState(), 1).dev).toEqual([
+      { text: 'Finish the current step first' },
+    ]);
+  });
+
+  it('no pieces left, empty deck', () => {
+    const s = midGame();
+    expect(blockReasons(s, 1, { kind: 'road', left: 0, total: 15, enabled: false })).toEqual([
+      { text: 'No roads left (all 15 placed)' },
+    ]);
+    s.devDeck = [];
+    expect(reasons(s, 1).dev).toEqual([{ text: 'No development cards left' }]);
+  });
+
+  it('no legal spot, also when the cards are there', () => {
+    const s = midGame();
+    s.players[1]!.resources = { brick: 5, lumber: 5, wool: 5, grain: 5, ore: 5 };
+    for (const [v, b] of Object.entries(s.pieces.buildings)) {
+      if (b.owner === 1) s.pieces.buildings[v as VertexId] = { owner: 1, kind: 'city' };
+    }
+    expect(reasons(s, 1).city).toEqual([{ text: 'No settlement to upgrade' }]);
+    s.players[1]!.resources = { brick: 0, lumber: 0, wool: 5, grain: 5, ore: 0 };
+    expect(reasons(s, 1).city?.map((r) => r.text)).toEqual([
+      'Missing 3 ore',
+      'No settlement to upgrade',
+    ]);
+  });
+});
+
+describe('special building phase pill', () => {
+  it('names the builder and who is still to go', () => {
+    const s = midGame();
+    for (const p of s.players) p.resources = { brick: 1, lumber: 1, wool: 1, grain: 1, ore: 1 };
+    s.phase = { kind: 'specialBuild', builder: 2, owner: 1 };
+    s.turn.current = 2;
+    expect(turnInfo(s, view(0, [], true), null)).toMatchObject({
+      title: 'Special build: White',
+      next: 'then Orange, Red',
+    });
+    expect(turnInfo(s, view(2, [{ type: 'passSpecialBuild', player: 2 }]), null)).toMatchObject({
+      title: 'Special build: you',
+      hint: { text: 'Build or buy a card, then pass', tone: 'action' },
+    });
+    // Players who could not do anything are skipped by the engine, and so by the list.
+    s.players[0]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(turnInfo(s, view(0, []), null).next).toBe('then Orange');
+    s.phase = { kind: 'specialBuild', builder: 0, owner: 1 };
+    s.turn.current = 0;
+    expect(turnInfo(s, view(0, []), null).next).toBe("then White's turn");
+    // White builds first after Blue's turn and nobody else can: White's own turn is next.
+    s.phase = { kind: 'specialBuild', builder: 2, owner: 1 };
+    s.turn.current = 2;
+    s.players[3]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(turnInfo(s, view(2, []), null)).toMatchObject({
+      title: 'Special build: you',
+      next: 'then your turn',
+    });
+  });
+
+  it('has no queue outside the phase', () => {
+    expect(turnInfo(midGame(), view(1, []), null).next).toBeNull();
   });
 });
 

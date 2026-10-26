@@ -24,6 +24,8 @@
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
+      // Hover-only extras (e.g. the cost cards on build buttons) are not part of the label.
+      if (node !== el && node.getAttribute('aria-hidden') === 'true') return;
       if (node.getAttribute('role') === 'img' && node.getAttribute('aria-label')) {
         parts.push(node.getAttribute('aria-label'));
         return;
@@ -98,6 +100,7 @@
         enabled: !btn.disabled,
         on: btn.classList.contains('is-on') || btn.classList.contains('is-selected'),
         inDialog: !!(dialog && dialog.contains(btn)),
+        why: btn.getAttribute('data-why'),
       });
     }
 
@@ -148,12 +151,18 @@
     }));
 
     const total = document.querySelector('.dice-total');
-    const hint = document.querySelector('.hud-hint-wrap .hint');
+    // Turn pill (T17): title, hint and the T14 turn timer.
+    const hint = document.querySelector('.hud-turn .hint');
+    const title = document.querySelector('.hud-turn .turn-title');
+    const timer = document.querySelector('.hud-turn .turn-timer');
     return {
       cover: cover && visible(cover) ? text(cover) : null,
       screen,
       winnerText: winner ? text(winner) : null,
-      hint: hint ? text(hint).replace(/\s*Cancel$/, '') : null,
+      hint: hint ? text(hint) : null,
+      turnTitle: title ? text(title) : null,
+      timer: timer ? text(timer) : null,
+      timerLow: !!timer && timer.classList.contains('is-low'),
       dialogTitle: dialog ? text(dialog.querySelector('h2')) : null,
       dialogText,
       controls,

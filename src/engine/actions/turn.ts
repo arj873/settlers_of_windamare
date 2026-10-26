@@ -1,7 +1,7 @@
 /**
  * OWNER: T2 (rules-core); special build phase + balanced dice: T13.
  * rollDice (phase preRoll): two dice (rules/dice.ts: plain, or the balanced dice deck), set
- *   state.dice, then
+ *   state.dice, log "Blue rolled 8 (3+5)" (before T14 the log had no faces: "Blue rolled 8"), then
  *   - 7  -> discard phase if anyone holds > settings.discardLimit cards, else moveRobber{resume:'main'}
  *   - else production: each settlement 1 / city 2 of the hex's resource, skipping the robber hex.
  *     If the bank can't pay a resource to everyone owed, nobody gets it — unless only one player
@@ -40,6 +40,26 @@ function canSpecialBuild(state: GameState): boolean {
 }
 
 /**
+ * Special building phase: the builders still to come after the current one, clockwise, as far
+ * as can be told now (players who could build or buy in the current state). [] outside the phase.
+ */
+export function specialBuildQueue(state: GameState): PlayerId[] {
+  const phase = state.phase;
+  if (phase.kind !== 'specialBuild') return [];
+  const n = state.players.length;
+  const out: PlayerId[] = [];
+  for (let b = (phase.builder + 1) % n; b !== phase.owner; b = (b + 1) % n) {
+    const view: GameState = {
+      ...state,
+      turn: { ...state.turn, current: b },
+      phase: { kind: 'specialBuild', builder: b, owner: phase.owner },
+    };
+    if (canSpecialBuild(view)) out.push(b);
+  }
+  return out;
+}
+
+/**
  * Hand the special build step to the next player after `from` (clockwise, stopping before
  * `owner`) who can do something; when there is none, start owner+1's turn.
  */
@@ -72,7 +92,11 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
     draft.dice = dice;
     const roll = dice[0] + dice[1];
     if (reshuffled) log(draft, null, 'The dice deck was shuffled');
-    log(draft, action.player, `${playerName(draft, action.player)} rolled ${roll}`);
+    log(
+      draft,
+      action.player,
+      `${playerName(draft, action.player)} rolled ${roll} (${dice[0]}+${dice[1]})`,
+    );
 
     if (roll === 7) {
       const pending = discardAmounts(draft);

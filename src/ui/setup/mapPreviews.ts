@@ -1,7 +1,18 @@
 /**
- * Map thumbnails for the setup screen: plain SVG hexes, no images.
- * TODO(T12): the hex lists below are local stand-ins; switch them to the engine's per-map layouts.
+ * Map thumbnails for the setup screen: plain SVG hexes, no images. Built from the engine's own
+ * map data (`MAPS` / `topologyFor` / `generateBoard`), so a preview always has the real board's
+ * shape, water ring and harbor spots. The beginner map shows its real layout; random maps show
+ * one sample layout (a fixed seed), with the map's real terrain mix (e.g. two deserts on 5-6P).
  */
+import {
+  generateBoard,
+  parseHexId,
+  Rng,
+  topologyFor,
+  type HexId,
+  type PortKind,
+  type Terrain,
+} from '../../engine';
 import type { MapId } from '../types';
 
 export interface PreviewHex {
@@ -9,31 +20,43 @@ export interface PreviewHex {
   r: number;
 }
 
-/** Hexes per row, top to bottom. Rows are centred on each other (half-hex offsets). */
-const ROWS: Record<MapId, number[]> = {
-  base: [3, 4, 5, 4, 3],
-  baseRandom: [3, 4, 5, 4, 3],
-  base56: [3, 4, 5, 6, 5, 4, 3],
-  base78: [4, 5, 6, 7, 6, 5, 4],
+export interface PreviewBoard {
+  land: (PreviewHex & { terrain: Terrain })[];
+  water: PreviewHex[];
+  /** Harbor markers on their water hexes. */
+  harbors: (PreviewHex & { kind: PortKind })[];
+}
+
+const hexAt = (id: HexId): PreviewHex => {
+  const { q, r } = parseHexId(id);
+  return { q, r };
 };
 
-export function previewHexes(map: MapId): PreviewHex[] {
-  const rows = ROWS[map];
-  const mid = (rows.length - 1) / 2;
-  const out: PreviewHex[] = [];
-  rows.forEach((count, i) => {
-    const r = i - mid;
-    // Centre the row: x = √3 (q + r/2) must average to 0. The floor keeps q integral on
-    // boards whose rows differ by one hex (5-6P, 7-8P) - the whole shape just shifts half a hex.
-    const q0 = Math.floor(-(count - 1) / 2 - r / 2);
-    for (let j = 0; j < count; j++) out.push({ q: q0 + j, r });
-  });
+const cache = new Map<MapId, PreviewBoard>();
+
+export function previewBoard(map: MapId): PreviewBoard {
+  const hit = cache.get(map);
+  if (hit) return hit;
+  const topo = topologyFor(map);
+  const { board } = generateBoard(map, Rng.fromSeed(`preview:${map}`));
+  const out: PreviewBoard = {
+    land: topo.landHexes.map((id) => ({
+      ...hexAt(id),
+      terrain: board.hexes[id]?.terrain ?? 'desert',
+    })),
+    water: topo.waterHexes.map(hexAt),
+    harbors: board.ports.map((p) => ({ ...hexAt(p.waterHex), kind: p.kind })),
+  };
+  cache.set(map, out);
   return out;
 }
 
-export type PreviewTerrain = 'brick' | 'lumber' | 'wool' | 'grain' | 'ore' | 'desert';
+/** The land hexes of a map (row-major, top row first). */
+export function previewHexes(map: MapId): PreviewHex[] {
+  return previewBoard(map).land.map(({ q, r }) => ({ q, r }));
+}
 
-export const PREVIEW_COLORS: Record<PreviewTerrain, string> = {
+export const PREVIEW_COLORS: Record<Terrain, string> = {
   brick: '#c4532d',
   lumber: '#3f8f46',
   wool: '#9bcf6a',
@@ -41,34 +64,6 @@ export const PREVIEW_COLORS: Record<PreviewTerrain, string> = {
   ore: '#7f8fa0',
   desert: '#d9c48f',
 };
-
-const CYCLE: PreviewTerrain[] = [
-  'lumber',
-  'wool',
-  'grain',
-  'brick',
-  'ore',
-  'wool',
-  'grain',
-  'lumber',
-];
-
-/** Fixed, deterministic terrain per hex (desert nearest the middle). "Random" uses a different order. */
-export function previewTerrain(map: MapId, hexes: PreviewHex[]): PreviewTerrain[] {
-  const step = map === 'baseRandom' ? 5 : 3;
-  let desert = 0;
-  let best = Infinity;
-  hexes.forEach((hx, i) => {
-    const d = hexCenter(hx).x ** 2 + hexCenter(hx).y ** 2;
-    if (d < best) {
-      best = d;
-      desert = i;
-    }
-  });
-  return hexes.map((_, i) =>
-    i === desert ? 'desert' : (CYCLE[(i * step + (i >> 2)) % CYCLE.length] ?? 'wool'),
-  );
-}
 
 const SQRT3 = Math.sqrt(3);
 
@@ -88,12 +83,17 @@ function corners(cx: number, cy: number, size: number): string {
   return pts.join(' ');
 }
 
-/** A small decorative SVG of the map's board shape. */
+function el(tag: string, attrs: Record<string, string>): SVGElement {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
+
+/** A small SVG of the map's board: land by terrain, the water ring, harbor dots. */
 export function mapPreviewSvg(map: MapId): SVGSVGElement {
-  const hexes = previewHexes(map);
-  const terrain = previewTerrain(map, hexes);
-  const pad = 1.1;
-  const centers = hexes.map(hexCenter);
+  const { land, water, harbors } = previewBoard(map);
+  const pad = 0.9;
+  const centers = water.map(hexCenter);
   const minX = Math.min(...centers.map((c) => c.x)) - pad;
   const maxX = Math.max(...centers.map((c) => c.x)) + pad;
   const minY = Math.min(...centers.map((c) => c.y)) - pad;
@@ -107,13 +107,39 @@ export function mapPreviewSvg(map: MapId): SVGSVGElement {
   svg.setAttribute('class', 'map-preview');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
-  centers.forEach((c, i) => {
-    const poly = document.createElementNS(SVG_NS, 'polygon');
-    poly.setAttribute('points', corners(c.x, c.y, 0.93));
-    poly.setAttribute('fill', PREVIEW_COLORS[terrain[i] ?? 'desert']);
-    poly.setAttribute('stroke', 'rgba(8,18,30,0.55)');
-    poly.setAttribute('stroke-width', '0.08');
-    svg.append(poly);
-  });
+  for (const c of centers) {
+    svg.append(
+      el('polygon', {
+        points: corners(c.x, c.y, 0.97),
+        fill: '#3d8cc4',
+        stroke: 'rgba(8,18,30,0.3)',
+        'stroke-width': '0.06',
+      }),
+    );
+  }
+  for (const hx of land) {
+    const c = hexCenter(hx);
+    svg.append(
+      el('polygon', {
+        points: corners(c.x, c.y, 0.93),
+        fill: PREVIEW_COLORS[hx.terrain],
+        stroke: 'rgba(8,18,30,0.55)',
+        'stroke-width': '0.08',
+      }),
+    );
+  }
+  for (const hb of harbors) {
+    const c = hexCenter(hb);
+    svg.append(
+      el('circle', {
+        cx: c.x.toFixed(2),
+        cy: c.y.toFixed(2),
+        r: '0.36',
+        fill: hb.kind === 'generic' ? '#f4ead2' : PREVIEW_COLORS[hb.kind],
+        stroke: 'rgba(8,18,30,0.7)',
+        'stroke-width': '0.08',
+      }),
+    );
+  }
   return svg;
 }

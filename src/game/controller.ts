@@ -28,9 +28,19 @@ import {
   type Seats,
 } from './logic';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
+import {
+  IDLE_CLOCK,
+  clockView,
+  isExpired,
+  syncClock,
+  tickClock,
+  timeoutMove,
+  timerSlot,
+  type TurnClock,
+} from './turnTimer';
 
 export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'>;
-export type HudLike = Pick<Hud, 'render' | 'on'>;
+export type HudLike = Pick<Hud, 'render' | 'on' | 'isCovered' | 'setTurnTimer'>;
 export type ToastKind = 'error' | 'info';
 
 export interface ControllerOptions {
@@ -53,6 +63,9 @@ export const FAST_FACTOR = 0.4;
 const INSTANT_BATCH_MS = 12;
 /** A bot may make this many player-trade offers per turn (the random bot would spam them). */
 export const BOT_OFFERS_PER_TURN = 1;
+/** Turn timer tick. A long gap (background tab) counts as at most MAX_TICK_MS. */
+export const TIMER_TICK_MS = 250;
+const MAX_TICK_MS = 1000;
 
 /** The default bot: random, nudged to make progress instead of ending the turn at once. */
 export const defaultBot: Bot = createRandomBot({ progressBias: 0.5 });
@@ -77,6 +90,16 @@ export class GameController {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stallReported = false;
   private readonly unsubscribe: (() => void)[] = [];
+
+  // Turn timer (settings.turnTimerSec): pure clock in turnTimer.ts, ticked here.
+  private clock: TurnClock = IDLE_CLOCK;
+  private clockInterval: ReturnType<typeof setInterval> | null = null;
+  private clockLast = 0;
+  /** Whole seconds last sent to the HUD (re-render the pill only when they change). */
+  private clockShown = -1;
+  /** Slot key whose timeout was announced (one toast per timeout). */
+  private timedOutKey: string | null = null;
+  private timeoutRng = new Rng(1);
 
   constructor(opts: ControllerOptions) {
     this.board = opts.board;
@@ -135,6 +158,7 @@ export class GameController {
       throw new Error(`seats (${seats.length}) must match players (${state.players.length})`);
     }
     this.cancelTimer();
+    this.stopClock();
     this.current = state;
     this.seatList = [...seats];
     this.viewerId = opts.viewer ?? null;
@@ -142,6 +166,9 @@ export class GameController {
     this.offers.clear();
     this.stallReported = false;
     this.botRng = new Rng(opts.botRng ?? Rng.fromSeed(`bots:${String(state.settings.seed)}`).state);
+    this.clock = IDLE_CLOCK;
+    this.timedOutKey = null;
+    this.timeoutRng = Rng.fromSeed(`timer:${String(state.settings.seed)}`);
     this.refresh();
   }
 
@@ -189,6 +216,7 @@ export class GameController {
 
   destroy(): void {
     this.cancelTimer();
+    this.stopClock();
     for (const off of this.unsubscribe) off();
     this.unsubscribe.length = 0;
     this.current = null;
@@ -238,13 +266,17 @@ export class GameController {
     if (!state) return;
     this.legal = legalActions(state);
     this.viewerId = pickViewer(state, this.seatList, this.legal, this.viewerId);
+    this.syncClock(state);
     const turn = this.seatList[state.turn.current];
+    const turnTimer = clockView(this.clock);
+    this.clockShown = turnTimer ? Math.ceil(turnTimer.remainingSec) : -1;
     this.board.render(state);
     this.hud.render(state, {
       viewer: this.viewerId,
       legal: this.legal,
       isBotTurn: turn === 'bot',
       bots: this.seatList.map((s) => s === 'bot'),
+      turnTimer,
     });
     this.updateHighlights();
     this.persist();
@@ -274,6 +306,68 @@ export class GameController {
   private persist(): void {
     const snap = this.snapshot();
     if (snap && this.storage) saveSession(this.storage, snap);
+  }
+
+  // -------------------------------------------------------------------------
+  // Turn timer
+  // -------------------------------------------------------------------------
+
+  /** Who is on the clock after a state change; runs the tick only while someone is. */
+  private syncClock(state: GameState): void {
+    const sec = state.settings.turnTimerSec;
+    const slot = sec ? timerSlot(state, this.seatList, this.legal, this.viewerId) : null;
+    this.clock = syncClock(this.clock, slot, (sec ?? 0) * 1000);
+    if (this.clock.key === null) {
+      this.stopClock();
+    } else if (this.clockInterval === null) {
+      this.clockLast = now();
+      this.clockInterval = setInterval(() => this.clockTick(), TIMER_TICK_MS);
+    }
+  }
+
+  private stopClock(): void {
+    if (this.clockInterval !== null) clearInterval(this.clockInterval);
+    this.clockInterval = null;
+  }
+
+  /** Count down unless the hotseat cover (or the new-game screen) hides the game. */
+  private clockTick(): void {
+    const t = now();
+    const dt = Math.min(t - this.clockLast, MAX_TICK_MS);
+    this.clockLast = t;
+    if (!this.current || this.clock.key === null || this.hud.isCovered()) return;
+    this.clock = tickClock(this.clock, dt);
+    if (isExpired(this.clock)) {
+      this.timeUp();
+      return;
+    }
+    const view = clockView(this.clock);
+    const shown = view ? Math.ceil(view.remainingSec) : -1;
+    if (shown !== this.clockShown) {
+      this.clockShown = shown;
+      this.hud.setTurnTimer(view);
+    }
+  }
+
+  /**
+   * Time is up: make one minimum move for the player on the clock. The slot usually stays
+   * expired (e.g. after rolling), so the next ticks keep going until the turn has passed.
+   */
+  private timeUp(): void {
+    const state = this.current;
+    const player = this.clock.player;
+    if (!state || player === null) return;
+    const action = timeoutMove(state, this.legal, player, this.timeoutRng);
+    if (!action) {
+      // Nothing to do after all: forget the slot (it restarts if it comes back).
+      this.clock = IDLE_CLOCK;
+      return;
+    }
+    if (this.timedOutKey !== this.clock.key) {
+      this.timedOutKey = this.clock.key;
+      this.toast(`${state.players[player]?.name ?? 'Player'} ran out of time`, 'info');
+    }
+    this.dispatch(action);
   }
 
   // -------------------------------------------------------------------------

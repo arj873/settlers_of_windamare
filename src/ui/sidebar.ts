@@ -21,16 +21,20 @@ function tokenNode(
       return playerName(state.players[t.id]);
     case 'resource':
       return miniCards(t.resource, t.count);
-    case 'dice':
-      // The latest roll shows its real faces; older ones only have the total in the log.
-      return liveDice && liveDice[0] + liveDice[1] === t.total
+    case 'dice': {
+      // The log has both faces since T14. Older saves only have the total: their latest roll
+      // borrows the faces from state.dice, earlier ones show the number.
+      const faces =
+        t.faces ?? (liveDice && liveDice[0] + liveDice[1] === t.total ? liveDice : null);
+      return faces
         ? h(
             'span',
-            { class: 'log-dice', title: `Rolled ${t.total}` },
-            dieFace(liveDice[0]),
-            dieFace(liveDice[1]),
+            { class: 'log-dice', title: `Rolled ${t.total} (${faces[0]}+${faces[1]})` },
+            dieFace(faces[0]),
+            dieFace(faces[1]),
           )
         : h('span', { class: 'log-roll', title: `Rolled ${t.total}` }, String(t.total));
+    }
     case 'piece':
       return glyph(t.piece, 18, t.piece);
     case 'dev':
@@ -53,7 +57,7 @@ export function logList(state: GameState): HTMLElement {
   const groups = groupLog(state.log, state.players);
   let lastRoll = -1;
   state.log.forEach((e, i) => {
-    if (/ rolled \d+$/.test(e.text)) lastRoll = i;
+    if (/ rolled \d+( \(\d\+\d\))?$/.test(e.text)) lastRoll = i;
   });
   return h(
     'div',

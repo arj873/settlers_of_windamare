@@ -10,7 +10,15 @@ import {
 import { MAPS, defaultMapFor, isMapId } from './maps';
 import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
-import type { DevCardType, GameSettings, GameState, Layout, MapId, Player } from './types';
+import type {
+  DevCardType,
+  GameSettings,
+  GameState,
+  Layout,
+  MapId,
+  Player,
+  PlayerId,
+} from './types';
 
 export interface PlayerConfig {
   name: string;
@@ -19,7 +27,7 @@ export interface PlayerConfig {
 
 export interface GameConfig {
   seed: number | string;
-  /** In turn order; player 0 places first in setup. Count must fit the map (3..8 overall). */
+  /** In seat (turn) order; `startingPlayer` places first. Count must fit the map (3..8 overall). */
   players: PlayerConfig[];
   /**
    * Board. Default: `layout` if given (compat), else the smallest random map designed for the
@@ -40,6 +48,19 @@ export interface GameConfig {
   hideBankCards?: boolean;
   /** Default null (no timer). Client-side only. */
   turnTimerSec?: number | null;
+  /**
+   * Who starts (places first, takes the first turn). Default 'random': a seat drawn from the
+   * seed, as the official rules have the players roll for it (RULES.md 2.7).
+   */
+  startingPlayer?: PlayerId | 'random';
+}
+
+/**
+ * The seat a seed starts with. Drawn from its own stream (not the game RNG), so the board, the
+ * deck and every roll of a seed stay the same as before starting players were random.
+ */
+export function randomStartingPlayer(seed: number | string, playerCount: number): PlayerId {
+  return Rng.fromSeed(`start:${typeof seed === 'number' ? `n${seed}` : seed}`).int(playerCount);
 }
 
 export function layoutToMap(layout: Layout): MapId {
@@ -66,6 +87,11 @@ export function resolveSettings(config: GameConfig): GameSettings {
   if (timer !== null && (!Number.isInteger(timer) || timer <= 0)) {
     throw new Error(`turnTimerSec must be a positive integer or null, got ${timer}`);
   }
+  const start = config.startingPlayer ?? 'random';
+  const startingPlayer =
+    start === 'random'
+      ? randomStartingPlayer(config.seed, n)
+      : intInRange('startingPlayer', start, { min: 0, max: n - 1 });
   return {
     seed: config.seed,
     map,
@@ -79,10 +105,11 @@ export function resolveSettings(config: GameConfig): GameSettings {
     specialBuildPhase: config.specialBuildPhase ?? n >= 5,
     hideBankCards: config.hideBankCards ?? false,
     turnTimerSec: timer,
+    startingPlayer,
   };
 }
 
-/** Build the initial state: board generated, deck shuffled, phase = setup (player 0, settlement). */
+/** Build the initial state: board generated, deck shuffled, phase = setup (starting player, settlement). */
 export function createGame(config: GameConfig): GameState {
   const settings = resolveSettings(config);
   const def = MAPS[settings.map];
@@ -110,8 +137,9 @@ export function createGame(config: GameConfig): GameState {
   const bank = emptyResources();
   for (const r of RESOURCES) bank[r] = def.bankPerResource;
 
+  const first = settings.startingPlayer;
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     settings,
     board,
     pieces: { buildings: {}, roads: {} },
@@ -119,7 +147,7 @@ export function createGame(config: GameConfig): GameState {
     players,
     bank,
     devDeck,
-    turn: { number: 0, current: 0, devCardPlayed: false, tradeOffers: 0 },
+    turn: { number: 0, current: first, devCardPlayed: false, tradeOffers: 0 },
     phase: { kind: 'setup', index: 0, step: 'settlement', lastSettlement: null },
     dice: null,
     diceDeck: [],
@@ -130,6 +158,7 @@ export function createGame(config: GameConfig): GameState {
         player: null,
         text: `Game created (${def.name} map, seed ${String(config.seed)})`,
       },
+      { turn: 0, player: first, text: `${players[first]?.name ?? `Player ${first + 1}`} starts` },
     ],
     rng: rng.state,
     winner: null,

@@ -27,8 +27,9 @@ import {
 /**
  * Dev params: `?fixture=midGame` (any fixtures.ts function), `?seed=…&layout=beginner|random`
  * or `?map=base|baseRandom|base56|base78` (start at once), `?autoplay=4bots&speed=0` (all-bot
- * game, 3..8 bots), `?seats=hbbb`, `?vp=5`, `?speed=ms`, `?hl=vertices|edges|hexes` (highlight
- * preview), `?names=A,B,C`, `?debug=1` (playtest hook). Without any, the new-game / resume screen opens.
+ * game, 3..8 bots), `?seats=hbbb`, `?vp=5`, `?timer=20` (turn timer, s), `?first=0` (starting
+ * seat), `?speed=ms`, `?hl=vertices|edges|hexes` (highlight preview), `?names=A,B,C`, `?debug=1`
+ * (playtest hook). Without any, the new-game / resume screen opens.
  */
 function devGame(params: DevParams): { state: GameState; seats: Controller[] } | null {
   const seatsFor = (n: number, fallback: Controller): Controller[] =>
@@ -37,7 +38,10 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
   if (params.fixture) {
     const make = (fixtures as unknown as Record<string, unknown>)[params.fixture];
     if (typeof make === 'function') {
-      const state = (make as () => GameState)();
+      let state = (make as () => GameState)();
+      if (params.timer !== null) {
+        state = { ...state, settings: { ...state.settings, turnTimerSec: params.timer } };
+      }
       return { state, seats: seatsFor(state.players.length, 'human') };
     }
     showToast(`Unknown fixture "${params.fixture}"`, 'error');
@@ -55,6 +59,8 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
         players: PLAYER_COLORS.slice(0, n).map((p, i) => ({ ...p, name: names?.[i] ?? p.name })),
         map,
         ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
+        ...(params.timer === null ? {} : { turnTimerSec: params.timer }),
+        ...(params.first === null || params.first >= n ? {} : { startingPlayer: params.first }),
       });
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), 'error');
