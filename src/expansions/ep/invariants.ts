@@ -4,6 +4,7 @@
  */
 import {
   RESOURCES,
+  expansionVictoryPoints,
   pieceLimit,
   terrainKind,
   victoryPoints,
@@ -16,9 +17,11 @@ import type { Violation } from '../../bots/invariants';
 import { graph, isCoastal, isPirateHex, isShipEdge } from './engine/geometry';
 import { FISH_HAULS, mapKeyOf, specOf, T } from './engine/maps';
 import { missionVp, spaceVp, totalMissionVp } from './engine/missions';
+import { epModule } from './engine';
 import { cargoOnBoard, harborsOf } from './engine/ships';
 import {
   CARGO,
+  citiesInPlay,
   HOLD,
   ITEM,
   LAIR_CREWS,
@@ -92,7 +95,11 @@ function check(state: GameState, s: EpSlice, bad: (m: string, p?: PlayerId) => v
     VertexId,
     { owner: number; kind: string },
   ][]) {
-    if (b.kind !== 'settlement') bad(`a ${b.kind} at ${v}`, b.owner);
+    // Cities only with Cities & Knights (E&P + C&K), and never a harbor settlement.
+    if (b.kind !== 'settlement' && !(b.kind === 'city' && citiesInPlay(state))) {
+      bad(`a ${b.kind} at ${v}`, b.owner);
+    }
+    if (b.kind !== 'settlement' && s.harbors[v] !== undefined) bad(`a harbor ${b.kind} at ${v}`);
     const hexes = g.hexesAt.get(v) ?? [];
     if (hexes.some((h) => terrainKind(state.board.hexes[h]?.terrain ?? 'sea') === 'fog')) {
       bad(`building next to an unexplored hex at ${v}`, b.owner);
@@ -122,9 +129,12 @@ function check(state: GameState, s: EpSlice, bad: (m: string, p?: PlayerId) => v
       bad('too many settlers', p);
     if (cargoOnBoard(state, p, 'crew') > pieceLimit(state, p, ITEM.crew)) bad('too many crews', p);
     const plain = Object.entries(state.pieces.buildings).filter(
-      ([v, b]) => b.owner === p && s.harbors[v as VertexId] === undefined,
+      ([v, b]) =>
+        b.owner === p && b.kind === 'settlement' && s.harbors[v as VertexId] === undefined,
     ).length;
-    if (plain > 5) bad(`${plain} settlements`, p);
+    // 5, or more with C&K's pillaged cities on their side (the limit already includes harbors).
+    const pieces = pieceLimit(state, p, 'settlement') - harborsOf(state, p).length;
+    if (plain > pieces) bad(`${plain} settlements`, p);
   }
 
   // --- face-down hexes ------------------------------------------------------------------------
@@ -180,11 +190,18 @@ function check(state: GameState, s: EpSlice, bad: (m: string, p?: PlayerId) => v
     });
   }
   for (let p = 0; p < n; p++) {
-    const buildings = Object.values(state.pieces.buildings).filter((b) => b.owner === p).length;
+    // Buildings (a city 2) + every module's VP; E&P's own share = its missions and harbors.
+    const buildings = Object.values(state.pieces.buildings)
+      .filter((b) => b.owner === p)
+      .reduce((k, b) => k + (b.kind === 'city' ? 2 : 1), 0);
     const v = missionVp(state, p);
-    const expected = buildings + totalMissionVp(v);
+    const modules = expansionVictoryPoints(state, p);
+    const expected = buildings + modules.public + modules.hidden;
     const vp = victoryPoints(state, p);
     if (vp !== expected) bad(`VP ${vp} ≠ ${expected}`, p);
+    if (epModule.hooks?.victoryPoints?.(state, p).public !== totalMissionVp(v)) {
+      bad('E&P VP mismatch', p);
+    }
     for (const m of MISSIONS) {
       const t = s.tracks[m];
       if (t && (v.tracks[m] ?? 0) !== spaceVp(m, t.pos[p] ?? 0)) bad(`${m} VP`, p);

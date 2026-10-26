@@ -25,7 +25,8 @@ export const PROGRESS_CARD_TYPES: readonly ProgressCardType[] = [
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 8;
 export const DEFAULT_VP_TO_WIN = 10;
-export const VP_TO_WIN_RANGE = { min: 3, max: 20 } as const;
+/** Up to 25: Explorers & Pirates (full game, 17) + Cities & Knights (+5) needs 22. */
+export const VP_TO_WIN_RANGE = { min: 3, max: 25 } as const;
 /** Default `settings.discardLimit`: on a 7, players holding MORE than this discard half. */
 export const DEFAULT_DISCARD_LIMIT = 7;
 export const DISCARD_LIMIT_RANGE = { min: 5, max: 20 } as const;

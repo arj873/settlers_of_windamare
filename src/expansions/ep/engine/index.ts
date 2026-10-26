@@ -60,6 +60,7 @@ import { maskEp } from './mask';
 import { missionsOf, missionVp, newTrack, totalMissionVp, vpParts } from './missions';
 import { harborsOf } from './ships';
 import {
+  citiesInPlay,
   EP,
   freshTurn,
   ITEM,
@@ -76,6 +77,7 @@ import {
 } from './state';
 
 export * from './state';
+export * from './trade';
 export { A as EP_ACTIONS } from './actions';
 
 const name = (s: GameState, p: PlayerId) => playerName(s, p);
@@ -249,6 +251,7 @@ function cloneSlice(x: unknown): EpSlice {
     pirate: s.pirate ? { ...s.pirate } : null,
     tracks: cloneJson(s.tracks),
     turn: cloneJson(s.turn),
+    ...(s.trade ? { trade: { ...s.trade } } : {}),
   };
 }
 
@@ -372,7 +375,7 @@ export const epModule: ExpansionModule = {
     cost: (_state, item, base) => COST[item] ?? base,
 
     pieceLimit(state, p, kind, base) {
-      if (kind === 'city') return 0;
+      if (kind === 'city') return citiesInPlay(state) ? base : 0;
       // A harbor settlement frees its settlement piece (§4.2).
       if (kind === 'settlement') return base + harborsOf(state, p).length;
       if (kind === ITEM.crew && !rulesOf(state).crews) return 0;
@@ -382,8 +385,19 @@ export const epModule: ExpansionModule = {
     vertexBlocked: vertexClosed,
     edgeBlocked: edgeClosed,
 
-    // No harbors (ports) and no 4:1: every resource trades 3:1 with the supply (§3.3).
-    bankTradeRatio: () => 3,
+    // No harbors (ports) and no 4:1: every resource trades 3:1 with the supply (§3.3); a better
+    // rate from another module stays (C&K's merchant, Merchant Fleet).
+    bankTradeRatio: (_state, _p, _r, base) => Math.min(base, 3),
+
+    // Event Cards give the numbers only (E&P + T&B sheet: "ignoring the effects").
+    onRoll(draft) {
+      const e = draft.lastEvent;
+      if (draft.settings.eventCards && e && e !== 'none') {
+        draft.lastEvent = 'none';
+        log(draft, null, 'Explorers & Pirates uses only the number of the event card');
+      }
+      return undefined;
+    },
 
     roadLength: () => 0,
     armySize: () => 0,
@@ -409,6 +423,8 @@ export const epModule: ExpansionModule = {
     deferVictory: (state) => state.phase.kind === 'ep/setupFleet',
 
     afterAction(draft, action) {
+      const s = epSlice(draft);
+      if (s.trade && draft.phase.kind !== 'trade') s.trade = null;
       if (action.type === 'placeSetupSettlement') {
         afterSetupSettlement(draft, action.vertex);
       }

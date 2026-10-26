@@ -233,7 +233,7 @@ describe('persistence', () => {
     const d = loadSetup(st);
     expect(d.map).toBe('base78'); // 7 seats; unknown map fell back to base, then grew
     expect(d.seats).toHaveLength(7);
-    expect(d.vpToWin).toBe(20);
+    expect(d.vpToWin).toBe(25);
     expect(d.discardLimit).toBe(5);
     expect(d.timerIdx).toBe(0);
     expect(d.balancedDice).toBe(false);
@@ -367,7 +367,7 @@ describe('SetupScreen', () => {
   it('sliders have the documented bounds and defaults', () => {
     const vp = q<HTMLInputElement>('input[data-k="vp"]');
     const dl = q<HTMLInputElement>('input[data-k="discard"]');
-    expect([vp.min, vp.max, vp.value]).toEqual(['3', '20', '10']);
+    expect([vp.min, vp.max, vp.value]).toEqual(['3', '25', '10']);
     expect([dl.min, dl.max, dl.value]).toEqual(['5', '20', '7']);
     slide('vp', 14);
     slide('discard', 12);

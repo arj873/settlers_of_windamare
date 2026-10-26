@@ -34,6 +34,7 @@ import {
   type TbSlice,
 } from './engine';
 import { HIDDEN_BA_CARD, HIDDEN_COMMODITY, HIDDEN_FISH } from './engine/mask';
+import { EPTB_MODE } from '../eptb/engine';
 
 const withSlice = (state: GameState, s: TbSlice): GameState => ({
   ...state,
@@ -126,6 +127,17 @@ describe('T&B online views: no secret leaks in bot games', () => {
     expect(report.planted).toBeGreaterThan(5);
     if (perSeat) expect(report.ownerSaw).toBeGreaterThan(players);
   });
+
+  it('E&P + T&B (Fishermen on the E&P island): fish hands and pool stay hidden', () => {
+    const states = sampleStates(
+      { seed: 19, players: 4, mode: EPTB_MODE, scenario: 'ep/fish' },
+      3000,
+      20,
+    );
+    const report = expectNoLeak(states, plantTb);
+    expect(report.planted).toBeGreaterThan(5);
+    expect(report.ownerSaw).toBeGreaterThan(4);
+  }, 60_000);
 
   it.each([
     [SC_RIVERS, 4, 21],

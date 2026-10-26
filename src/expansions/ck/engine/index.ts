@@ -60,6 +60,8 @@ import {
   payCommodities,
   payResources,
   pillageOverflow,
+  measuringPieces,
+  settlementPieces,
   promote,
   promoteBuildBlocker,
   stealRandom,
@@ -701,8 +703,13 @@ export const ckModule: ExpansionModule = {
         return KNIGHTS_PER_LEVEL;
       }
       if (kind === WALL_ITEM) return WALLS_PER_PLAYER;
-      // A pillaged city lying on its side (FAQ Q15): a settlement made of a city piece.
-      if (kind === 'settlement') return Math.max(base, buildingsOf(state, p, 'settlement').length);
+      // A pillaged city lying on its side (FAQ Q15): a settlement made of a city piece. Modules
+      // after C&K may add settlement pieces (E&P: one per harbor settlement): `extra`.
+      if (measuringPieces()) return base;
+      if (kind === 'settlement') {
+        const extra = settlementPieces(state, p) - base;
+        return Math.max(base, buildingsOf(state, p, 'settlement').length - extra);
+      }
       if (kind === 'city') return base - pillageOverflow(state, p);
       return base;
     },
