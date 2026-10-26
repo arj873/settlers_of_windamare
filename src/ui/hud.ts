@@ -97,6 +97,8 @@ export class Hud {
   private yopFirst: Resource | null = null;
   private draft: TradeDraft = emptyDraft([]);
   private discardSel: ResourceCounts = emptyResources();
+  /** Viewer the discard selection was made for (null outside the discard phase). */
+  private discardFor: PlayerId | null = null;
   private setup: SetupScreen | null = null;
   private newGameOpen = false;
   /** The viewer who has been shown the screen (hotseat cover compares against this). */
@@ -217,7 +219,11 @@ export class Hud {
     if (this.dialog !== 'trade') this.draft = emptyDraft(others);
     this.draft = { ...this.draft, to: this.draft.to.filter((p) => others.includes(p)) };
 
-    if (state.phase.kind !== 'discard') this.discardSel = emptyResources();
+    // Several players can owe a discard on the same 7: the selection belongs to one viewer.
+    if (state.phase.kind !== 'discard' || this.discardFor !== view.viewer) {
+      this.discardSel = emptyResources();
+      this.discardFor = state.phase.kind === 'discard' ? view.viewer : null;
+    }
   }
 
   private setPlaceMode(mode: PlaceMode | null): void {

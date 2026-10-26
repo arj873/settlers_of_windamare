@@ -104,6 +104,23 @@ describe('Hud', () => {
     expect(a).toMatchObject({ type: 'discard', player: 1 });
   });
 
+  it("discard selection does not carry over to the next player's discard", () => {
+    const s = discardGame(); // Blue (1) and Orange (3) both owe a discard.
+    hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
+    const plus = (i: number) =>
+      root
+        .querySelectorAll<HTMLElement>('.dialog .step')
+        [i]!.querySelectorAll('button')[1]!
+        .click();
+    plus(3);
+    plus(3);
+    hud.render(s, { viewer: 3, legal: fakeLegal(s, 3), isBotTurn: false });
+    byText('show my cards')!.click();
+    const values = [...root.querySelectorAll('.dialog .step-val')].map((e) => e.textContent);
+    expect(values.length).toBeGreaterThan(0);
+    expect(values.every((v) => v === '0')).toBe(true);
+  });
+
   it('responder sees accept/reject; offerer can confirm an acceptor', () => {
     const s = tradeOfferGame();
     s.players[2]!.resources.brick = 1;
