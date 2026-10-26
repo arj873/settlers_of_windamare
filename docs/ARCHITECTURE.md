@@ -17,7 +17,9 @@ src/server/  Cloudflare room server   Worker + Durable Object around GameSession
 ```
 
 Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
-clients get `viewFor(state, seat)` (§8) and their legal actions.
+clients get `viewFor(state, seat)` (§8) and their legal actions. Browser client (home, lobby,
+`RoomClient`, `NetGameController`, `src/game/online`, `src/ui/online`; `HudView.spectator` /
+`.away`, `Hud.setChat` / `.setSessionActions`): `docs/ONLINE-CLIENT.md`.
 
 Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, action) -> new state -> render/ui`.
 Nobody but `applyAction` produces a new GameState (fixtures excepted).

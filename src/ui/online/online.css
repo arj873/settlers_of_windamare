@@ -1,0 +1,660 @@
+/*
+ * Online play (M3): home screen, lobby, chat, reactions, reconnect banner, and the HUD's online
+ * bits (spectating pill, away icon, chat section). Theme tokens only (src/ui/theme); the lobby
+ * reuses the setup screen's classes (.su-*) so it looks like the hotseat setup.
+ */
+
+/* ---- full-screen pages (home, lobby, notices) ------------------------ */
+/* They also carry `.setup`, so themes give them the setup screen's local ink. */
+.online-screen,
+.online-screen.setup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  color: var(--ink);
+  font: 14px/1.35 var(--font-ui);
+  background: var(--setup-bg);
+  animation: ol-fade 0.2s ease;
+  user-select: none;
+}
+.online-screen *,
+.online-screen *::before,
+.online-screen *::after {
+  box-sizing: border-box;
+}
+.online-screen h1,
+.online-screen h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+}
+.online-screen p {
+  margin: 0;
+}
+.online-screen button {
+  font: inherit;
+}
+.online-screen .muted {
+  color: var(--ink-dim);
+}
+@keyframes ol-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* home + notices */
+.ol-home {
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px 16px;
+}
+.ol-home-card {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.ol-home-card h1 {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-case);
+  color: var(--ink);
+}
+.ol-home-theme {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+}
+.ol-logo {
+  color: var(--accent);
+}
+.ol-home.is-busy {
+  cursor: progress;
+}
+.ol-home.is-busy button {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.ol-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+.ol-field .input {
+  width: 220px;
+}
+.ol-choices {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.ol-choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  text-align: left;
+  color: var(--ink);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--tile-bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--tile-shadow);
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.18s ease;
+}
+.ol-choice > .glyph {
+  grid-row: span 2;
+  color: var(--accent);
+}
+.ol-choice > :not(.glyph) {
+  grid-column: 2;
+}
+button.ol-choice:hover {
+  transform: translateY(-1px);
+  border-color: var(--tile-hover-edge);
+}
+.ol-choice.is-primary {
+  border-color: var(--accent);
+  background: var(--tile-on-bg), var(--tile-bg);
+}
+.ol-join {
+  cursor: default;
+}
+.ol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ol-code-input {
+  flex: 1;
+  min-width: 140px;
+}
+.ol-wide {
+  min-width: 220px;
+}
+.ol-code {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.ol-error {
+  min-height: 1.35em;
+  color: var(--bad);
+  font-weight: 700;
+}
+.ol-notice-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---- lobby ------------------------------------------------------------ */
+.ol-inner {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 22px 0 26px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 26px;
+  align-items: start;
+}
+.ol-main {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+.ol-side {
+  position: sticky;
+  top: 0;
+}
+.ol-lobby .su-footer-in {
+  width: min(1180px, 100%);
+}
+.ol-link {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  user-select: all;
+}
+.ol-link + .btn,
+.ol-row .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ol-name {
+  width: 200px;
+}
+.ol-note {
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+.ol-role {
+  display: flex;
+  gap: 6px;
+}
+.tag.ol-tag-host {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.ol-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.ol-seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--tile-bg);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--pc);
+  box-shadow: var(--tile-shadow);
+}
+.ol-seat.is-mine {
+  border-color: var(--accent);
+  border-left-color: var(--pc);
+  background: var(--tile-on-bg), var(--tile-bg);
+}
+.ol-seat.is-open {
+  border-style: dashed;
+  border-left-style: solid;
+}
+.ol-seat.is-away {
+  opacity: 0.7;
+}
+.ol-seat-dot {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: color-mix(in srgb, var(--pc) 30%, #000);
+  background: var(--pc);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+.ol-seat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ol-seat-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 750;
+  font-size: 15px;
+  min-width: 0;
+}
+.ol-seat.is-open .ol-seat-name {
+  color: var(--ink-dim);
+}
+.ol-seat-sub {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.ol-seat .su-swatches {
+  margin: 4px 0 0;
+  flex-wrap: wrap;
+}
+.ol-seat-actions {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.ol-hint {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  max-width: 90px;
+  text-align: right;
+}
+.ol-seat-add {
+  justify-content: center;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink-dim);
+  cursor: pointer;
+  border-style: dashed;
+  border-left: 1px dashed var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+.ol-seat-add:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.ol-add-plus {
+  font-size: 24px;
+  line-height: 1;
+}
+.ol-spec-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.ol-spec-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+.ol-spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--tile-bg);
+  border: 1px solid var(--line);
+}
+.ol-spec.is-away {
+  opacity: 0.6;
+}
+.ol-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+.ol-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The wrapped setup screen: inline, without the parts the lobby replaces. */
+.ol-config .setup {
+  position: static;
+  background: none;
+  animation: none;
+}
+.ol-config .su-scroll {
+  overflow: visible;
+}
+.ol-config .su-inner {
+  width: 100%;
+  padding: 0;
+}
+.ol-config .su-head,
+.ol-config .su-footer,
+.ol-config .su-more,
+.ol-config [aria-labelledby='su-h-seats'] {
+  display: none;
+}
+.ol-config.is-readonly {
+  opacity: 0.72;
+  filter: saturate(0.8);
+}
+.ol-config.is-readonly * {
+  cursor: default !important;
+}
+
+/* ---- chat ------------------------------------------------------------- */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  flex: 1;
+}
+.ol-chat .chat {
+  height: min(60vh, 520px);
+}
+.chat-list {
+  flex: 1;
+  min-height: 70px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--log-bg);
+  box-shadow: var(--log-shadow);
+  font: 14px/1.45 var(--font-log);
+  color: var(--log-ink);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.chat-row {
+  padding: 1px 0;
+}
+.chat-row.is-system {
+  font-style: italic;
+  color: var(--log-dim);
+  font-size: 13px;
+}
+.chat-name {
+  color: color-mix(in srgb, var(--pc, var(--log-ink)) var(--pname-mix, 70%), var(--log-ink));
+  text-shadow: var(--pname-shadow);
+}
+.chat-empty {
+  color: var(--log-dim);
+  font-style: italic;
+  font-size: 13px;
+}
+.chat-compose {
+  display: flex;
+  gap: 6px;
+}
+.chat-input {
+  flex: 1;
+  width: auto;
+}
+.chat-send {
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+}
+.chat-reacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chat-react {
+  flex: 1 0 auto;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--raised-ink);
+  border-radius: var(--btn-radius);
+  border: 1.5px solid var(--edge);
+  background: var(--surface-raised);
+  box-shadow: var(--btn-shadow);
+}
+.chat-react.is-text {
+  font: 800 12px/1 var(--font-ui);
+}
+.chat-react:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.chat-react:disabled,
+.chat-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.chat-note {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.chat-note:empty {
+  display: none;
+}
+
+/* chat as a HUD sidebar section */
+.hud-side .sec-chat {
+  flex: 0 1 300px;
+  min-height: 0;
+}
+.hud-side .sec-chat.is-collapsed {
+  flex: none;
+}
+.hud-side .sec-chat .sec-body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- reactions -------------------------------------------------------- */
+.reaction-layer {
+  position: fixed;
+  left: 50%;
+  top: 112px;
+  transform: translateX(-50%);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font: 14px/1.2 var(--font-ui);
+}
+.reaction-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 6px;
+  border-radius: 99px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--pc, var(--edge));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  animation: ol-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+  transition: opacity 0.4s ease;
+}
+.reaction-bubble.is-leaving {
+  opacity: 0;
+}
+.reaction-face {
+  font-size: 24px;
+  line-height: 1;
+}
+.reaction-face.is-text {
+  font: 900 15px/1 var(--font-display);
+  padding: 4px 6px;
+  border-radius: 8px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.reaction-name {
+  font-weight: 750;
+}
+@keyframes ol-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(-8px);
+  }
+}
+
+/* ---- reconnect banner + spinner -------------------------------------- */
+.conn-banner {
+  position: fixed;
+  /* Below the turn pill (which says whose turn it is). */
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 16px);
+  padding: 7px 10px 7px 14px;
+  border-radius: 12px;
+  color: var(--toast-ink, #fff);
+  background: var(--toast-bg, #222);
+  border: 1px solid var(--toast-error-edge, #ff7a6b);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  font: 700 14px/1.3 var(--font-ui);
+}
+.conn-banner[hidden] {
+  display: none;
+}
+.conn-spin {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: ol-spin 0.8s linear infinite;
+}
+.conn-spin.is-big {
+  width: 34px;
+  height: 34px;
+  border-width: 3px;
+  color: var(--accent);
+}
+@keyframes ol-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- HUD: spectating pill, away icon, winner actions ----------------- */
+.spectate-pill {
+  pointer-events: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.pp-away {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(20, 10, 5, 0.6);
+}
+.pp.is-away .avatar {
+  filter: grayscale(0.7);
+  opacity: 0.75;
+}
+.winner-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .online-screen,
+  .reaction-bubble,
+  .conn-spin {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ol-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ol-side {
+    position: static;
+  }
+  .ol-chat .chat {
+    height: 320px;
+  }
+}
+@media (max-width: 560px) {
+  .ol-field {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ol-field .input,
+  .ol-name {
+    width: 100%;
+  }
+  .ol-lobby .su-footer-in {
+    flex-wrap: wrap;
+  }
+  .ol-lobby .su-footer-in .theme-picker {
+    display: none;
+  }
+}

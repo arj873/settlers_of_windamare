@@ -39,6 +39,20 @@ export interface HudView {
   bots?: readonly boolean[];
   /** Optional turn timer (T14); the turn pill shows a countdown while set. */
   turnTimer?: { remainingSec: number; totalSec: number } | null;
+  /**
+   * Online spectator (M3): public info only. No hand bar, no buttons, no dialogs, a
+   * "Spectating" pill. `viewer` is then not a seat (pass -1).
+   */
+  spectator?: boolean;
+  /** Online (M3): seats whose player is disconnected (indexed by PlayerId). */
+  away?: readonly boolean[];
+}
+
+/** Online play (M3): what the menu and the winner screen offer instead of "New game". */
+export interface SessionAction {
+  label: string;
+  primary?: boolean;
+  onClick: () => void;
 }
 
 /** Optional bot-speed control shown in the HUD menu (see `Hud.setBotSpeed`). */
