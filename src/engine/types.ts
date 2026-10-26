@@ -161,6 +161,23 @@ export type Phase =
    * skipped. After the last one, owner+1 starts their turn (preRoll). Nobody wins in this phase.
    */
   | { kind: 'specialBuild'; builder: PlayerId; owner: PlayerId }
+  /**
+   * Map veto (settings.mapSelection 'veto', before setup). `order` lists the vetoers;
+   * turn.current = order[next]. Each vetoes one candidate not vetoed yet (`vetoed[i]` = who
+   * vetoed candidate i). When one candidate is left it becomes the board and setup starts.
+   */
+  | {
+      kind: 'mapVeto';
+      candidates: MapCandidate[];
+      vetoed: (PlayerId | null)[];
+      order: PlayerId[];
+      next: number;
+    }
+  /**
+   * Event Cards: the event drawn this turn needs decisions. Every player with a task acts, in
+   * any order. Then the card's number produces (state.dice) and play goes on in `main`.
+   */
+  | { kind: 'event'; event: EventKind; tasks: EventTask[] }
   | { kind: 'gameOver' };
 
 export type PhaseKind = Phase['kind'];
@@ -177,12 +194,91 @@ export interface TurnState {
   devCardPlayed: boolean;
   /** Player trade offers made this turn (max MAX_TRADE_OFFERS_PER_TURN). Reset on endTurn. */
   tradeOffers: number;
+  /**
+   * Second Settler (paired players' turn): set while `current` takes the Catanian 2 step of
+   * this player's turn (bank trade, build, buy, one dev card; no roll, no player trade).
+   * Absent otherwise.
+   */
+  secondSettlerOf?: PlayerId;
 }
 
 export interface LogEntry {
   turn: number;
   player: PlayerId | null;
   text: string;
+}
+
+// ---------------------------------------------------------------------------
+// Variant settings (V1). All optional in GameSettings; absent = the official rule.
+// Read through the accessors in variants.ts. docs/RULES.md §18.
+// ---------------------------------------------------------------------------
+
+/**
+ * 'normal' = official. 'friendly' = the robber may not be placed next to, and cannot rob,
+ * players with ≤ 2 public VP. 'none' = no robber: a 7 still makes players discard, but nobody
+ * moves the robber or steals; knights still count for Largest Army.
+ */
+export type RobberMode = 'normal' | 'friendly' | 'none';
+
+export type SetupBuilding = 'settlement' | 'city';
+/** 'normal' = the distance rule. 'anyVertex' = any empty vertex (no distance rule). */
+export type SetupRestriction = 'normal' | 'anyVertex';
+export interface SetupRound {
+  building: SetupBuilding;
+  restriction: SetupRestriction;
+}
+/** Setup placement per round (first / second building). */
+export interface SetupPlacement {
+  first: SetupRound;
+  second: SetupRound;
+}
+
+/** 'fixed' = the chosen map; 'random' = a seeded pick among the maps that fit; 'veto' = vote. */
+export type MapSelection = 'fixed' | 'random' | 'veto';
+
+/** Turn timer presets (chess clock: a bank per player + an increment per turn). */
+export type TimerPreset = 'off' | 'bullet' | 'blitz' | 'rapid' | 'classic' | 'custom';
+export interface TimerSettings {
+  preset: Exclude<TimerPreset, 'off'>;
+  /** Starting bank per player, seconds. */
+  bankSec: number;
+  /** Added to a player's bank after each of their turns, seconds. */
+  incrementSec: number;
+}
+
+/** Catan Event Cards (T&B 2020 rulebook pp. 4–5). 'none' = "Catan prospers" (no event). */
+export type EventKind =
+  | 'none'
+  | 'robberAttacks'
+  | 'epidemic'
+  | 'earthquake'
+  | 'goodNeighbors'
+  | 'tournament'
+  | 'tradeAdvantage'
+  | 'calmSea'
+  | 'robberFlees'
+  | 'neighborlyAssistance'
+  | 'conflict'
+  | 'plentifulYear';
+
+/**
+ * One player's open decision in an `event` phase:
+ *  - gain: take 1 resource of their choice from the bank (eventGain)
+ *  - give: give 1 resource of their choice to one of `targets` (eventGive)
+ *  - steal: take 1 random card from one of `targets` (eventSteal); `optional` allows passing
+ *  - damageRoad: turn one of their roads sideways (eventDamageRoad)
+ */
+export interface EventTask {
+  player: PlayerId;
+  kind: 'gain' | 'give' | 'steal' | 'damageRoad';
+  targets: PlayerId[];
+  optional: boolean;
+}
+
+/** A candidate board of a map veto. */
+export interface MapCandidate {
+  board: Board;
+  robber: HexId;
 }
 
 /** Settings (schema v2+). Fixed after createGame. */
@@ -206,6 +302,29 @@ export interface GameSettings {
    * createGame draws it from the seed unless the config fixes it (RULES.md 2.7).
    */
   startingPlayer: PlayerId;
+  // --- V1 variants: optional, absent = official rule (no schema bump; variants.ts) ---------
+  /** Robber mode (default 'normal'). */
+  robberMode?: RobberMode;
+  /** The Catan Event Cards deck replaces the dice (`GameState.eventDeck`, RULES.md §18). */
+  eventCards?: boolean;
+  /** Setup buildings and placement restrictions (default: two settlements, distance rule). */
+  setupPlacement?: SetupPlacement;
+  /**
+   * Randomize Turn Order: the config's players were shuffled into seats. `seatOrder[p]` = the
+   * config index that sits in seat p (so a client can map its seat controllers). Absent = config
+   * order. Seat 0 of the shuffled order starts.
+   */
+  seatOrder?: number[];
+  /** How the board was chosen (default 'fixed'). With 'veto' the game starts in `mapVeto`. */
+  mapSelection?: MapSelection;
+  /** Rush (Colonist-inspired, turn-based): the dice roll automatically when a turn starts. */
+  rushMode?: boolean;
+  /** Turbo (our definition): both setup rounds pay starting resources. */
+  turboMode?: boolean;
+  /** Second Settler = catan.com's paired players' turn (2021): see TurnState.secondSettlerOf. */
+  secondSettler?: boolean;
+  /** Chess-clock turn timer; wins over turnTimerSec (clock.ts). Client/server enforced. */
+  timer?: TimerSettings;
 }
 
 export interface GameState {
@@ -233,6 +352,13 @@ export interface GameState {
   /** Seeded RNG state (uint32). Only touch through `Rng` in rng.ts. */
   rng: number;
   winner: PlayerId | null;
+  // --- V1 variants: optional, present only in games that use them (no schema bump) -------
+  /** Event Cards: undrawn cards (indices into EVENT_CARDS), drawn with pop(). */
+  eventDeck?: number[];
+  /** Event Cards: the event of the last card drawn (null before the first). */
+  lastEvent?: EventKind | null;
+  /** Event Cards (Earthquake): each player's damaged road, or null. Indexed by PlayerId. */
+  damagedRoads?: (EdgeId | null)[];
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +401,16 @@ export type Action =
   | { type: 'acceptTrade'; player: PlayerId }
   | { type: 'rejectTrade'; player: PlayerId }
   | { type: 'cancelTrade'; player: PlayerId }
-  | { type: 'confirmTrade'; player: PlayerId; partner: PlayerId };
+  | { type: 'confirmTrade'; player: PlayerId; partner: PlayerId }
+  // veto.ts
+  | { type: 'vetoMap'; player: PlayerId; candidate: number }
+  // events.ts
+  | { type: 'eventGain'; player: PlayerId; resource: Resource }
+  | { type: 'eventGive'; player: PlayerId; to: PlayerId; resource: Resource }
+  /** victim null = pass (only when the task is optional). */
+  | { type: 'eventSteal'; player: PlayerId; victim: PlayerId | null }
+  | { type: 'eventDamageRoad'; player: PlayerId; edge: EdgeId }
+  | { type: 'repairRoad'; player: PlayerId };
 
 export type ActionType = Action['type'];
 export type ActionOf<T extends ActionType> = Extract<Action, { type: T }>;

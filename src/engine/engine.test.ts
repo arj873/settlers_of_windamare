@@ -38,6 +38,12 @@ const SAMPLES: { [K in ActionType]: Extract<Action, { type: K }> } = {
   rejectTrade: { type: 'rejectTrade', player: 1 },
   cancelTrade: { type: 'cancelTrade', player: 0 },
   confirmTrade: { type: 'confirmTrade', player: 0, partner: 1 },
+  vetoMap: { type: 'vetoMap', player: 0, candidate: 0 },
+  eventGain: { type: 'eventGain', player: 0, resource: 'ore' },
+  eventGive: { type: 'eventGive', player: 0, to: 1, resource: 'ore' },
+  eventSteal: { type: 'eventSteal', player: 0, victim: 1 },
+  eventDamageRoad: { type: 'eventDamageRoad', player: 0, edge: 'e:0,0,NE' },
+  repairRoad: { type: 'repairRoad', player: 0 },
 };
 
 describe('applyAction', () => {

@@ -157,6 +157,14 @@ export function timeoutMove(
       return first('endTurn');
     case 'specialBuild':
       return first('passSpecialBuild');
+    case 'mapVeto':
+      return first('vetoMap');
+    case 'event':
+      // Pass an optional steal; otherwise a random choice.
+      return (
+        mine.find((a) => a.type === 'eventSteal' && a.victim === null) ??
+        first('eventGain', 'eventGive', 'eventSteal', 'eventDamageRoad')
+      );
     case 'gameOver':
       return null;
   }

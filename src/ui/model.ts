@@ -9,6 +9,7 @@ import {
   canPlaceSettlement,
   COSTS,
   DEV_CARD_TYPES,
+  EVENT_INFO,
   getPlayer,
   handSize,
   longestRoadLength,
@@ -448,6 +449,16 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
       return placeMode
         ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
         : { text: 'Build or buy a card, then pass', tone: 'action' };
+    case 'mapVeto':
+      return { text: 'Veto one of the candidate maps', tone: 'action' };
+    case 'event': {
+      const t = phase.tasks.find((x) => x.player === view.viewer);
+      const what =
+        t?.kind === 'damageRoad'
+          ? 'Earthquake — pick one of your roads to damage'
+          : `${EVENT_INFO[phase.event].name} — make your choice`;
+      return { text: what, tone: 'action' };
+    }
   }
 }
 

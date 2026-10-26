@@ -28,7 +28,9 @@ import type {
   ResourceBundle,
   ResumePhase,
 } from '../types';
+import { roadsBlocked } from '../variants';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import { startRobber } from './robber';
 
 type PlayableCard = Exclude<DevCardType, 'victoryPoint'>;
 
@@ -70,8 +72,9 @@ function canPlay(
   return { resume: kind };
 }
 
-/** Edges where `player` could place a road right now (geometry only). */
+/** Edges where `player` could place a road right now (geometry; none while a road is damaged). */
 function roadSpots(state: GameState, player: PlayerId): EdgeId[] {
+  if (roadsBlocked(state, player)) return [];
   return topologyOf(state).edges.filter((e) => canPlaceRoad(state, player, e));
 }
 
@@ -124,7 +127,7 @@ export const devHandlers: HandlerMap<
     const check = canPlay(draft, player, 'knight');
     if ('error' in check) return fail(check.error);
     spend(draft, player, 'knight');
-    draft.phase = { kind: 'moveRobber', resume: check.resume };
+    startRobber(draft, check.resume);
     return ok(draft);
   },
 
@@ -143,6 +146,7 @@ export const devHandlers: HandlerMap<
     if (phase.kind !== 'roadBuilding') return fail('not placing free roads');
     if (!isCurrent(draft, player)) return fail('not your turn');
     if (piecesLeft(draft, player).road < 1) return fail('no roads left');
+    if (roadsBlocked(draft, player)) return fail('repair your damaged road first');
     if (typeof edge !== 'string' || !canPlaceRoad(draft, player, edge)) {
       return fail('cannot place a road there');
     }
