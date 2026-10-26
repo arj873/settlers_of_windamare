@@ -1,6 +1,7 @@
 /* Theme picker (./picker.ts): preview tiles in the HUD menu and the setup footer. */
 .theme-pick {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
 .theme-opt {
@@ -13,7 +14,8 @@
   padding: 5px 1px 4px;
   font: 600 11px/1.1 var(--font-ui);
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
   color: var(--ink-dim);
   cursor: pointer;
   border: 1.5px solid transparent;
@@ -63,6 +65,7 @@
 /* Setup footer: tiles only. */
 .theme-pick.is-compact {
   flex: none;
+  display: flex;
   gap: 6px;
 }
 .theme-pick.is-compact .theme-opt {

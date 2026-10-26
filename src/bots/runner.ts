@@ -55,6 +55,8 @@ export type VariantConfig = Pick<
   | 'rushMode'
   | 'turboMode'
   | 'secondSettler'
+  | 'mapRules'
+  | 'rules56'
 >;
 
 export function newGame(setup: GameSetup): GameState {

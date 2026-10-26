@@ -23,14 +23,26 @@ import '@fontsource/figtree/700.css';
 import '@fontsource/figtree/800.css';
 import '@fontsource/marcellus/400.css';
 import '@fontsource-variable/nunito';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
 import './wood.css';
 import './chartroom.css';
 import './parlour.css';
 import './sunfired.css';
+import './githubdark.css';
+import './materialdark.css';
 import './picker.css';
 
 /** Picker order. */
-export const THEMES = ['sunfired', 'chartroom', 'parlour', 'wood'] as const;
+export const THEMES = [
+  'sunfired',
+  'chartroom',
+  'parlour',
+  'wood',
+  'githubdark',
+  'materialdark',
+] as const;
 export type ThemeName = (typeof THEMES)[number];
 export const DEFAULT_THEME: ThemeName = 'sunfired';
 export const THEME_KEY = 'catan.theme';
@@ -41,6 +53,8 @@ export const THEME_INFO: Record<ThemeName, { label: string; swatch: readonly str
   chartroom: { label: 'Chartroom', swatch: ['#efe2c4', '#2c1d10', '#9e2a1f', '#1f4767'] },
   parlour: { label: 'Parlour', swatch: ['#5e1f2c', '#d8ad55', '#f4ead6', '#0d2233'] },
   wood: { label: 'Wood', swatch: ['#6e411f', '#b47a49', '#f2c35a', '#fff3dc'] },
+  githubdark: { label: 'GitHub Dark', swatch: ['#161b22', '#30363d', '#2f81f7', '#e6edf3'] },
+  materialdark: { label: 'Material Dark', swatch: ['#211f24', '#4a4458', '#d0bcff', '#e6e1e5'] },
 };
 
 export type ThemeStorage = Pick<Storage, 'getItem' | 'setItem'>;

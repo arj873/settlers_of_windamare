@@ -17,6 +17,7 @@ import {
   RESOURCES,
   actingPlayers,
   edgeVertices,
+  firstDesert,
   isBoardEdge,
   isBoardVertex,
   isLandHex,
@@ -186,6 +187,25 @@ export function checkInvariants(state: GameState): Violation[] {
     if (!validPlayer(owner)) add('structure', `road ${e} has owner ${owner}`);
   }
   if (!isLandHex(t, state.robber)) add('robber-position', `robber on non-land hex ${state.robber}`);
+  if (state.settings.rules56 && state.board.hexes[state.robber]?.terrain === 'desert') {
+    const first = firstDesert(state);
+    if (state.robber !== first) {
+      add('robber-position', `rules56: robber on the second desert ${state.robber}`);
+    }
+  }
+  const sbpPhase =
+    state.phase.kind === 'specialBuild' ||
+    ((state.phase.kind === 'moveRobber' ||
+      state.phase.kind === 'steal' ||
+      state.phase.kind === 'roadBuilding') &&
+      state.phase.resume === 'specialBuild');
+  if (sbpPhase && !state.settings.rules56 && state.phase.kind !== 'specialBuild') {
+    add('phase-actor', `${state.phase.kind} resumes to specialBuild without rules56`);
+  }
+  // (specialBuild itself carries its owner; older saves have no turn.specialOwner there.)
+  if (sbpPhase && state.phase.kind !== 'specialBuild' && state.turn.specialOwner === undefined) {
+    add('phase-actor', `special build step without turn.specialOwner (${state.phase.kind})`);
+  }
 
   // --- piece limits --------------------------------------------------------------------------
   for (const p of state.players) {
@@ -312,6 +332,7 @@ export function checkInvariants(state: GameState): Violation[] {
     }
   } else if (
     state.phase.kind !== 'specialBuild' &&
+    state.turn.specialOwner === undefined && // a card played inside a special build step
     validPlayer(state.turn.current) &&
     victoryPoints(state, state.turn.current) >= state.settings.vpToWin
   ) {
