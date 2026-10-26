@@ -1,5 +1,6 @@
 /** Autosave: one session in localStorage. Every storage access is wrapped (private mode, quota...). */
 import { upgradeState, type GameState, type PlayerId } from '../engine';
+import { isBotLevel, type BotLevel } from '../bots/levels';
 import type { Controller } from '../ui';
 
 export const SAVE_KEY = 'catan:save:v1';
@@ -23,6 +24,8 @@ export interface SavedSession {
    * saves (the stats screen then shows no duration). Time between sessions does not count.
    */
   playedMs?: number;
+  /** B1: each seat's bot level (indexed like `seats`); absent in older saves = all Normal. */
+  botLevels?: BotLevel[];
 }
 
 /** `window.localStorage`, or null when it is unavailable or throws on access. */
@@ -83,6 +86,11 @@ export function loadSession(store: KeyValueStore | null): SavedSession | null {
       ...(Array.isArray(s.banks) ? { banks: s.banks } : {}),
       ...(typeof s.playedMs === 'number' && Number.isFinite(s.playedMs) && s.playedMs >= 0
         ? { playedMs: s.playedMs }
+        : {}),
+      ...(Array.isArray(s.botLevels) &&
+      s.botLevels.length === s.seats.length &&
+      s.botLevels.every(isBotLevel)
+        ? { botLevels: s.botLevels }
         : {}),
     };
   } catch {

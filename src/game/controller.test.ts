@@ -583,3 +583,64 @@ describe('GameController: game duration (UX2 stats)', () => {
     expect(hud.last.gameDurationMs).toBeNull();
   });
 });
+
+describe('GameController: bot levels (B1)', () => {
+  const cfg = (variants?: NewGameConfig['variants']): NewGameConfig => ({
+    mode: 'base',
+    map: 'base',
+    rules: { balancedDice: false, hideBankCards: false },
+    turnTimerSec: null,
+    vpToWin: 10,
+    discardLimit: 7,
+    players: [
+      { name: 'Ann', color: '#d64541', controller: 'human' },
+      { name: 'Hal', color: '#3a7bd5', controller: 'bot', botLevel: 'hard' },
+      { name: 'Eve', color: '#ecf0f1', controller: 'bot', botLevel: 'easy' },
+      { name: 'Ned', color: '#f39c12', controller: 'bot' },
+    ],
+    seed: 'levels',
+    ...(variants ? { variants } : {}),
+  });
+
+  it('each seat keeps its level (default Normal), also when the turn order is shuffled', () => {
+    const c = make();
+    hud.emit('newGame', cfg());
+    expect(c.botLevels).toEqual(['normal', 'hard', 'easy', 'normal']);
+    hud.emit('newGame', cfg({ randomTurnOrder: true }));
+    const byName = new Map(c.state!.players.map((p, i) => [p.name, c.botLevels[i]]));
+    expect(byName).toEqual(
+      new Map([
+        ['Ann', 'normal'],
+        ['Hal', 'hard'],
+        ['Eve', 'easy'],
+        ['Ned', 'normal'],
+      ]),
+    );
+  });
+
+  it('saves the levels and resumes with them; older saves play Normal', () => {
+    make();
+    hud.emit('newGame', cfg());
+    const saved = loadSession(store)!;
+    expect(saved.botLevels).toEqual(['normal', 'hard', 'easy', 'normal']);
+    const again = make();
+    again.resume(saved);
+    expect(again.botLevels).toEqual(['normal', 'hard', 'easy', 'normal']);
+    const { botLevels: _drop, ...old } = saved;
+    again.resume(old);
+    expect(again.botLevels).toEqual(['normal', 'normal', 'normal', 'normal']);
+    store.setItem(SAVE_KEY, JSON.stringify({ ...saved, botLevels: ['hard', 'x', 'easy', 'easy'] }));
+    expect(loadSession(store)!.botLevels).toBeUndefined();
+  });
+
+  it('bot seats play their own level until the human is up', () => {
+    const c = make(0);
+    hud.emit('newGame', {
+      ...cfg(),
+      players: cfg().players.map((p) => ({ ...p, controller: 'bot' as const })),
+    });
+    vi.advanceTimersByTime(2000);
+    expect(c.state!.turn.number).toBeGreaterThan(0);
+    expect(toasts).toEqual([]);
+  });
+});
