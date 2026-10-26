@@ -5,14 +5,25 @@
 
 Legend: 🟦 Opus · 🟩 Sonnet
 
+## 🏃 In Progress — Stage 4: online multiplayer (on `main`, in parallel with stage 3)
+
+> You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
+
+- **M1** · Protocol + per-player state views (hide other hands, deck order, RNG) + docs/MULTIPLAYER.md · 🟦
+
+## 📋 Backlog — Stage 4
+
+- **M2** · Room server: Cloudflare Durable Object per room, authoritative engine, seats, reconnect tokens, server-side bots + timer, spectators, chat, persistence, `wrangler dev` locally · 🟦 · deps: M1
+- **M3** · Client: home/lobby (create room → invite link, join with nickname, seats/colours, host config + start), network controller, reconnect, chat panel, spectator view · 🟦/🟩 · deps: M1
+- **M4** · Multi-browser e2e tests + Haiku remote playtest (each agent its own browser) · deps: M2, M3
+- **M5** · Go live on Cloudflare (needs your account) · deps: M4
+
 ## 🏃 In Progress — Stage 3 (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5
 - **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
 - **BUG-B1** · 🔴 BLOCKER: board camera zooms in over a long game (6 Haiku reports, turns 59-75); spots off-screen/under HUD · `s3-camera-bug` 🟦
-- **D1** · UI theme refresh: Sunfired (default) / Chartroom / Parlour / Wood with a theme picker in the menu (your pick: keep all) · `s3-ui-theme` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -126,3 +137,5 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **P2** · Road junctions look clean for any mix of owners (your screenshot) · `s3-road-joints` 🟩 · merged
 - **H1** · Hosting research → docs/HOSTING.md (no deploys) · `s3-hosting` 🟩 · merged
 - **T18** · 6-player Haiku playtest · game 1 (pt6a): 3 real bugs found+fixed, ended turn 32 on old-build discard bug · game 2 (pt6b, wood HUD + SBP): **Seat6 won at turn 90**, no rules violations seen; found the camera-zoom blocker (BUG-B1)
+- **D1** · UI theme refresh: Sunfired (default) / Chartroom / Parlour / Wood with a theme picker in the menu (your pick: keep all) · `s3-ui-theme` 🟦 · merged
+- **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5 · merged
