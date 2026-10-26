@@ -71,8 +71,9 @@ describe('T&B + C&K HUD', () => {
     }
     show(s);
     expect(root.querySelector('.tbck-panel')?.textContent).toContain('13 VP to win');
-    byText('7 fish: ')?.click();
+    byText('Take for 7 fish')?.click();
     expect(actions.at(-1)?.type).toBe('tbck/fishProgress');
+    expect(root.querySelectorAll('.tbck-select option').length).toBeGreaterThan(10);
   });
 
   it('Rivers: commodities sell for gold from the panel', () => {

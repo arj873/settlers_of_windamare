@@ -13,6 +13,7 @@ import { ckSlice, type ProgressCard } from '../../ck/engine';
 import { giveCards, knight, rngFor, setGoods } from '../../ck/engine/testkit';
 import { TB_MAPS, bridgesOf, goldOf, tbBoard, tbSlice } from '../../tb/engine';
 import { fishOf, tradersOf } from '../../tb/engine/state';
+import { vertexOnRiver } from '../../tb/engine/rivers';
 import { TBCK, TBCK_MODE, TBCK_VP } from '.';
 
 const players = (n: number) =>
@@ -104,17 +105,27 @@ describe('Fishermen + C&K', () => {
     expect(fishOf(t).hands[0]).toEqual([]);
   });
 
-  it('7 fish buy a progress card of a chosen stack, not a development card (C4)', () => {
+  it('7 fish take a progress card of your choice, not a development card (C4)', () => {
     const s = fisher([3, 3, 1]);
-    expect(legalOf(s, 'tbck/fishProgress')).toHaveLength(3);
+    const cards = legalOf(s, 'tbck/fishProgress').map((a) => (a as { card?: string }).card);
+    expect(cards).toContain('alchemist');
+    expect(cards).toContain('bishop');
+    expect(new Set(cards).size).toBe(cards.length);
     expect(legalOf(s, 'tb/fish').some((a) => (a as { use?: string }).use === 'devCard')).toBe(
       false,
     );
     fails(s, { type: 'tb/fish', player: 0, use: 'devCard' } as Action);
-    const t = run(s, { type: 'tbck/fishProgress', player: 0, track: 'science' } as Action);
-    expect(ckSlice(t).players[0]!.progress).toHaveLength(1);
+    const t = run(s, { type: 'tbck/fishProgress', player: 0, card: 'alchemist' } as Action);
+    expect(ckSlice(t).players[0]!.progress).toEqual(['alchemist']);
     expect(ckSlice(t).decks.science.length).toBe(ckSlice(s).decks.science.length - 1);
     expect(fishOf(t).hands[0]).toEqual([]);
+    // A VP card is laid out at once.
+    const u = run(fisher([3, 3, 1]), {
+      type: 'tbck/fishProgress',
+      player: 0,
+      card: 'printer',
+    } as Action);
+    expect(ckSlice(u).players[0]!.vpCards).toEqual(['printer']);
   });
 
   it('fish are no cards: a player catching only fish still gets the Aqueduct (FAQ 43)', () => {
@@ -141,6 +152,17 @@ describe('Fishermen + C&K', () => {
 });
 
 describe('Rivers + C&K', () => {
+  it('a setup city on a river intersection pays 1 gold (T&B already pays it, once)', () => {
+    const t = main('tb/rivers');
+    const v = topologyOf(t).vertices.find((x) => vertexOnRiver(t, x)) as VertexId;
+    // Step 7 of the snake order is player 0's second building: a city in C&K.
+    t.phase = { kind: 'setup', index: 7, step: 'settlement', lastSettlement: null };
+    const before = goldOf(t, 0);
+    const after = run(t, { type: 'placeSetupSettlement', player: 0, vertex: v });
+    expect(after.pieces.buildings[v]?.kind).toBe('city');
+    expect(goldOf(after, 0)).toBe(before + 1);
+  });
+
   it('commodities sell for gold at the normal rate (C4)', () => {
     const s = main('tb/rivers');
     setGoods(s, 0, { paper: 4 });

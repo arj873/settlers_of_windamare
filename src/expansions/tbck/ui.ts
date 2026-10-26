@@ -9,7 +9,8 @@ import { h, type Child } from '../../ui/dom';
 import type { HudDialog, HudExtension } from '../../ui/expansions';
 import type { HudView } from '../../ui/types';
 import { resCardFace } from '../../ui/widgets';
-import { TRACK_LABEL, ckHud } from '../ck/ui';
+import { CARD_NAMES, type ProgressCard } from '../ck/engine';
+import { ckHud } from '../ck/ui';
 import { has } from '../tb/engine';
 import { TBCK } from './engine';
 import './tbck.css';
@@ -31,6 +32,29 @@ function buttons(view: HudView, send: Send, type: string, label: (a: Action) => 
   );
 }
 
+/** 7 fish: a progress card of your choice (Fishing + C&K). */
+function fishForm(view: HudView, send: Send): HTMLElement | null {
+  const list = mine(view, 'tbck/fishProgress');
+  if (list.length === 0) return null;
+  const select = h(
+    'select',
+    { class: 'tbck-select', attrs: { 'aria-label': 'Progress card' } },
+    ...list.map((a, i) => {
+      const card = field(a, 'card') as ProgressCard;
+      return h('option', { value: String(i) }, CARD_NAMES[card] ?? card);
+    }),
+  ) as HTMLSelectElement;
+  const take = h(
+    'button',
+    {
+      class: 'btn btn-primary tbck-btn',
+      on: { click: () => send(list[Number(select.value)] ?? (list[0] as Action)) },
+    },
+    'Take for 7 fish',
+  );
+  return h('div', { class: 'tbck-buttons' }, select, take);
+}
+
 function panel(state: GameState, view: HudView, send: Send) {
   const rules: string[] = [];
   if (has(state, 'fish')) rules.push('7 fish buy a progress card; 3 fish steal any card.');
@@ -49,10 +73,7 @@ function panel(state: GameState, view: HudView, send: Send) {
     ...rules.map((r) => h('p', { class: 'tbck-fact' }, r)),
   );
   if (!view.spectator) {
-    const fish = buttons(view, send, 'tbck/fishProgress', (a) => {
-      const t = field(a, 'track') as keyof typeof TRACK_LABEL;
-      return `7 fish: ${TRACK_LABEL[t] ?? t}`;
-    });
+    const fish = fishForm(view, send);
     const sell = buttons(
       view,
       send,

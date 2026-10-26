@@ -26,3 +26,7 @@
   align-items: center;
   gap: 4px;
 }
+.tbck-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}

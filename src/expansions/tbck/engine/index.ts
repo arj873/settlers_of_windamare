@@ -29,14 +29,17 @@ import {
   TRACKS,
   ckModule,
   ckSlice,
-  drawProgress,
+  CARD_NAMES,
+  giveRatio,
   goodCount,
   isCommodity,
-  isTrack,
+  isProgressCard,
+  isVpCard,
   moveGood,
   phaseOf,
   stealRandom,
   type Commodity,
+  type ProgressCard,
   type Track,
 } from '../../ck/engine';
 import {
@@ -49,7 +52,7 @@ import {
   has,
   tbModule,
 } from '../../tb/engine';
-import { addGold, goldOf, goldSaleRatio, payBank } from '../../tb/engine/common';
+import { addGold, goldOf, payBank } from '../../tb/engine/common';
 import { fishCost, fishPayment } from '../../tb/engine/fish';
 import { edgeOnRiver, isBridgeSite } from '../../tb/engine/rivers';
 import { fishOf, tradersOf } from '../../tb/engine/state';
@@ -78,7 +81,7 @@ export interface TbckSlice {
 export type TbckAction =
   | { type: 'tbck/chaseBarbarian'; player: PlayerId; edge: EdgeId }
   | { type: 'tbck/sellCommodity'; player: PlayerId; commodity: Commodity }
-  | { type: 'tbck/fishProgress'; player: PlayerId; track: Track };
+  | { type: 'tbck/fishProgress'; player: PlayerId; card: ProgressCard };
 
 const pn = playerName;
 
@@ -111,24 +114,45 @@ function fishTurn(state: GameState, p: PlayerId): string | null {
   return null;
 }
 
-/** Why `p` cannot pay 7 fish for a progress card of `track` (C4: instead of a dev card). */
-export function fishProgressBlocker(state: GameState, p: PlayerId, track: unknown): string | null {
+/** The stack holding a `card` (null: none left). */
+function stackOf(state: GameState, card: unknown): Track | null {
+  if (!isProgressCard(card)) return null;
+  return TRACKS.find((t) => ckSlice(state).decks[t].includes(card)) ?? null;
+}
+
+/** Why `p` cannot pay 7 fish for the progress card `card` of their choice (Fishing + C&K). */
+export function fishProgressBlocker(state: GameState, p: PlayerId, card: unknown): string | null {
   if (!has(state, 'fish')) return 'no fish in this game';
   const t = fishTurn(state, p);
   if (t) return t;
-  if (!isTrack(track)) return 'pick a progress stack';
+  if (!isProgressCard(card)) return 'pick a progress card';
   const cost = fishCost(state, p, 'devCard');
   if (fishTotal(state, p) < cost) return `needs ${cost} fish`;
-  return ckSlice(state).decks[track].length > 0 ? null : 'that stack is empty';
+  return stackOf(state, card) !== null ? null : 'no such card left in the stacks';
+}
+
+/** Progress cards `p` may take for 7 fish: one of each kind still in a stack. */
+export function fishProgressChoices(state: GameState, p: PlayerId): ProgressCard[] {
+  const kinds = new Set(TRACKS.flatMap((t) => ckSlice(state).decks[t]));
+  return [...kinds].filter((c) => fishProgressBlocker(state, p, c) === null).sort();
 }
 
 const fishProgress: ExtHandler = (draft, action) => {
-  const track = action['track'];
-  const err = fishProgressBlocker(draft, action.player, track);
+  const card = action['card'];
+  const err = fishProgressBlocker(draft, action.player, card);
   if (err) return fail(err);
+  const c = card as ProgressCard;
+  const deck = ckSlice(draft).decks[stackOf(draft, c) as Track];
+  deck.splice(deck.lastIndexOf(c), 1);
   const paid = payFish(draft, action.player, 'devCard');
-  drawProgress(draft, action.player, track as Track);
-  log(draft, action.player, `${pn(draft, action.player)} paid ${paid} fish for a progress card`);
+  const pl = ckSlice(draft).players[action.player];
+  if (isVpCard(c)) pl?.vpCards.push(c);
+  else pl?.progress.push(c);
+  log(
+    draft,
+    action.player,
+    `${pn(draft, action.player)} paid ${paid} fish for the ${CARD_NAMES[c]}${isVpCard(c) ? ' (1 victory point)' : ''}`,
+  );
   return ok(draft);
 };
 
@@ -141,7 +165,7 @@ export function sellCommodityBlocker(state: GameState, p: PlayerId, c: unknown):
   if (state.phase.kind !== 'main') return 'trade with the bank in the main phase';
   if (state.turn.current !== p || state.turn.secondSettlerOf !== undefined) return 'not your turn';
   if (!isCommodity(c)) return 'pick a commodity';
-  const ratio = goldSaleRatio(state, p);
+  const ratio = giveRatio(state, p, c);
   return goodCount(state, p, c) >= ratio ? null : `needs ${ratio} ${c}`;
 }
 
@@ -149,7 +173,7 @@ const sellCommodity: ExtHandler = (draft, action) => {
   const c = action['commodity'];
   const err = sellCommodityBlocker(draft, action.player, c);
   if (err) return fail(err);
-  const ratio = goldSaleRatio(draft, action.player);
+  const ratio = giveRatio(draft, action.player, c as Commodity);
   moveGood(draft, action.player, 'bank', c as Commodity, ratio);
   addGold(draft, action.player, 1);
   log(draft, action.player, `${pn(draft, action.player)} traded ${ratio} ${String(c)} for 1 gold`);
@@ -371,8 +395,15 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
   'ck/pickEdge': (draft, action, next) => {
     const ph = diplomatPhase(draft);
     const e = action['edge'];
-    if (!ph || ph.removed !== null || typeof e !== 'string' || !has(draft, 'rivers')) {
-      return next(draft, action);
+    if (!ph || typeof e !== 'string' || !has(draft, 'rivers')) return next(draft, action);
+    if (ph.removed !== null) {
+      // An own road built again at no cost: 1 gold if it lies on a river hex.
+      const r = next(draft, action);
+      if (r.ok && edgeOnRiver(draft, e as EdgeId)) {
+        addGold(draft, action.player, 1);
+        log(draft, action.player, `${pn(draft, action.player)} received 1 gold`);
+      }
+      return r;
     }
     const err = riverDiplomatBlocker(draft, action.player, e as EdgeId);
     if (err) return fail(err);
@@ -395,10 +426,8 @@ function legal(state: GameState): Action[] {
   const out: Action[] = [];
   const add = (a: TbckAction) => out.push(a as unknown as Action);
   if (has(state, 'fish')) {
-    for (const track of TRACKS) {
-      if (fishProgressBlocker(state, p, track) === null) {
-        add({ type: 'tbck/fishProgress', player: p, track });
-      }
+    for (const card of fishProgressChoices(state, p)) {
+      add({ type: 'tbck/fishProgress', player: p, card });
     }
     for (const victim of state.players.map((x) => x.id)) {
       // Victims holding commodities only (T&B's legal offers resource holders).
