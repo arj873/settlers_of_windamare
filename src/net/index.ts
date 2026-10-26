@@ -9,3 +9,6 @@ export {
   type SessionOptions,
   type SessionSnapshot,
 } from './session';
+export * from './transport';
+export * from './client';
+export { FakeClock, RoomHost, hostConnect, type Sink } from './loopback';

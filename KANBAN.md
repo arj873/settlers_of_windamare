@@ -10,8 +10,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M3** · Client: home + lobby (invite link, nickname, seats, host config), network controller + reconnect, chat, spectator HUD, in-browser dev server · `s4-mp-client` 🟦
-- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦
+- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩
+- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦 · ✅ built (721 tests, 0 sim violations) → finishing online-protocol integration before merge · ⚠️ your call later: Rush = auto-roll (real Colonist Rush is real-time), Turbo = both setup settlements pay (no source), timer presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
 
 ## 📋 Backlog — Stage 4
 
@@ -22,7 +22,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **E1** · Oil Springs + Crop Trust scenarios (rules research + docs/rules/*.md) · `s3-oil-crop` 🟩
 
 ## 🏃 In Progress — Stage 2
 
@@ -57,6 +56,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (M3) remove-seat-N protocol message + lobby kick button · unread badge on collapsed chat · CI job on `scripts/e2e/online.ts --remote` · reconnect banner vs toast overlap
+- (E1) Oil Springs "Wide Open" variant · pick which hex a Crop Trust loss hits · shared wins (`winner` array) · core counts metropolis-only special builds
+- (V1) real-time Rush (simultaneous actors, server dice clock) · all players' chess-clock banks in the players panel · C&K notes on event cards · smarter bot event choices
+- (orch) board behind the winner modal isn't refit (sits left)
 - (M2) global rate limiting via WAF / rate-limit binding · fewer DO storage writes · send diffs not full views · run e2e:server in GitHub Actions
 - (B1) harness auto-clicks Fit board when a spot is off-screen · headed playtests guard wheel input · highlight Fit board while camera is manual
 - (M1) HUD spectator mode → in M3 · parallel timer for simultaneous discards · board once + log deltas over the wire · heuristic bot that plays from `viewFor` · private "you stole X" notice
@@ -116,6 +119,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
+- **E1** · Oil Springs + Crop Trust (official rulebooks; docs/rules/oil-springs.md, crop-trust.md) · `s3-oil-crop` 🟩 · PR #5 → `expansions` · 948 tests on expansions
 - **M2** · Room server: Worker + Durable Object per room (hibernation, alarms, snapshots), 6-char codes, origin check + rate limits, `pnpm dev:server` / `e2e:server` / `deploy:cf` · `s4-mp-server` 🟦 · PR #4 → `main` · 777 tests, e2e passed
 - **BUG-B1** · Camera stuck zoomed (stray wheel in headed playtest never left manual mode) → fit math fixed, manual mode only on real drag/wheel/pinch, **Fit board** button · `s3-camera-bug` 🟦 · PR #3 → `main` · 747 tests
 - **M1** · Multiplayer protocol, per-player views (leak-tested), GameSession, LocalNet, docs/MULTIPLAYER.md · `s4-mp-protocol` 🟦 · PR #2 → `main` · 733 tests
