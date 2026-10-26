@@ -21,7 +21,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
 - **E5** · Explorers & Pirates: settler/crew ships, harbor settlements, exploration, pirate lairs, fish, spice, all missions (+5-6P) · `s3-ep` 🟦
-- **C1** · Official combos: Seafarers + C&K, T&B + Seafarers, T&B + C&K, T&B×T&B pairs, 5-6P versions · `s3-combos` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -54,6 +53,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (C1) T&B + Seafarers (needs scenario-id seam) · Barbarian Attack + C&K · Catan for Two + C&K · T&B×T&B sheets · E&P + C&K / T&B
 - (E4) gold in player trades · 2025 T&B×T&B combination sheets · BA 5-6 SBP details · Caravans coalition vote
 - (E2) viewFor masking hook for expansion slices (fog stack, gifts, fish, progress cards) → expansions online · online protocol for expansion actions · Seafarers heuristic bot · verify guessed harbour sites vs the box
 - (E3) `viewFor` hook to hide expansion secrets → C&K online · bot action weighting (random C&K games ~270 turns) · Nasty variant · knight Event Cards ↔ C&K knights · verify starter-board harbors
@@ -126,6 +126,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **C1** · Official combos: Seafarers + C&K (New Shores, Through the Desert, +2 VP), T&B + C&K per 2025 sheets (Fishermen, Rivers, Caravans, Traders, variants); framework `before`/`wraps`/`routeEdges`; Rivers Diplomat stall fixed · `s3-combos` 🟦 · PR #17 (squashed) → `expansions` · 1712 tests
 - **E2** · Seafarers: ships, pirate, gold, Longest Trade Route, all 9 scenarios × 3p/4p/5-6p (20 maps), F3 setupOrder hook; unified VP-chip/stats/refusal/bot-steer mechanisms with C&K + T&B · `s3-seafarers` 🟦 · PR #16 (squashed) → `expansions` · 1621 tests
 - **E4** · Traders & Barbarians: Fishermen, Rivers, Caravans, Barbarian Attack, T&B main scenario (+F2 plaza ids), Catan for Two, Harbormaster, 5-6 boards · `s3-tb` 🟦 · PR #15 (squashed) → `expansions` · 1453 tests
 - **E3** · Cities & Knights: commodities, improvements + metropolises, knights, barbarians + event die, all 54 progress cards, walls, aqueduct, 13 VP, 5-6P, starter board, Easy start / Knight-errant, works with Event Cards · `s3-ck` 🟦 · PR #14 (squashed) → `expansions` · 1321 tests
