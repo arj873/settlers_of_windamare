@@ -10,13 +10,12 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M1** · Protocol + per-player state views (hide other hands, deck order, RNG) + docs/MULTIPLAYER.md · `s4-mp-protocol` 🟦
+- **M2** · Room server: Cloudflare Worker + Durable Object per room (hibernating WebSockets, alarms, snapshots), room codes, rate limits, `wrangler dev`, e2e script · `s4-mp-server` 🟦
+- **M3** · Client: home + lobby (invite link, nickname, seats, host config), network controller + reconnect, chat, spectator HUD, in-browser dev server · `s4-mp-client` 🟦
 - **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦
 
 ## 📋 Backlog — Stage 4
 
-- **M2** · Room server: Cloudflare Durable Object per room, authoritative engine, seats, reconnect tokens, server-side bots + timer, spectators, chat, persistence, `wrangler dev` locally · 🟦 · deps: M1
-- **M3** · Client: home/lobby (create room → invite link, join with nickname, seats/colours, host config + start), network controller, reconnect, chat panel, spectator view · 🟦/🟩 · deps: M1
 - **M4** · Multi-browser e2e tests + Haiku remote playtest (each agent its own browser) · deps: M2, M3
 - **M5** · Go live on Cloudflare (needs your account) · deps: M4
 
@@ -59,6 +58,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Beginner start option: pre-place the rulebook starting pieces (from T8)
 
 ## 💡 Ideas from agents
+
+- (M1) HUD spectator mode → in M3 · parallel timer for simultaneous discards · board once + log deltas over the wire · heuristic bot that plays from `viewFor` · private "you stole X" notice
 - Beginner layout suggested starting positions as a setup option (from T1)
 - Per-player hidden-info view of state: hands, deck order (needed for online + fair bots) (from T1)
 - "Roll to decide who starts" option (from T1)
@@ -115,6 +116,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **M1** · Multiplayer protocol, per-player views (leak-tested), GameSession, LocalNet, docs/MULTIPLAYER.md · `s4-mp-protocol` 🟦 · PR #2 → `main` · 733 tests
 - **F1** · Expansion framework: registry, 20 hooks, schema v5, generalised board/topology, render/HUD/setup/bot extension points, Oasis demo · `s3-framework` 🟦 · PR #1 → `expansions` `7ff36aa` · 718 tests
 - **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · merged `b6a4937` · 67 tests
 - **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · merged `71b5aba` · 119 tests total

@@ -343,14 +343,22 @@ view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} cle
 view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
-view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
+view.setInsets(insets, avoid?);           // Insets = { top, right, bottom, left } px. insets: permanent HUD (board fits inside);
+                                          // avoid: transient overlays (docked trade card) the board slides away from, never zooms for
+view.isFitted();                          // false once the user panned/zoomed, until the next refit
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
 - While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
-- Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit. Refits on renderer resize until the user moves it.
+- Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit.
+- Camera (`render/viewport.ts`, unit-tested): the fitted view is the pure `fitBoardView(bounds, w, h, insets, avoid)`
+  (inside the insets, or the full screen if they leave < `MIN_INSET_FIT`; negative margins count as 0; `avoid`
+  only translates). The fitted camera follows every resize and inset change. Only a real gesture switches to the
+  manual camera: a _pressed_ drag past `TAP_SLOP` (6 px), a wheel, a two-pointer pinch. A mouse press is always a
+  single pointer (a missed release is dropped, and a move with no button held is a hover, never a drag). Inset
+  changes leave a manual camera alone; a real size change, double-click, `fit()` or the "Fit board" button refit.
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
@@ -402,8 +410,11 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   360px, 300px under 1280px, a drawer under 720px), menu top-left (`.hud-menu`: New game, Bot speed,
   Theme, Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
   text), hand + Trade/Bank + build bar bottom-left (`.hud-bottom`), dice + Roll dice / End turn
-  bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets`; a docked
-  trade offer card (`.scrim.is-side .dialog`, above the hand) becomes a left inset.
+  bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets` (nothing
+  while the HUD is covered or has no bottom bar; dialogs are never measured); a docked trade offer card
+  (`.scrim.is-side .dialog`, above the hand) is an `avoid` margin: the board slides right without zooming.
+  `game/layout.ts` also adds the "Fit board" button (`.board-fit`, top-left under the menu, outside the HUD
+  root, hidden while covered) that calls `BoardView.fit()`.
 - Game Events parse the engine's log text (`ui/log.ts`): player names, resource counts, rolls,
   pieces, dev cards, robber and awards become icons; "X received …" lines after a roll fold into a
   "Production:" block. Unknown text stays text, so log wording changes degrade gracefully.
