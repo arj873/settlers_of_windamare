@@ -26,41 +26,64 @@ import {
 } from './composer';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
-import { dieFace, RESOURCE_LABEL, resourceIcon } from './icons';
+import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
   availability,
   bestRatios,
+  buildCards,
   devCardRows,
   DEV_CARD_INFO,
   diceTotal,
   findBankTrade,
   findYearOfPlenty,
-  hintFor,
   ofType,
   placeModeAvailable,
-  playerSummaries,
+  turnInfo,
   viewerLegal,
   type Availability,
+  type BuildKind,
 } from './model';
-import type { HudEventName, HudEvents, HudView, PlaceMode } from './types';
+import { bankPanel, logList, playersList } from './sidebar';
+import type { BotSpeedControl, HudEventName, HudEvents, HudView, PlaceMode } from './types';
+import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
 
 type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
+type Section = 'log' | 'bank' | 'players';
+type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
 
-const COSTS_TEXT: Record<PlaceMode | 'dev', string> = {
-  road: '1 brick + 1 lumber',
-  settlement: '1 brick, 1 lumber, 1 wool, 1 grain',
-  city: '2 grain + 3 ore',
-  dev: '1 wool, 1 grain, 1 ore',
+const BUILD_LABEL: Record<BuildKind, string> = {
+  dev: 'Buy card',
+  road: 'Road',
+  settlement: 'Settlement',
+  city: 'City',
 };
+
+const BUILD_COST: Record<BuildKind, Partial<Record<Resource, number>>> = {
+  road: { brick: 1, lumber: 1 },
+  settlement: { brick: 1, lumber: 1, wool: 1, grain: 1 },
+  city: { grain: 2, ore: 3 },
+  dev: { wool: 1, grain: 1, ore: 1 },
+};
+
+const costText = (k: BuildKind) =>
+  Object.entries(BUILD_COST[k])
+    .map(([r, n]) => `${n} ${r}`)
+    .join(', ');
+
+const SECTION_TITLE: Record<Section, string> = {
+  log: 'Game Events',
+  bank: 'Bank',
+  players: 'Players',
+};
+
+/** Regions emptied while a full-screen cover is up. */
+const GAME_REGIONS = ['menu', 'turn', 'side', 'drawer', 'bottom', 'controls', 'dialog'] as const;
 
 export class Hud {
   private readonly root: HTMLElement;
-  private readonly regions: Record<
-    'players' | 'hint' | 'dice' | 'log' | 'bottom' | 'dialog' | 'overlay',
-    HTMLElement
-  >;
+  private readonly regions: Record<Region, HTMLElement>;
   private listeners: Listeners = { action: [], newGame: [], placeMode: [] };
 
   private state: GameState | null = null;
@@ -82,8 +105,23 @@ export class Hud {
   private lastDice = '';
   private lastDialogKey = '';
   private lastLogLength = -1;
+  private menuOpen = false;
+  /** Phone layout: the sidebar is a drawer. */
+  private drawerOpen = false;
+  private collapsed = new Set<Section>();
+  private botSpeed: BotSpeedControl | null = null;
   private onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this.placeMode) this.setPlaceMode(null);
+    if (e.key !== 'Escape') return;
+    if (this.menuOpen) {
+      this.menuOpen = false;
+      this.refresh();
+    } else if (this.placeMode) this.setPlaceMode(null);
+  };
+  private onDocClick = (e: MouseEvent) => {
+    if (this.menuOpen && !this.regions.menu.contains(e.target as Node)) {
+      this.menuOpen = false;
+      this.refresh();
+    }
   };
 
   constructor(root: HTMLElement) {
@@ -91,23 +129,32 @@ export class Hud {
     root.classList.add('catan-hud');
     const mk = (cls: string) => h('div', { class: cls });
     this.regions = {
-      players: mk('hud-players'),
-      hint: mk('hud-hint-wrap'),
-      dice: mk('hud-dice-wrap'),
-      log: mk('hud-log-wrap'),
+      menu: mk('hud-menu'),
+      turn: mk('hud-turn'),
+      side: h('aside', { class: 'hud-side', attrs: { 'aria-label': 'Game info' } }),
+      drawer: mk('hud-drawer'),
       bottom: mk('hud-bottom'),
+      controls: mk('hud-controls'),
       dialog: mk('hud-dialog-layer'),
       overlay: mk('hud-overlay-layer'),
     };
     root.replaceChildren(...Object.values(this.regions));
     document.addEventListener('keydown', this.onKey);
+    document.addEventListener('click', this.onDocClick, true);
   }
 
   /** Remove listeners and DOM. */
   destroy(): void {
     document.removeEventListener('keydown', this.onKey);
+    document.removeEventListener('click', this.onDocClick, true);
     this.root.replaceChildren();
     this.root.classList.remove('catan-hud');
+  }
+
+  /** Show a bot-speed picker in the menu (null hides it). The HUD keeps the chosen value. */
+  setBotSpeed(control: BotSpeedControl | null): void {
+    this.botSpeed = control;
+    this.refresh();
   }
 
   on<E extends HudEventName>(event: E, cb: (payload: HudEvents[E]) => void): void {
@@ -204,9 +251,7 @@ export class Hud {
       this.setup ??= this.newSetupScreen();
       r.overlay.replaceChildren(this.setup.element);
       this.root.classList.add('is-covered');
-      for (const k of ['players', 'hint', 'dice', 'log', 'bottom', 'dialog'] as const) {
-        r[k].replaceChildren();
-      }
+      for (const k of GAME_REGIONS) r[k].replaceChildren();
       return;
     }
     if (!state || !view) {
@@ -221,9 +266,7 @@ export class Hud {
       this.unlockedViewer !== view.viewer;
     this.root.classList.toggle('is-covered', covered);
     if (covered) {
-      for (const k of ['players', 'hint', 'dice', 'log', 'bottom', 'dialog'] as const) {
-        r[k].replaceChildren();
-      }
+      for (const k of GAME_REGIONS) r[k].replaceChildren();
       r.overlay.replaceChildren(this.coverScreen(state, view));
       return;
     }
@@ -231,221 +274,240 @@ export class Hud {
     const legal = viewerLegal(view);
     const av = availability(legal);
 
-    r.players.replaceChildren(...this.playerPanels(state, view));
-    r.hint.replaceChildren(...this.hintBanner(state, view));
-    r.dice.replaceChildren(...this.diceBox(state));
-    this.renderLog(state);
-    r.bottom.replaceChildren(...this.bottomBar(state, view, av));
+    r.menu.replaceChildren(...this.menu(view));
+    r.turn.replaceChildren(...this.turnPill(state, view));
+    this.renderSidebar(state, view);
+    r.bottom.replaceChildren(...this.handBar(state, view, av));
+    r.controls.replaceChildren(...this.controls(state, view, av));
     this.renderDialog(state, view, legal);
     r.overlay.replaceChildren(
       ...(state.phase.kind === 'gameOver' ? [this.winnerScreen(state)] : []),
     );
   }
 
-  // --- players -------------------------------------------------------------
+  // --- top: menu and turn pill ----------------------------------------------
 
-  private playerPanels(state: GameState, view: HudView): HTMLElement[] {
-    return playerSummaries(state, view.viewer).map((p) => {
-      const badges = [
-        p.longestRoad &&
-          h('span', { class: 'badge', title: 'Longest Road (+2 VP)' }, '🛣️', 'Longest Road'),
-        p.largestArmy &&
-          h('span', { class: 'badge', title: 'Largest Army (+2 VP)' }, '⚔️', 'Largest Army'),
-      ];
-      return h(
-        'div',
-        {
-          class: `pp${p.isCurrent ? ' is-current' : ''}${p.id === view.viewer ? ' is-you' : ''}${p.isActing && !p.isCurrent ? ' is-acting' : ''}`,
-          style: { '--pc': p.color },
+  private menu(view: HudView): HTMLElement[] {
+    const toggle = h(
+      'button',
+      {
+        class: `menu-btn${this.menuOpen ? ' is-open' : ''}`,
+        title: 'Menu',
+        attrs: { 'aria-label': 'Menu', 'aria-expanded': String(this.menuOpen) },
+        on: {
+          click: () => {
+            this.menuOpen = !this.menuOpen;
+            this.refresh();
+          },
         },
+      },
+      glyph('menu', 22),
+    );
+    if (!this.menuOpen) return [toggle];
+    const speed = this.botSpeed;
+    const showSpeed = speed !== null && (view.bots?.some(Boolean) ?? true);
+    return [
+      toggle,
+      h(
+        'div',
+        { class: 'menu-panel wood', attrs: { role: 'menu' } },
         h(
-          'div',
-          { class: 'pp-head' },
-          h('span', { class: 'pp-dot' }),
-          h('span', { class: 'pp-name' }, p.name),
-          p.id === view.viewer && h('span', { class: 'tag' }, 'you'),
-          p.isCurrent && h('span', { class: 'turn-pip', title: 'Current turn' }),
+          'button',
+          {
+            class: 'menu-item',
+            attrs: { role: 'menuitem' },
+            on: {
+              click: () => {
+                this.menuOpen = false;
+                this.showNewGame();
+              },
+            },
+          },
+          'New game',
+        ),
+        showSpeed &&
           h(
-            'span',
-            { class: 'pp-vp', title: 'Victory points (public)' },
-            String(p.publicVp),
-            h('small', {}, 'VP'),
-          ),
-        ),
-        h(
-          'div',
-          { class: 'pp-stats' },
-          h('span', { title: 'Resource cards in hand' }, '🃏 ', String(p.cards)),
-          h('span', { title: 'Development cards' }, '🎴 ', String(p.devCards)),
-          h('span', { title: 'Knights played' }, '⚔️ ', String(p.knights)),
-          p.hiddenVp > 0 &&
+            'div',
+            { class: 'menu-sec' },
+            h('div', { class: 'menu-label' }, 'Bot speed'),
             h(
-              'span',
-              { class: 'hidden-vp', title: 'Hidden VP cards (only you see this)' },
-              `+${p.hiddenVp} hidden`,
+              'div',
+              { class: 'seg', attrs: { role: 'group', 'aria-label': 'Bot speed' } },
+              ...speed.presets.map((p) =>
+                h(
+                  'button',
+                  {
+                    class: `seg-btn${p.ms === speed.value ? ' is-on' : ''}`,
+                    on: {
+                      click: () => {
+                        this.botSpeed = { ...speed, value: p.ms };
+                        speed.onChange(p.ms);
+                        this.refresh();
+                      },
+                    },
+                  },
+                  p.label,
+                ),
+              ),
             ),
+          ),
+        h(
+          'a',
+          {
+            class: 'menu-item',
+            attrs: {
+              role: 'menuitem',
+              href: 'https://www.catan.com/understand-catan/game-rules',
+              target: '_blank',
+              rel: 'noopener noreferrer',
+            },
+          },
+          'Rules ↗',
         ),
-        badges.some(Boolean) && h('div', { class: 'pp-badges' }, ...badges),
-      );
-    });
+      ),
+    ];
   }
 
-  private hintBanner(state: GameState, view: HudView): HTMLElement[] {
-    const hint = hintFor(state, view, this.placeMode);
-    if (!hint) return [];
+  private turnPill(state: GameState, view: HudView): HTMLElement[] {
+    if (state.phase.kind === 'gameOver') return [];
+    const info = turnInfo(state, view, this.placeMode);
+    const p = getPlayer(state, info.player);
+    const timer = view.turnTimer;
     return [
       h(
         'div',
-        { class: `hint hint-${hint.tone}`, attrs: { role: 'status' } },
-        hint.text,
+        {
+          class: `turn-pill${info.hint?.tone === 'action' ? ' is-action' : ''}`,
+          style: playerStyle(p.color),
+          attrs: { role: 'status' },
+        },
+        avatar(p, view.bots?.[info.player] ?? view.isBotTurn, 34),
+        h(
+          'div',
+          { class: 'turn-text' },
+          h('span', { class: 'turn-title' }, info.title),
+          info.hint && h('span', { class: `hint hint-${info.hint.tone}` }, info.hint.text),
+        ),
+        timer && this.timerBadge(timer.remainingSec, timer.totalSec),
         this.placeMode &&
           h(
             'button',
-            { class: 'btn btn-ghost btn-sm', on: { click: () => this.setPlaceMode(null) } },
+            { class: 'btn btn-sm', on: { click: () => this.setPlaceMode(null) } },
             'Cancel',
           ),
       ),
     ];
   }
 
-  private diceBox(state: GameState): HTMLElement[] {
-    const d = state.dice;
-    if (!d)
-      return [h('div', { class: 'dice dice-empty' }, h('span', { class: 'dice-label' }, 'Dice'))];
-    const key = `${state.turn.number}:${d[0]}:${d[1]}`;
-    const fresh = key !== this.lastDice;
-    this.lastDice = key;
-    const total = diceTotal(d);
-    return [
-      h(
-        'div',
-        { class: `dice${fresh ? ' rolling' : ''}${total === 7 ? ' is-seven' : ''}` },
-        dieFace(d[0]),
-        dieFace(d[1]),
-        h('span', { class: 'dice-total', title: 'Last roll' }, String(total)),
-      ),
-    ];
+  private timerBadge(remaining: number, total: number): HTMLElement {
+    const left = Math.max(0, Math.ceil(remaining));
+    const frac = total > 0 ? Math.min(1, left / total) : 0;
+    return h(
+      'span',
+      {
+        class: `turn-timer${left <= 10 ? ' is-low' : ''}`,
+        style: { '--frac': String(frac) },
+        title: 'Time left this turn',
+      },
+      `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
+    );
   }
 
-  private renderLog(state: GameState): void {
-    const box = this.regions.log;
-    const old = box.querySelector('.log-list');
+  // --- sidebar ---------------------------------------------------------------
+
+  private renderSidebar(state: GameState, view: HudView): void {
+    const side = this.regions.side;
+    const old = side.querySelector('.log-list');
     const wasAtBottom = !old || old.scrollTop + old.clientHeight >= old.scrollHeight - 8;
     const prevTop = old ? old.scrollTop : 0;
-    const list = h(
-      'div',
-      { class: 'log-list' },
-      ...state.log.map((e) => {
-        const p = e.player === null ? undefined : state.players[e.player];
-        return h(
-          'div',
-          { class: 'log-row', style: { '--pc': p?.color ?? 'transparent' } },
-          h('span', { class: 'log-turn' }, e.turn > 0 ? `T${e.turn}` : 'Setup'),
-          h('span', { class: 'log-text' }, e.text),
-        );
-      }),
+
+    const list = logList(state);
+    side.classList.toggle('is-open', this.drawerOpen);
+    side.replaceChildren(
+      this.section('log', list),
+      this.section('bank', bankPanel(state)),
+      this.section('players', playersList(state, view)),
     );
-    box.replaceChildren(h('div', { class: 'log-title' }, 'Game log'), list);
     const grew = state.log.length !== this.lastLogLength;
     this.lastLogLength = state.log.length;
     list.scrollTop = grew && wasAtBottom ? list.scrollHeight : prevTop;
-  }
 
-  // --- hand & actions ------------------------------------------------------
-
-  private bottomBar(state: GameState, view: HudView, av: Availability): HTMLElement[] {
-    const me = getPlayer(state, view.viewer);
-    const legal = viewerLegal(view);
-    const over = state.phase.kind === 'gameOver';
-
-    const actionBtn = (
-      label: string,
-      icon: string,
-      enabled: boolean,
-      onClick: () => void,
-      opts: { title?: string; primary?: boolean; active?: boolean } = {},
-    ) =>
+    this.regions.drawer.replaceChildren(
       h(
         'button',
         {
-          class: `btn act${opts.primary ? ' btn-primary' : ''}${opts.active ? ' is-active' : ''}`,
-          disabled: !enabled || over,
-          title: opts.title ?? '',
-          on: { click: onClick },
+          class: `drawer-btn${this.drawerOpen ? ' is-open' : ''}`,
+          title: this.drawerOpen ? 'Hide game info' : 'Show game info',
+          attrs: { 'aria-label': 'Game info', 'aria-expanded': String(this.drawerOpen) },
+          on: {
+            click: () => {
+              this.drawerOpen = !this.drawerOpen;
+              this.refresh();
+            },
+          },
         },
-        h('span', { class: 'act-ico' }, icon),
-        h('span', {}, label),
-      );
-
-    const toggleMode = (m: PlaceMode) => () => this.setPlaceMode(this.placeMode === m ? null : m);
-
-    const actions = h(
-      'div',
-      { class: 'actions' },
-      actionBtn(
-        'Roll dice',
-        '🎲',
-        av.roll,
-        () => this.send({ type: 'rollDice', player: view.viewer }),
-        { primary: av.roll },
-      ),
-      h('span', { class: 'sep' }),
-      actionBtn('Road', '🛣️', av.buildRoad, toggleMode('road'), {
-        title: `Cost: ${COSTS_TEXT.road}`,
-        active: this.placeMode === 'road',
-      }),
-      actionBtn('Settlement', '🏠', av.buildSettlement, toggleMode('settlement'), {
-        title: `Cost: ${COSTS_TEXT.settlement}`,
-        active: this.placeMode === 'settlement',
-      }),
-      actionBtn('City', '🏙️', av.buildCity, toggleMode('city'), {
-        title: `Cost: ${COSTS_TEXT.city}`,
-        active: this.placeMode === 'city',
-      }),
-      actionBtn(
-        'Buy card',
-        '🎴',
-        av.buyDevCard,
-        () => this.send({ type: 'buyDevCard', player: view.viewer }),
-        { title: `Cost: ${COSTS_TEXT.dev}` },
-      ),
-      h('span', { class: 'sep' }),
-      actionBtn('Bank', '🏦', av.bankTrade, () => this.open('bank'), {
-        active: this.dialog === 'bank',
-      }),
-      actionBtn('Trade', '🤝', av.offerTrade, () => this.open('trade'), {
-        active: this.dialog === 'trade',
-      }),
-      h('span', { class: 'sep' }),
-      actionBtn(
-        'End turn',
-        '⏭️',
-        av.endTurn,
-        () => this.send({ type: 'endTurn', player: view.viewer }),
-        { primary: av.endTurn && !av.roll },
+        glyph(this.drawerOpen ? 'close' : 'cards', 22),
       ),
     );
+  }
 
-    const ratios = bestRatios(state, view.viewer);
-    const cards = h(
-      'div',
-      { class: 'hand' },
-      ...RESOURCES.map((r) =>
+  private section(key: Section, body: HTMLElement): HTMLElement {
+    const closed = this.collapsed.has(key);
+    return h(
+      'section',
+      { class: `side-sec sec-${key}${closed ? ' is-collapsed' : ''}` },
+      h(
+        'header',
+        { class: 'sec-head' },
+        h('h2', { class: 'plaque' }, SECTION_TITLE[key]),
         h(
-          'div',
+          'button',
           {
-            class: `rcard rc-${r}${me.resources[r] === 0 ? ' is-zero' : ''}`,
-            title: `${RESOURCE_LABEL[r]} — bank ratio ${ratios[r]}:1`,
+            class: 'sec-toggle',
+            title: closed ? 'Expand' : 'Collapse',
+            attrs: {
+              'aria-label': `${closed ? 'Expand' : 'Collapse'} ${SECTION_TITLE[key]}`,
+              'aria-expanded': String(!closed),
+            },
+            on: {
+              click: () => {
+                if (closed) this.collapsed.delete(key);
+                else this.collapsed.add(key);
+                this.refresh();
+              },
+            },
           },
-          resourceIcon(r, 30),
-          h('span', { class: 'rc-count' }, String(me.resources[r])),
-          h('span', { class: 'rc-name' }, RESOURCE_LABEL[r]),
-          h('span', { class: `rc-ratio r${ratios[r]}` }, `${ratios[r]}:1`),
+          glyph('chevron', 14),
         ),
       ),
+      h('div', { class: 'sec-body' }, body),
     );
+  }
 
-    const rows = devCardRows(state, view.viewer, legal);
+  // --- bottom-left: hand, trade, build bar ------------------------------------
+
+  private handBar(state: GameState, view: HudView, av: Availability): HTMLElement[] {
+    const me = getPlayer(state, view.viewer);
+    const legal = viewerLegal(view);
+    const over = state.phase.kind === 'gameOver';
+    const ratios = bestRatios(state, view.viewer);
+
+    const stackCls = (n: number) =>
+      n === 0 ? ' is-zero' : n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : '';
+    const resCards = RESOURCES.map((r) => {
+      const n = me.resources[r];
+      return h(
+        'div',
+        {
+          class: `hcard rcard rc-${r}${stackCls(n)}`,
+          title: `${RESOURCE_LABEL[r]}: ${n} (bank ${ratios[r]}:1)`,
+        },
+        resCardFace(r, 46),
+        ratios[r] < 4 && h('span', { class: `ratio-tag r${ratios[r]}` }, `${ratios[r]}:1`),
+        h('span', { class: 'count-badge' }, String(n)),
+      );
+    });
+
     const devOpen = (type: string) =>
       type === 'knight'
         ? () => this.send({ type: 'playKnight', player: view.viewer })
@@ -454,34 +516,148 @@ export class Hud {
           : type === 'yearOfPlenty'
             ? () => this.open('yop')
             : () => this.open('monopoly');
-    const dev = h(
+    const devCards = devCardRows(state, view.viewer, legal).map((row) => {
+      const info = DEV_CARD_INFO[row.type];
+      const n = row.ready + row.fresh;
+      return h(
+        'button',
+        {
+          class: `hcard dcard${stackCls(n)}${row.canPlay ? ' can-play' : ''}${row.type === 'victoryPoint' ? ' is-vp' : ''}`,
+          disabled: !row.canPlay || over,
+          title: `${info.name}: ${info.blurb}${row.fresh > 0 ? ` (${row.fresh} new: playable next turn)` : ''}`,
+          attrs: { 'aria-label': `${info.name} ×${n}` },
+          on: { click: row.type === 'victoryPoint' ? () => undefined : devOpen(row.type) },
+        },
+        devCardFace(row.type, 46),
+        row.fresh > 0 && h('span', { class: 'new-tag' }, 'new'),
+        h('span', { class: 'count-badge' }, String(n)),
+      );
+    });
+
+    const hand = h(
       'div',
-      { class: 'devs' },
-      rows.length === 0 && h('span', { class: 'muted' }, 'No development cards'),
-      ...rows.map((row) => {
-        const info = DEV_CARD_INFO[row.type];
-        const playable = row.type !== 'victoryPoint';
-        return h(
-          'button',
-          {
-            class: `dcard${row.canPlay ? ' can-play' : ''}${row.type === 'victoryPoint' ? ' is-vp' : ''}`,
-            disabled: !row.canPlay || over,
-            title: `${info.name}: ${info.blurb}${row.fresh > 0 ? ' (new cards can be played next turn)' : ''}`,
-            on: { click: playable ? devOpen(row.type) : () => undefined },
-          },
-          h('span', { class: 'dc-ico' }, info.icon),
-          h('span', { class: 'dc-name' }, info.name),
-          h(
-            'span',
-            { class: 'dc-counts' },
-            row.ready > 0 && h('b', {}, `×${row.ready}`),
-            row.fresh > 0 && h('em', { title: 'Bought this turn' }, `+${row.fresh} new`),
-          ),
-        );
-      }),
+      { class: 'hand wood' },
+      ...resCards,
+      devCards.length > 0 && h('span', { class: 'hand-sep' }),
+      ...devCards,
     );
 
-    return [actions, h('div', { class: 'hand-row' }, cards, h('span', { class: 'vsep' }), dev)];
+    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: Dialog) =>
+      h(
+        'button',
+        {
+          class: `act tbtn${this.dialog === d ? ' is-active' : ''}`,
+          disabled: !enabled || over,
+          on: { click: () => this.open(d) },
+        },
+        glyph(label === 'Trade' ? 'trade' : 'bank', 20),
+        h('span', {}, label),
+      );
+    const trade = h(
+      'div',
+      { class: 'trade-col wood' },
+      sideBtn('Trade', av.offerTrade, 'trade'),
+      sideBtn('Bank', av.bankTrade, 'bank'),
+    );
+
+    const toggleMode = (m: PlaceMode) => () => this.setPlaceMode(this.placeMode === m ? null : m);
+    const build = h(
+      'div',
+      { class: 'build-bar wood', style: playerStyle(me.color) },
+      ...buildCards(state, view.viewer, av).map((c) =>
+        h(
+          'button',
+          {
+            class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
+            disabled: !c.enabled || over,
+            title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
+            on: {
+              click:
+                c.kind === 'dev'
+                  ? () => this.send({ type: 'buyDevCard', player: view.viewer })
+                  : toggleMode(c.kind),
+            },
+          },
+          h(
+            'span',
+            { class: 'bcard-art' },
+            c.kind === 'dev' ? devCardFace(null, 26) : glyph(c.kind, 30),
+          ),
+          h('span', { class: 'bcard-label' }, BUILD_LABEL[c.kind]),
+          h('span', { class: 'bcard-left' }, `${c.left}/${c.total}`),
+          h(
+            'span',
+            { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+            ...Object.entries(BUILD_COST[c.kind]).flatMap(([r, n]) =>
+              Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
+    // CSS `order` shows hand | trade | build from left to right.
+    return [build, trade, hand];
+  }
+
+  // --- bottom-right: dice, roll, end turn ------------------------------------
+
+  private controls(state: GameState, view: HudView, av: Availability): HTMLElement[] {
+    const over = state.phase.kind === 'gameOver';
+    return [
+      this.diceBox(state),
+      h(
+        'div',
+        { class: 'ctl-btns' },
+        h(
+          'button',
+          {
+            class: `act btn-roll${av.roll ? ' is-ready' : ''}`,
+            disabled: !av.roll || over,
+            on: { click: () => this.send({ type: 'rollDice', player: view.viewer }) },
+          },
+          glyph('dice', 24),
+          h('span', {}, 'Roll dice'),
+        ),
+        h(
+          'button',
+          {
+            class: `act btn-end${av.endTurn && !av.roll ? ' is-ready' : ''}`,
+            disabled: !av.endTurn || over,
+            on: { click: () => this.send({ type: 'endTurn', player: view.viewer }) },
+          },
+          glyph('next', 20),
+          h('span', {}, 'End turn'),
+        ),
+      ),
+    ];
+  }
+
+  private diceBox(state: GameState): HTMLElement {
+    const d = state.dice;
+    if (!d) {
+      return h(
+        'div',
+        { class: 'dice dice-empty', title: 'No roll yet' },
+        h('span', { class: 'die die-blank' }),
+        h('span', { class: 'die die-blank' }),
+      );
+    }
+    const key = `${state.turn.number}:${d[0]}:${d[1]}`;
+    const fresh = key !== this.lastDice;
+    this.lastDice = key;
+    const total = diceTotal(d);
+    return h(
+      'div',
+      {
+        class: `dice${fresh ? ' rolling' : ''}${total === 7 ? ' is-seven' : ''}`,
+        title: `Last roll: ${total}`,
+      },
+      dieFace(d[0]),
+      dieFace(d[1]),
+      h('span', { class: 'dice-total' }, String(total)),
+    );
   }
 
   // --- dialogs -------------------------------------------------------------
@@ -781,7 +957,7 @@ export class Hud {
       'span',
       { class: 'bundle' },
       ...RESOURCES.filter((r) => bundle[r] > 0).map((r) =>
-        h('span', { class: 'bundle-item' }, resourceIcon(r, 22), `×${bundle[r]}`),
+        h('span', { class: 'bundle-item' }, resCardFace(r, 24), `×${bundle[r]}`),
       ),
     );
   }
@@ -974,7 +1150,7 @@ export class Hud {
                 disabled: !act,
                 on: { click: () => act && this.send(act) },
               },
-              h('span', { class: 'pp-dot big' }),
+              avatar(p, view.bots?.[id] ?? false, 44),
               h('span', { class: 'victim-name' }, p.name),
               h('span', { class: 'muted' }, `${count} cards`),
             );

@@ -6,8 +6,8 @@
   flex-direction: column;
   pointer-events: auto;
   background:
-    radial-gradient(circle at 50% 0%, rgba(58, 123, 213, 0.35), transparent 55%),
-    linear-gradient(180deg, #0f2a44, #08121e);
+    radial-gradient(circle at 50% 0%, rgba(255, 214, 150, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(20, 9, 2, 0.35), rgba(20, 9, 2, 0.6)), var(--wood-bg);
   animation: fade 0.25s ease;
 }
 .su-scroll {
@@ -255,7 +255,7 @@
     transform 0.1s ease;
 }
 .su-step:hover:not(:disabled) {
-  background: rgba(40, 70, 104, 0.95);
+  background: var(--wood-4);
 }
 .su-step:active:not(:disabled) {
   transform: translateY(1px);
@@ -398,8 +398,8 @@
   flex: none;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line);
-  background: rgba(8, 18, 30, 0.94);
-  backdrop-filter: blur(8px);
+  background: var(--wood-bg);
+  border-top: 2px solid var(--wood-0);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
 }
 .su-footer-in {

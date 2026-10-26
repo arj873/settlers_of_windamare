@@ -38,7 +38,7 @@ describe('Hud', () => {
   it('disables everything when there are no legal actions (bot turn)', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: [], isBotTurn: true });
-    const act = [...root.querySelectorAll<HTMLButtonElement>('.actions button')];
+    const act = [...root.querySelectorAll<HTMLButtonElement>('button.act')];
     expect(act.length).toBeGreaterThan(5);
     expect(act.every((b) => b.disabled)).toBe(true);
   });
@@ -199,6 +199,106 @@ describe('Hud', () => {
     byText('Start game')!.click();
     expect(cfg?.players).toHaveLength(3);
     expect(cfg?.map).toBe('baseRandom');
+  });
+
+  it('build bar shows pieces and dev cards left', () => {
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
+    const cards = [...root.querySelectorAll('.bcard')].map((b) => [
+      b.querySelector('.bcard-label')!.textContent,
+      b.querySelector('.bcard-left')!.textContent,
+    ]);
+    // Blue (midGame) has 4 roads, 2 settlements and 1 city on the board.
+    expect(cards).toEqual([
+      ['Buy card', `${s.devDeck.length}/25`],
+      ['Road', '11/15'],
+      ['Settlement', '3/5'],
+      ['City', '3/4'],
+    ]);
+  });
+
+  it('bank shows counts, or bare stacks when bank cards are hidden', () => {
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: [], isBotTurn: false });
+    const counts = () => [...root.querySelectorAll('.bank .count-badge')].map((b) => b.textContent);
+    expect(counts()).toEqual([...Object.values(s.bank).map(String), String(s.devDeck.length)]);
+
+    const hidden = { ...s, settings: { ...s.settings, hideBankCards: true } };
+    hud.render(hidden, { viewer: 1, legal: [], isBotTurn: false });
+    expect(root.querySelectorAll('.bank .bank-stack')).toHaveLength(6);
+    // Only the development deck keeps its count.
+    expect(counts()).toEqual([String(s.devDeck.length)]);
+  });
+
+  it('lists up to 8 players, compact, with bot markers and the current turn', () => {
+    const s = midGame();
+    for (let i = 4; i < 8; i++) {
+      s.players.push({ ...s.players[i % 4]!, id: i, name: `P${i + 1}` });
+    }
+    const bots = s.players.map((p) => p.id % 2 === 0);
+    hud.render(s, { viewer: 1, legal: [], isBotTurn: false, bots });
+    const list = root.querySelector('.hud-players')!;
+    expect(list.classList.contains('is-compact')).toBe(true);
+    const bars = [...list.querySelectorAll('.pp')];
+    expect(bars).toHaveLength(8);
+    expect(bars.map((b) => b.querySelector('.pp-name')!.textContent)).toEqual([
+      'Red',
+      'Blue',
+      'White',
+      'Orange',
+      'P5',
+      'P6',
+      'P7',
+      'P8',
+    ]);
+    expect(bars.filter((b) => b.querySelector('.tag-bot'))).toHaveLength(4);
+    expect(bars[1]!.classList.contains('is-current')).toBe(true);
+    expect(bars[1]!.textContent).toContain('You');
+  });
+
+  it('renders the log with player names and icons', () => {
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: [], isBotTurn: false });
+    const rows = [...root.querySelectorAll('.log-row')];
+    const roll = rows.find((r) => r.textContent?.includes('rolled'))!;
+    // The latest roll shows both dice faces.
+    expect(roll.querySelectorAll('.die')).toHaveLength(2);
+    expect(roll.querySelector('.pname')!.textContent).toBe('Blue');
+    const built = rows.find((r) => r.textContent?.includes('built'))!;
+    expect(built.querySelector('.g-road')).not.toBeNull();
+  });
+
+  it('turn pill names the current player and shows a timer when given one', () => {
+    const s = midGame();
+    hud.render(s, {
+      viewer: 0,
+      legal: [],
+      isBotTurn: true,
+      turnTimer: { remainingSec: 75, totalSec: 90 },
+    });
+    const pill = root.querySelector('.turn-pill')!;
+    expect(pill.querySelector('.turn-title')!.textContent).toBe("Blue's turn");
+    expect(pill.querySelector('.turn-timer')!.textContent).toBe('1:15');
+  });
+
+  it('menu offers a new game and the bot speed', () => {
+    const speeds: number[] = [];
+    hud.setBotSpeed({
+      value: 500,
+      presets: [
+        { label: 'Normal', ms: 500 },
+        { label: 'Fast', ms: 150 },
+      ],
+      onChange: (ms) => speeds.push(ms),
+    });
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: [], isBotTurn: false, bots: [true, false, true, true] });
+    expect(byText('New game')).toBeUndefined();
+    root.querySelector<HTMLButtonElement>('.menu-btn')!.click();
+    byText('Fast')!.click();
+    expect(speeds).toEqual([150]);
+    byText('New game')!.click();
+    expect(root.querySelector('.setup')).not.toBeNull();
   });
 
   it('escapes player names', () => {

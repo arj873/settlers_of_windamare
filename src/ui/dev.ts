@@ -40,6 +40,20 @@ const FIXTURES: Record<string, () => GameState> = {
     return s;
   },
   'trade offer': tradeOfferGame,
+  '8 players, hidden bank': () => {
+    const s = midGame();
+    const extra = [
+      ['Green', '#2e9e5b'],
+      ['Purple', '#8e5bc8'],
+      ['Teal', '#1fa3a3'],
+      ['Brown', '#8a5a2b'],
+    ] as const;
+    extra.forEach(([name, color], i) => {
+      const base = s.players[i];
+      if (base) s.players.push({ ...base, id: s.players.length, name, color });
+    });
+    return { ...s, settings: { ...s.settings, hideBankCards: true } };
+  },
   'game over': gameOverGame,
 };
 

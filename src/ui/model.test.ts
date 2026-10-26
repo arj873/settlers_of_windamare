@@ -5,8 +5,13 @@ import { discardGame, freshGame, midGame, tradeOfferGame } from '../engine/fixtu
 import { fakeLegal } from './devLegal';
 import {
   availability,
+  bankCardsHidden,
+  bankView,
   bestRatios,
   boardPrompt,
+  buildCards,
+  inkFor,
+  turnInfo,
   devCardRows,
   findBankTrade,
   findYearOfPlenty,
@@ -119,6 +124,62 @@ describe('dev cards and players', () => {
       .filter((p) => p.isActing)
       .map((p) => p.id);
     expect(acting).toEqual([1, 3]);
+  });
+});
+
+describe('bank, build bar, players (redesigned HUD)', () => {
+  it('bank shows counts unless bank cards are hidden (read defensively)', () => {
+    const s = midGame();
+    const shown = bankView(s);
+    expect(shown.stacks.map((x) => x.count)).toEqual(Object.values(s.bank));
+    expect(shown.devDeck).toBe(s.devDeck.length);
+    expect(bankCardsHidden(s)).toBe(false);
+
+    const flat = { ...s, settings: { ...s.settings, hideBankCards: true } };
+    expect(bankView(flat).stacks.every((x) => x.count === null)).toBe(true);
+    const nested = { ...s, settings: { ...s.settings, rules: { hideBankCards: true } } };
+    expect(bankCardsHidden(nested)).toBe(true);
+  });
+
+  it('build cards count pieces left and only enable legal builds', () => {
+    const s = freshGame();
+    const av = availability([{ type: 'buildRoad', player: 0, edge: TOPOLOGY.edges[0]! }]);
+    expect(buildCards(s, 0, av)).toEqual([
+      { kind: 'dev', left: 25, total: 25, enabled: false },
+      { kind: 'road', left: 15, total: 15, enabled: true },
+      { kind: 'settlement', left: 5, total: 5, enabled: false },
+      { kind: 'city', left: 4, total: 4, enabled: false },
+    ]);
+    s.pieces.buildings[cornerVertex(0, 0, 'N')] = { owner: 0, kind: 'city' };
+    expect(buildCards(s, 0, av)[3]!.left).toBe(3);
+  });
+
+  it('summaries carry road length and the bot flag', () => {
+    const s = midGame();
+    const list = playerSummaries(s, 1, [true, false]);
+    expect(list.map((p) => p.isBot)).toEqual([true, false, false, false]);
+    expect(list[0]!.roadLength).toBeGreaterThanOrEqual(5); // Red holds Longest Road
+  });
+
+  it('picks readable text for player colours', () => {
+    expect(inkFor('#ecf0f1')).toBe('dark');
+    expect(inkFor('#f39c12')).toBe('dark');
+    expect(inkFor('#3a7bd5')).toBe('light');
+    expect(inkFor('#d64541')).toBe('light');
+    expect(inkFor('rebeccapurple')).toBe('light');
+  });
+
+  it('turn info: your turn vs. someone else, without repeating the name', () => {
+    const s = midGame();
+    expect(turnInfo(s, view(1, [{ type: 'endTurn', player: 1 }]), null)).toMatchObject({
+      player: 1,
+      title: 'Your turn',
+      hint: { text: 'build, trade or end your turn' },
+    });
+    expect(turnInfo(s, view(0, [], true), null)).toMatchObject({
+      title: "Blue's turn",
+      hint: { text: 'thinking…', tone: 'wait' },
+    });
   });
 });
 

@@ -281,7 +281,9 @@ view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the 
 ```ts
 import { Hud } from './ui';
 const hud = new Hud(document.getElementById('ui')!);          // overlay; only its panels take pointer events
-hud.render(state, { viewer, legal, isBotTurn });              // call after every state change / viewer change
+hud.render(state, { viewer, legal, isBotTurn, bots?, turnTimer? }); // call after every state change / viewer change
+                                                              // bots: boolean[] by PlayerId (bot marker); turnTimer: { remainingSec, totalSec } | null (T14)
+hud.setBotSpeed({ value, presets, onChange } | null);         // bot-speed picker inside the HUD menu (main.ts wires it)
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
 hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode:'base', map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[3..8], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
 hud.on('placeMode', (m: 'road'|'settlement'|'city'|null) => …); // build button toggled: board shows targets, click -> buildX
@@ -295,6 +297,17 @@ hud.showNewGame();                                            // open the new-ga
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
 - Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+- Layout (T17, wooden theme): right sidebar `.hud-side` (Game Events / Bank / Players, collapsible;
+  360px, 300px under 1280px, a drawer under 720px), menu top-left (`.hud-menu`: New game, Bot speed,
+  Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
+  text), hand + Trade/Bank + build bar bottom-left (`.hud-bottom`), dice + Roll dice / End turn
+  bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets`; a docked
+  trade offer card (`.scrim.is-side .dialog`, above the hand) becomes a left inset.
+- Game Events parse the engine's log text (`ui/log.ts`): player names, resource counts, rolls,
+  pieces, dev cards, robber and awards become icons; "X received …" lines after a roll fold into a
+  "Production:" block. Unknown text stays text, so log wording changes degrade gracefully.
+- Bank counts hide when `settings.hideBankCards` (or `settings.rules.hideBankCards`) is true; read
+  defensively since the engine may not have the field yet.
 
 ## 13b. Game controller (`src/game`, T7)
 

@@ -5,7 +5,7 @@ import { BoardView } from './render';
 import { Hud, type Controller } from './ui';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { measureHudInsets } from './game/layout';
-import { mountSpeedPicker, showResumePrompt, showToast } from './game/overlays';
+import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import {
   SPEED_KEY,
@@ -75,8 +75,6 @@ async function boot() {
     const insets = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
     if (insets) board.setInsets(insets);
   };
-  let setSpeedVisible: (v: boolean) => void = () => undefined;
-
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,
@@ -84,14 +82,18 @@ async function boot() {
     storage,
     speed,
     toast: showToast,
-    onRender: () => {
-      fitBoard();
-      setSpeedVisible(controller.seats.includes('bot'));
-    },
+    onRender: fitBoard,
   });
-  setSpeedVisible = mountSpeedPicker(speed, (ms) => {
-    controller.setSpeed(ms);
-    saveNumber(prefs, SPEED_KEY, ms);
+  // Bot speed lives in the HUD menu (shown while any seat is a bot).
+  hud.setBotSpeed({
+    value: speed,
+    presets: SPEED_PRESETS.some((p) => p.ms === speed)
+      ? SPEED_PRESETS
+      : [...SPEED_PRESETS, { label: `${speed} ms`, ms: speed }],
+    onChange: (ms) => {
+      controller.setSpeed(ms);
+      saveNumber(prefs, SPEED_KEY, ms);
+    },
   });
   window.addEventListener('resize', fitBoard);
   // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
