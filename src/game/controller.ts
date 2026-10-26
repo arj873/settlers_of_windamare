@@ -20,6 +20,7 @@ import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import {
   actionForClick,
   boardActions,
+  gameConfigOf,
   highlightsFor,
   isStalled,
   nextBot,
@@ -175,16 +176,7 @@ export class GameController {
   /** New game from the HUD's new-game screen. */
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
-    const state = createGame({
-      seed,
-      players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-      map: cfg.map,
-      vpToWin: extra.vpToWin ?? cfg.vpToWin,
-      discardLimit: cfg.discardLimit,
-      balancedDice: cfg.rules.balancedDice,
-      hideBankCards: cfg.rules.hideBankCards,
-      turnTimerSec: cfg.turnTimerSec,
-    });
+    const state = createGame(gameConfigOf(cfg, seed, extra.vpToWin));
     console.info(`New game: map=${cfg.map} seed=${seed}`);
     this.start(
       state,
