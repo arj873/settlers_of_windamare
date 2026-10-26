@@ -13,14 +13,18 @@
  * open sea and take ships from `routeEdges` (tb/engine/paths.ts); no robber and no pirate in T&B
  * and Barbarian Attack (tb's robberless rule, the map's pirate start null).
  */
-import { fail, isCurrent, log, ok } from '../../../engine/actions/common';
+import { fail, isCurrent, log, ok, resumePhase } from '../../../engine/actions/common';
 import type {
   ExpansionModule,
   ExtHandler,
   ExtWrap,
   ScenarioDef,
 } from '../../../engine/expansions/types';
+import { canPlaceRoad } from '../../../engine/rules/placement';
 import { playerName } from '../../../engine/rules/text';
+import { piecesLeft } from '../../../engine/selectors';
+import { topologyOf } from '../../../engine/topology';
+import { roadsBlocked } from '../../../engine/variants';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { seafarersModule, SEAFARERS, seaSlice, type MoveShipPhase } from '../../seafarers/engine';
 import { SEA_ACTIONS } from '../../seafarers/engine/actions';
@@ -281,11 +285,33 @@ function legal(state: GameState): Action[] {
   return out;
 }
 
+/** The pair limits ships (Rivers: bridge sites; Barbarian Attack: unconquered routes). */
+const limitsShips = (state: GameState) => has(state, 'rivers') || has(state, 'ba');
+
+/** Road Building could place a road, or a free ship the pair allows. */
+function freePieceFits(state: GameState, p: PlayerId): boolean {
+  if (piecesLeft(state, p).road > 0 && !roadsBlocked(state, p)) {
+    if (topologyOf(state).edges.some((e) => canPlaceRoad(state, p, e))) return true;
+  }
+  if (shipsLeft(state, p) <= 0) return false;
+  const free = (edge: EdgeId) => ({ type: T.freeShip, player: p, edge }) as unknown as Action;
+  return shipSpots(state, p).some((e) => shipBlocker(state, free(e)) === null);
+}
+
 function filterLegal(state: GameState, actions: Action[]): Action[] {
-  if (!has(state, 'rivers') && !has(state, 'ba')) return actions;
-  return actions.filter(
-    (a) => !a.type.startsWith(`${SEAFARERS}/`) || shipBlocker(state, a) === null,
-  );
+  if (!limitsShips(state)) return actions;
+  return actions.filter((a) => {
+    // No Road Building card when only forbidden ship spots are left (it would place nothing).
+    if (a.type === 'playRoadBuilding') return freePieceFits(state, a.player);
+    return !a.type.startsWith(`${SEAFARERS}/`) || shipBlocker(state, a) === null;
+  });
+}
+
+/** Road Building ends when nothing the pair allows fits any more (Seafarers counts every ship spot). */
+function endRoadBuilding(draft: GameState): void {
+  const phase = draft.phase;
+  if (phase.kind !== 'roadBuilding' || !limitsShips(draft)) return;
+  if (!freePieceFits(draft, draft.turn.current)) draft.phase = resumePhase(draft, phase.resume);
 }
 
 const scenarios: ScenarioDef[] = PAIRS.map((pair) => ({
@@ -330,6 +356,9 @@ export const tbseaModule: ExpansionModule = {
   },
 
   actions: { 'tbsea/fishPirate': fishPirate, 'tbsea/fishShip': fishShip },
+  // Barbarian Attack: a conquest (or a freed hex) changes the trade route (FAQ 6). Barbarians
+  // land after a city too, Treason and Intrigue move them, the end of the turn expels them.
+  changesRoads: ['buildCity', 'endTurn', 'tb/treasonHex', 'tb/intrigueHex'],
   wraps,
   legal,
   filterLegal,
@@ -341,5 +370,6 @@ export const tbseaModule: ExpansionModule = {
     routeEdges: (state, p) => (has(state, 'traders') ? shipsOf(state, p) : []),
     // Barbarian Attack: a conquered settlement interrupts the trade route (FAQ 6).
     blocksRoute: (state, v) => has(state, 'ba') && isConqueredBuilding(state, v),
+    afterAction: (draft) => endRoadBuilding(draft),
   },
 };

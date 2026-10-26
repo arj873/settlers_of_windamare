@@ -320,6 +320,27 @@ describe('Rivers + Seafarers', () => {
     expect(mid).toBeGreaterThanOrEqual(before);
   });
 
+  it('regression (sim seed 55): Road Building ends when only bridge sites are left for ships', () => {
+    const s = main('tbsea/rivers');
+    const site = (tbBoard(s).bridgeSites ?? []).find((e) => isShipEdge(s, e)) as EdgeId;
+    const v = graph(s).ends.get(site)?.[0] as VertexId;
+    settle(s, v, 0);
+    // No road left to place; every other ship spot at the settlement is taken by player 1.
+    const far = topologyOf(s)
+      .edges.filter((e) => !pathEnds(s, e).includes(v))
+      .slice(0, 15);
+    for (const e of far) s.pieces.roads[e] = 0;
+    for (const e of graph(s).edgesAt.get(v) ?? [])
+      if (e !== site && isShipEdge(s, e)) ship(s, e, 1);
+    s.players[0]!.devCards.roadBuilding = 1;
+    expect(legalOf(s, 'playRoadBuilding')).toHaveLength(0);
+    s.phase = { kind: 'roadBuilding', remaining: 1, resume: 'main' };
+    expect(legalActions(s)).toHaveLength(0);
+    const d = cloneState(s);
+    tbseaModule.hooks?.afterAction?.(d, act('seafarers/placeFreeShip', 0));
+    expect(d.phase.kind).toBe('main');
+  });
+
   it('moving a ship away from a river hex’s edge costs 1 gold', () => {
     const s = main('tbsea/rivers');
     const e = riverShipEdge(s);
@@ -439,6 +460,41 @@ describe('Barbarian Attack + Seafarers', () => {
     expect(longestRoadLengths(s)[0]).toBe(6);
     conquer(s, hex);
     expect(longestRoadLengths(s)[0]).toBe(3);
+  });
+
+  it('regression (sim seed 55): a conquest by Treason moves the Longest Trade Route at once', () => {
+    const s = main('tbsea/barbarianAttack');
+    const { hex, corner } = outerCorner(s);
+    settle(s, corner, 0);
+    const t = topologyOf(s);
+    for (const e of pathFrom(s, corner, 3, (e) => t.hex[hex as never]?.edges.includes(e) ?? false))
+      s.pieces.roads[e] = 0;
+    for (const e of pathFrom(s, corner, 3, (e) => seaOnly(s, e))) ship(s, e, 0);
+    // Player 1: a 5-ship route from a settlement on another coast corner.
+    const other = (tbBoard(s).coast ?? [])
+      .flatMap((h) => t.hex[h as never]?.vertices ?? [])
+      .find((v) => t.vertex[v]?.hexes.length === 1 && !t.hex[hex as never]?.vertices.includes(v));
+    settle(s, other as VertexId, 1);
+    for (const e of pathFrom(
+      s,
+      other as VertexId,
+      5,
+      (e) => seaOnly(s, e) && !seaSlice(s).ships[e],
+    ))
+      ship(s, e, 1);
+    s.awards.longestRoad = 0;
+    baOf(s).onHex[hex as never] = 2;
+    s.phase = {
+      kind: 'tb/treason',
+      left: 1,
+      from: 'supply',
+      sources: [],
+      dests: [],
+      resume: 'main',
+    } as unknown as GameState['phase'];
+    const u = run(s, act('tb/treasonHex', 0, { hex }));
+    expect(longestRoadLengths(u).slice(0, 2)).toEqual([3, 5]);
+    expect(u.awards.longestRoad).toBe(1);
   });
 });
 

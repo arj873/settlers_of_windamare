@@ -2,8 +2,9 @@
  * End-to-end check of the room server (M2): starts `wrangler dev` on a free port, creates a room
  * over HTTP, connects 3 WebSocket clients (host + 2 friends; the 4th seat is a server bot), plays
  * a 3-VP game to the end with random-bot clients, and drops + reconnects one player mid-game.
- * Then one game each of Cities & Knights, Seafarers (Fog Islands) and Explorers & Pirates
- * (Land Ho!): 2 clients + 2 server bots to the end, every view checked for masked secrets.
+ * Then one game each of Cities & Knights, Seafarers (Fog Islands), T&B + Seafarers (Fishermen
+ * on New Shores) and Explorers & Pirates (Land Ho!): 2 clients + 2 server bots to the end, every
+ * view checked for masked secrets.
  *
  *   pnpm e2e:server            (builds dist/ first if it is missing)
  *
@@ -218,6 +219,8 @@ interface ExpansionGame {
   config: Partial<RoomConfig>;
   /** Secrets of other seats / face-down stacks are masked in this client's view (or why not). */
   hidden: (view: GameView) => string | null;
+  /** Longer than EXPANSION_TIMEOUT_MS for slow games (random bots on Seafarers maps). */
+  timeoutMs?: number;
 }
 
 const opponents = (view: GameView) => view.players.filter((p) => p.id !== view.view.viewer);
@@ -233,7 +236,14 @@ const EXPANSION_GAMES: ExpansionGame[] = [
       };
       const decks = Object.values(ck.decks).flat();
       if (new Set(decks).size > 1) return 'progress deck order is visible';
+      // The Spy shows its player the victim's hand (ck/engine/mask.ts): that one is allowed.
+      const phase = view.phase as { kind: string; card?: string; victim?: number | null };
+      const spied =
+        phase.kind === 'ck/card' && phase.card === 'spy' && view.turn.current === view.view.viewer
+          ? phase.victim
+          : null;
       for (const p of opponents(view)) {
+        if (p.id === spied) continue;
         if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
       }
       return null;
@@ -247,6 +257,21 @@ const EXPANSION_GAMES: ExpansionGame[] = [
       if (!fog) return 'no fog stacks';
       if (fog.terrains.some((t) => t !== 'fog') || fog.tokens.some((t) => t !== 0)) {
         return 'fog stack contents are visible';
+      }
+      return null;
+    },
+  },
+  {
+    label: 'T&B + Seafarers: Fishermen on New Shores',
+    config: { mode: 'tb+seafarers', scenario: 'tbsea/fishermen', vpToWin: 4 },
+    timeoutMs: 480_000,
+    hidden: (view) => {
+      const fish = (view.ext['tb'] as { fish?: { pool: number[]; hands: number[][] } }).fish;
+      if (!fish) return 'no fish';
+      // 0 = the masked token (tb/engine/mask.ts HIDDEN_FISH); the boot is 0 too, so any 1-3 leaks.
+      if (fish.pool.some((t) => t !== 0)) return 'the fish pool is visible';
+      for (const p of opponents(view)) {
+        if ((fish.hands[p.id] ?? []).some((t) => t !== 0)) return `${p.name}'s fish`;
       }
       return null;
     },
@@ -290,7 +315,10 @@ async function playExpansionGame(base: string, game: ExpansionGame): Promise<voi
   check(first.view.settings.mode === game.config.mode, `${game.label}: game started`);
   const over = await Promise.all(
     clients.map((c) =>
-      c.waitFor((m) => m.type === 'game' && m.view.winner !== null, EXPANSION_TIMEOUT_MS),
+      c.waitFor(
+        (m) => m.type === 'game' && m.view.winner !== null,
+        game.timeoutMs ?? EXPANSION_TIMEOUT_MS,
+      ),
     ),
   ).catch((e: unknown) => {
     for (const c of clients) {

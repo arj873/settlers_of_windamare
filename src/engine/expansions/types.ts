@@ -352,8 +352,12 @@ export interface ExpansionModule {
   legal?: LegalGenerator;
   /** Drop / replace legal actions (runs after every generator, in settings order). */
   filterLegal?(state: GameState, actions: Action[]): Action[];
-  /** Your action types that add roads or occupy vertices (Longest Road is then recomputed). */
-  changesRoads?: readonly ExpansionActionType[];
+  /**
+   * Action types that add roads or occupy vertices (Longest Road is then recomputed): yours, or
+   * any whose effect your rules turn into a route change (T&B + Seafarers: a conquest cuts the
+   * trade route, so `buildCity` and `endTurn` count there).
+   */
+  changesRoads?: readonly (ExpansionActionType | BaseActionType)[];
   /** Who may act in your phases (undefined = not my phase / default turn.current). */
   actors?(state: GameState): PlayerId[] | undefined;
   hooks?: ExpansionHooks;

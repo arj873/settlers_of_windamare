@@ -30,7 +30,8 @@ vertex, land and sea alike) and the ship / pirate / gold / fog / sea painters
 
 Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tbck` (mode
 `tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
-pair's rules (§11).
+pair's rules (§11). C2: `tbsea` (mode `tb+seafarers`), each T&B scenario on Heading for New
+Shores, through the `playsAs` / `basedOn` seam (§11).
 
 ---
 
@@ -152,7 +153,7 @@ interface ExpansionModule {
   wraps?: { ['<other>/<x>']?: (draft, action, next) => ActionResult }; // another module's actions
   legal?: LegalGenerator; // extra legal actions, any phase
   filterLegal?(state, actions): Action[]; // drop / replace legal actions
-  changesRoads?: ['<id>/...']; // your actions that change road lengths / occupancy
+  changesRoads?: ['<id>/...' | baseType]; // actions that change road lengths / occupancy (C2: base types too)
   actors?(state): PlayerId[] | undefined; // who acts in your phases
   hooks?: ExpansionHooks; // §5
 }
@@ -449,10 +450,11 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module  | Composes          | Scenarios (VP)                                                                  |
-| -------------- | ------- | ----------------- | ------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack` | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players      |
-| `tb+ck`        | `tbck`  | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6 |
+| Mode           | Module  | Composes          | Scenarios (VP)                                                                                 |
+| -------------- | ------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack` | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
+| `tb+ck`        | `tbck`  | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
+| `tb+seafarers` | `tbsea` | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
 
 How a combination is built:
 
@@ -475,9 +477,16 @@ seafarers]`).
   `isVertexOpen`, `victoryPoints`) instead of constants, never assume you are the only module
   (invariants: check your own VP hook, not `expansionVictoryPoints`), and read another module's
   state only through its exported selectors (`requires` it).
-- **Known limit:** T&B switches its features on by its own scenario ids and Seafarers its rules
-  by its own scenario ids, so a T&B scenario on a Seafarers map (T&B + Seafarers, the 2025 sheets)
-  needs a seam in one of them first (`docs/rules/combos.md` §3).
+- **A scenario of one module on another module's map (C2).** A combination scenario says what it
+  plays as: `ScenarioDef.playsAs = { tb: ['tb/traders'], seafarers: ['seafarers/newShores'] }`.
+  A module that keys rules on its scenario ids reads `scenariosAs(settings, id)` (hooks.ts,
+  cached): the listed ids, else the game's scenario (T&B's `featuresOf` takes the union, so a
+  T&B × T&B scenario can list two). A combination map built on a module's map sets
+  `CustomMapDef.basedOn` (Seafarers' `mapKeyOf` follows it) and may put data for each module in
+  `board.ext` (`tbsea` shifts T&B's whole 19-hex board onto New Shores' main island).
+- **Sea paths for road pieces.** On a map with open sea T&B's wagons, camels and barbarians also
+  use sea edges (`tb/engine/paths.ts`); the pieces that carry a wagon like a road (ships) come
+  from the `routeEdges` hook, so T&B never imports Seafarers.
 
 ## 12. Coverage of the rules docs' framework needs
 
@@ -501,6 +510,7 @@ seafarers]`).
 | E&P 5-6 paired players' turn                                              | core Second Settler step, `ScenarioDef.pairedTurns56` — **done (E5)**                                        |
 | Combination matrix, VP increments                                         | modes only, `conflicts`, `vpBonus`, `scenarioVp` — **done for Seafarers + C&K, T&B + C&K (C1)**              |
 | Combination rules on top of two modules                                   | combo module: `requires`, `before` (order), `wraps`, `routeEdges` (C1)                                       |
+| A module's scenario on another module's map (T&B + Seafarers)             | `ScenarioDef.playsAs` + `scenariosAs`, `CustomMapDef.basedOn` — **done (C2, `tbsea`)**                       |
 
 **Known gaps (framework follow-ups, not blocking the first modes):**
 
@@ -513,9 +523,10 @@ seafarers]`).
   should check `bestRatios` in `ui/model.ts` when they need it.
 - ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
-- **Combinations (C1):** Seafarers + C&K and T&B + C&K are built (§11). Not built: T&B +
-  Seafarers (the 2025 sheets need T&B features on Seafarers scenarios: a seam in `tb` or
-  `seafarers`), Barbarian Attack + C&K, Catan for Two + C&K, the T&B × T&B sheets (T6). Details in `docs/rules/combos.md` §3.
+- **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
+  built (§11). Not built: T&B + Seafarers on the other Seafarers scenarios (per-scenario maps),
+  Barbarian Attack + C&K, Catan for Two + C&K, the T&B × T&B sheets (T6). Details in
+  `docs/rules/combos.md` §2b, §3.
 - **E&P combinations for card E5b** (official, not built yet): E&P + C&K (2025 sheet: city first,
   harbor second, +5 VP, knights stay on their island, Fast Gold with commodities) and E&P + T&B
   (event cards for the numbers, Fishermen variant with fish tokens). Player trades with gold

@@ -1014,11 +1014,11 @@ implemented.
 
 ### 11.3 Combinations
 
-| Combination                                | Status | Note                                                                                                                                                                                         |
-| ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T&B × T&B scenario sheets (§8.1, T6 2025)  | —      | T6 rulesets (wagon board, Merchant Trains); our scenarios are T5. The feature design (`featuresOf`) lets a combo scenario switch on two features; the sheet changes would be per-pair rules. |
-| With Cities & Knights (FAQ 3-5, 43, 62-64) | OK     | Mode `tb+ck` (module `tbck`), 2025 sheets; BA and Catan for Two not built (docs/rules/combos.md).                                                                                            |
-| With Seafarers (FAQ 6, 19-20, 53, 58, 65)  | —      | Not built; sheet texts and the missing seam in docs/rules/combos.md §3.                                                                                                                      |
+| Combination                                   | Status | Note                                                                                                                                                                                                                                                                       |
+| --------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T&B × T&B scenario sheets (§8.1, T6 2025)     | —      | T6 rulesets (wagon board, Merchant Trains); our scenarios are T5. The feature design (`featuresOf`) lets a combo scenario switch on two features; the sheet changes would be per-pair rules.                                                                               |
+| With Cities & Knights (FAQ 3-5, 43, 62-64)    | OK     | Mode `tb+ck` (module `tbck`), 2025 sheets; BA and Catan for Two not built (docs/rules/combos.md).                                                                                                                                                                          |
+| With Seafarers (FAQ 6, 17-20, 40, 53, 58, 65) | OK     | Mode `tb+seafarers` (module `tbsea`, C2): each scenario on Heading for New Shores, 2025 sheets; FAQ 58 replaced by the 2025 "no ship on a bridge site" (docs/rules/combos.md §2b). On a map with open sea wagons, camels and barbarians use sea paths (`engine/paths.ts`). |
 
 ### 11.4 Known gaps
 
