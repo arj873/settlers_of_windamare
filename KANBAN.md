@@ -7,13 +7,12 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
+- **T18** · AI playtest, 6 players (LIVE, headed window): 6 Haiku agents on Base 5-6P, seed pt6a, to 10 VP · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · tab `s2-rules`
 - **T17** · HUD redesign (your reference: Colonist layout + wooden theme): right sidebar (events w/ inline icons, bank stacks, players bars up to 8), turn pill, menu button, hand + build cards w/ pieces left, dice bottom-right · `s2-hud-redesign` 🟦 · tab `s2-hud-redesign`
-- **T15** · Playwright playtest harness: session server, `pnpm pt <seat> <cmd>` CLI (wait/status/spots/click/shot/report), seat guard, PLAYBOOK.md · `s2-playtest` 🟦 · tab `s2-playtest`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
-- **T18** · AI playtest, 6 players: 6 Haiku agents on the Base 5-6P map via the harness, file bugs → triage → fixes · `s2-haiku6-1..6` (Haiku) · deps: T10, T15, map wiring
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
 - **T14** · Controller (+ former T12 bits): turn timer + auto-resolve on timeout, special-build flow, map previews from engine data, save migration · `s2-integration` 🟦 · deps: T13, T17
 
@@ -86,3 +85,4 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **P1** · Playtest polish: roads touch without overlapping (joint discs for same owner), ore icon looks like ore · `s2-polish` 🟩 · deps: — · merged
 - **T11** · New setup screen: Game Mode (Base), Map tiles, Rules (Balanced Dice, Hide Bank Cards), Advanced (Turn Timer, Players 3–8, Points to Win 3–20, Discard Limit 5–20), up to 8 seats · `s2-setup-ui` 🟩 · deps: — · merged · settings collected, applied in T14
 - **T10** · Multi-size boards: per-map topology (Base / Base Random / 5-6P / 7-8P), generators + ports, up to 8 players, scaled bank & dev deck, new GameSettings fields · `s2-boards` 🟦 · deps: — · merged `7cae6f4` · 493 tests · sims clean on all 4 maps · setup screen config wired into createGame (orchestrator)
+- **T15** · Playwright playtest harness: session server, `pnpm pt <seat> <cmd>` CLI (wait/status/spots/click/shot/report), seat guard, PLAYBOOK.md · `s2-playtest` 🟦 · merged `f07a7f1` · 535 tests
