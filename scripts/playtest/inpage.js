@@ -144,7 +144,7 @@
     };
     const panels = [...document.querySelectorAll('.hud-players .pp')].map((pp) => ({
       name: text(pp.querySelector('.pp-name')),
-      vp: Number(text(pp.querySelector('.pp-vp')).replace(/[^0-9]/g, '')),
+      vp: Number(text(pp.querySelector('.vp-badge, .pp-vp')).replace(/[^0-9]/g, '')),
       cards: stat(pp, 'Resource cards in hand'),
       dev: stat(pp, 'Development cards'),
       knights: stat(pp, 'Knights played'),
