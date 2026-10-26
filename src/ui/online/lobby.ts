@@ -374,7 +374,7 @@ export class LobbyScreen {
               class: 'btn btn-primary btn-lg su-start',
               disabled: v.startBlocked !== null,
               title: v.startBlocked ?? 'Start the game; open seats get bots',
-              attrs: { 'data-k': 'start' },
+              attrs: { 'data-k': 'lobby-start' },
               on: { click: () => a.start() },
             },
             'Start game',
