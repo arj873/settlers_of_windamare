@@ -10,8 +10,11 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩
-- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦 · ✅ built (721 tests, 0 sim violations) → finishing online-protocol integration before merge · ⚠️ your call later: Rush = auto-roll (real Colonist Rush is real-time), Turbo = both setup settlements pay (no source), timer presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
+- **M4b** · 3 Haiku agents play one ONLINE game (room on wrangler dev, headed windows, seat 2 tests drop/reconnect) · `s4-haiku-1..3` (Haiku)
+- **UX2** · End-of-game **Game Statistics** (your Colonist screenshot): winner/turns/duration + tabs Overview · Dice · Resources · Activity · Dev Cards; engine stats slice, online-safe · `s4-game-stats` 🟦
+- **V2** · Optional **5+ player rule set** (settlersboard.com 5-6 FAQ, cross-checked with official rules): build phase may play 1 dev card, no robber on 2nd desert, 12 VP preset; + general **Map rules → Balance rules** (your mockup): Allow 6&8 touching / Allow 2&12 touching / Same numbers may touch / Same resources may touch, all off by default, all random maps, component-count audit · `s4-rules-56` 🟩
+- **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
+- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
 ## 📋 Backlog — Stage 4
 
@@ -119,6 +122,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **M4a** · Online playtest harness (`pt:serve --online`, per-seat browser contexts vs wrangler dev, drop/reconnect/reload/chat) + GitHub Actions CI · `s4-mp-e2e` 🟩 · PR #8 → `main` · 917 tests
+- **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
 - **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
 - **E1** · Oil Springs + Crop Trust (official rulebooks; docs/rules/oil-springs.md, crop-trust.md) · `s3-oil-crop` 🟩 · PR #5 → `expansions` · 948 tests on expansions
 - **M2** · Room server: Worker + Durable Object per room (hibernation, alarms, snapshots), 6-char codes, origin check + rate limits, `pnpm dev:server` / `e2e:server` / `deploy:cf` · `s4-mp-server` 🟦 · PR #4 → `main` · 777 tests, e2e passed

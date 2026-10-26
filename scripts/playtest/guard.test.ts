@@ -36,6 +36,52 @@ function snap(state: GameState, viewer: PlayerId, ui: Partial<UiScan> = {}): Sna
   };
 }
 
+describe('online snapshots (own legal actions only)', () => {
+  const online = (status = 'open', fatal: { code: string; message: string } | null = null) => ({
+    room: 'ABC234',
+    status,
+    attempts: 0,
+    seq: 5,
+    roomPhase: 'playing',
+    fatal,
+    seats: [],
+    chat: [],
+    timerLeftMs: null,
+    banner: null,
+    notice: null,
+  });
+  const mine = (seat: PlayerId, o = online()): Snapshot => {
+    const state = freshGame(3);
+    return {
+      ...snap(state, seat),
+      legal: legalActions(state).filter((a) => a.player === seat),
+      online: o,
+    };
+  };
+
+  it('is not STALLED when this seat has nothing to do', () => {
+    const state = freshGame(3);
+    const other = (state.turn.current + 1) % 3;
+    const s = mine(other);
+    expect(s.legal).toEqual([]);
+    expect(wakeReason(s, other)).toBeNull();
+  });
+
+  it('wakes the seat on the clock', () => {
+    const state = freshGame(3);
+    expect(wakeReason(mine(state.turn.current), state.turn.current)).toMatch(/^YOUR MOVE/);
+  });
+
+  it('wakes on a fatal close and refuses acting while offline', () => {
+    const cur = freshGame(3).turn.current;
+    const dead = mine(cur, online('closed', { code: 'replaced', message: 'Another tab.' }));
+    expect(wakeReason(dead, cur)).toMatch(/DISCONNECTED for good \(replaced\)/);
+    const off = actingVerdict(mine(cur, online('reconnecting')), cur, 'act');
+    expect(off.ok).toBe(false);
+    if (!off.ok) expect(off.reason).toMatch(/offline/);
+  });
+});
+
 describe('actingVerdict (seat guard)', () => {
   it('lets only the viewer with a legal action act', () => {
     const s = snap(freshGame(3), 0);

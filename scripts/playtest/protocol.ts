@@ -20,6 +20,11 @@ export interface SessionInfo {
   seed: string;
   vp: number | null;
   startedAt: string;
+  /** `online`: one browser page per human seat against a room server; default hotseat. */
+  mode?: 'hotseat' | 'online';
+  /** Online: the room code and the server origin the pages talk to. */
+  room?: string;
+  server?: string;
 }
 
 export interface CommandRequest {
@@ -85,7 +90,33 @@ export interface UiScan {
   diceTotal: number | null;
 }
 
+/** Online pages only (`inpage.js` reads `window.catan.online.roomClient`). */
+export interface OnlineScan {
+  /** Room code. */
+  room: string;
+  /** RoomClient status: connecting | open | reconnecting | closed. */
+  status: string;
+  /** Failed reconnect attempts since the last welcome. */
+  attempts: number;
+  /** Last `game` message number seen (null before the first). */
+  seq: number | null;
+  roomPhase: string | null;
+  /** Fatal close (replaced, kicked, expired...) — the page will not reconnect by itself. */
+  fatal: { code: string; message: string } | null;
+  /** Seats as the server lists them, e.g. "1 Seat1 human", "3 Red bot". */
+  seats: string[];
+  /** Newest chat lines, "[id] Name: text". */
+  chat: { id: number; line: string }[];
+  /** Server turn clock for the seat on it, ms left (counted down locally). */
+  timerLeftMs: number | null;
+  /** Text of the reconnect banner / full-screen notice if showing. */
+  banner: string | null;
+  notice: string | null;
+}
+
 export interface Snapshot {
+  /** Set on online pages. `viewer` is then always the page's own seat, and `legal` is only theirs. */
+  online?: OnlineScan;
   state: GameState | null;
   viewer: PlayerId | null;
   legal: Action[];
