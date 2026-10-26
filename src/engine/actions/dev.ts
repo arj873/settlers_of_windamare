@@ -3,7 +3,9 @@
  * buyDevCard (main): pay COSTS.devCard, pop devDeck into newDevCards.
  *   Also in specialBuild (T13), by the builder: the card goes straight into devCards, since it
  *   was bought before the builder's own turn and may be played on it (RULES.md §16.10c).
- * play* (preRoll or main): at most one per turn (turn.devCardPlayed), only from devCards
+ *   With settings.rules56 it goes to newDevCards instead (merged when the step ends, §20.1).
+ * play* (preRoll or main; also specialBuild with settings.rules56): at most one per turn
+ *   (turn.devCardPlayed; a special build step counts as the builder's turn), only from devCards
  *   (never newDevCards). VP cards are never "played"; they count automatically.
  *   Played cards are recorded (knightsPlayed / progressCardsPlayed) so deck + hands + played = 25.
  *   playKnight        -> knightsPlayed++, phase moveRobber{resume: <phase it was played in>}
@@ -28,8 +30,16 @@ import type {
   ResourceBundle,
   ResumePhase,
 } from '../types';
-import { roadsBlocked } from '../variants';
-import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import { roadsBlocked, rules56On } from '../variants';
+import {
+  type HandlerMap,
+  type LegalGenerator,
+  fail,
+  isCurrent,
+  log,
+  ok,
+  resumePhase,
+} from './common';
 import { startRobber } from './robber';
 
 type PlayableCard = Exclude<DevCardType, 'victoryPoint'>;
@@ -61,7 +71,8 @@ function canPlay(
   card: PlayableCard,
 ): { resume: ResumePhase } | { error: string } {
   const kind = state.phase.kind;
-  if (kind !== 'preRoll' && kind !== 'main') {
+  const sbp = kind === 'specialBuild' && rules56On(state.settings);
+  if (kind !== 'preRoll' && kind !== 'main' && !sbp) {
     return { error: 'can only play development cards before rolling or in the main phase' };
   }
   if (!isCurrent(state, player)) return { error: 'not your turn' };
@@ -116,8 +127,10 @@ export const devHandlers: HandlerMap<
     p.resources = subtractResources(p.resources, COSTS.devCard);
     draft.bank = addResources(draft.bank, COSTS.devCard);
     const card = draft.devDeck.pop() as DevCardType;
-    // Bought outside your own turn (special build) -> playable on your next turn (FAQ).
-    if (draft.phase.kind === 'specialBuild') p.devCards[card] += 1;
+    // Bought outside your own turn (special build) -> playable on your next turn (FAQ). With the
+    // 5+ rule set a card may be played in the step, but not one bought in it: it waits in
+    // newDevCards until the step ends (advanceSpecialBuild).
+    if (draft.phase.kind === 'specialBuild' && !rules56On(draft.settings)) p.devCards[card] += 1;
     else p.newDevCards[card] += 1;
     log(draft, player, `${p.name} bought a development card`);
     return ok(draft);
@@ -156,7 +169,7 @@ export const devHandlers: HandlerMap<
     draft.phase =
       remaining > 0 && canPlaceAnyRoad(draft, player)
         ? { kind: 'roadBuilding', remaining, resume: phase.resume }
-        : { kind: phase.resume };
+        : resumePhase(draft, phase.resume);
     return ok(draft);
   },
 

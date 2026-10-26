@@ -14,8 +14,12 @@ import {
   CLOCK_OPTIONS,
   CUSTOM_BANK_MIN,
   CUSTOM_INCREMENT_SEC,
+  MAP_RULE_OPTIONS,
   MAP_SELECTION_OPTIONS,
+  mapRulesApply,
   ROBBER_OPTIONS,
+  RULES56_SEATS,
+  RULES56_VP,
   SECOND_SETTLER_MIN_PLAYERS,
   SETUP_BUILDING_OPTIONS,
   SETUP_RESTRICTION_OPTIONS,
@@ -75,6 +79,9 @@ const ICON = {
     <path d="M18 3 7 18h8l-2 11 11-15h-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`,
   turbo: `<path d="M4 8l10 8-10 8zM16 8l10 8-10 8z" fill="currentColor" opacity=".18"/>
     <path d="M4 8l10 8-10 8zM16 8l10 8-10 8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`,
+  seats: `<g fill="currentColor" opacity=".18"><circle cx="16" cy="9" r="4.5"/><circle cx="7" cy="14" r="3.5"/><circle cx="25" cy="14" r="3.5"/></g>
+    <g fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="9" r="4.5"/><circle cx="7" cy="14" r="3.5"/><circle cx="25" cy="14" r="3.5"/>
+    <path d="M7 27c0-5 4-8 9-8s9 3 9 8z" stroke-linejoin="round"/></g>`,
   logo: `<path d="M16 2 28 9v14l-12 7L4 23V9z" fill="currentColor" opacity=".18"/>
     <path d="M16 2 28 9v14l-12 7L4 23V9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
     <path d="M16 9v14M10 12.5l12 7M22 12.5l-12 7" stroke="currentColor" stroke-width="1.4" opacity=".7"/>`,
@@ -186,6 +193,7 @@ export class SetupScreen {
       ),
       this.modeSection(),
       this.mapSection(),
+      this.balanceSection(),
       this.rulesSection(),
       this.advancedSection(),
       this.seatsSection(),
@@ -254,6 +262,28 @@ export class SetupScreen {
     );
   }
 
+  /** Which neighbouring hexes may touch on random maps (all off = every constraint on). */
+  private balanceSection(): HTMLElement {
+    const d = this.draft;
+    const applies = mapRulesApply(d);
+    return this.section(
+      'Balance rules',
+      'balance',
+      h(
+        'div',
+        { class: 'su-card su-card-wide', attrs: { role: 'group', 'aria-label': 'Balance rules' } },
+        ...MAP_RULE_OPTIONS.map((o) => this.switchRow(o.key, o.title, o.desc, !applies)),
+        h(
+          'p',
+          { class: 'su-hint', attrs: { 'data-v': 'balance-note' } },
+          applies
+            ? 'Random maps only: with a switch off, the generator keeps those hexes apart.'
+            : 'The official beginner layout is fixed, so these do not apply. Pick a random map to use them.',
+        ),
+      ),
+    );
+  }
+
   private rulesSection(): HTMLElement {
     const d = this.draft;
     const rule = (key: ToggleKey, ico: keyof typeof ICON, title: string, desc: string) =>
@@ -310,6 +340,13 @@ export class SetupScreen {
           'Turbo Mode',
           'Both starting settlements pay resources, for a faster start.',
         ),
+        d.seats.length >= RULES56_SEATS &&
+          rule(
+            'rules56',
+            'seats',
+            '5+ player rules',
+            `Play one dev card in the build phase. Robber stays off the 2nd desert. Suggests ${RULES56_VP} VP.`,
+          ),
       ),
     );
   }

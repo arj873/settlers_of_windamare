@@ -19,6 +19,26 @@ const CASES: { name: string; setup: Omit<GameSetup, 'seed'> }[] = [
     name: '6 players, base56, SBP off',
     setup: { players: 6, map: 'base56' as MapId, specialBuildPhase: false },
   },
+  // The 5+ player rule set (RULES.md §20) at every size, and map rules (§19) all allowed.
+  ...([5, 6, 7, 8] as const).map((players) => ({
+    name: `${players} players, 5+ rule set`,
+    setup: { players, variants: { rules56: true } } as Omit<GameSetup, 'seed'>,
+  })),
+  {
+    name: '8 players, 5+ rule set, every adjacency allowed',
+    setup: {
+      players: 8,
+      variants: {
+        rules56: true,
+        mapRules: {
+          allowRedTouch: true,
+          allowExtremeTouch: true,
+          allowSameNumberTouch: true,
+          allowSameResourceTouch: true,
+        },
+      },
+    } as Omit<GameSetup, 'seed'>,
+  },
 ];
 
 describe('bot games with rule variants', () => {

@@ -24,7 +24,15 @@ import type {
   ResourceCounts,
   ResumePhase,
 } from '../types';
-import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import {
+  type HandlerMap,
+  type LegalGenerator,
+  fail,
+  isCurrent,
+  log,
+  ok,
+  resumePhase,
+} from './common';
 
 /** Opponents of `player` with a building on `hex` and at least one card, ascending. */
 export function stealCandidates(state: GameState, player: PlayerId, hex: HexId): PlayerId[] {
@@ -61,7 +69,9 @@ export function resolveSeven(draft: GameState): void {
  * robber (settings.robberMode 'none') go straight to `resume`.
  */
 export function startRobber(draft: GameState, resume: ResumePhase): void {
-  draft.phase = hasRobber(draft.settings) ? { kind: 'moveRobber', resume } : { kind: resume };
+  draft.phase = hasRobber(draft.settings)
+    ? { kind: 'moveRobber', resume }
+    : resumePhase(draft, resume);
 }
 
 /** Every distinct way to choose `count` cards from `hand`. */
@@ -131,7 +141,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
     draft.phase =
       candidates.length > 0
         ? { kind: 'steal', candidates, resume: phase.resume }
-        : { kind: phase.resume };
+        : resumePhase(draft, phase.resume);
     return ok(draft);
   },
 
@@ -158,7 +168,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
       text += ' (no cards)';
     }
     log(draft, action.player, text);
-    draft.phase = { kind: phase.resume };
+    draft.phase = resumePhase(draft, phase.resume);
     return ok(draft);
   },
 };

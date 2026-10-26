@@ -449,7 +449,12 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
     case 'specialBuild':
       return placeMode
         ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
-        : { text: 'Build or buy a card, then pass', tone: 'action' };
+        : {
+            text: state.settings.rules56
+              ? 'Build, buy or play one card, then pass'
+              : 'Build or buy a card, then pass',
+            tone: 'action',
+          };
     case 'mapVeto':
       return { text: 'Veto one of the candidate maps', tone: 'action' };
     case 'event': {

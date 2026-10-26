@@ -13,6 +13,7 @@ import {
   layoutToMap,
   type Action,
   type MapId,
+  type MapRules,
   type SetupPlacement,
 } from '../engine';
 import { createRandomBot, type PickMode } from './index';
@@ -50,6 +51,24 @@ export interface SimArgs {
   help: boolean;
   /** V1 variants (--robber, --event-cards, --rush, --turbo, --second-settler, ...). */
   variants: VariantConfig;
+}
+
+const ALLOW_FLAGS: Record<string, keyof MapRules> = {
+  red: 'allowRedTouch',
+  extreme: 'allowExtremeTouch',
+  number: 'allowSameNumberTouch',
+  resource: 'allowSameResourceTouch',
+};
+
+/** `--allow red,resource` -> MapRules. */
+export function parseMapRules(value: string): MapRules {
+  const out: MapRules = {};
+  for (const name of value.split(',').filter(Boolean)) {
+    const key = ALLOW_FLAGS[name];
+    if (!key) throw new Error(`--allow: "${name}" (red, extreme, number, resource)`);
+    out[key] = true;
+  }
+  return out;
 }
 
 /** `--setup city:any,settlement:normal` -> SetupPlacement (round 1, round 2). */
@@ -92,6 +111,11 @@ export const USAGE = `pnpm sim -- [options]
   --map-select M  fixed | random | veto
   --random-order  shuffle the seats
   --setup B:R,B:R setup buildings + restrictions, e.g. city:any,settlement:normal
+ map rules + 5+ rule set (docs/RULES.md §19, §20):
+  --allow L       comma list of adjacencies to allow on random maps: red, extreme, number,
+                  resource (default: none, i.e. all constrained)
+  --rules56       the 5+ player rule set (5+ players): a dev card in the build step, no robber on
+                  the second desert
 `;
 
 export function parseArgs(argv: readonly string[]): SimArgs {
@@ -123,6 +147,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     '--turbo',
     '--second-settler',
     '--random-order',
+    '--rules56',
   ]);
   for (let i = 0; i < argv.length; i++) {
     const raw = argv[i] as string;
@@ -220,6 +245,12 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         break;
       case '--setup':
         args.variants.setupPlacement = parseSetupPlacement(value as string);
+        break;
+      case '--rules56':
+        args.variants.rules56 = true;
+        break;
+      case '--allow':
+        args.variants.mapRules = parseMapRules(value as string);
         break;
       case '--verbose':
         args.verbose = true;

@@ -7,6 +7,7 @@ import {
   defaultSetup,
   loadSetup,
   mapDisabledReason,
+  mapRulesApply,
   MAPS,
   MAX_PLAYERS,
   pickSeatColor,
@@ -18,6 +19,7 @@ import {
   STORAGE_KEY,
   TIMER_STEPS,
   timerLabel,
+  toggle,
   type SetupStorage,
 } from './model';
 import { MAPS as ENGINE_MAPS, beginnerBoard, topologyFor } from '../../engine';
@@ -304,7 +306,14 @@ describe('SetupScreen', () => {
 
   it('renders the sections, 4 seats and only a Base mode tile', () => {
     const titles = [...screen.element.querySelectorAll('h2')].map((h) => h.textContent);
-    expect(titles).toEqual(['Game mode', 'Map', 'Rules', 'Advanced settings', 'Seats']);
+    expect(titles).toEqual([
+      'Game mode',
+      'Map',
+      'Balance rules',
+      'Rules',
+      'Advanced settings',
+      'Seats',
+    ]);
     expect(screen.element.querySelectorAll('.su-seat')).toHaveLength(4);
     expect(screen.element.querySelectorAll('[data-k^="mode-"]')).toHaveLength(1);
     expect(screen.element.querySelectorAll('.su-map')).toHaveLength(4);
@@ -443,5 +452,154 @@ describe('SetupScreen', () => {
       .find((b) => b.textContent === 'Back to game')!
       .click();
     expect(back).toBe(1);
+  });
+});
+
+describe('balance rules and the 5+ player rule set', () => {
+  let screen: SetupScreen;
+  let started: NewGameConfig[];
+  const q = <T extends HTMLElement>(sel: string) => screen.element.querySelector<T>(sel)!;
+  const has = (sel: string) => screen.element.querySelector(sel) !== null;
+  const click = (k: string) => q(`[data-k="${k}"]`).click();
+  const on = (k: string) => q(`[data-k="${k}"]`).getAttribute('aria-pressed') === 'true';
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    started = [];
+    screen = new SetupScreen({ onStart: (c) => started.push(c), storage: new MemoryStorage() });
+    document.body.append(screen.element);
+  });
+
+  it('shows the four balance switches, all off, with the mockup wording', () => {
+    const text = q('section[aria-labelledby="su-h-balance"]').textContent ?? '';
+    for (const s of [
+      'Allow 6 & 8 touching',
+      'Disabled by default — official red-number rule.',
+      'Allow 2 & 12 touching',
+      'Adjacent dead corners.',
+      'Same numbers may touch',
+      'Two 5s side-by-side, etc.',
+      'Same resources may touch',
+      'Resource clusters, more theme.',
+    ]) {
+      expect(text).toContain(s);
+    }
+    for (const k of [
+      'allowRedTouch',
+      'allowExtremeTouch',
+      'allowSameNumberTouch',
+      'allowSameResourceTouch',
+    ]) {
+      expect(on(`rule-${k}`)).toBe(false);
+    }
+  });
+
+  it('on the fixed beginner map the switches are disabled with a note; random maps enable them', () => {
+    expect(screen.state.map).toBe('base');
+    expect(q<HTMLButtonElement>('[data-k="rule-allowRedTouch"]').disabled).toBe(true);
+    expect(q('[data-v="balance-note"]').textContent).toContain('beginner layout is fixed');
+    click('map-baseRandom');
+    expect(q<HTMLButtonElement>('[data-k="rule-allowRedTouch"]').disabled).toBe(false);
+    expect(q('[data-v="balance-note"]').textContent).toContain('Random maps only');
+  });
+
+  it('a veto or random map pick enables them even on the Base tile', () => {
+    expect(mapRulesApply({ ...defaultSetup(), map: 'base', mapSelection: 'veto' })).toBe(true);
+    expect(mapRulesApply({ ...defaultSetup(), map: 'base', mapSelection: 'random' })).toBe(true);
+    expect(mapRulesApply({ ...defaultSetup(), map: 'base', mapSelection: 'fixed' })).toBe(false);
+    expect(mapRulesApply({ ...defaultSetup(), map: 'base78' })).toBe(true);
+  });
+
+  it('shows for every player count: 3 to 8 seats on a random map', () => {
+    click('map-baseRandom');
+    expect(has('[data-k="rule-allowSameResourceTouch"]')).toBe(true);
+    for (let i = 0; i < 5; i++) click('players-inc');
+    expect(screen.state.seats).toHaveLength(8);
+    expect(q<HTMLButtonElement>('[data-k="rule-allowSameResourceTouch"]').disabled).toBe(false);
+  });
+
+  it('only the switches that are on go into the config (default: none)', () => {
+    click('map-baseRandom');
+    click('start');
+    expect(started[0]!.variants).toBeUndefined();
+    click('rule-allowExtremeTouch');
+    click('rule-allowSameResourceTouch');
+    click('start');
+    expect(started[1]!.variants).toEqual({
+      mapRules: { allowExtremeTouch: true, allowSameResourceTouch: true },
+    });
+  });
+
+  it('the 5+ player tile only exists with 5+ seats', () => {
+    expect(has('[data-k="rule-rules56"]')).toBe(false);
+    click('players-inc'); // 5
+    expect(has('[data-k="rule-rules56"]')).toBe(true);
+    expect(q('[data-k="rule-rules56"]').textContent).toContain('5+ player rules');
+    click('players-dec'); // 4
+    expect(has('[data-k="rule-rules56"]')).toBe(false);
+  });
+
+  it('turning it on suggests 12 VP (still editable); turning it off undoes only the preset', () => {
+    click('players-inc');
+    click('rule-rules56');
+    expect(on('rule-rules56')).toBe(true);
+    expect(screen.state.vpToWin).toBe(12);
+    click('start');
+    expect(started[0]!.vpToWin).toBe(12);
+    expect(started[0]!.variants).toEqual({ rules56: true });
+    click('rule-rules56');
+    expect(screen.state.vpToWin).toBe(10);
+  });
+
+  it('a VP value the player chose is not overwritten', () => {
+    click('players-inc');
+    const vp = q<HTMLInputElement>('input[data-k="vp"]');
+    vp.value = '8';
+    vp.dispatchEvent(new Event('input', { bubbles: true }));
+    click('rule-rules56');
+    expect(screen.state.vpToWin).toBe(8);
+    click('rule-rules56');
+    expect(screen.state.vpToWin).toBe(8);
+  });
+
+  it('dropping below 5 seats turns the rule set off and gives back the preset', () => {
+    const d = toggle(setPlayerCount(defaultSetup(), 6), 'rules56');
+    expect(d.rules56).toBe(true);
+    expect(d.vpToWin).toBe(12);
+    const back = setPlayerCount(d, 4);
+    expect(back.rules56).toBe(false);
+    expect(back.vpToWin).toBe(10);
+    expect(buildConfig(back).variants).toBeUndefined();
+    // cannot be switched on with 4 seats
+    expect(toggle(defaultSetup(4), 'rules56').rules56).toBe(false);
+  });
+
+  it('excludes Second Settler both ways', () => {
+    let d = toggle(setPlayerCount(defaultSetup(), 5), 'rules56');
+    d = toggle(d, 'secondSettler');
+    expect(d.secondSettler).toBe(true);
+    expect(d.rules56).toBe(false);
+    expect(d.vpToWin).toBe(10);
+    d = toggle(d, 'rules56');
+    expect(d.rules56).toBe(true);
+    expect(d.secondSettler).toBe(false);
+  });
+
+  it('persists and sanitizes both', () => {
+    const st = new MemoryStorage();
+    const d = toggle(toggle(setPlayerCount(defaultSetup(), 6), 'rules56'), 'allowSameNumberTouch');
+    saveSetup(st, d);
+    const loaded = loadSetup(st);
+    expect(loaded.rules56).toBe(true);
+    expect(loaded.allowSameNumberTouch).toBe(true);
+    expect(loaded.allowRedTouch).toBe(false);
+    // hostile values
+    st.setItem(STORAGE_KEY, JSON.stringify({ rules56: 'yes', allowRedTouch: 1, seats: [] }));
+    const bad = loadSetup(st);
+    expect(bad.rules56).toBe(false);
+    expect(bad.allowRedTouch).toBe(false);
+    // a stored rules56 with too few seats is dropped
+    st.setItem(STORAGE_KEY, JSON.stringify({ rules56: true, seats: [{}, {}, {}, {}] }));
+    expect(loadSetup(st).rules56).toBe(false);
   });
 });
