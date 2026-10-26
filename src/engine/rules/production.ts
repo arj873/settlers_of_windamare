@@ -10,30 +10,48 @@ import { runProductionHooks } from '../expansions/hooks';
 import { emptyResources, isResource } from '../resources';
 import { hexVertices, topologyOf } from '../topology';
 import type { GameState, HexId, ResourceCounts } from '../types';
+import { recordProduction } from '../stats';
+import { hasRobber } from '../variants';
+
+export interface ProductionOptions {
+  /** Cards per city (default 2). The Epidemic event card makes it 1. */
+  cityYield?: number;
+}
 
 /** What each player is owed for `roll` before the bank-shortage rule. Indexed by PlayerId. */
-export function computeProduction(state: GameState, roll: number): ResourceCounts[] {
+export function computeProduction(
+  state: GameState,
+  roll: number,
+  opts: ProductionOptions = {},
+): ResourceCounts[] {
   const owed = state.players.map(() => emptyResources());
   const t = topologyOf(state);
+  const cityYield = opts.cityYield ?? 2;
+  // No robber (settings.robberMode 'none'): its starting hex is not blocked.
+  const blocked = hasRobber(state.settings) ? state.robber : null;
   for (const id of Object.keys(state.board.hexes) as HexId[]) {
     const hex = state.board.hexes[id];
-    if (!hex || hex.token !== roll || id === state.robber) continue;
+    if (!hex || hex.token !== roll || id === blocked) continue;
     const terrain = hex.terrain;
     // Only resource terrains produce in the core (gold etc.: expansion production hooks).
     if (!isResource(terrain)) continue;
     for (const v of hexVertices(t, id)) {
       const b = state.pieces.buildings[v];
       const hand = b && owed[b.owner];
-      if (hand) hand[terrain] += b.kind === 'city' ? 2 : 1;
+      if (hand) hand[terrain] += b.kind === 'city' ? cityYield : 1;
     }
   }
-  runProductionHooks(state, roll, owed);
+  runProductionHooks(state, roll, owed, { cityYield, blocked });
   return owed;
 }
 
 /** What each player actually receives after applying the bank-shortage rule. */
-export function payableProduction(state: GameState, roll: number): ResourceCounts[] {
-  const owed = computeProduction(state, roll);
+export function payableProduction(
+  state: GameState,
+  roll: number,
+  opts: ProductionOptions = {},
+): ResourceCounts[] {
+  const owed = computeProduction(state, roll, opts);
   for (const r of RESOURCES) {
     const total = owed.reduce((sum, h) => sum + h[r], 0);
     if (total <= state.bank[r]) continue;
@@ -44,9 +62,13 @@ export function payableProduction(state: GameState, roll: number): ResourceCount
   return owed;
 }
 
-/** Pay production for `roll` from the bank into hands. Mutates the draft. */
-export function produce(draft: GameState, roll: number): ResourceCounts[] {
-  const pay = payableProduction(draft, roll);
+/** Pay production for `roll` from the bank into hands (and into the stats). Mutates the draft. */
+export function produce(
+  draft: GameState,
+  roll: number,
+  opts: ProductionOptions = {},
+): ResourceCounts[] {
+  const pay = payableProduction(draft, roll, opts);
   pay.forEach((gain, p) => {
     const player = draft.players[p];
     if (!player) return;
@@ -55,5 +77,6 @@ export function produce(draft: GameState, roll: number): ResourceCounts[] {
       draft.bank[r] -= gain[r];
     }
   });
+  recordProduction(draft, roll, pay, opts.cityYield ?? 2);
   return pay;
 }

@@ -1,5 +1,14 @@
 /** Shared types and helpers for action handlers. Owned by T1; extend carefully (everyone imports it). */
-import type { Action, ActionOf, ActionResult, ActionType, GameState, PlayerId } from '../types';
+import type {
+  Action,
+  ActionOf,
+  ActionResult,
+  ActionType,
+  GameState,
+  Phase,
+  PlayerId,
+  ResumePhase,
+} from '../types';
 
 /**
  * A handler receives a PRIVATE DEEP COPY of the state (`draft`) — mutate it freely.
@@ -33,6 +42,15 @@ export function notImplemented(): ActionResult {
 /** Append a log line for the current turn. */
 export function log(draft: GameState, player: PlayerId | null, text: string): void {
   draft.log.push({ turn: draft.turn.number, player, text });
+}
+
+/**
+ * The phase to return to after an interrupt (robber / road building). A special build step
+ * (5+ player rule set) resumes to `specialBuild{builder = turn.current, owner = turn.specialOwner}`.
+ */
+export function resumePhase(state: GameState, resume: ResumePhase): Phase {
+  if (resume !== 'specialBuild') return { kind: resume };
+  return { kind: 'specialBuild', builder: state.turn.current, owner: state.turn.specialOwner ?? 0 };
 }
 
 /** Common guard: is it `player`'s turn? */

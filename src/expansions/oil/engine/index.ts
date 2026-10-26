@@ -10,8 +10,15 @@
  * the robber off destroyed hexes and let discards and thefts name oil.
  */
 import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../../../engine/constants';
-import { log, ok, fail, isCurrent, type LegalGenerator } from '../../../engine/actions/common';
-import { discardOptions, robberHandlers } from '../../../engine/actions/robber';
+import {
+  log,
+  ok,
+  fail,
+  isCurrent,
+  resumePhase,
+  type LegalGenerator,
+} from '../../../engine/actions/common';
+import { discardOptions, robberHandlers, startRobber } from '../../../engine/actions/robber';
 import { costOf, pieceLimit } from '../../../engine/expansions/hooks';
 import type { ExpansionModule, ExtHandler } from '../../../engine/expansions/types';
 import { addResources, hasResources, isResource, isValidBundle } from '../../../engine/resources';
@@ -21,6 +28,7 @@ import { Rng } from '../../../engine/rng';
 import { playerName } from '../../../engine/rules/text';
 import { buildingsOf, getPlayer, victoryPoints } from '../../../engine/selectors';
 import { hexVertices, topologyOf, vertexInfo } from '../../../engine/topology';
+import { hasRobber } from '../../../engine/variants';
 import type {
   Action,
   ActionResult,
@@ -146,10 +154,10 @@ export function oilOwed(state: GameState, roll: number): number[] {
   const owed = state.players.map(() => 0);
   const s = oilSlice(state);
   const t = topologyOf(state);
+  const blocked = hasRobber(state.settings) ? state.robber : null;
   for (const id of Object.keys(state.board.hexes) as HexId[]) {
     const hex = state.board.hexes[id];
-    if (!hex || hex.token !== roll || id === state.robber || !isSpringTerrain(hex.terrain))
-      continue;
+    if (!hex || hex.token !== roll || id === blocked || !isSpringTerrain(hex.terrain)) continue;
     for (const v of hexVertices(t, id)) {
       const b = state.pieces.buildings[v];
       if (!b) continue;
@@ -424,7 +432,7 @@ const actions: Record<`oil/${string}`, ExtHandler> = {
       action.player,
       `${playerName(draft, action.player)} discarded ${owed} cards${a.oil > 0 ? ` (${a.oil} oil)` : ''}`,
     );
-    if (phase.pending.every((n) => n === 0)) draft.phase = { kind: 'moveRobber', resume: 'main' };
+    if (phase.pending.every((n) => n === 0)) startRobber(draft, 'main');
     return ok(draft);
   },
 
@@ -448,7 +456,7 @@ const actions: Record<`oil/${string}`, ExtHandler> = {
       action.player,
       `${playerName(draft, action.player)} stole 1 oil from ${playerName(draft, victim)}`,
     );
-    draft.phase = { kind: phase.resume };
+    draft.phase = resumePhase(draft, phase.resume);
     return ok(draft);
   },
 
@@ -777,12 +785,12 @@ export const oilModule: ExpansionModule = {
     handSize: (state, player, base) => base + (oilSlice(state).oil[player] ?? 0),
 
     // A metropolis produces 3 resources instead of 2: the city's 2 come from the core.
-    production(state, roll, owed) {
+    production(state, roll, owed, ctx) {
       const metro = oilSlice(state).metropolis;
       const t = topologyOf(state);
       for (const id of Object.keys(state.board.hexes) as HexId[]) {
         const hex = state.board.hexes[id];
-        if (!hex || hex.token !== roll || id === state.robber || !isResource(hex.terrain)) continue;
+        if (!hex || hex.token !== roll || id === ctx.blocked || !isResource(hex.terrain)) continue;
         for (const v of hexVertices(t, id)) {
           const owner = metro[v];
           const hand = owner === undefined ? undefined : owed[owner];

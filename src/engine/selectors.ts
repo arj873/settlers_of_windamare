@@ -114,6 +114,8 @@ export function actingPlayers(state: GameState): PlayerId[] {
       const responders = phase.offer.responses.flatMap((r, p) => (r === 'pending' ? [p] : []));
       return [phase.offer.from, ...responders];
     }
+    case 'event':
+      return phase.tasks.map((t) => t.player);
     default:
       return expansionActors(state) ?? [state.turn.current];
   }

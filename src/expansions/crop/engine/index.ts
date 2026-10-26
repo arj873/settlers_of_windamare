@@ -17,6 +17,7 @@ import { changesRoads, updateAwards } from '../../../engine/rules/awards';
 import { playerName } from '../../../engine/rules/text';
 import { getPlayer, victoryPoints } from '../../../engine/selectors';
 import { hexVertices, topologyOf, vertexInfo } from '../../../engine/topology';
+import { hasRobber, setupPlacementOf } from '../../../engine/variants';
 import type {
   Action,
   DevCardType,
@@ -577,8 +578,15 @@ export const cropModule: ExpansionModule = {
     }
     const deck = rng.shuffle(eventTokens());
     const pieces: CropSlice['pieces'] = [];
+    // A token lies under each piece left after setup: 3 settlements + 4 cities, or one more
+    // settlement and one city fewer per setup round that places a city (settings.setupPlacement).
+    const place = setupPlacementOf(draft.settings);
+    const setupCities = [place.first, place.second].filter((r) => r.building === 'city').length;
     for (let p = 0; p < n; p++) {
-      pieces.push({ settlement: deck.splice(-3), city: deck.splice(-4) });
+      pieces.push({
+        settlement: deck.splice(-(3 + setupCities)),
+        city: deck.splice(-(4 - setupCities)),
+      });
     }
     const cards = { longestRoad: deck.pop() ?? null, largestArmy: deck.pop() ?? null };
     const slice: CropSlice = {
@@ -641,22 +649,23 @@ export const cropModule: ExpansionModule = {
     cost: (_state, item, base) => (item === DEPOSIT ? DEPOSIT_COST : base),
 
     // Fields no longer pay grain on a roll: they are harvested in rounds (afterProduction).
-    production(state, roll, owed) {
+    production(state, roll, owed, ctx) {
       const t = topologyOf(state);
       for (const id of fieldsHexes(state)) {
-        if (state.board.hexes[id]?.token !== roll || id === state.robber) continue;
+        if (state.board.hexes[id]?.token !== roll || id === ctx.blocked) continue;
         for (const v of hexVertices(t, id)) {
           const b = state.pieces.buildings[v];
           const hand = b && owed[b.owner];
-          if (b && hand) hand.grain -= b.kind === 'city' ? 2 : 1;
+          if (b && hand) hand.grain -= b.kind === 'city' ? ctx.cityYield : 1;
         }
       }
     },
 
     afterProduction(draft, roll) {
       const queue: HarvestPhase['queue'] = [];
+      const blocked = hasRobber(draft.settings) ? draft.robber : null;
       for (const id of fieldsHexes(draft)) {
-        if (draft.board.hexes[id]?.token !== roll || id === draft.robber) continue;
+        if (draft.board.hexes[id]?.token !== roll || id === blocked) continue;
         queue.push(...harvestQueue(draft, id));
       }
       trimQueue(draft, queue);

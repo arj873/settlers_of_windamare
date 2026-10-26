@@ -4,7 +4,7 @@
  * buildCity returns the settlement piece to the supply (implicit: piecesLeft is derived).
  * Helpers: canPlaceRoad, canPlaceSettlement(.., { requireRoad: true }), canPlaceCity.
  */
-import { RESOURCES } from '../constants';
+import { COSTS, RESOURCES } from '../constants';
 import { costOf } from '../expansions/hooks';
 import { canPlaceCity, canPlaceRoad, canPlaceSettlement } from '../rules/placement';
 import { playerName } from '../rules/text';
@@ -20,6 +20,7 @@ import type {
   ResourceCounts,
   VertexId,
 } from '../types';
+import { nextToDamagedRoad, roadsBlocked } from '../variants';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 
 type Piece = 'road' | 'settlement' | 'city';
@@ -55,26 +56,49 @@ function built(draft: GameState, player: PlayerId, piece: Piece): ActionResult {
   return ok(draft);
 }
 
+/** Road placement incl. the Earthquake event (no roads while one of yours is damaged). */
+function roadSpotOk(state: GameState, player: PlayerId, e: EdgeId): boolean {
+  return !roadsBlocked(state, player) && canPlaceRoad(state, player, e);
+}
+
+/** Settlement placement incl. the Earthquake event (not at your damaged road). */
+function settlementSpotOk(state: GameState, player: PlayerId, v: VertexId): boolean {
+  return (
+    canPlaceSettlement(state, player, v, { requireRoad: true }) &&
+    !nextToDamagedRoad(state, player, v)
+  );
+}
+
 export function canBuildRoad(state: GameState, player: PlayerId, e: EdgeId): boolean {
-  return buildPrecheck(state, player, 'road') === null && canPlaceRoad(state, player, e);
+  return buildPrecheck(state, player, 'road') === null && roadSpotOk(state, player, e);
 }
 
 export function canBuildSettlement(state: GameState, player: PlayerId, v: VertexId): boolean {
-  return (
-    buildPrecheck(state, player, 'settlement') === null &&
-    canPlaceSettlement(state, player, v, { requireRoad: true })
-  );
+  return buildPrecheck(state, player, 'settlement') === null && settlementSpotOk(state, player, v);
+}
+
+/** Earthquake: can `player` repair their damaged road now (build phase, 1 brick + 1 lumber)? */
+export function canRepairRoad(state: GameState, player: PlayerId): string | null {
+  if (!isBuildPhase(state)) return 'can only repair in the main or special building phase';
+  if (!isCurrent(state, player)) return 'not your turn';
+  if (!roadsBlocked(state, player)) return 'you have no damaged road';
+  const hand = state.players[player]?.resources;
+  if (!hand || !hasResources(hand, COSTS.road)) return 'repairs cost 1 brick and 1 lumber';
+  return null;
 }
 
 export function canBuildCity(state: GameState, player: PlayerId, v: VertexId): boolean {
   return buildPrecheck(state, player, 'city') === null && canPlaceCity(state, player, v);
 }
 
-export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildCity'> = {
+export const buildHandlers: HandlerMap<
+  'buildRoad' | 'buildSettlement' | 'buildCity' | 'repairRoad'
+> = {
   buildRoad: (draft, action) => {
     const err = buildPrecheck(draft, action.player, 'road');
     if (err) return fail(err);
     if (!isBoardEdge(topologyOf(draft), action.edge)) return fail('invalid edge');
+    if (roadsBlocked(draft, action.player)) return fail('repair your damaged road first');
     if (!canPlaceRoad(draft, action.player, action.edge)) {
       return fail('road must be on an empty edge connected to your network');
     }
@@ -88,6 +112,9 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
     if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
     if (!canPlaceSettlement(draft, action.player, action.vertex, { requireRoad: true })) {
       return fail('settlement must be on an open vertex touching your road');
+    }
+    if (nextToDamagedRoad(draft, action.player, action.vertex)) {
+      return fail('no settlement next to your damaged road');
     }
     draft.pieces.buildings[action.vertex] = { owner: action.player, kind: 'settlement' };
     return built(draft, action.player, 'settlement');
@@ -103,20 +130,32 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
     draft.pieces.buildings[action.vertex] = { owner: action.player, kind: 'city' };
     return built(draft, action.player, 'city');
   },
+
+  repairRoad: (draft, action) => {
+    const err = canRepairRoad(draft, action.player);
+    if (err) return fail(err);
+    pay(draft, action.player, COSTS.road);
+    const damaged = draft.damagedRoads ? [...draft.damagedRoads] : [];
+    damaged[action.player] = null;
+    draft.damagedRoads = damaged;
+    log(draft, action.player, `${playerName(draft, action.player)} repaired their road`);
+    return ok(draft);
+  },
 };
 
 export const buildLegal: LegalGenerator = (state: GameState): Action[] => {
   if (!isBuildPhase(state)) return [];
   const player = state.turn.current;
   const out: Action[] = [];
-  if (buildPrecheck(state, player, 'road') === null) {
+  if (buildPrecheck(state, player, 'road') === null && !roadsBlocked(state, player)) {
     for (const edge of topologyOf(state).edges) {
       if (canPlaceRoad(state, player, edge)) out.push({ type: 'buildRoad', player, edge });
     }
   }
+  if (canRepairRoad(state, player) === null) out.push({ type: 'repairRoad', player });
   if (buildPrecheck(state, player, 'settlement') === null) {
     for (const vertex of topologyOf(state).vertices) {
-      if (canPlaceSettlement(state, player, vertex, { requireRoad: true })) {
+      if (settlementSpotOk(state, player, vertex)) {
         out.push({ type: 'buildSettlement', player, vertex });
       }
     }

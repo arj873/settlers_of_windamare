@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { TOPOLOGY, hexCenter } from '../engine';
+import { MAP_IDS, TOPOLOGY, hexCenter, topologyFor } from '../engine';
 import {
+  HEX_SIZE,
+  PORT_REACH,
   boardBounds,
   clampView,
   distToSegment,
+  fitBounds,
   fitView,
   hexAt,
   pick,
   pickRadii,
   screenToUnit,
+  textResolution,
   unitToScreen,
   zoomAt,
 } from './geometry';
@@ -169,5 +173,68 @@ describe('hit-testing', () => {
     expect(distToSegment({ x: 1, y: 1 }, a, b)).toBeCloseTo(1);
     expect(distToSegment({ x: 5, y: 0 }, a, b)).toBeCloseTo(3);
     expect(distToSegment({ x: 3, y: 4 }, a, a)).toBeCloseTo(5);
+  });
+});
+
+describe('fitBounds', () => {
+  it('holds every land hex and every harbor badge, inside the drawn board', () => {
+    for (const map of MAP_IDS) {
+      const topo = topologyFor(map);
+      const fit = fitBounds(topo);
+      const board = boardBounds(topo);
+      const inside = (x: number, y: number) =>
+        x >= fit.minX - 1e-9 &&
+        x <= fit.maxX + 1e-9 &&
+        y >= fit.minY - 1e-9 &&
+        y <= fit.maxY + 1e-9;
+      for (const id of topo.landHexes) {
+        const h = topo.hex[id];
+        expect(h && inside(h.x, h.y - 1) && inside(h.x, h.y + 1)).toBe(true);
+        expect(
+          h && inside(h.x - Math.sqrt(3) / 2, h.y) && inside(h.x + Math.sqrt(3) / 2, h.y),
+        ).toBe(true);
+      }
+      for (const slot of topo.portSlots) {
+        const w = topo.water[slot.waterHex];
+        expect(w && inside(w.x - PORT_REACH, w.y - PORT_REACH)).toBe(true);
+        expect(w && inside(w.x + PORT_REACH, w.y + PORT_REACH)).toBe(true);
+      }
+      expect(fit.minX).toBeGreaterThan(board.minX);
+      expect(fit.maxY).toBeLessThan(board.maxY);
+    }
+  });
+});
+
+describe('textResolution', () => {
+  it('gives 1 to 1.41 texels per device pixel at any zoom and pixel ratio', () => {
+    for (const dpr of [0.67, 1, 1.25, 1.5, 2, 3]) {
+      for (let pxPerUnit = 20; pxPerUnit <= 400; pxPerUnit *= 1.07) {
+        const devicePx = (pxPerUnit / HEX_SIZE) * dpr;
+        if (devicePx < 0.25 || devicePx > 8) continue; // clamped (tested below)
+        const ratio = textResolution(pxPerUnit, dpr) / devicePx;
+        expect(ratio).toBeGreaterThanOrEqual(1 - 1e-9);
+        expect(ratio).toBeLessThanOrEqual(Math.SQRT2 + 1e-9);
+      }
+    }
+  });
+
+  it('follows the zoom in coarse steps, so small zooms do not re-rasterize', () => {
+    expect(textResolution(57, 1)).toBeCloseTo(Math.SQRT1_2); // fitted base78 at 1918x938
+    expect(textResolution(60, 1)).toBe(textResolution(65, 1));
+    expect(textResolution(57, 2)).toBeCloseTo(textResolution(57, 1) * 2);
+    let prev = 0;
+    for (let pxPerUnit = 10; pxPerUnit < 1000; pxPerUnit += 3) {
+      const r = textResolution(pxPerUnit, 1);
+      expect(r).toBeGreaterThanOrEqual(prev);
+      prev = r;
+    }
+  });
+
+  it('is clamped and safe for odd input', () => {
+    expect(textResolution(5000, 3)).toBe(8);
+    expect(textResolution(1, 1)).toBe(0.25);
+    expect(textResolution(0, 1)).toBe(1);
+    expect(textResolution(Number.NaN, 1)).toBe(1);
+    expect(textResolution(100, 0)).toBe(1);
   });
 });

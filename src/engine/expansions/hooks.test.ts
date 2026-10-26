@@ -17,10 +17,12 @@ import { canPlaceRoad, canPlaceSettlement, isVertexOpen } from '../rules/placeme
 import { longestRoadLengths } from '../rules/longestRoad';
 import { emptyBoardGame, expectFail, expectOk, rngForRoll, run, setHand } from '../actions/testkit';
 import { cloneState } from '../clone';
-import type { Action, GameState, VertexId } from '../types';
+import { EVENT_CARDS } from '../rules/events';
+import { emptyStats, statsOf } from '../stats';
+import type { Action, EventKind, GameState, VertexId } from '../types';
 import { costOf, pieceLimit, terrainKind } from './hooks';
 import { registerExpansion } from './registry';
-import type { ExpansionHooks, ExpansionModule } from './types';
+import type { ExpansionHooks, ExpansionModule, ProductionContext } from './types';
 
 const hooks: ExpansionHooks = {};
 const mod: ExpansionModule = {
@@ -413,5 +415,117 @@ describe('createGame: modes, options, validation, init', () => {
     expect(a.ext.tst).toEqual(b.ext.tst);
     expect(a.rng).not.toBe(createGame({ seed: 5, players: players(3) }).rng);
     expect(createGame({ seed: 5, players: players(3) }).ext).toEqual({});
+  });
+});
+
+describe('V1/V2 variants through the hooks (main x expansions merge)', () => {
+  /** A tst game whose next event card is the first card matching `number` and `event`. */
+  const eventRoller = (number: number, event: EventKind): GameState => {
+    const s = withTst(emptyBoardGame());
+    const top = EVENT_CARDS.findIndex((c) => c.number === number && c.event === event);
+    const filler = EVENT_CARDS.map((_, i) => i)
+      .filter((i) => i !== top)
+      .slice(0, 8);
+    return {
+      ...s,
+      settings: { ...s.settings, eventCards: true },
+      eventDeck: [...filler, top],
+      lastEvent: null,
+      damagedRoads: s.players.map((): null => null),
+    };
+  };
+
+  it('event cards end in the afterProduction hook, like dice', () => {
+    hooks.afterProduction = (_d, roll) => (roll === 8 ? { kind: 'tst/after' } : undefined);
+    const after = run(eventRoller(8, 'none'), { type: 'rollDice', player: 0 });
+    expect(after.lastEvent).toBe('none');
+    expect(after.phase.kind).toBe('tst/after');
+  });
+
+  it('Robber Attacks goes through the onSeven hook', () => {
+    hooks.onSeven = () => ({ kind: 'tst/seven' });
+    const after = run(eventRoller(7, 'robberAttacks'), { type: 'rollDice', player: 0 });
+    expect(after.phase.kind).toBe('tst/seven');
+  });
+
+  it('the production hook gets the city yield (Epidemic) and the blocked hex (no robber)', () => {
+    const seen: ProductionContext[] = [];
+    hooks.production = (_s, _roll, _owed, ctx) => {
+      seen.push(ctx);
+    };
+    run(eventRoller(8, 'epidemic'), { type: 'rollDice', player: 0 });
+    const dice = withTst(emptyBoardGame());
+    dice.rng = rngForRoll(8);
+    run(dice, { type: 'rollDice', player: 0 });
+    const none = { ...dice, settings: { ...dice.settings, robberMode: 'none' as const } };
+    run(none, { type: 'rollDice', player: 0 });
+    expect(seen).toEqual([
+      { cityYield: 1, blocked: dice.robber },
+      { cityYield: 2, blocked: dice.robber },
+      { cityYield: 2, blocked: null },
+    ]);
+  });
+
+  it('onStartTurn runs for the first turn after setup and for Catanian 2 (Second Settler)', () => {
+    const started: number[] = [];
+    hooks.onStartTurn = (_d, p) => {
+      started.push(p);
+    };
+    let s = createGame({ seed: 4, players: players(4), mode: 'tst', startingPlayer: 0 });
+    while (s.phase.kind === 'setup') s = run(s, legalActions(s)[0] as Action);
+    expect(started).toEqual([0]);
+    const paired: GameState = {
+      ...s,
+      settings: { ...s.settings, secondSettler: true, specialBuildPhase: false },
+      phase: { kind: 'main' },
+    };
+    run(paired, { type: 'endTurn', player: 0 });
+    expect(started).toEqual([0, 3]);
+  });
+
+  it('a setupBuilding hook wins over settings.setupPlacement', () => {
+    hooks.setupBuilding = (_s, index) => (index === 0 ? 'settlement' : undefined);
+    const s = createGame({
+      seed: 2,
+      players: players(3),
+      mode: 'tst',
+      startingPlayer: 0,
+      setupPlacement: {
+        first: { building: 'city', restriction: 'normal' },
+        second: { building: 'city', restriction: 'normal' },
+      },
+    });
+    const first = run(s, legalActions(s)[0] as Action);
+    expect(Object.values(first.pieces.buildings)).toEqual([{ owner: 0, kind: 'settlement' }]);
+    const road = run(first, legalActions(first)[0] as Action);
+    const second = run(road, legalActions(road)[0] as Action);
+    expect(Object.values(second.pieces.buildings).map((b) => b.kind)).toEqual([
+      'settlement',
+      'city',
+    ]);
+  });
+
+  it('createGame refuses a map veto with expansions; random picks a fitting scenario map', () => {
+    expect(() =>
+      createGame({ seed: 1, players: players(3), mode: 'tst', mapSelection: 'veto' }),
+    ).toThrow(/veto/);
+    for (let seed = 0; seed < 10; seed++) {
+      const s = createGame({ seed, players: players(5), mode: 'oil', mapSelection: 'random' });
+      expect(s.settings.map).toBe('oil/fixed30');
+      expect(s.settings.mapSelection).toBe('random');
+    }
+  });
+
+  it('stats count the base parts of an expansion action (a road it places)', () => {
+    const e = sideEdge(0, -2, 'NE');
+    mod.actions = {
+      'tst/freeRoad': (d, a) => {
+        d.pieces.roads[e] = a.player;
+        return { ok: true, state: d };
+      },
+    };
+    const s = { ...withTst(emptyBoardGame()), phase: { kind: 'main' as const } };
+    const after = run({ ...s, stats: emptyStats(4) }, { type: 'tst/freeRoad', player: 0 });
+    expect(statsOf(after).players[0]?.built.road).toBe(1);
   });
 });

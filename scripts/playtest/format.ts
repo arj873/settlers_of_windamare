@@ -1,7 +1,8 @@
 /** Plain-text renderings of a Snapshot for the playtest CLI. Pure, unit-tested. */
 import {
   bankTradeRatio,
-  handSize,
+  devCardCount,
+  handCount,
   piecesLeft,
   publicVictoryPoints,
   RESOURCES,
@@ -12,7 +13,7 @@ import {
   type PlayerId,
 } from '../../src/engine';
 import { actors, mustDo, waitingOn } from './guard';
-import type { Snapshot, UiScan } from './protocol';
+import type { OnlineScan, Snapshot, UiScan } from './protocol';
 import { hexLabel } from './spots';
 
 const DEV_NAMES: Record<keyof DevCardCounts, string> = {
@@ -71,8 +72,8 @@ export function uiMismatches(state: GameState, ui: UiScan, seat: PlayerId): stri
   for (const panel of ui.panels) {
     const p = state.players.find((x) => x.name === panel.name);
     if (!p) continue;
-    if (panel.cards !== handSize(p)) {
-      out.push(`${p.name} panel shows ${panel.cards} cards, engine has ${handSize(p)}`);
+    if (panel.cards !== handCount(state, p.id)) {
+      out.push(`${p.name} panel shows ${panel.cards} cards, engine has ${handCount(state, p.id)}`);
     }
     const vp = publicVictoryPoints(state, p.id);
     if (panel.vp !== vp)
@@ -111,6 +112,25 @@ export function formatControls(ui: UiScan): string[] {
   return lines;
 }
 
+/** Online-only lines: connection, seats as the server lists them, recent chat. */
+export function formatOnline(o: OnlineScan): string[] {
+  const lines: string[] = [];
+  const link =
+    o.status === 'open'
+      ? 'connected'
+      : `${o.status.toUpperCase()}${o.attempts > 0 ? ` (attempt ${o.attempts})` : ''}`;
+  lines.push(`Online: ${link} | room ${o.room} (${o.roomPhase ?? '?'}) | game seq ${o.seq ?? '-'}`);
+  if (o.fatal) lines.push(`DISCONNECTED for good: ${o.fatal.code} — ${o.fatal.message}`);
+  if (o.banner) lines.push(`Banner on screen: "${o.banner}"`);
+  if (o.notice) lines.push(`Full-screen notice: "${o.notice}"`);
+  if (o.seats.length > 0) lines.push(`Seats (server): ${o.seats.join(' | ')}`);
+  if (o.chat.length > 0) {
+    lines.push('Chat (last 8):');
+    for (const c of o.chat) lines.push(`  ${c.line}`);
+  }
+  return lines;
+}
+
 export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number): string {
   const state = snap.state;
   if (!state) return 'The game has not loaded yet. Is `pnpm pt:serve` running?';
@@ -135,7 +155,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   }
 
   const hand = RESOURCES.map((r) => `${r} ${me.resources[r]}`).join(', ');
-  lines.push(`Hand: ${hand} (${handSize(me)} cards)`);
+  lines.push(`Hand: ${hand} (${handCount(state, seat)} cards)`);
   const ratios = RESOURCES.map((r) => `${r} ${bankTradeRatio(state, seat, r)}:1`).join(', ');
   lines.push(`Bank ratios: ${ratios}`);
   lines.push(`Dev cards: ${devLine(state, seat)}`);
@@ -146,9 +166,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   const others = state.players
     .filter((p) => p.id !== seat)
     .map((p) => {
-      const dev = Object.values(p.devCards).reduce((a, b) => a + b, 0);
-      const fresh = Object.values(p.newDevCards).reduce((a, b) => a + b, 0);
-      return `${p.name}: ${publicVictoryPoints(state, p.id)} VP, ${handSize(p)} cards, ${dev + fresh} dev, ${p.knightsPlayed} knights`;
+      return `${p.name}: ${publicVictoryPoints(state, p.id)} VP, ${handCount(state, p.id)} cards, ${devCardCount(state, p.id)} dev, ${p.knightsPlayed} knights`;
     });
   lines.push(`Others: ${others.join(' | ')}`);
   const award = (p: PlayerId | null) => (p === null ? 'nobody' : (state.players[p]?.name ?? p));
@@ -170,7 +188,8 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   }
   if (ui.toasts.length > 0) lines.push(`Toasts: ${ui.toasts.map((t) => `"${t}"`).join(' ')}`);
   lines.push(`Legal for you: ${legalKinds(snap.legal, seat)}`);
-  if (actors(snap.legal).length === 0 && phase.kind !== 'gameOver') {
+  if (snap.online) lines.push(...formatOnline(snap.online));
+  if (!snap.online && actors(snap.legal).length === 0 && phase.kind !== 'gameOver') {
     lines.push('STALLED: nobody can act. Report this as a blocker.');
   }
   if (newConsole > 0)

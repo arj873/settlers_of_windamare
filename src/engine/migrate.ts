@@ -13,6 +13,9 @@
  *             options {}, and state.ext {}. A v5 save naming an expansion, mode or scenario this
  *             build does not know is rejected (null). Expansions version their own slices.
  * Log texts are not migrated: older logs say "Blue rolled 8" without the dice faces.
+ * V1/V2 variant fields (settings.robberMode, mapRules, rules56, eventDeck, ...) and UX2 stats are
+ * optional and absent in older saves, where absent means the official rule (stats: recording
+ * starts at the next action), so they need no step: every upgrade above keeps them as they are.
  */
 import { DEFAULT_DISCARD_LIMIT } from './constants';
 import { isExpansionId, modeById, scenarioById } from './expansions/registry';

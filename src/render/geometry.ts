@@ -73,6 +73,47 @@ export function boardBounds(topo: Topology = TOPOLOGY): Rect {
   return { minX: x - r, minY: y - h, maxX: x + r, maxY: y + h };
 }
 
+/** How far (units) a harbor badge on a water hex center reaches, shadow and a little air included. */
+export const PORT_REACH = 0.5;
+
+/**
+ * What the fitted camera frames (units): the land hexes plus every harbor badge the water ring
+ * can hold. The sea backdrop and frame around it are decoration: they may run under the HUD or
+ * off screen, so fitting them (as `boardBounds` would) shrinks the island for nothing.
+ */
+export function fitBounds(topo: Topology = TOPOLOGY): Rect {
+  const r = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const grow = (x: number, y: number, rx: number, ry: number) => {
+    r.minX = Math.min(r.minX, x - rx);
+    r.maxX = Math.max(r.maxX, x + rx);
+    r.minY = Math.min(r.minY, y - ry);
+    r.maxY = Math.max(r.maxY, y + ry);
+  };
+  // Pointy-top hex of size 1: half-width sqrt(3)/2, half-height 1.
+  for (const id of topo.landHexes) {
+    const h = topo.hex[id];
+    if (h) grow(h.x, h.y, Math.sqrt(3) / 2, 1);
+  }
+  for (const slot of topo.portSlots) {
+    const w = topo.water[slot.waterHex];
+    if (w) grow(w.x, w.y, PORT_REACH, PORT_REACH);
+  }
+  return r;
+}
+
+/**
+ * Resolution for board `Text` drawn at design size `HEX_SIZE`, so its texture has about one texel
+ * per device pixel at `pxPerUnit` CSS px per unit and device pixel ratio `dpr`. Snapped up to a
+ * power of sqrt(2) (texels per pixel stay in [1, 1.41]: never upscaled, never minified enough to
+ * alias) so small zoom changes don't re-rasterize; clamped to [0.25, 8].
+ */
+export function textResolution(pxPerUnit: number, dpr: number): number {
+  const want = (pxPerUnit / HEX_SIZE) * (dpr > 0 ? dpr : 1);
+  if (!Number.isFinite(want) || want <= 0) return 1;
+  const snapped = Math.pow(2, Math.ceil(Math.log2(want) * 2 - 1e-9) / 2);
+  return Math.min(8, Math.max(0.25, snapped));
+}
+
 export function unitToScreen(view: ViewTransform, p: Point): Point {
   return { x: view.x + p.x * view.scale, y: view.y + p.y * view.scale };
 }

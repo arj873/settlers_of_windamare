@@ -5,6 +5,7 @@
 import {
   costOf,
   emptyResources,
+  EVENT_INFO,
   getPlayer,
   handCount,
   RESOURCES,
@@ -27,6 +28,7 @@ import {
   type TradeDraft,
 } from './composer';
 import { hudExtensionsFor } from './expansions';
+import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
@@ -49,15 +51,24 @@ import {
   type BuildKind,
 } from './model';
 import { bankPanel, logList, playersList } from './sidebar';
+import { statsFor, type StatsTab } from './stats/model';
+import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
-import type { BotSpeedControl, HudEventName, HudEvents, HudView, PlaceMode } from './types';
+import type {
+  BotSpeedControl,
+  HudEventName,
+  HudEvents,
+  HudView,
+  PlaceMode,
+  SessionAction,
+} from './types';
 import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
 
 type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
 /** Base sections, or `ext:<expansionId>` for an expansion panel. */
-type Section = 'log' | 'bank' | 'players' | `ext:${string}`;
+type Section = 'log' | 'bank' | 'players' | 'chat' | `ext:${string}`;
 type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
 
 const BUILD_LABEL: Record<BuildKind, string> = {
@@ -84,10 +95,11 @@ const describeCost = (cost: ResourceCounts) =>
     .map((r) => `${cost[r]} ${r}`)
     .join(', ');
 
-const SECTION_TITLE: Record<'log' | 'bank' | 'players', string> = {
+const SECTION_TITLE: Record<'log' | 'bank' | 'players' | 'chat', string> = {
   log: 'Game Events',
   bank: 'Bank',
   players: 'Players',
+  chat: 'Chat',
 };
 
 /** How long a tapped "why is this disabled" bubble stays open. */
@@ -110,6 +122,8 @@ export class Hud {
   private bankGive: Resource | null = null;
   private bankReceive: Resource | null = null;
   private yopFirst: Resource | null = null;
+  /** Event card "give" task: the recipient picked so far. */
+  private eventTo: PlayerId | null = null;
   private draft: TradeDraft = emptyDraft([]);
   private discardSel: ResourceCounts = emptyResources();
   /** Viewer the discard selection was made for (null outside the discard phase). */
@@ -120,13 +134,25 @@ export class Hud {
   private unlockedViewer: PlayerId | null = null;
   private pieceSig = '';
   private lastDice = '';
+  private lastPillKey = '';
   private lastDialogKey = '';
   private lastLogLength = -1;
   private menuOpen = false;
   /** Phone layout: the sidebar is a drawer. */
   private drawerOpen = false;
   private collapsed = new Set<Section>();
+  /** Game over (UX2): the statistics panel instead of the winner card; collapsed = the board shows. */
+  private statsOpen = false;
+  private statsCollapsed = false;
+  private statsTab: StatsTab = 'overview';
+  private statsPlayer: PlayerId | null = null;
+  /** The panel was just opened / expanded: play its fade-in once. */
+  private statsEntering = false;
   private botSpeed: BotSpeedControl | null = null;
+  /** Online: replaces "New game" in the menu and on the winner screen. */
+  private sessionActions: SessionAction[] | null = null;
+  /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
+  private chatSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
   private whyKind: BuildKind | null = null;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -175,6 +201,22 @@ export class Hud {
   /** Show a bot-speed picker in the menu (null hides it). The HUD keeps the chosen value. */
   setBotSpeed(control: BotSpeedControl | null): void {
     this.botSpeed = control;
+    this.refresh();
+  }
+
+  /** Online play: menu / winner-screen actions instead of "New game" (null = hotseat). */
+  setSessionActions(actions: SessionAction[] | null): void {
+    this.sessionActions = actions;
+    this.refresh();
+  }
+
+  /**
+   * Online play: show `panel` as a Chat section at the bottom of the sidebar (null removes it).
+   * The node is kept as is across renders.
+   */
+  setChat(panel: HTMLElement | null): void {
+    this.chatSec?.remove();
+    this.chatSec = panel ? this.section('chat', panel, true) : null;
     this.refresh();
   }
 
@@ -230,6 +272,14 @@ export class Hud {
 
     if (this.unlockedViewer === null) this.unlockedViewer = view.viewer;
 
+    // A game in progress: the next game over starts on the winner card again.
+    if (state.phase.kind !== 'gameOver') {
+      this.statsOpen = false;
+      this.statsCollapsed = false;
+      this.statsTab = 'overview';
+      this.statsPlayer = null;
+    }
+
     // Leave build mode after anything was placed, or when it stops being legal.
     // (Expansion pieces live in state.ext: its size stands in for "a module piece was placed".)
     const extSig = state.settings.expansions.length > 0 ? JSON.stringify(state.ext).length : 0;
@@ -247,6 +297,7 @@ export class Hud {
     if (this.dialog === 'monopoly' && !av.playMonopoly) this.dialog = null;
     if (this.dialog !== 'bank') this.bankGive = this.bankReceive = null;
     if (this.dialog !== 'yop') this.yopFirst = null;
+    if (state.phase.kind !== 'event') this.eventTo = null;
 
     // Fresh draft per turn / viewer; recipients default to everyone else.
     const others = state.players.filter((p) => p.id !== view.viewer).map((p) => p.id);
@@ -331,11 +382,92 @@ export class Hud {
     r.menu.replaceChildren(...this.menu(view));
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
-    r.bottom.replaceChildren(...this.handBar(state, view, av));
-    r.controls.replaceChildren(...this.controls(state, view, av));
-    this.renderDialog(state, view, legal);
-    r.overlay.replaceChildren(
-      ...(state.phase.kind === 'gameOver' ? [this.winnerScreen(state)] : []),
+    if (view.spectator) {
+      // Public info only: no hand, no buttons, no dialogs; the dice stay visible.
+      r.bottom.replaceChildren();
+      r.controls.replaceChildren(this.diceBox(state));
+      r.dialog.replaceChildren();
+      this.lastDialogKey = '';
+    } else {
+      r.bottom.replaceChildren(...this.handBar(state, view, av));
+      r.controls.replaceChildren(...this.controls(state, view, av));
+      this.renderDialog(state, view, legal);
+    }
+    // Stats panel: keep the body's scroll position across re-renders of the same tab.
+    const prevBody = r.overlay.querySelector<HTMLElement>('.gs-body');
+    const keep = prevBody ? { tab: prevBody.dataset.tab, top: prevBody.scrollTop } : null;
+    r.overlay.replaceChildren(...this.gameOverScreen(state, view));
+    const body = r.overlay.querySelector<HTMLElement>('.gs-body');
+    if (body && keep && body.dataset.tab === keep.tab) body.scrollTop = keep.top;
+  }
+
+  /** Winner card, or (UX2) the statistics panel; nothing before game over. */
+  private gameOverScreen(state: GameState, view: HudView): HTMLElement[] {
+    const stats = statsFor(state);
+    if (state.phase.kind !== 'gameOver') return [];
+    if (!this.statsOpen || !stats) return [this.winnerScreen(state, stats !== null)];
+    const panel = statsPanel(state, stats, {
+      tab: this.statsTab,
+      player: this.statsPlayer ?? state.winner ?? 0,
+      collapsed: this.statsCollapsed,
+      durationMs: view.gameDurationMs ?? null,
+      onTab: (tab) => {
+        this.statsTab = tab;
+        this.refresh();
+      },
+      onPlayer: (p) => {
+        this.statsPlayer = p;
+        this.refresh();
+      },
+      onToggle: () => {
+        this.statsCollapsed = !this.statsCollapsed;
+        this.statsEntering = !this.statsCollapsed;
+        this.refresh();
+      },
+      actions: [
+        h(
+          'button',
+          {
+            class: 'btn gs-results',
+            on: {
+              click: () => {
+                this.statsOpen = false;
+                this.refresh();
+              },
+            },
+          },
+          'Results',
+        ),
+        ...this.endActions(''),
+      ],
+    });
+    // Fade in only when the panel opens, not on every tab switch.
+    const entering = this.statsEntering;
+    this.statsEntering = false;
+    const cls = this.statsCollapsed ? 'gs-dock' : `gs-overlay${entering ? ' is-entering' : ''}`;
+    return [h('div', { class: cls }, panel)];
+  }
+
+  /** "New game" (hotseat) or the online session actions, as buttons. */
+  private endActions(size: string): HTMLElement[] {
+    if (!this.sessionActions) {
+      return [
+        h(
+          'button',
+          { class: `btn btn-primary ${size}`, on: { click: () => this.showNewGame() } },
+          'New game',
+        ),
+      ];
+    }
+    return this.sessionActions.map((a) =>
+      h(
+        'button',
+        {
+          class: `btn ${a.primary ? 'btn-primary' : 'btn-ghost'} ${size}`,
+          on: { click: () => a.onClick() },
+        },
+        a.label,
+      ),
     );
   }
 
@@ -365,19 +497,23 @@ export class Hud {
       h(
         'div',
         { class: 'menu-panel wood', attrs: { role: 'menu' } },
-        h(
-          'button',
-          {
-            class: 'menu-item',
-            attrs: { role: 'menuitem' },
-            on: {
-              click: () => {
-                this.menuOpen = false;
-                this.showNewGame();
+        ...(this.sessionActions ?? [{ label: 'New game', onClick: () => this.showNewGame() }]).map(
+          (a) =>
+            h(
+              'button',
+              {
+                class: 'menu-item',
+                attrs: { role: 'menuitem' },
+                on: {
+                  click: () => {
+                    this.menuOpen = false;
+                    this.refresh();
+                    a.onClick();
+                  },
+                },
               },
-            },
-          },
-          'New game',
+              a.label,
+            ),
         ),
         showSpeed &&
           h(
@@ -425,16 +561,32 @@ export class Hud {
 
   private turnPill(state: GameState, view: HudView): HTMLElement[] {
     if (state.phase.kind === 'gameOver') return [];
+    const spectating =
+      view.spectator &&
+      h(
+        'span',
+        {
+          class: 'spectate-pill',
+          attrs: { role: 'status' },
+          title: 'You are watching: only public information is shown',
+        },
+        glyph('eye', 16),
+        'Spectating',
+      );
     const info = turnInfo(state, view, this.placeMode);
     const p = getPlayer(state, info.player);
     const timer = view.turnTimer;
     const low = timer ? Math.ceil(timer.remainingSec) <= TIMER_WARN_SEC : false;
+    // The pill is rebuilt on every render and timer tick: drop it in only when it says something new.
+    const pillKey = `${info.player}|${info.title}|${info.hint?.text ?? ''}`;
+    const fresh = pillKey !== this.lastPillKey;
+    this.lastPillKey = pillKey;
     return [
       h(
         'div',
         {
           class: `turn-pill${info.hint?.tone === 'action' ? ' is-action' : ''}${low ? ' is-timer-low' : ''}`,
-          style: playerStyle(p.color),
+          style: { ...playerStyle(p.color), ...(fresh ? {} : { animation: 'none' }) },
           attrs: { role: 'status' },
         },
         avatar(p, view.bots?.[info.player] ?? view.isBotTurn, 34),
@@ -457,6 +609,7 @@ export class Hud {
             'Cancel',
           ),
       ),
+      ...(spectating ? [spectating] : []),
     ];
   }
 
@@ -486,7 +639,7 @@ export class Hud {
     side.classList.toggle('is-open', this.drawerOpen);
     const extPanels = hudExtensionsFor(state).flatMap((x) => {
       const p = x.panel?.(state, view, (a) => this.send(a));
-      return p ? [this.section(`ext:${x.id}`, p.body, p.title)] : [];
+      return p ? [this.section(`ext:${x.id}`, p.body, false, p.title)] : [];
     });
     side.replaceChildren(
       this.section('log', list),
@@ -494,6 +647,7 @@ export class Hud {
       ...extPanels,
       this.section('players', playersList(state, view)),
     );
+    if (this.chatSec) side.append(this.chatSec);
     const grew = state.log.length !== this.lastLogLength;
     this.lastLogLength = state.log.length;
     list.scrollTop = grew && wasAtBottom ? list.scrollHeight : prevTop;
@@ -517,10 +671,19 @@ export class Hud {
     );
   }
 
-  private section(key: Section, body: HTMLElement, title?: string): HTMLElement {
+  /**
+   * `persistent`: the section is reused across renders, so collapsing toggles it in place.
+   * `title`: heading of an expansion panel (default: the section's base title).
+   */
+  private section(
+    key: Section,
+    body: HTMLElement,
+    persistent = false,
+    title?: string,
+  ): HTMLElement {
     const closed = this.collapsed.has(key);
-    const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log']);
-    return h(
+    const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log' | 'chat']);
+    const sec: HTMLElement = h(
       'section',
       { class: `side-sec sec-${key.replace(':', '-')}${closed ? ' is-collapsed' : ''}` },
       h(
@@ -537,10 +700,19 @@ export class Hud {
               'aria-expanded': String(!closed),
             },
             on: {
-              click: () => {
-                if (closed) this.collapsed.delete(key);
+              click: (e) => {
+                if (this.collapsed.has(key)) this.collapsed.delete(key);
                 else this.collapsed.add(key);
-                this.refresh();
+                if (!persistent) {
+                  this.refresh();
+                  return;
+                }
+                const now = this.collapsed.has(key);
+                sec.classList.toggle('is-collapsed', now);
+                const btn = e.currentTarget as HTMLElement;
+                btn.title = now ? 'Expand' : 'Collapse';
+                btn.setAttribute('aria-label', `${now ? 'Expand' : 'Collapse'} ${heading}`);
+                btn.setAttribute('aria-expanded', String(!now));
               },
             },
           },
@@ -549,6 +721,7 @@ export class Hud {
       ),
       h('div', { class: 'sec-body' }, body),
     );
+    return sec;
   }
 
   // --- bottom-left: hand, trade, build bar ------------------------------------
@@ -800,15 +973,18 @@ export class Hud {
     const fresh = key !== this.lastDice;
     this.lastDice = key;
     const total = diceTotal(d);
+    // Event Cards: the card's event is shown under the dice.
+    const event = state.lastEvent ? EVENT_INFO[state.lastEvent] : null;
     return h(
       'div',
       {
         class: `dice${fresh ? ' rolling' : ''}${total === 7 ? ' is-seven' : ''}`,
-        title: `Last roll: ${total}`,
+        title: event ? `Last card: ${total}, ${event.name}. ${event.text}` : `Last roll: ${total}`,
       },
       dieFace(d[0]),
       dieFace(d[1]),
       h('span', { class: 'dice-total' }, String(total)),
+      event && state.lastEvent !== 'none' && h('span', { class: 'dice-event' }, event.name),
     );
   }
 
@@ -878,6 +1054,13 @@ export class Hud {
         return this.responderDialog(state, view, legal);
       return null;
     }
+    if (phase.kind === 'mapVeto' && ofType(legal, 'vetoMap').length > 0) {
+      return this.vetoDialog(state, legal);
+    }
+    if (phase.kind === 'event') {
+      const d = this.eventDialog(state, view, legal);
+      if (d) return d;
+    }
     for (const x of hudExtensionsFor(state)) {
       const d = x.dialog?.(state, view, legal, (a) => this.send(a));
       if (d) return d;
@@ -893,8 +1076,209 @@ export class Hud {
       case 'monopoly':
         return this.monopolyDialog(legal);
       default:
-        return null;
+        return this.repairCard(legal);
     }
+  }
+
+  // --- V1 variant dialogs: map veto, event-card choices, road repair ----------
+
+  private vetoDialog(state: GameState, legal: Action[]) {
+    const phase = state.phase;
+    if (phase.kind !== 'mapVeto') return null;
+    const acts = ofType(legal, 'vetoMap');
+    return {
+      key: `veto-${phase.next}`,
+      title: 'Veto a map',
+      modal: true,
+      wide: true,
+      body: [
+        h(
+          'p',
+          { class: 'sub' },
+          'Players veto in turn until one map is left. Pick the board you least want to play.',
+        ),
+        h(
+          'div',
+          { class: 'veto-maps' },
+          ...phase.candidates.map((c, i) => {
+            const act = acts.find((a) => a.candidate === i);
+            const by = phase.vetoed[i];
+            return h(
+              'button',
+              {
+                class: `veto-map${by !== null && by !== undefined ? ' is-vetoed' : ''}`,
+                disabled: !act,
+                attrs: { 'data-k': `veto-${i}`, 'aria-label': `Veto map ${i + 1}` },
+                on: { click: () => act && this.send(act) },
+              },
+              boardPreviewSvg(state.settings.map, c.board),
+              h(
+                'span',
+                { class: 'veto-label' },
+                by !== null && by !== undefined
+                  ? `Map ${i + 1}: vetoed by ${getPlayer(state, by).name}`
+                  : `Veto map ${i + 1}`,
+              ),
+            );
+          }),
+        ),
+      ],
+    };
+  }
+
+  private eventDialog(state: GameState, view: HudView, legal: Action[]) {
+    const phase = state.phase;
+    if (phase.kind !== 'event') return null;
+    const task = phase.tasks.find((t) => t.player === view.viewer);
+    if (!task || task.kind === 'damageRoad') return null; // Earthquake: picked on the board
+    const info = EVENT_INFO[phase.event];
+    const base = { key: `event-${state.turn.number}-${view.viewer}`, modal: true };
+    const note = h('p', { class: 'sub' }, info.text);
+    if (task.kind === 'gain') {
+      const acts = ofType(legal, 'eventGain');
+      return {
+        ...base,
+        title: `${info.name}: take a resource`,
+        body: [
+          note,
+          this.resourcePick(
+            null,
+            (r) => acts.some((a) => a.resource === r),
+            (r) => {
+              const a = acts.find((x) => x.resource === r);
+              if (a) this.send(a);
+            },
+          ),
+        ],
+      };
+    }
+    if (task.kind === 'give') {
+      const acts = ofType(legal, 'eventGive');
+      const to =
+        task.targets.length === 1
+          ? task.targets[0]
+          : this.eventTo !== null && task.targets.includes(this.eventTo)
+            ? this.eventTo
+            : null;
+      return {
+        ...base,
+        title: `${info.name}: give a resource`,
+        body: [
+          note,
+          task.targets.length > 1 &&
+            h(
+              'div',
+              { class: 'victims' },
+              ...task.targets.map((id) => {
+                const p = getPlayer(state, id);
+                return h(
+                  'button',
+                  {
+                    class: `victim${to === id ? ' is-on' : ''}`,
+                    style: { '--pc': p.color },
+                    attrs: { 'aria-pressed': String(to === id) },
+                    on: {
+                      click: () => {
+                        this.eventTo = id;
+                        this.refresh();
+                      },
+                    },
+                  },
+                  avatar(p, view.bots?.[id] ?? false, 44),
+                  h('span', { class: 'victim-name' }, p.name),
+                );
+              }),
+            ),
+          to !== null && to !== undefined
+            ? h(
+                'div',
+                {},
+                h('p', { class: 'sub' }, `Give ${getPlayer(state, to).name} one of your cards:`),
+                this.resourcePick(
+                  null,
+                  (r) => acts.some((a) => a.to === to && a.resource === r),
+                  (r) => {
+                    const a = acts.find((x) => x.to === to && x.resource === r);
+                    if (a) this.send(a);
+                  },
+                ),
+              )
+            : h('p', { class: 'sub' }, 'Pick a player with fewer points first.'),
+        ],
+      };
+    }
+    // steal
+    const acts = ofType(legal, 'eventSteal');
+    const pass = acts.find((a) => a.victim === null);
+    return {
+      ...base,
+      title: `${info.name}: take a card from whom?`,
+      body: [
+        note,
+        h(
+          'div',
+          { class: 'victims' },
+          ...task.targets.map((id) => {
+            const p = getPlayer(state, id);
+            const act = acts.find((a) => a.victim === id);
+            return h(
+              'button',
+              {
+                class: 'victim',
+                style: { '--pc': p.color },
+                disabled: !act,
+                on: { click: () => act && this.send(act) },
+              },
+              avatar(p, view.bots?.[id] ?? false, 44),
+              h('span', { class: 'victim-name' }, p.name),
+              h('span', { class: 'muted' }, `${handCount(state, id)} cards`),
+            );
+          }),
+        ),
+        pass &&
+          h(
+            'div',
+            { class: 'dialog-actions' },
+            h(
+              'button',
+              { class: 'btn btn-ghost', on: { click: () => this.send(pass) } },
+              'Take nothing',
+            ),
+          ),
+      ],
+    };
+  }
+
+  /** Earthquake: a docked card offering the repair while the viewer has a damaged road. */
+  private repairCard(legal: Action[]) {
+    const act = ofType(legal, 'repairRoad')[0];
+    if (!act) return null;
+    return {
+      key: 'repair',
+      title: 'Damaged road',
+      modal: false,
+      side: true,
+      body: [
+        h(
+          'p',
+          { class: 'sub' },
+          'Earthquake: you cannot build roads, or settlements next to the damaged road, until it is repaired.',
+        ),
+        h(
+          'div',
+          { class: 'dialog-actions' },
+          h(
+            'button',
+            {
+              class: 'btn btn-primary',
+              attrs: { 'data-k': 'repair' },
+              on: { click: () => this.send(act) },
+            },
+            'Repair (1 brick, 1 lumber)',
+          ),
+        ),
+      ],
+    };
   }
 
   private closeButton(label = 'Close'): HTMLElement {
@@ -1420,7 +1804,7 @@ export class Hud {
     );
   }
 
-  private winnerScreen(state: GameState): HTMLElement {
+  private winnerScreen(state: GameState, hasStats: boolean): HTMLElement {
     const ranked = state.players
       // Final scores reveal hidden VP cards.
       .map((p) => ({ p, vp: victoryPoints(state, p.id) }))
@@ -1453,9 +1837,25 @@ export class Hud {
           ),
         ),
         h(
-          'button',
-          { class: 'btn btn-primary btn-lg', on: { click: () => this.showNewGame() } },
-          'New game',
+          'div',
+          { class: 'winner-actions' },
+          hasStats &&
+            h(
+              'button',
+              {
+                class: 'btn btn-lg winner-stats',
+                on: {
+                  click: () => {
+                    this.statsOpen = true;
+                    this.statsCollapsed = false;
+                    this.statsEntering = true;
+                    this.refresh();
+                  },
+                },
+              },
+              'Game stats',
+            ),
+          ...this.endActions('btn-lg'),
         ),
       ),
     );

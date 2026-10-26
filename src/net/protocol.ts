@@ -8,8 +8,19 @@
  */
 import {
   MAP_IDS,
+  MAP_RULE_KEYS,
+  MAP_SELECTIONS,
+  MAP_VETO_CANDIDATES,
   MAPS,
   RESOURCES,
+  ROBBER_MODES,
+  RULES56_MIN_PLAYERS,
+  SETUP_BUILDINGS,
+  SETUP_RESTRICTIONS,
+  TIMER_BANK_RANGE,
+  TIMER_INCREMENT_RANGE,
+  TIMER_PRESETS,
+  timerSettings,
   type Action,
   type BaseActionType,
   type EdgeId,
@@ -19,11 +30,14 @@ import {
   type PlayerId,
   type Resource,
   type ResourceBundle,
+  type SetupRound,
+  type TimerPreset,
+  type TimerSettings,
   type VertexId,
 } from '../engine';
 import type { SlotKind } from '../game/turnTimer';
-import type { NewGameConfig } from '../ui/types';
-import { NAME_MAX, SEAT_COLORS, TIMER_STEPS } from '../ui/setup/model';
+import type { NewGameConfig, NewGameVariants } from '../ui/types';
+import { NAME_MAX, SEAT_COLORS, SECOND_SETTLER_MIN_PLAYERS, TIMER_STEPS } from '../ui/setup/model';
 import {
   arrayOf,
   bool,
@@ -160,7 +174,11 @@ export interface ChatEntry {
   text: string;
 }
 
-/** The turn clock (settings.turnTimerSec), counted down locally from when the message arrives. */
+/**
+ * The turn clock, counted down locally from when the message arrives. Per-turn timer
+ * (settings.turnTimerSec): a fresh `totalMs` per slot. Chess clock (settings.timer, V1):
+ * `remainingMs` is the player's bank, `totalMs` the starting bank.
+ */
 export interface TimerInfo {
   player: PlayerId;
   kind: SlotKind;
@@ -263,6 +281,8 @@ export type ServerMessage = V &
         /** The recipient's legal actions, computed by the server from the full state. */
         legal: Action[];
         timer: TimerInfo | null;
+        /** UX2: game over only — the room clock from start to the end (stats screen). */
+        durationMs?: number;
       }
     | { type: 'chat'; entry: ChatEntry }
     | { type: 'reaction'; member: MemberId; seat: PlayerId | null; reaction: Reaction }
@@ -382,6 +402,35 @@ const ACTIONS: ActionParsers = {
     player,
     partner: field(o, 'partner', PLAYER_ID, p),
   }),
+  // V1 variants (RULES.md §18)
+  vetoMap: (o, player, p) => ({
+    type: 'vetoMap',
+    player,
+    candidate: field(o, 'candidate', int(0, MAP_VETO_CANDIDATES - 1), p),
+  }),
+  eventGain: (o, player, p) => ({
+    type: 'eventGain',
+    player,
+    resource: field(o, 'resource', RESOURCE, p),
+  }),
+  eventGive: (o, player, p) => ({
+    type: 'eventGive',
+    player,
+    to: field(o, 'to', PLAYER_ID, p),
+    resource: field(o, 'resource', RESOURCE, p),
+  }),
+  // victim null = pass; it must be sent explicitly (a missing key is malformed).
+  eventSteal: (o, player, p) => ({
+    type: 'eventSteal',
+    player,
+    victim: field(o, 'victim', nullable(PLAYER_ID), p),
+  }),
+  eventDamageRoad: (o, player, p) => ({
+    type: 'eventDamageRoad',
+    player,
+    edge: field(o, 'edge', EDGE, p),
+  }),
+  repairRoad: (_o, player) => ({ type: 'repairRoad', player }),
 };
 
 const ACTION_TYPES = Object.keys(ACTIONS) as BaseActionType[];
@@ -406,18 +455,128 @@ export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
   if (timer !== null && !TIMER_STEPS.includes(timer)) {
     throw new Invalid(`${path}.turnTimerSec`, `expected one of ${TIMER_STEPS.join(', ')}`);
   }
+  const seatCount = field(o, 'seatCount', int(def.minPlayers, def.maxPlayers), path);
+  const balancedDice = field(rules, 'balancedDice', bool, `${path}.rules`);
+  const variants = optional(o, 'variants', parseVariants, path);
+  // Cross-field rules createGame enforces too: reject here so `start` cannot fail later.
+  const vp = `${path}.variants`;
+  if (variants?.eventCards && balancedDice) {
+    throw new Invalid(`${vp}.eventCards`, 'event cards replace the dice: turn balanced dice off');
+  }
+  if (variants?.timer && timer !== null) {
+    throw new Invalid(`${vp}.timer`, 'use either the chess clock or turnTimerSec');
+  }
+  if (variants?.secondSettler && seatCount < SECOND_SETTLER_MIN_PLAYERS) {
+    throw new Invalid(`${vp}.secondSettler`, `needs ${SECOND_SETTLER_MIN_PLAYERS}+ seats`);
+  }
+  if (variants?.rules56 && seatCount < RULES56_MIN_PLAYERS) {
+    throw new Invalid(`${vp}.rules56`, `needs ${RULES56_MIN_PLAYERS}+ seats`);
+  }
+  if (variants?.rules56 && variants.secondSettler) {
+    throw new Invalid(
+      `${vp}.rules56`,
+      'the 5+ rules use the special building phase: turn second settler off',
+    );
+  }
   return {
     mode: field(o, 'mode', oneOf(['base'] as const), path),
     map,
-    seatCount: field(o, 'seatCount', int(def.minPlayers, def.maxPlayers), path),
+    seatCount,
     rules: {
-      balancedDice: field(rules, 'balancedDice', bool, `${path}.rules`),
+      balancedDice,
       hideBankCards: field(rules, 'hideBankCards', bool, `${path}.rules`),
     },
     turnTimerSec: timer,
     vpToWin: field(o, 'vpToWin', int(3, 20), path),
     discardLimit: field(o, 'discardLimit', int(5, 20), path),
+    ...(variants ? { variants } : {}),
   };
+};
+
+const VARIANT_FLAGS = [
+  'eventCards',
+  'rushMode',
+  'turboMode',
+  'secondSettler',
+  'randomTurnOrder',
+  'rules56',
+] as const;
+
+/** Map rules: strict keys, only `true` flags are kept (off = absent), so one canonical form. */
+const MAP_RULES: Check<NonNullable<NewGameVariants['mapRules']>> = (x, path) => {
+  const o = record(x, path);
+  onlyKeys(o, MAP_RULE_KEYS, path);
+  const out: NonNullable<NewGameVariants['mapRules']> = {};
+  for (const k of MAP_RULE_KEYS) {
+    if (optional(o, k, bool, path)) out[k] = true;
+  }
+  return out;
+};
+
+const SETUP_ROUND: Check<SetupRound> = (x, path) => {
+  const o = record(x, path);
+  onlyKeys(o, ['building', 'restriction'], path);
+  return {
+    building: field(o, 'building', oneOf(SETUP_BUILDINGS), path),
+    restriction: field(o, 'restriction', oneOf(SETUP_RESTRICTIONS), path),
+  };
+};
+
+/** Chess clock: a named preset must carry its own values; custom stays in clock.ts's ranges. */
+const TIMER: Check<TimerSettings> = (x, path) => {
+  const o = record(x, path);
+  onlyKeys(o, ['preset', 'bankSec', 'incrementSec'], path);
+  const preset = field(o, 'preset', oneOf(TIMER_PRESETS.filter((t) => t !== 'off')), path);
+  const bankSec = field(o, 'bankSec', int(TIMER_BANK_RANGE.min, TIMER_BANK_RANGE.max), path);
+  const incrementSec = field(
+    o,
+    'incrementSec',
+    int(TIMER_INCREMENT_RANGE.min, TIMER_INCREMENT_RANGE.max),
+    path,
+  );
+  const expected = timerSettings(preset as Exclude<TimerPreset, 'off'>, { bankSec, incrementSec });
+  if (expected?.bankSec !== bankSec || expected.incrementSec !== incrementSec) {
+    throw new Invalid(
+      path,
+      `preset ${preset} is ${expected?.bankSec}s + ${expected?.incrementSec}s`,
+    );
+  }
+  return { preset: preset as TimerSettings['preset'], bankSec, incrementSec };
+};
+
+/**
+ * Room variants (the setup screen's NewGameVariants). Strict keys; flags may only be `true`
+ * (off = absent), so a config has one canonical form, as `buildVariants` makes it.
+ */
+export const parseVariants: Check<NewGameVariants> = (x, path) => {
+  const o = record(x, path);
+  onlyKeys(
+    o,
+    [...VARIANT_FLAGS, 'robberMode', 'mapSelection', 'setupPlacement', 'timer', 'mapRules'],
+    path,
+  );
+  const out: NewGameVariants = {};
+  const robberMode = optional(o, 'robberMode', oneOf(ROBBER_MODES), path);
+  if (robberMode !== undefined && robberMode !== 'normal') out.robberMode = robberMode;
+  for (const k of VARIANT_FLAGS) {
+    if (optional(o, k, bool, path)) out[k] = true;
+  }
+  const mapSelection = optional(o, 'mapSelection', oneOf(MAP_SELECTIONS), path);
+  if (mapSelection !== undefined && mapSelection !== 'fixed') out.mapSelection = mapSelection;
+  const sp = optional(o, 'setupPlacement', record, path);
+  if (sp) {
+    const spPath = `${path}.setupPlacement`;
+    onlyKeys(sp, ['first', 'second'], spPath);
+    out.setupPlacement = {
+      first: field(sp, 'first', SETUP_ROUND, spPath),
+      second: field(sp, 'second', SETUP_ROUND, spPath),
+    };
+  }
+  const timer = optional(o, 'timer', TIMER, path);
+  if (timer) out.timer = timer;
+  const mapRules = optional(o, 'mapRules', MAP_RULES, path);
+  if (mapRules && Object.keys(mapRules).length > 0) out.mapRules = mapRules;
+  return out;
 };
 
 type ClientParsers = {

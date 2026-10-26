@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../engine';
 import { topologyFor } from '../engine';
-import { boardBounds, fitView, unitToScreen, type ViewTransform } from './geometry';
+import { boardBounds, fitBounds, fitView, unitToScreen, type ViewTransform } from './geometry';
 import {
   FIT_PADDING,
   MIN_INSET_FIT,
@@ -67,6 +67,50 @@ describe('fitBoardView', () => {
     const base = fitBoardView(BOUNDS, 1366, 768, HUD);
     fitBoardView(BOUNDS, 1366, 768, HUD, DOCK);
     expect(fitBoardView(BOUNDS, 1366, 768, HUD, NO_INSETS)).toEqual(base);
+  });
+});
+
+describe('fitted board on a real screen (BUG-B2)', () => {
+  // 1918x938, base78, Wood theme, setup phase: pill bottom 56, sidebar 360, hand/controls 118.
+  const topo = topologyFor('base78');
+  const free = { top: 56, bottom: 938 - 118, left: 0, right: 1918 - 360 };
+  const landSpan = (v: ViewTransform) => {
+    const ys = topo.landHexes.map((id) => topo.hex[id]?.y ?? 0);
+    return (Math.max(...ys) - Math.min(...ys) + 2) * v.scale;
+  };
+
+  it('fills the free height with the island, harbors included', () => {
+    const v = fitBoardView(fitBounds(topo), 1918, 938, HUD);
+    const height = free.bottom - free.top;
+    expect(landSpan(v) / height).toBeGreaterThan(0.75);
+    const fit = fitBounds(topo);
+    const tl = unitToScreen(v, { x: fit.minX, y: fit.minY });
+    const br = unitToScreen(v, { x: fit.maxX, y: fit.maxY });
+    expect(tl.x).toBeGreaterThanOrEqual(free.left);
+    expect(tl.y).toBeGreaterThanOrEqual(free.top);
+    expect(br.x).toBeLessThanOrEqual(free.right);
+    expect(br.y).toBeLessThanOrEqual(free.bottom);
+    // The old fit (whole sea backdrop + frame) left the island ~30% smaller.
+    const old = fitBoardView(boardBounds(topo), 1918, 938, HUD);
+    expect(v.scale / old.scale).toBeGreaterThan(1.15);
+  });
+
+  it('frames fitBounds, while the clamp still uses the whole board', () => {
+    const canvas = new FakeCanvas();
+    const vp = new Viewport({
+      canvas: canvas as unknown as HTMLCanvasElement,
+      bounds: boardBounds(topo),
+      fitBounds: fitBounds(topo),
+      getSize: () => ({ width: 1918, height: 938 }),
+      onChange: () => undefined,
+      onTap: () => undefined,
+      onHover: () => undefined,
+    });
+    vp.setInsets(HUD);
+    expect(vp.view).toEqual(fitBoardView(fitBounds(topo), 1918, 938, HUD));
+    vp.setBounds(boardBounds(), fitBounds());
+    expect(vp.view).toEqual(fitBoardView(fitBounds(), 1918, 938, HUD));
+    vp.dispose();
   });
 });
 

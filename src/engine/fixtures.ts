@@ -27,6 +27,15 @@ export function freshGame(playerCount: 3 | 4 = 4): GameState {
   });
 }
 
+/**
+ * freshGame to edit by hand: without `stats` (they could not match the edits), like a save from
+ * before stats existed. The first action starts recording (complete: false).
+ */
+function handBuilt(): GameState {
+  const { stats: _stats, ...s } = freshGame();
+  return s;
+}
+
 type Spot = [q: number, r: number, corner: Corner];
 type Side3 = [q: number, r: number, side: Side];
 
@@ -65,7 +74,7 @@ function giveDev(s: GameState, p: PlayerId, type: DevCardType, fresh = false) {
  * Player 3's round-2 settlement already produced its starting resources.
  */
 export function setupInProgressGame(): GameState {
-  const s = freshGame();
+  const s = handBuilt();
   settle(s, 0, [0, -1, 'N'], 'settlement');
   road(s, 0, [0, -1, 'NE']);
   settle(s, 1, [2, -1, 'N'], 'settlement');
@@ -90,7 +99,7 @@ export function setupInProgressGame(): GameState {
  * Robber sits on h:1,-1. Mix of settlements and cities, hands, and dev cards.
  */
 export function midGame(): GameState {
-  const s = freshGame();
+  const s = handBuilt();
 
   // Red: settlement + 5-road loop around h:0,-1 (Longest Road), city in the south-west.
   settle(s, 0, [0, -1, 'N'], 'settlement');
@@ -198,7 +207,7 @@ export function gameOverGame(): GameState {
 
 /** Render fixture: every road-junction case around h:0,0 (3-way mixed, 2-way same/mixed, dead ends, road at a settlement). */
 export function roadJointsGame(): GameState {
-  const s = freshGame();
+  const s = handBuilt();
   road(s, 0, [0, 0, 'NW']);
   road(s, 1, [0, 0, 'NE']);
   road(s, 2, [0, -1, 'E']);

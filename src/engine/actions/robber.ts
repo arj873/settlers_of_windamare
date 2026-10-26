@@ -8,11 +8,13 @@
  * steal (phase steal): victim in candidates; take one random card via Rng -> phase = resume.
  */
 import { RESOURCES } from '../constants';
+import { hookDiscardLimit, hookSevenPhase } from '../expansions/hooks';
 import { describeBundle, playerName } from '../rules/text';
 import { Rng } from '../rng';
 import { hasResources, isValidBundle, totalResources } from '../resources';
 import { cardsInHand } from '../selectors';
 import { hexVertices, isLandHex, topologyOf } from '../topology';
+import { hasRobber, isRobberProtected, robberTargets } from '../variants';
 import type {
   Action,
   GameState,
@@ -21,8 +23,17 @@ import type {
   Resource,
   ResourceBundle,
   ResourceCounts,
+  ResumePhase,
 } from '../types';
-import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import {
+  type HandlerMap,
+  type LegalGenerator,
+  fail,
+  isCurrent,
+  log,
+  ok,
+  resumePhase,
+} from './common';
 
 /** Opponents of `player` with a building on `hex` and at least one card, ascending. */
 export function stealCandidates(state: GameState, player: PlayerId, hex: HexId): PlayerId[] {
@@ -32,8 +43,45 @@ export function stealCandidates(state: GameState, player: PlayerId, hex: HexId):
     if (b && b.owner !== player) owners.add(b.owner);
   }
   return [...owners]
-    .filter((p) => state.players[p] !== undefined && cardsInHand(state, p) > 0)
+    .filter((p) => {
+      const pl = state.players[p];
+      return pl !== undefined && cardsInHand(state, p) > 0 && !isRobberProtected(state, p);
+    })
     .sort((a, b) => a - b);
+}
+
+/**
+ * Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit).
+ * Expansions change the count and the limit through the handSize / discardLimit hooks.
+ */
+export function discardAmounts(state: GameState): number[] {
+  return state.players.map((p) => {
+    const n = cardsInHand(state, p.id);
+    const limit = hookDiscardLimit(state, p.id, state.settings.discardLimit);
+    return n > limit ? Math.floor(n / 2) : 0;
+  });
+}
+
+/**
+ * A 7 (rolled, or the Robber Attacks event card): an expansion's onSeven phase, else discards
+ * if anyone is over, then the robber.
+ */
+export function resolveSeven(draft: GameState): void {
+  const pending = discardAmounts(draft);
+  const custom = hookSevenPhase(draft, pending);
+  if (custom) draft.phase = custom;
+  else if (pending.some((n) => n > 0)) draft.phase = { kind: 'discard', pending };
+  else startRobber(draft, 'main');
+}
+
+/**
+ * After a 7 (once discards are done) or a knight: move the robber, then `resume`. Without a
+ * robber (settings.robberMode 'none') go straight to `resume`.
+ */
+export function startRobber(draft: GameState, resume: ResumePhase): void {
+  draft.phase = hasRobber(draft.settings)
+    ? { kind: 'moveRobber', resume }
+    : resumePhase(draft, resume);
 }
 
 /** Every distinct way to choose `count` cards from `hand`. */
@@ -79,7 +127,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
       action.player,
       `${playerName(draft, action.player)} discarded ${describeBundle(action.resources)}`,
     );
-    if (phase.pending.every((n) => n === 0)) draft.phase = { kind: 'moveRobber', resume: 'main' };
+    if (phase.pending.every((n) => n === 0)) startRobber(draft, 'main');
     return ok(draft);
   },
 
@@ -88,7 +136,14 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
     if (phase.kind !== 'moveRobber') return fail('cannot move the robber now');
     if (!isCurrent(draft, action.player)) return fail('not your turn');
     if (!isLandHex(topologyOf(draft), action.hex)) return fail('invalid hex');
-    if (action.hex === draft.robber) return fail('the robber must move to a different hex');
+    const targets = robberTargets(draft, action.player);
+    // The friendly robber may have to stay on its desert (robberTargets); otherwise it must move.
+    if (action.hex === draft.robber && !targets.includes(action.hex)) {
+      return fail('the robber must move to a different hex');
+    }
+    if (!targets.includes(action.hex)) {
+      return fail('friendly robber: that hex touches a player with 2 or fewer points');
+    }
 
     draft.robber = action.hex;
     log(draft, action.player, `${playerName(draft, action.player)} moved the robber`);
@@ -96,7 +151,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
     draft.phase =
       candidates.length > 0
         ? { kind: 'steal', candidates, resume: phase.resume }
-        : { kind: phase.resume };
+        : resumePhase(draft, phase.resume);
     return ok(draft);
   },
 
@@ -123,7 +178,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
       text += ' (no cards)';
     }
     log(draft, action.player, text);
-    draft.phase = { kind: phase.resume };
+    draft.phase = resumePhase(draft, phase.resume);
     return ok(draft);
   },
 };
@@ -143,9 +198,11 @@ export const robberLegal: LegalGenerator = (state: GameState): Action[] => {
         }));
       });
     case 'moveRobber':
-      return topologyOf(state)
-        .landHexes.filter((h) => h !== state.robber)
-        .map((hex): Action => ({ type: 'moveRobber', player, hex }));
+      return robberTargets(state, player).map((hex): Action => ({
+        type: 'moveRobber',
+        player,
+        hex,
+      }));
     case 'steal':
       return phase.candidates.map((victim): Action => ({ type: 'steal', player, victim }));
     default:

@@ -8,6 +8,8 @@ import {
   DEV_CARD_TYPES,
   DICE_DECK_RESHUFFLE_AT,
   DICE_DECK_SIZE,
+  EVENT_CARDS,
+  setupPlacementOf,
   LARGEST_ARMY_MIN,
   LONGEST_ROAD_MIN,
   RESOURCES,
@@ -18,11 +20,13 @@ import {
   isExpansionId,
   mapOf,
   pieceLimit,
+  firstDesert,
   isBoardEdge,
   isBoardVertex,
   isLandHex,
   isMapId,
   setupPlayerAt,
+  sumCounts,
   supplyOf,
   topologyOf,
   vertexNeighbors,
@@ -47,6 +51,7 @@ export type ViolationCode =
   | 'vp-mismatch'
   | 'award-holder'
   | 'award-mismatch'
+  | 'stats'
   | 'winner'
   | 'phase-actor'
   | 'dice-deck'
@@ -60,6 +65,64 @@ export interface Violation {
 }
 
 const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+
+/**
+ * Game statistics (UX2) agree with the state they describe: per player and resource,
+ * Σ gained − Σ lost = hand; nothing unclassified ('other'); dev cards bought = held + played;
+ * played counts = knightsPlayed / progressCardsPlayed; roads and cities built = on the board.
+ * Only for stats recorded since createGame (`complete`). Expansion games: expansion actions
+ * change hands ('other') and may remove pieces (Oil Springs floods), so those two checks are
+ * base-game only; the hand equation and the dev card counts still hold.
+ */
+function checkStats(
+  state: GameState,
+  add: (code: ViolationCode, message: string, player?: PlayerId) => void,
+): void {
+  const stats = state.stats;
+  if (!stats?.complete) return;
+  if (stats.players.length !== state.players.length) {
+    add('stats', `stats for ${stats.players.length} players, game has ${state.players.length}`);
+    return;
+  }
+  const officialSetup = setupPlacementOf(state.settings);
+  const noSetupCities =
+    officialSetup.first.building === 'settlement' && officialSetup.second.building === 'settlement';
+  const baseGame = state.settings.expansions.length === 0;
+  state.players.forEach((p, i) => {
+    const s = stats.players[i];
+    if (!s) return;
+    const gained = sumCounts(s.gained);
+    const lost = sumCounts(s.lost);
+    for (const r of RESOURCES) {
+      if (gained[r] - lost[r] !== p.resources[r])
+        add('stats', `${r}: gained ${gained[r]} − lost ${lost[r]} ≠ hand ${p.resources[r]}`, i);
+      if (baseGame && (s.gained.other[r] !== 0 || s.lost.other[r] !== 0))
+        add('stats', `${r}: unclassified hand change`, i);
+    }
+    for (const t of DEV_CARD_TYPES) {
+      const played =
+        t === 'knight' ? p.knightsPlayed : t === 'victoryPoint' ? 0 : p.progressCardsPlayed[t];
+      if (s.devPlayed[t] !== played)
+        add('stats', `${t}: devPlayed ${s.devPlayed[t]} ≠ ${played}`, i);
+      const held = p.devCards[t] + p.newDevCards[t] + played;
+      if (s.devBought[t] !== held) add('stats', `${t}: bought ${s.devBought[t]} ≠ ${held}`, i);
+    }
+    if (!baseGame) return;
+    const kinds = Object.values(state.pieces.buildings).filter((b) => b.owner === i);
+    const cities = kinds.filter((b) => b.kind === 'city').length;
+    const settlements = kinds.length - cities;
+    const roads = Object.values(state.pieces.roads).filter((o) => o === i).length;
+    if (s.built.road !== roads) add('stats', `built ${s.built.road} roads, board has ${roads}`, i);
+    if (s.built.city !== cities)
+      add('stats', `built ${s.built.city} cities, board has ${cities}`, i);
+    if (noSetupCities && s.built.settlement - s.built.city !== settlements)
+      add(
+        'stats',
+        `built ${s.built.settlement} settlements − ${cities} upgraded ≠ ${settlements}`,
+        i,
+      );
+  });
+}
 
 /** Each vertex's incident on-board roads of `player`. */
 function roadsByVertex(state: GameState, player: PlayerId): Map<VertexId, EdgeId[]> {
@@ -202,6 +265,7 @@ export function checkBaseInvariants(state: GameState): Violation[] {
   });
 
   checkDiceDeck(state, add);
+  checkEventDeck(state, add);
 
   // --- board ids, robber ---------------------------------------------------------------------
   const buildings = Object.entries(state.pieces.buildings) as [VertexId, { owner: PlayerId }][];
@@ -215,6 +279,25 @@ export function checkBaseInvariants(state: GameState): Violation[] {
     if (!validPlayer(owner)) add('structure', `road ${e} has owner ${owner}`);
   }
   if (!isLandHex(t, state.robber)) add('robber-position', `robber on non-land hex ${state.robber}`);
+  if (state.settings.rules56 && state.board.hexes[state.robber]?.terrain === 'desert') {
+    const first = firstDesert(state);
+    if (state.robber !== first) {
+      add('robber-position', `rules56: robber on the second desert ${state.robber}`);
+    }
+  }
+  const sbpPhase =
+    state.phase.kind === 'specialBuild' ||
+    ((state.phase.kind === 'moveRobber' ||
+      state.phase.kind === 'steal' ||
+      state.phase.kind === 'roadBuilding') &&
+      state.phase.resume === 'specialBuild');
+  if (sbpPhase && !state.settings.rules56 && state.phase.kind !== 'specialBuild') {
+    add('phase-actor', `${state.phase.kind} resumes to specialBuild without rules56`);
+  }
+  // (specialBuild itself carries its owner; older saves have no turn.specialOwner there.)
+  if (sbpPhase && state.phase.kind !== 'specialBuild' && state.turn.specialOwner === undefined) {
+    add('phase-actor', `special build step without turn.specialOwner (${state.phase.kind})`);
+  }
 
   // --- piece limits --------------------------------------------------------------------------
   for (const p of state.players) {
@@ -232,8 +315,11 @@ export function checkBaseInvariants(state: GameState): Violation[] {
     }
   }
 
-  // --- distance rule -------------------------------------------------------------------------
-  for (const [v] of buildings) {
+  // --- distance rule (setup restriction 'anyVertex' lets setup buildings ignore it) ----------
+  const place = setupPlacementOf(state.settings);
+  const distanceRule =
+    place.first.restriction !== 'anyVertex' && place.second.restriction !== 'anyVertex';
+  for (const [v] of distanceRule ? buildings : []) {
     if (!isBoardVertex(t, v)) continue;
     for (const nb of vertexNeighbors(t, v)) {
       if (v < nb && state.pieces.buildings[nb])
@@ -322,6 +408,8 @@ export function checkBaseInvariants(state: GameState): Violation[] {
       );
   }
 
+  checkStats(state, add);
+
   // --- winner / game over --------------------------------------------------------------------
   const over = state.phase.kind === 'gameOver';
   if (over !== (state.winner !== null)) {
@@ -337,6 +425,7 @@ export function checkBaseInvariants(state: GameState): Violation[] {
     }
   } else if (
     state.phase.kind !== 'specialBuild' &&
+    state.turn.specialOwner === undefined && // a card played inside a special build step
     validPlayer(state.turn.current) &&
     victoryPoints(state, state.turn.current) >= state.settings.vpToWin
   ) {
@@ -361,7 +450,7 @@ function checkPhase(
   const n = state.players.length;
   // Cards as the 7 rule counts them (expansions add oil, commodities ... via the handSize hook).
   const hand = (p: PlayerId) => (state.players[p] ? cardsInHand(state, p) : 0);
-  const setupPhase = phase.kind === 'setup';
+  const setupPhase = phase.kind === 'setup' || phase.kind === 'mapVeto';
   if (setupPhase !== (state.turn.number === 0)) {
     add('phase-actor', `phase ${phase.kind} with turn.number ${state.turn.number}`);
   }
@@ -424,6 +513,30 @@ function checkPhase(
         add('phase-actor', `roadBuilding.remaining = ${phase.remaining}`);
       }
       break;
+    case 'mapVeto': {
+      if (state.settings.mapSelection !== 'veto') add('phase-actor', 'mapVeto without veto');
+      const left = phase.vetoed.filter((v) => v === null).length;
+      if (phase.vetoed.length !== phase.candidates.length || left < 2)
+        add('phase-actor', `mapVeto with ${left} maps left`);
+      if (phase.order[phase.next] !== state.turn.current)
+        add('phase-actor', `mapVeto: current ${state.turn.current}, expected order[${phase.next}]`);
+      break;
+    }
+    case 'event': {
+      if (!state.settings.eventCards) add('phase-actor', 'event phase without event cards');
+      const seen = new Set<PlayerId>();
+      for (const t of phase.tasks) {
+        if (!validPlayer(t.player) || seen.has(t.player))
+          add('phase-actor', `event task for player ${t.player} invalid or repeated`);
+        seen.add(t.player);
+        if (t.kind === 'steal' && t.targets.every((v) => hand(v) === 0))
+          add('phase-actor', `event steal for ${t.player} without a victim holding cards`);
+        if (t.kind === 'give' && hand(t.player) === 0)
+          add('phase-actor', `event give for ${t.player} with an empty hand`);
+      }
+      if (phase.tasks.length === 0) add('phase-actor', 'event phase with no tasks');
+      break;
+    }
     case 'trade': {
       const o = phase.offer;
       if (o.from !== state.turn.current)
@@ -446,6 +559,38 @@ function checkPhase(
     default:
       break;
   }
+}
+
+/**
+ * Event cards: the deck holds distinct card ids (0..35), at least DICE_DECK_RESHUFFLE_AT after
+ * the first draw; each damaged road belongs to its player. Without event cards: no such fields.
+ */
+function checkEventDeck(
+  state: GameState,
+  add: (code: ViolationCode, message: string, player?: PlayerId) => void,
+): void {
+  if (!state.settings.eventCards) {
+    if (state.eventDeck !== undefined || state.damagedRoads !== undefined)
+      add('dice-deck', 'event-card fields without event cards');
+    return;
+  }
+  const deck = state.eventDeck;
+  if (!Array.isArray(deck)) {
+    add('dice-deck', 'eventDeck missing');
+    return;
+  }
+  if (
+    deck.some((c) => !isCount(c) || c >= EVENT_CARDS.length) ||
+    new Set(deck).size !== deck.length
+  ) {
+    add('dice-deck', `eventDeck malformed: [${deck.join(',')}]`);
+  } else if (state.dice !== null && deck.length < DICE_DECK_RESHUFFLE_AT) {
+    add('dice-deck', `eventDeck has ${deck.length} cards after a draw`);
+  }
+  (state.damagedRoads ?? []).forEach((e, p) => {
+    if (e !== null && state.pieces.roads[e] !== p)
+      add('structure', `damaged road ${e} of player ${p} is not theirs`, p);
+  });
 }
 
 /**

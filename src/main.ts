@@ -11,6 +11,11 @@ import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
 import { setFrameColors } from './render';
 import { boardFrameColors, Hud, initTheme, onThemeChange, type Controller } from './ui';
+import { NAME_KEY, parseRoomCode, tokenKey } from './net/transport';
+import { HomeScreen } from './ui/online/home';
+import { inviteUrl } from './ui/online/lobbyModel';
+import { OnlineApp } from './game/online/app';
+import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
@@ -23,6 +28,7 @@ import {
   loadNumber,
   loadSession,
   saveNumber,
+  type KeyValueStore,
 } from './game/persist';
 
 /**
@@ -112,6 +118,104 @@ async function boot() {
     if (layout) board.setInsets(layout.insets, layout.avoid);
   };
   uiRoot.after(createFitButton(() => board.fit()));
+  window.addEventListener('resize', fitBoard);
+  // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
+  uiRoot.addEventListener('click', () => requestAnimationFrame(fitBoard));
+
+  // Online play (M3): `?room=CODE` joins a room; otherwise the home screen picks a mode.
+  const online = (roomId: string, then: (app: OnlineApp) => void = (app) => void app.run()) => {
+    void pickBackend(location.search).then((backend) => {
+      // `params` was read at boot: creating a room rewrites the URL and may drop `?debug=1`.
+      const room = new OnlineApp(
+        {
+          board,
+          hud,
+          backend,
+          store: browserKeyStore,
+          tokens: tokenStoreFor(backend.kind),
+          clock: realClock,
+          toast: showToast,
+          onRender: fitBoard,
+          layer: document.body,
+          href: location.href,
+          goHome: () => location.assign(homeUrl()),
+          playOffline: () => {
+            history.replaceState(null, '', homeUrl());
+            offline(null);
+          },
+        },
+        roomId,
+      );
+      (window as unknown as { catan: unknown }).catan = { online: room, board, hud };
+      if (params.debug) installDebugHook(room.debugController, board);
+      then(room);
+    });
+  };
+  const roomId = dev ? null : parseRoomCode(new URLSearchParams(location.search).get('room') ?? '');
+  if (roomId) {
+    online(roomId);
+    return;
+  }
+
+  // Hotseat: everything below is the offline game, unchanged.
+  const offline = (dev: { state: GameState; seats: Controller[] } | null) =>
+    startOffline({ board, hud, params, dev, storage, prefs, fitBoard });
+  if (dev) {
+    offline(dev);
+    return;
+  }
+  const home = new HomeScreen({
+    name: browserKeyStore.get(NAME_KEY) ?? '',
+    onOffline: () => {
+      home.element.remove();
+      offline(null);
+    },
+    onCreate: async (name) => {
+      const backend = await pickBackend(location.search);
+      const room = await backend.api.create();
+      tokenStoreFor(backend.kind).set(tokenKey(room.roomId), room.hostToken);
+      browserKeyStore.set(NAME_KEY, name);
+      history.pushState(null, '', inviteUrl(location.href, room.roomId));
+      online(room.roomId, (a) => {
+        home.element.remove();
+        a.connect(name);
+      });
+    },
+    onJoin: async (code, name) => {
+      const backend = await pickBackend(location.search);
+      if (!(await backend.api.check(code))) throw new Error(`There is no room “${code}”.`);
+      browserKeyStore.set(NAME_KEY, name);
+      history.pushState(null, '', inviteUrl(location.href, code));
+      online(code, (a) => {
+        home.element.remove();
+        a.connect(name);
+      });
+    },
+  });
+  document.body.append(home.element);
+}
+
+/** This page without query parameters (except an explicit `?server=`, kept for dev). */
+function homeUrl(): string {
+  const u = new URL(location.href);
+  const server = u.searchParams.get('server');
+  u.search = '';
+  u.hash = '';
+  if (server) u.searchParams.set('server', server);
+  return u.toString();
+}
+
+/** The hotseat game: controller, bot speed, debug hook, dev params, resume prompt. */
+function startOffline(o: {
+  board: BoardView;
+  hud: Hud;
+  params: DevParams;
+  dev: { state: GameState; seats: Controller[] } | null;
+  storage: KeyValueStore | null;
+  prefs: KeyValueStore | null;
+  fitBoard: () => void;
+}): void {
+  const { board, hud, params, dev, storage, prefs, fitBoard } = o;
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,
@@ -132,9 +236,6 @@ async function boot() {
       saveNumber(prefs, SPEED_KEY, ms);
     },
   });
-  window.addEventListener('resize', fitBoard);
-  // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
-  uiRoot.addEventListener('click', () => requestAnimationFrame(fitBoard));
   // Debug handle for the console.
   (window as unknown as { catan: unknown }).catan = { controller, board, hud };
   if (params.debug) installDebugHook(controller, board);

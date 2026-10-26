@@ -170,12 +170,12 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 
 | Hook                                      | Called from                                    | Kind                        | Examples                                                       |
 | ----------------------------------------- | ---------------------------------------------- | --------------------------- | -------------------------------------------------------------- |
-| `setupBuilding(state, index)`             | `placeSetupSettlement`                         | first-wins                  | C&K / E&P: a setup step places a city / harbour                |
-| `rollDice(draft)`                         | `rollDice`                                     | first-wins                  | C&K red/yellow + event die, T&B event cards (extras in slice)  |
+| `setupBuilding(state, index)`             | `setupRoundAt` (setup placement)               | first-wins (over settings)  | C&K / E&P: a setup step places a city / harbour                |
+| `rollDice(draft)`                         | `rollFor` (not with `settings.eventCards`)     | first-wins                  | C&K red/yellow + event die, T&B event cards (extras in slice)  |
 | `onRoll(draft, roll)` → `Phase?`          | `rollDice`, after the log, before 7/production | additive (first phase wins) | C&K barbarians (interrupt for pillage, then `continueRoll`)    |
-| `onSeven(draft, pending)` → `Phase?`      | `continueRoll` on a 7                          | first-wins                  | C&K robber inert before the first attack, E&P pirate           |
-| `production(state, roll, owed)`           | `computeProduction`, before the shortage rule  | additive                    | wells, C&K city commodities, T&B lake / fishing grounds        |
-| `afterProduction(draft, roll)` → `Phase?` | `continueRoll` after paying                    | first-wins                  | Seafarers gold choice, demo bloom                              |
+| `onSeven(draft, pending)` → `Phase?`      | `resolveSeven` (a 7, Robber Attacks card)      | first-wins                  | C&K robber inert before the first attack, E&P pirate           |
+| `production(state, roll, owed, ctx)`      | `computeProduction`, before the shortage rule  | additive                    | wells, C&K city commodities; `ctx = { cityYield, blocked }`    |
+| `afterProduction(draft, roll)` → `Phase?` | `produceAndContinue` (dice and event cards)    | first-wins                  | Seafarers gold choice, demo bloom                              |
 | `cost(state, item, base)`                 | `costOf` (build, dev, HUD)                     | chained                     | `'seafarers/ship'`, `'ck/knight'`, changed base costs          |
 | `pieceLimit(state, p, kind, base)`        | `pieceLimit` / `piecesLeft` / invariants       | chained                     | ships 15, knights per level, E&P harbours                      |
 | `vertexBlocked(state, v)`                 | `isVertexOpen`                                 | additive OR                 | knights, neutral pieces, fortresses                            |
@@ -188,9 +188,15 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `bankTradeRatio(state, p, r, base)`       | `bankTradeRatio`                               | chained                     | C&K trading house / merchant, Oil Springs                      |
 | `roadLength(state, p, base)`              | Longest Road award                             | chained                     | Seafarers longest trade route                                  |
 | `onEndTurn(draft, p)`                     | `endTurn`, before SBP / next turn              | additive                    | upkeep, lair resolution, disaster phase                        |
-| `onStartTurn(draft, p)`                   | every turn start (incl. after SBP)             | additive                    | reset per-turn flags (ship moved, fast gold used)              |
+| `onStartTurn(draft, p)`                   | `beginTurn` (turn 1, after SBP, Catanian 2)    | additive                    | reset per-turn flags (ship moved, fast gold used)              |
 | `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |
 | `deferVictory(state)`                     | `checkVictory`                                 | additive OR                 | Oil Springs: the win is declared at the end of the turn        |
+
+**Variant settings** (V1/V2, `docs/RULES.md` §18-20) apply in expansion modes too. Read the
+blocked hex and the city yield from `ctx` (or `hasRobber(settings)`), not `state.robber` / 2, so
+`robberMode 'none'` and the Epidemic card stay right. `validate(settings)` may refuse a variant
+your module cannot support. Map veto is refused with any expansion (slices are built from the
+board); see ARCHITECTURE.md "Variants × expansions".
 
 Terrains: `terrainKind(t)` → `'land'` (resources, desert, gold, unknown), `'sea'`, `'fog'`, or your
 module's declared kind. Settlements need a vertex touching a land hex; roads need an edge

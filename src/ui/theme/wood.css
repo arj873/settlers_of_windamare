@@ -6,6 +6,8 @@
  * and only take their base colours from here.
  */
 :root {
+  /* native controls (select popups, scrollbars) follow the theme's light/dark */
+  color-scheme: dark;
   /* page (behind the transparent board canvas) */
   --page-bg: #0f2a44;
   /* Pixi board frame (hex colours only: read by boardFrameColors() in ./index.ts) */

@@ -6,7 +6,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEV_CARD_TYPES,
+  emptyStats,
   HIDDEN_DEV_CARD,
+  HIDDEN_EVENT_CARD,
   HIDDEN_SEED,
   RESOURCES,
   Rng,
@@ -20,7 +22,7 @@ import {
   type Viewer,
 } from '../engine';
 import { createRandomBot } from './index';
-import { newGame, runGame } from './runner';
+import { newGame, runGame, type VariantConfig } from './runner';
 
 /** Every `every`-th state of a bot game (plus the last one). */
 function sampleStates(setup: {
@@ -28,6 +30,7 @@ function sampleStates(setup: {
   players: number;
   map?: MapId;
   balancedDice?: boolean;
+  variants?: VariantConfig;
 }): GameState[] {
   const out: GameState[] = [];
   const result = runGame({
@@ -73,7 +76,10 @@ function scramble(state: GameState, viewer: Viewer, rng: Rng): GameState {
     }),
     devDeck: rng.shuffle(state.devDeck.map(() => rng.pick(DEV_CARD_TYPES))),
     diceDeck: state.diceDeck.map(() => rng.int(36)),
+    ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => rng.int(36)) } : {}),
     rng: rng.int(2 ** 32),
+    // Stats (stolen card types, dev cards bought, hidden VP history) are secret until game over.
+    ...(revealAll ? {} : { stats: emptyStats(state.players.length, false, rng.int(99)) }),
     log: state.log.map((e) =>
       e.text.startsWith('Game created (')
         ? { ...e, text: e.text.replace(/seed .*\)$/, `seed ${seed})`) }
@@ -88,6 +94,18 @@ const GAMES = [
   { seed: 3, players: 4, balancedDice: true },
   { seed: 4, players: 5, map: 'base56' as const },
   { seed: 5, players: 7, map: 'base78' as const, balancedDice: true },
+  // V1: event deck (secret order), map veto (public candidates), shuffled seats, paired turns.
+  {
+    seed: 6,
+    players: 4,
+    variants: {
+      eventCards: true,
+      mapSelection: 'veto' as const,
+      randomTurnOrder: true,
+      secondSettler: true,
+      robberMode: 'friendly' as const,
+    },
+  },
 ];
 
 describe('online views leak nothing (property test over simulated games)', () => {
@@ -107,7 +125,11 @@ describe('online views leak nothing (property test over simulated games)', () =>
           expect(v.settings.seed).toBe(HIDDEN_SEED);
           expect(v.devDeck.every((c) => c === HIDDEN_DEV_CARD)).toBe(true);
           expect(v.diceDeck.every((c) => c === 0)).toBe(true);
+          expect(v.eventDeck === undefined).toBe(state.eventDeck === undefined);
+          expect((v.eventDeck ?? []).every((c) => c === HIDDEN_EVENT_CARD)).toBe(true);
+          expect(v.eventDeck?.length).toBe(state.eventDeck?.length);
           expect(v.log.some((e) => /seed/.test(e.text))).toBe(false);
+          expect(v.stats).toEqual(revealAll ? state.stats : undefined);
           for (const p of v.players) {
             const own = revealAll || p.id === viewer;
             const real = state.players[p.id]!;
@@ -132,4 +154,18 @@ describe('online views leak nothing (property test over simulated games)', () =>
       }
     });
   }
+
+  it('reveals the full stats to everyone once the game is over', () => {
+    const result = runGame({
+      initial: newGame({ seed: 11, players: 4 }),
+      maxSteps: 8000,
+      bot: createRandomBot({ progressBias: 0.5 }),
+    });
+    const state = result.finalState;
+    expect(state.phase.kind).toBe('gameOver');
+    expect(state.stats?.complete).toBe(true);
+    for (const viewer of ['spectator', 0, 1, 2, 3] as Viewer[]) {
+      expect(viewFor(state, viewer).stats).toEqual(state.stats);
+    }
+  });
 });

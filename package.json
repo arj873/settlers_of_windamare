@@ -15,6 +15,7 @@
     "sim": "tsx src/bots/sim.ts",
     "pt:serve": "tsx scripts/playtest/serve.ts",
     "pt": "tsx scripts/playtest/cli.ts",
+    "e2e:online": "tsx scripts/e2e/online.ts",
     "dev:server": "vite build && wrangler dev",
     "e2e:server": "tsx scripts/e2e-server.ts",
     "deploy:cf": "tsc --noEmit && vite build && wrangler deploy"
@@ -27,6 +28,7 @@
     "@fontsource/figtree": "^5.3.0",
     "@fontsource/im-fell-english-sc": "^5.3.0",
     "@fontsource/marcellus": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
     "pixi.js": "^8.22.0"
   },
   "devDependencies": {

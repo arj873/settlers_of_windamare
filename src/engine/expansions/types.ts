@@ -19,6 +19,7 @@ import type {
   ExpansionId,
   GameSettings,
   GameState,
+  HexId,
   MapId,
   ModeId,
   Phase,
@@ -28,6 +29,14 @@ import type {
   ScenarioId,
   VertexId,
 } from '../types';
+
+/** How the core paid a production roll (the `production` hook's `ctx`). */
+export interface ProductionContext {
+  /** Cards per city: 2, or 1 under the Epidemic event card (settings.eventCards). */
+  cityYield: number;
+  /** The hex that does not produce (the robber's), or null without a robber. */
+  blocked: HexId | null;
+}
 
 export interface TerrainInfo {
   kind: 'land' | 'sea' | 'fog';
@@ -145,8 +154,12 @@ export interface ExpansionHooks {
   onRoll?(draft: GameState, roll: number): Phase | undefined;
   /** first-wins. Phase to enter on a 7 instead of discard / moveRobber. `pending` = base discards. */
   onSeven?(draft: GameState, pending: readonly number[]): Phase | undefined;
-  /** additive. Mutate what each player is owed for `roll`, before the bank-shortage rule. */
-  production?(state: GameState, roll: number, owed: ResourceCounts[]): void;
+  /**
+   * additive. Mutate what each player is owed for `roll`, before the bank-shortage rule. `ctx`
+   * says how the core paid: cards per city (1 under the Epidemic event card) and the hex the
+   * robber blocks (null without a robber, settings.robberMode 'none').
+   */
+  production?(state: GameState, roll: number, owed: ResourceCounts[], ctx: ProductionContext): void;
   /** first-wins. Phase to enter after production instead of main. */
   afterProduction?(draft: GameState, roll: number): Phase | undefined;
   /** chained. Cost of `item` ('road', 'settlement', 'city', 'devCard' or '<id>/<item>'). */

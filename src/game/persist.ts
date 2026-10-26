@@ -16,6 +16,13 @@ export interface SavedSession {
   viewer: PlayerId | null;
   /** The bots' private RNG state, so a resumed game keeps the same bot choices. */
   botRng: number;
+  /** Chess clock (settings.timer) only: each player's bank in ms. */
+  banks?: number[];
+  /**
+   * UX2: wall-clock time played so far in ms (the whole game once it is over); absent in older
+   * saves (the stats screen then shows no duration). Time between sessions does not count.
+   */
+  playedMs?: number;
 }
 
 /** `window.localStorage`, or null when it is unavailable or throws on access. */
@@ -72,6 +79,11 @@ export function loadSession(store: KeyValueStore | null): SavedSession | null {
       seats: s.seats,
       viewer,
       botRng: typeof s.botRng === 'number' ? s.botRng >>> 0 : 1,
+      // Checked again by restoreBanks when the game resumes.
+      ...(Array.isArray(s.banks) ? { banks: s.banks } : {}),
+      ...(typeof s.playedMs === 'number' && Number.isFinite(s.playedMs) && s.playedMs >= 0
+        ? { playedMs: s.playedMs }
+        : {}),
     };
   } catch {
     return null;

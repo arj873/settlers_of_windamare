@@ -5,28 +5,48 @@
  * After the last road: turn.number = 1, current = settings.startingPlayer, phase = preRoll.
  * Helpers: canPlaceSettlement(.., { requireRoad: false }), canPlaceRoad(.., { fromVertex }),
  * setupPlayerAt().
+ * V1 variants: settings.setupPlacement picks each round's building (settlement / city) and
+ * restriction (distance rule / any empty vertex); settings.turboMode pays in round 1 too.
  */
 import { RESOURCES } from '../constants';
-import { canPlaceRoad, canPlaceSettlement } from '../rules/placement';
+import { canPlaceRoad, canPlaceSettlement, touchesLand } from '../rules/placement';
 import { describeBundle, playerName } from '../rules/text';
 import { piecesLeft, setupPlayerAt } from '../selectors';
 import { isBoardEdge, isBoardVertex, topologyOf, vertexEdges, vertexHexes } from '../topology';
-import { setupBuildingKind } from '../expansions/hooks';
+import { setupBuildingKind, vertexBlocked } from '../expansions/hooks';
 import { emptyResources, isResource } from '../resources';
-import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../types';
+import type { Action, EdgeId, GameState, PlayerId, SetupRound, VertexId } from '../types';
+import { setupPlacementOf } from '../variants';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import { beginTurn } from './turn';
 
-/** `index` = setup step; its building kind comes from the setupBuilding hook (C&K: a city). */
+/**
+ * The building and restriction of setup placement `index` (round 1: index < n). An expansion's
+ * setupBuilding hook (C&K / E&P) decides the building over settings.setupPlacement.
+ */
+export function setupRoundAt(state: GameState, index: number): SetupRound {
+  const p = setupPlacementOf(state.settings);
+  const round = index < state.players.length ? p.first : p.second;
+  const building = setupBuildingKind(state, index, round.building);
+  return building === round.building ? round : { ...round, building };
+}
+
 function canSetupSettlement(
   state: GameState,
   player: PlayerId,
   v: VertexId,
-  index: number,
+  round: SetupRound,
 ): boolean {
-  return (
-    piecesLeft(state, player)[setupBuildingKind(state, index)] > 0 &&
-    canPlaceSettlement(state, player, v, { requireRoad: false })
-  );
+  if (piecesLeft(state, player)[round.building] <= 0) return false;
+  if (round.restriction === 'anyVertex') {
+    return (
+      isBoardVertex(topologyOf(state), v) &&
+      state.pieces.buildings[v] === undefined &&
+      !vertexBlocked(state, v) &&
+      touchesLand(state, v)
+    );
+  }
+  return canPlaceSettlement(state, player, v, { requireRoad: false });
 }
 
 function canSetupRoad(state: GameState, player: PlayerId, e: EdgeId, from: VertexId): boolean {
@@ -41,14 +61,16 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     }
     if (!isCurrent(draft, action.player)) return fail('not your turn');
     if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
-    if (!canSetupSettlement(draft, action.player, action.vertex, phase.index)) {
+    const round = setupRoundAt(draft, phase.index);
+    if (!canSetupSettlement(draft, action.player, action.vertex, round)) {
       return fail('vertex is taken or too close to another building');
     }
 
-    const kind = setupBuildingKind(draft, phase.index);
-    draft.pieces.buildings[action.vertex] = { owner: action.player, kind };
-    let text = `${playerName(draft, action.player)} placed a ${kind}`;
-    if (phase.index >= draft.players.length) {
+    draft.pieces.buildings[action.vertex] = { owner: action.player, kind: round.building };
+    let text = `${playerName(draft, action.player)} placed a ${round.building}`;
+    // Round 2 pays starting resources (Turbo Mode: both rounds). A setup city pays like a
+    // settlement, 1 per hex (C&K's second-placement city does the same).
+    if (phase.index >= draft.players.length || draft.settings.turboMode) {
       const gain = emptyResources();
       for (const h of vertexHexes(topologyOf(draft), action.vertex)) {
         const terrain = draft.board.hexes[h]?.terrain;
@@ -100,8 +122,8 @@ export function advanceSetup(draft: GameState): void {
   if (next >= 2 * n) {
     draft.turn.number = 1;
     draft.turn.current = draft.settings.startingPlayer;
-    draft.phase = { kind: 'preRoll' };
     log(draft, null, 'Setup complete');
+    beginTurn(draft);
   } else {
     draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
     draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
@@ -113,8 +135,9 @@ export const setupLegal: LegalGenerator = (state: GameState): Action[] => {
   if (phase.kind !== 'setup') return [];
   const player = state.turn.current;
   if (phase.step === 'settlement') {
+    const round = setupRoundAt(state, phase.index);
     return topologyOf(state)
-      .vertices.filter((v) => canSetupSettlement(state, player, v, phase.index))
+      .vertices.filter((v) => canSetupSettlement(state, player, v, round))
       .map((vertex) => ({ type: 'placeSetupSettlement', player, vertex }));
   }
   const from = phase.lastSettlement;

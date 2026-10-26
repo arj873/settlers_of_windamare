@@ -10,6 +10,7 @@ import {
   COSTS,
   DEV_CARD_TYPES,
   devCardCount,
+  EVENT_INFO,
   getPlayer,
   handCount,
   longestRoadLength,
@@ -458,7 +459,22 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
     case 'specialBuild':
       return placeMode
         ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
-        : { text: 'Build or buy a card, then pass', tone: 'action' };
+        : {
+            text: state.settings.rules56
+              ? 'Build, buy or play one card, then pass'
+              : 'Build or buy a card, then pass',
+            tone: 'action',
+          };
+    case 'mapVeto':
+      return { text: 'Veto one of the candidate maps', tone: 'action' };
+    case 'event': {
+      const t = phase.tasks.find((x) => x.player === view.viewer);
+      const what =
+        t?.kind === 'damageRoad'
+          ? 'Earthquake — pick one of your roads to damage'
+          : `${EVENT_INFO[phase.event].name} — make your choice`;
+      return { text: what, tone: 'action' };
+    }
     default:
       // An expansion phase: its HudExtension.hint, or a generic prompt.
       return { text: extensionHint(state, view) ?? 'Your move', tone: 'action' };
@@ -466,7 +482,8 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
 }
 
 /** What a plain board click means right now (non-build). T7 uses it to pick which targets to highlight. */
-export type BoardPrompt = 'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad';
+export type BoardPrompt =
+  'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | 'damageRoad';
 
 export function boardPrompt(view: HudView): BoardPrompt | null {
   for (const a of viewerLegal(view)) {
@@ -474,6 +491,7 @@ export function boardPrompt(view: HudView): BoardPrompt | null {
     if (a.type === 'placeSetupRoad') return 'setupRoad';
     if (a.type === 'moveRobber') return 'moveRobber';
     if (a.type === 'placeFreeRoad') return 'freeRoad';
+    if (a.type === 'eventDamageRoad') return 'damageRoad';
   }
   return null;
 }

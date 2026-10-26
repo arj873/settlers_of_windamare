@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
-import type { Supply } from './types';
+import type { ProductionContext, Supply } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -49,12 +49,17 @@ export function pieceLimit(state: GameState, player: PlayerId, kind: string): nu
   return n;
 }
 
-export function setupBuildingKind(state: GameState, index: number): BuildingKind {
+/** Building of setup step `index`: the first module's setupBuilding, else `base` (settings). */
+export function setupBuildingKind(
+  state: GameState,
+  index: number,
+  base: BuildingKind = 'settlement',
+): BuildingKind {
   for (const m of activeModules(state)) {
     const k = m.hooks?.setupBuilding?.(state, index);
     if (k !== undefined) return k;
   }
-  return 'settlement';
+  return base;
 }
 
 export function hookRollDice(draft: GameState): [number, number] | undefined {
@@ -119,8 +124,13 @@ export function hookSevenPhase(draft: GameState, pending: readonly number[]): Ph
   return undefined;
 }
 
-export function runProductionHooks(state: GameState, roll: number, owed: ResourceCounts[]): void {
-  for (const m of activeModules(state)) m.hooks?.production?.(state, roll, owed);
+export function runProductionHooks(
+  state: GameState,
+  roll: number,
+  owed: ResourceCounts[],
+  ctx: ProductionContext,
+): void {
+  for (const m of activeModules(state)) m.hooks?.production?.(state, roll, owed, ctx);
 }
 
 export function hookAfterProduction(draft: GameState, roll: number): Phase | undefined {

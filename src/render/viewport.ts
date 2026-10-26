@@ -20,7 +20,10 @@ import {
 
 export interface ViewportOptions {
   canvas: HTMLCanvasElement;
+  /** Whole drawn board (units): its center can never be panned off screen. */
   bounds: Rect;
+  /** What the fitted camera frames (units); default `bounds`. */
+  fitBounds?: Rect;
   /** Current screen size in CSS px. */
   getSize: () => { width: number; height: number };
   onChange: (view: ViewTransform) => void;
@@ -145,7 +148,13 @@ export class Viewport {
   /** Reset to the fitted framing. */
   fit() {
     const size = this.o.getSize();
-    const v = fitBoardView(this.o.bounds, size.width, size.height, this.insets, this.avoid);
+    const v = fitBoardView(
+      this.o.fitBounds ?? this.o.bounds,
+      size.width,
+      size.height,
+      this.insets,
+      this.avoid,
+    );
     this.size = size;
     this.fitScale = v.scale;
     this.fitted = true;
@@ -153,8 +162,9 @@ export class Viewport {
   }
 
   /** New board bounds (a different map was loaded): refit. */
-  setBounds(bounds: Rect) {
+  setBounds(bounds: Rect, fitBounds?: Rect) {
     this.o.bounds = bounds;
+    this.o.fitBounds = fitBounds;
     this.fit();
   }
 

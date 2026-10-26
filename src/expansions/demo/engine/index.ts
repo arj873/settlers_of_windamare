@@ -242,12 +242,12 @@ export const demoModule: ExpansionModule = {
     cost: (_state, item, base) => (item === WELL ? WELL_COST : base),
     pieceLimit: (_state, _player, kind, base) => (kind === WELL ? WELL_LIMIT : base),
 
-    production(state, roll, owed) {
+    production(state, roll, owed, ctx) {
       const wells = demoSlice(state).wells;
       const t = topologyOf(state);
       for (const id of Object.keys(state.board.hexes) as HexId[]) {
         const hex = state.board.hexes[id];
-        if (!hex || hex.token !== roll || id === state.robber || !isResource(hex.terrain)) continue;
+        if (!hex || hex.token !== roll || id === ctx.blocked || !isResource(hex.terrain)) continue;
         for (const v of hexVertices(t, id)) {
           const owner = wells[v];
           const hand = owner === undefined ? undefined : owed[owner];

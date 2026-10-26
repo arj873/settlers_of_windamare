@@ -17,8 +17,11 @@
 import {
   applyAction,
   createGame,
+  initialBanks,
   legalActions,
+  restoreBanks,
   Rng,
+  timerOf,
   viewFor,
   type Action,
   type GameState,
@@ -29,7 +32,9 @@ import { BOT_OFFERS_PER_TURN, defaultBot, FAST_FACTOR } from '../game/controller
 import { gameConfigOf, nextBot, type Seats } from '../game/logic';
 import {
   IDLE_CLOCK,
+  bankAfterAction,
   isExpired,
+  syncBankClock,
   syncClock,
   tickClock,
   timeoutMove,
@@ -134,6 +139,11 @@ interface GameRec {
   timedOutKey: string | null;
   /** Player-trade offers per `${turn}:${player}` (bots get BOT_OFFERS_PER_TURN). */
   offers: Record<string, number>;
+  /** Chess clock (settings.timer) only: each player's bank in ms (engine clock.ts). */
+  banks?: number[];
+  /** UX2: room clock at `start` and at game over (absent in older snapshots). */
+  startedAt?: number;
+  endedAt?: number;
 }
 
 /** Everything a room needs to survive a Durable Object restart. JSON-safe. */
@@ -623,6 +633,10 @@ export class GameSession {
     } catch (e) {
       return ['bad_config', e instanceof Error ? e.message : String(e)];
     }
+    // Randomize Turn Order shuffled the players: move the lobby seats along, so seat index =
+    // PlayerId again (seat p holds config player seatOrder[p], with its occupant and colour).
+    const order = state.settings.seatOrder;
+    if (order) this.d.seats = order.map((i) => this.seatRec(i));
     for (const s of this.d.seats) {
       const member = s.occupant === null ? undefined : this.member(s.occupant);
       s.status = !member ? 'bot' : member.conn !== null ? 'human' : 'away';
@@ -638,6 +652,10 @@ export class GameSession {
       timeoutDueAt: null,
       timedOutKey: null,
       offers: {},
+      startedAt: this.now,
+      ...(timerOf(state.settings).kind === 'bank'
+        ? { banks: initialBanks(state.settings, state.players.length) }
+        : {}),
     };
     this.d.phase = 'playing';
     this.roomDirty = true;
@@ -785,6 +803,12 @@ export class GameSession {
       g.offers[key] = (g.offers[key] ?? 0) + 1;
     }
     if (action.type === 'endTurn') g.offers = {};
+    if (timerOf(g.state.settings).kind === 'bank') {
+      // begin() advanced the clock to `now`, so the bank gets exactly the time used.
+      const banked = bankAfterAction(g.clock, this.banks(g), g.state, result.state);
+      g.clock = banked.clock;
+      g.banks = banked.banks;
+    }
     g.state = result.state;
     this.gameChanged();
     return null;
@@ -798,6 +822,7 @@ export class GameSession {
     this.legalCache = null;
     this.gameDirty = true;
     if (g.state.phase.kind === 'gameOver') {
+      g.endedAt ??= this.now;
       g.clock = IDLE_CLOCK;
       g.botDueAt = null;
       g.timeoutDueAt = null;
@@ -823,12 +848,25 @@ export class GameSession {
   private syncTimer(): void {
     const g = this.d.game;
     if (!g) return;
-    const sec = g.state.settings.turnTimerSec;
-    const slot = sec ? timerSlot(g.state, this.controllers(), this.legal(), null) : null;
+    const timer = timerOf(g.state.settings);
+    const slot =
+      timer.kind === 'off' ? null : timerSlot(g.state, this.controllers(), this.legal(), null);
     const before = g.clock.key;
-    g.clock = syncClock(g.clock, slot, (sec ?? 0) * 1000);
+    if (timer.kind === 'bank') {
+      // Chess clock: the player on the clock spends their own bank (no fresh time per slot).
+      const next = syncBankClock(g.clock, this.banks(g), slot, timer.bankSec * 1000);
+      g.clock = next.clock;
+      g.banks = next.banks;
+    } else {
+      g.clock = syncClock(g.clock, slot, timer.kind === 'perTurn' ? timer.sec * 1000 : 0);
+    }
     g.clockAt = this.now;
     if (g.clock.key !== before) g.timeoutDueAt = null;
+  }
+
+  /** Chess-clock banks (fresh ones for a snapshot from before banks were saved). */
+  private banks(g: GameRec): number[] {
+    return restoreBanks(g.banks, g.state.settings, g.state.players.length);
   }
 
   private advanceClock(): void {
@@ -914,6 +952,9 @@ export class GameSession {
       view: viewFor(g.state, seat ?? 'spectator'),
       legal: seat === null ? [] : this.legal().filter((a) => a.player === seat),
       timer,
+      ...(g.startedAt !== undefined && g.endedAt !== undefined
+        ? { durationMs: g.endedAt - g.startedAt }
+        : {}),
     };
   }
 

@@ -8,7 +8,7 @@ import type { GeneratedBoard, StdMapDef } from './maps';
 import { isResource } from './resources';
 import type { Rng } from './rng';
 import { hexNeighbors, topologyFor, type Topology } from './topology';
-import type { Board, HexId, HexTile, MapId, Port, PortKind, Terrain } from './types';
+import type { Board, HexId, HexTile, MapId, MapRules, Port, PortKind, Terrain } from './types';
 
 export type { GeneratedBoard } from './maps';
 
@@ -34,12 +34,22 @@ const BEGINNER_PORTS: readonly PortKind[] = [
 
 /**
  * The board of a new game. Base maps: the robber starts on the desert (a random one of them on
- * maps with several deserts). Custom (scenario) maps: their own `generate`.
+ * maps with several deserts, or the first one with `firstDesertOnly`, the 5+ player rule set);
+ * random layouts follow `mapRules` (RULES.md §19). Custom (scenario) maps: their own `generate`
+ * (map rules do not apply).
  */
-export function generateBoard(map: MapId, rng: Rng, players = 4): GeneratedBoard {
+export function generateBoard(
+  map: MapId,
+  rng: Rng,
+  players = 4,
+  mapRules: MapRules = {},
+  firstDesertOnly = false,
+): GeneratedBoard {
   const def = mapById(map);
   if (def.layout === 'custom') return def.generate(rng, players);
-  return def.layout === 'beginner' ? beginnerBoard() : randomBoard(rng, map);
+  return def.layout === 'beginner'
+    ? beginnerBoard()
+    : randomBoard(rng, map, mapRules, firstDesertOnly);
 }
 
 /**
@@ -95,31 +105,142 @@ export function beginnerBoard(): GeneratedBoard {
 }
 
 const isRed = (n: number | null) => n === 6 || n === 8;
+const isExtreme = (n: number | null) => n === 2 || n === 12;
+
+/** Which map rules a board breaks (counts of touching pairs; 0 = the rule holds). */
+export interface MapRuleViolations {
+  red: number;
+  extreme: number;
+  sameNumber: number;
+  sameResource: number;
+}
+
+/** Count adjacent land-hex pairs breaking each map rule (ignores which rules are allowed). */
+export function mapRuleViolations(
+  hexes: Record<HexId, HexTile>,
+  map: MapId = 'baseRandom',
+): MapRuleViolations {
+  const topo = topologyFor(map);
+  const out: MapRuleViolations = { red: 0, extreme: 0, sameNumber: 0, sameResource: 0 };
+  for (const h of Object.values(hexes)) {
+    for (const nId of hexNeighbors(topo, h.id)) {
+      const n = hexes[nId];
+      if (!n || n.id <= h.id) continue; // each pair once
+      if (isRed(h.token) && isRed(n.token)) out.red++;
+      if (isExtreme(h.token) && isExtreme(n.token)) out.extreme++;
+      if (h.token !== null && h.token === n.token) out.sameNumber++;
+      if (h.terrain !== 'desert' && h.terrain === n.terrain) out.sameResource++;
+    }
+  }
+  return out;
+}
 
 /** True if no two 6/8 tokens sit on adjacent hexes (adjacency of `map`'s board). */
 export function redNumbersSeparated(
   hexes: Record<HexId, HexTile>,
   map: MapId = 'baseRandom',
 ): boolean {
-  const topo = topologyFor(map);
-  return Object.values(hexes).every(
-    (h) =>
-      !isRed(h.token) || hexNeighbors(topo, h.id).every((n) => !isRed(hexes[n]?.token ?? null)),
+  return mapRuleViolations(hexes, map).red === 0;
+}
+
+/** Search budget: DFS nodes per restart, restarts per relaxation level. */
+const NODE_BUDGET = 4000;
+const RESTARTS = 60;
+
+/**
+ * Fill `slots` (indices into `adj`) with items from `bag` so that no two adjacent slots hold a
+ * `conflict`ing pair. Randomized depth-first search (random slot order, random candidate order),
+ * restarted when a restart's node budget is spent. Returns null when every restart failed.
+ * Deterministic for a given RNG state.
+ */
+function fill<T>(
+  count: number,
+  adj: readonly (readonly number[])[],
+  bag: readonly T[],
+  conflict: ((a: T, b: T) => boolean) | null,
+  rng: Rng,
+): T[] | null {
+  for (let restart = 0; restart < RESTARTS; restart++) {
+    const order = rng.shuffle(Array.from({ length: count }, (_, i) => i));
+    const left = new Map<T, number>();
+    for (const x of rng.shuffle(bag)) left.set(x, (left.get(x) ?? 0) + 1);
+    const placed: (T | undefined)[] = new Array<T | undefined>(count).fill(undefined);
+    let nodes = 0;
+    const dfs = (k: number): boolean => {
+      if (k === count) return true;
+      if (++nodes > NODE_BUDGET) return false;
+      const slot = order[k] as number;
+      const kinds = rng.shuffle([...left.keys()].filter((x) => (left.get(x) ?? 0) > 0));
+      for (const x of kinds) {
+        if (
+          conflict &&
+          adj[slot]?.some((n) => placed[n] !== undefined && conflict(x, placed[n] as T))
+        ) {
+          continue;
+        }
+        placed[slot] = x;
+        left.set(x, (left.get(x) ?? 0) - 1);
+        if (dfs(k + 1)) return true;
+        left.set(x, (left.get(x) ?? 0) + 1);
+        placed[slot] = undefined;
+        if (nodes > NODE_BUDGET) return false;
+      }
+      return false;
+    };
+    if (dfs(0)) return placed as T[];
+  }
+  return null;
+}
+
+/** Neighbour indices among a subset of land hexes (`ids[i]` = hex of slot i). */
+function adjacency(topo: Topology, ids: readonly HexId[]): number[][] {
+  const index = new Map(ids.map((id, i) => [id, i]));
+  return ids.map((id) =>
+    hexNeighbors(topo, id).flatMap((n) => {
+      const i = index.get(n);
+      return i === undefined ? [] : [i];
+    }),
   );
 }
 
-const MAX_TOKEN_ATTEMPTS = 100_000;
+/**
+ * The token pair rules still in force, strongest first when relaxing: a level drops the last
+ * rule(s). Relaxation order when no layout is found (RULES.md §19): same numbers, then 2 & 12,
+ * then 6 & 8, then none (any shuffle). Terrain: same resources, then none.
+ */
+function tokenConflicts(rules: MapRules): ((a: number, b: number) => boolean)[] {
+  const levels: ((a: number, b: number) => boolean)[] = [];
+  const build = (red: boolean, extreme: boolean, same: boolean) => (a: number, b: number) =>
+    (red && isRed(a) && isRed(b)) || (extreme && isExtreme(a) && isExtreme(b)) || (same && a === b);
+  const red = !rules.allowRedTouch;
+  const extreme = !rules.allowExtremeTouch;
+  const same = !rules.allowSameNumberTouch;
+  levels.push(build(red, extreme, same));
+  if (same) levels.push(build(red, extreme, false));
+  if (extreme) levels.push(build(red, false, false));
+  return levels; // randomBoard falls back to an unconstrained shuffle after the last level
+}
 
 /**
- * Shuffle terrains, then shuffle tokens onto non-desert hexes until no 6/8 are adjacent
- * (rejection sampling; deterministic for a given RNG state). Port kinds are shuffled too.
- * With several deserts the robber starts on a random one.
+ * Shuffle terrains, then tokens onto the non-desert hexes, so that the active map rules hold
+ * (`mapRules`: all constrained by default; see MapRules). Bounded randomized backtracking; when
+ * a rule set cannot be met within the budget the rules are relaxed in a fixed order
+ * (token: same numbers, 2 & 12; terrain: same resources) and finally the red rule, so
+ * generation always terminates. Port kinds are shuffled too. With several deserts the robber
+ * starts on a random one, or on the first (`firstDesertOnly`, the 5+ player rule set).
  */
-export function randomBoard(rng: Rng, map: MapId = 'baseRandom'): GeneratedBoard {
+export function randomBoard(
+  rng: Rng,
+  map: MapId = 'baseRandom',
+  mapRules: MapRules = {},
+  firstDesertOnly = false,
+): GeneratedBoard {
   const def = mapById(map);
   if (def.layout === 'custom') throw new Error(`${map} has its own generator`);
-  return randomStdBoard(rng, def);
+  return randomStdBoard(rng, def, mapRules, firstDesertOnly);
 }
+
+const MAX_TOKEN_ATTEMPTS = 100_000;
 
 /**
  * Tokens for `terrains` (in landHexes order): a shuffled `tokens` bag dealt to every hex where
@@ -150,7 +271,12 @@ export function dealTokens(
   throw new Error('could not place number tokens');
 }
 
-function randomStdBoard(rng: Rng, def: StdMapDef): GeneratedBoard {
+function randomStdBoard(
+  rng: Rng,
+  def: StdMapDef,
+  mapRules: MapRules,
+  firstDesertOnly: boolean,
+): GeneratedBoard {
   const map = def.id;
   const topo = topologyFor(map);
   const terrainBag: Terrain[] = [];
@@ -163,17 +289,26 @@ function randomStdBoard(rng: Rng, def: StdMapDef): GeneratedBoard {
   }
   if (def.harbors.length !== topo.portSlots.length) throw new Error(`${map}: harbor count`);
 
-  const terrains = rng.shuffle(terrainBag);
+  const landAdj = adjacency(topo, topo.landHexes);
+  const sameTerrain = (a: Terrain, b: Terrain) => a === b && a !== 'desert';
+  const terrains =
+    (mapRules.allowSameResourceTouch
+      ? null
+      : fill(terrainBag.length, landAdj, terrainBag, sameTerrain, rng)) ?? rng.shuffle(terrainBag);
   const portKinds = rng.shuffle(def.harbors);
 
-  for (let attempt = 0; attempt < MAX_TOKEN_ATTEMPTS; attempt++) {
-    const bag = rng.shuffle(def.tokens);
-    const tokens = terrains.map((t) => (t === 'desert' ? null : (bag.pop() ?? null)));
-    const { board, deserts } = assemble(topo, terrains, tokens, portKinds, true);
-    if (redNumbersSeparated(board.hexes, map)) {
-      const robber = deserts.length === 1 ? deserts[0] : rng.pick(deserts);
-      return { board, robber: robber as HexId };
-    }
+  const landIds = topo.landHexes.filter((_, i) => terrains[i] !== 'desert');
+  const tokenAdj = adjacency(topo, landIds);
+  let placed: number[] | null = null;
+  for (const conflict of tokenConflicts(mapRules)) {
+    placed = fill(landIds.length, tokenAdj, def.tokens, conflict, rng);
+    if (placed) break;
   }
-  throw new Error('could not place number tokens'); // practically unreachable
+  placed ??= rng.shuffle(def.tokens);
+  const byHex = new Map(landIds.map((id, i) => [id, placed[i] as number]));
+  const tokens = topo.landHexes.map((id) => byHex.get(id) ?? null);
+
+  const { board, deserts } = assemble(topo, terrains, tokens, portKinds, true);
+  const robber = deserts.length === 1 || firstDesertOnly ? deserts[0] : rng.pick(deserts);
+  return { board, robber: robber as HexId };
 }

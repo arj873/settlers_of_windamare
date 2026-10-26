@@ -248,20 +248,23 @@ Eve: hello{token:null,name:'Eve'} → welcome (seat:null) → game{view(spectato
 `viewFor(state, viewer)` returns a **GameView**: the GameState shape with secrets masked, plus
 `view: ViewInfo`. Because the shape is unchanged, `BoardView.render` and `Hud.render` accept it.
 
-| Secret                                                | In a view                                 | Public replacement                                                |
-| ----------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| other players' `resources`                            | all 0                                     | `view.handCounts[p]`                                              |
-| other players' `devCards`, `newDevCards`              | all 0                                     | `view.devCardCounts[p]`                                           |
-| `devDeck` order and composition                       | `HIDDEN_DEV_CARD` × length                | `devDeck.length`                                                  |
-| `diceDeck` (balanced dice)                            | `0` × length                              | `diceDeck.length`                                                 |
-| `rng`                                                 | `0`                                       | —                                                                 |
-| `settings.seed` (+ "Game created …, seed X" log line) | `HIDDEN_SEED`; seed removed from the line | —                                                                 |
-| exact special-build queue (depends on hands)          | —                                         | `view.specialBuildQueue` (all builders still to come, unfiltered) |
+| Secret                                                    | In a view                                 | Public replacement                                                |
+| --------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| other players' `resources`                                | all 0                                     | `view.handCounts[p]`                                              |
+| other players' `devCards`, `newDevCards`                  | all 0                                     | `view.devCardCounts[p]`                                           |
+| `devDeck` order and composition                           | `HIDDEN_DEV_CARD` × length                | `devDeck.length`                                                  |
+| `diceDeck` (balanced dice)                                | `0` × length                              | `diceDeck.length`                                                 |
+| `rng`                                                     | `0`                                       | —                                                                 |
+| `settings.seed` (+ "Game created …, seed X" log line)     | `HIDDEN_SEED`; seed removed from the line | —                                                                 |
+| exact special-build queue (depends on hands)              | —                                         | `view.specialBuildQueue` (all builders still to come, unfiltered) |
+| `stats` (UX2: stolen cards, dev cards bought, VP history) | absent until `gameOver`, then all of it   | —                                                                 |
 
 Kept (public by the rules): board, pieces, robber, bank, dice, phase (incl. discard `pending`
 counts, trade offers, steal candidates), awards, knights and progress cards played, turn, log.
-A spectator is masked like an opponent for every seat. At `gameOver` hands and dev cards are
-revealed to all; decks, rng and seed stay hidden.
+A spectator is masked like an opponent for every seat. At `gameOver` hands, dev cards and the
+game statistics are revealed to all; decks, rng and seed stay hidden. The game-over `game`
+message also carries `durationMs` (room clock: `GameRec.startedAt` at `start` → `endedAt` at game
+over; absent for games started before UX2) for the stats screen.
 
 **UI code reads only public info:** `handCount(state, p)`, `devCardCount(state, p)`,
 `visibleSpecialBuildQueue(state)` work on full states (hotseat) and on views; the player list,
@@ -309,6 +312,13 @@ the turn timer on, an away player can still time out during the grace period (mi
 `TIMER_STEPS`). The session reuses `src/game/turnTimer.ts` unchanged:
 `timerSlot(state, controllers, legal, null)` → `syncClock` → `tickClock(now − clockAt)` →
 `timeoutMove`. `away` seats count as human (they are on the clock); bots are never timed.
+Chess clock (`settings.timer`, V1): the same slots, but `syncBankClock` puts the player on the
+clock with their own bank (`GameRec.banks`, part of the snapshot) and `bankAfterAction` banks the
+time used and credits the increment after each action (`begin()` has advanced the clock to `now`).
+`TimerInfo.remainingMs` is then the bank and `totalMs` the starting bank. Map veto and event-card
+choices need nothing special: `actingPlayers` / `obligated` cover them, so legal actions, bots and
+the timer work unchanged. With Randomize Turn Order, `start` reorders the lobby seats by
+`settings.seatOrder` so that seat index = PlayerId.
 Differences from hotseat: there is no viewer (`null`), so when several humans owe a discard or
 a trade reply they are timed one after another in table order; there is no "covered" pause; the
 clock only freezes while nobody is connected. Clients get `timer: { player, kind, remainingMs,
@@ -377,7 +387,15 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
 plus `seatCount` (`mode: 'base'`, `map`, `rules{balancedDice, hideBankCards}`, `turnTimerSec`,
-`vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range).
+`vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range), plus optional
+`variants` (V1, RULES.md §18: `robberMode, eventCards, rushMode, turboMode, secondSettler,
+randomTurnOrder, mapSelection, setupPlacement, timer`; V2, §19/§20: `rules56` (5+ seats, not with
+second settler) and `mapRules`, strict keys, only `true` flags kept). `parseVariants` is strict (unknown keys
+rejected, a named clock preset must carry its own values) and normalises defaults away (off flags,
+`'normal'`, `'fixed'`). Combinations `createGame` would refuse are refused at `configure`
+(`bad_message`): event cards + balanced dice, chess clock + `turnTimerSec`, second settler with
+fewer than 4 seats. The V1 game actions (`vetoMap`, `eventGain`, `eventGive`, `eventSteal` with an
+explicit `victim: null` to pass, `eventDamageRoad`, `repairRoad`) have strict parsers like the rest.
 
 **Server → client**
 

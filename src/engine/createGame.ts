@@ -16,21 +16,41 @@ import {
 } from './expansions/registry';
 import type { ExpansionModule, ModeDef, PlayerRange, ScenarioDef } from './expansions/types';
 import { isMapId, mapById, supplyOf } from './mapLookup';
-import { defaultMapFor, isBaseMapId } from './maps';
+import { MAPS, MAP_IDS, defaultMapFor, isBaseMapId } from './maps';
+import { MAP_VETO_CANDIDATES, vetoOrder } from './actions/veto';
+import { isTimerPreset, timerSettings } from './clock';
+import {
+  MAP_RULE_KEYS,
+  MAP_SELECTIONS,
+  OFFICIAL_SETUP,
+  RULES56_MIN_PLAYERS,
+  ROBBER_MODES,
+  SETUP_BUILDINGS,
+  SETUP_RESTRICTIONS,
+  mapRulesOf,
+  rules56On,
+} from './variants';
 import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
+import { emptyStats } from './stats';
 import type {
   DevCardType,
   ExpansionId,
   GameSettings,
   GameState,
   Layout,
+  MapCandidate,
   MapId,
+  MapRules,
+  MapSelection,
   ModeId,
   OptionValue,
   Player,
   PlayerId,
+  RobberMode,
   ScenarioId,
+  SetupPlacement,
+  TimerSettings,
 } from './types';
 
 export interface PlayerConfig {
@@ -74,6 +94,37 @@ export interface GameConfig {
   scenario?: ScenarioId;
   /** Per-expansion options; missing ones get their defaults. */
   options?: Record<ExpansionId, Record<string, OptionValue>>;
+  // --- V1 variants (variants.ts, RULES.md §18). Absent = official rule. -------------------
+  robberMode?: RobberMode;
+  /** Default false. Event Cards replace the dice. Not combinable with balancedDice. */
+  eventCards?: boolean;
+  setupPlacement?: SetupPlacement;
+  /**
+   * Default false. Shuffle `players` into seats (own seeded stream, so board and rolls of a seed
+   * do not change); seat 0 of the shuffled order starts unless `startingPlayer` is a number.
+   */
+  randomTurnOrder?: boolean;
+  /**
+   * Default 'fixed'. 'random' ignores `map` (with a scenario: a pick among its maps that fit);
+   * 'veto' starts with a map vote (on `map`'s frame; base game only).
+   */
+  mapSelection?: MapSelection;
+  /** Default false. Rush: the dice roll automatically at the start of each turn. */
+  rushMode?: boolean;
+  /** Default false. Turbo (ours): both setup rounds pay starting resources. */
+  turboMode?: boolean;
+  /** Default false. Paired players' turn (4+ players); replaces the special building phase. */
+  secondSettler?: boolean;
+  /** Default none. Chess-clock timer (clock.ts); not together with turnTimerSec. */
+  timer?: TimerSettings | null;
+  /**
+   * Which adjacencies random maps may have (RULES.md §19). Default: none allowed (no touching
+   * 6/8, no touching 2/12, no equal numbers or equal resources side by side). The fixed
+   * beginner map and scenario maps (their own generators) ignore it.
+   */
+  mapRules?: MapRules;
+  /** Default false. The 5+ player rule set (RULES.md §20); needs 5+ players and the special building phase. */
+  rules56?: boolean;
 }
 
 /** The mode, scenario and expansions of a config, validated (throws on bad values). */
@@ -160,6 +211,12 @@ export function defaultVpToWin(mode: ModeDef, scenario: ScenarioDef | null): num
   return mode.vpToWin ?? DEFAULT_VP_TO_WIN;
 }
 
+/** Seat order for Randomize Turn Order: `order[seat]` = config index. Own stream per seed. */
+export function randomSeatOrder(seed: number | string, playerCount: number): number[] {
+  const rng = Rng.fromSeed(`order:${typeof seed === 'number' ? `n${seed}` : seed}`);
+  return rng.shuffle(Array.from({ length: playerCount }, (_, i) => i));
+}
+
 /**
  * The seat a seed starts with. Drawn from its own stream (not the game RNG), so the board, the
  * deck and every roll of a seed stay the same as before starting players were random.
@@ -193,14 +250,29 @@ export function resolveSettings(config: GameConfig): GameSettings {
       throw new Error(`${what} needs ${r.min}-${r.max} players, got ${n}`);
     }
   }
+  const mapSelection = config.mapSelection ?? 'fixed';
+  if (!MAP_SELECTIONS.includes(mapSelection)) {
+    throw new Error(`unknown mapSelection ${String(mapSelection)}`);
+  }
+  // Expansion slices are created from the board (module init), so the board cannot change
+  // after createGame: no map veto with expansions.
+  if (mapSelection === 'veto' && modules.length > 0) {
+    throw new Error('map veto is only available in the base game');
+  }
   let map: MapId;
   if (scenario) {
-    map = config.map ?? scenario.mapFor(n);
+    map =
+      mapSelection === 'random'
+        ? randomScenarioMap(config.seed, scenario, n)
+        : (config.map ?? scenario.mapFor(n));
     if (!scenario.maps.includes(map)) {
       throw new Error(`scenario ${scenario.id} cannot be played on map ${map}`);
     }
   } else {
     map = config.map ?? (config.layout ? layoutToMap(config.layout) : defaultMapFor(n));
+    if (mapSelection === 'random') map = randomMapFor(config.seed, n);
+    // A veto between copies of the fixed beginner board means nothing: vote on random layouts.
+    if (mapSelection === 'veto' && map === 'base') map = 'baseRandom';
     if (!isBaseMapId(map)) throw new Error(`unknown map ${String(map)}`);
   }
   if (!isMapId(map)) throw new Error(`unknown map ${String(map)}`);
@@ -212,11 +284,48 @@ export function resolveSettings(config: GameConfig): GameSettings {
   if (timer !== null && (!Number.isInteger(timer) || timer <= 0)) {
     throw new Error(`turnTimerSec must be a positive integer or null, got ${timer}`);
   }
+  const clock = config.timer ?? null;
+  if (clock !== null) {
+    if (timer !== null) throw new Error('use either timer or turnTimerSec, not both');
+    if (!isTimerPreset(clock.preset) || (clock.preset as string) === 'off') {
+      throw new Error(`unknown timer preset ${String(clock.preset)}`);
+    }
+    timerSettings(clock.preset, clock); // validates the ranges (throws)
+  }
+  const secondSettler = config.secondSettler ?? false;
+  if (secondSettler && n < 4) {
+    throw new Error('second settler needs 4+ players (Catanian 2 sits third to the left)');
+  }
+  if (secondSettler && config.specialBuildPhase) {
+    throw new Error('second settler replaces the special building phase; turn one off');
+  }
   const start = config.startingPlayer ?? 'random';
+  const shuffled = config.randomTurnOrder === true;
   const startingPlayer =
-    start === 'random'
-      ? randomStartingPlayer(config.seed, n)
-      : intInRange('startingPlayer', start, { min: 0, max: n - 1 });
+    start !== 'random'
+      ? intInRange('startingPlayer', start, { min: 0, max: n - 1 })
+      : shuffled
+        ? 0
+        : randomStartingPlayer(config.seed, n);
+  const robberMode = config.robberMode ?? 'normal';
+  if (!ROBBER_MODES.includes(robberMode)) throw new Error(`unknown robberMode ${robberMode}`);
+  const eventCards = config.eventCards ?? false;
+  if (eventCards && config.balancedDice) {
+    throw new Error(
+      'eventCards and balancedDice cannot both be on (the event deck replaces the dice)',
+    );
+  }
+  const placement = config.setupPlacement;
+  if (placement !== undefined) validateSetupPlacement(placement);
+  const allowed = config.mapRules === undefined ? {} : validateMapRules(config.mapRules);
+  if (config.rules56) {
+    if (n < RULES56_MIN_PLAYERS) throw new Error(`rules56 needs ${RULES56_MIN_PLAYERS}+ players`);
+    if (secondSettler)
+      throw new Error('rules56 uses the special building phase, not second settler');
+    if (config.specialBuildPhase === false) {
+      throw new Error('rules56 needs the special building phase');
+    }
+  }
   const options = resolveOptions(modules, config.options);
   const vpDefault = defaultVpToWin(mode, scenario) + optionVpBonus(modules, options);
   const settings: GameSettings = {
@@ -229,7 +338,7 @@ export function resolveSettings(config: GameConfig): GameSettings {
       DISCARD_LIMIT_RANGE,
     ),
     balancedDice: config.balancedDice ?? false,
-    specialBuildPhase: config.specialBuildPhase ?? n >= 5,
+    specialBuildPhase: config.specialBuildPhase ?? (n >= 5 && !secondSettler),
     hideBankCards: config.hideBankCards ?? false,
     turnTimerSec: timer,
     startingPlayer,
@@ -237,6 +346,21 @@ export function resolveSettings(config: GameConfig): GameSettings {
     expansions: modules.map((m) => m.id),
     scenario: scenario?.id ?? null,
     options,
+    // Variants are written only when they differ from the official rule, so default settings
+    // (and every existing save) look exactly as before.
+    ...(robberMode === 'normal' ? {} : { robberMode }),
+    ...(eventCards ? { eventCards } : {}),
+    ...(placement === undefined || isOfficialSetup(placement)
+      ? {}
+      : { setupPlacement: structuredCopy(placement) }),
+    ...(shuffled ? { seatOrder: randomSeatOrder(config.seed, n) } : {}),
+    ...(mapSelection === 'fixed' ? {} : { mapSelection }),
+    ...(config.rushMode ? { rushMode: true } : {}),
+    ...(config.turboMode ? { turboMode: true } : {}),
+    ...(secondSettler ? { secondSettler: true } : {}),
+    ...(clock ? { timer: { ...clock } } : {}),
+    ...(Object.keys(allowed).length > 0 ? { mapRules: allowed } : {}),
+    ...(config.rules56 ? { rules56: true } : {}),
   };
   for (const m of modules) {
     const err = m.validate?.(settings);
@@ -259,6 +383,64 @@ export function optionVpBonus(
   return bonus;
 }
 
+/** Only the `true` flags are kept, so default settings stay free of the field. */
+function validateMapRules(rules: MapRules): MapRules {
+  const out: MapRules = {};
+  for (const [k, v] of Object.entries(rules)) {
+    if (!(MAP_RULE_KEYS as readonly string[]).includes(k)) throw new Error(`unknown map rule ${k}`);
+    if (typeof v !== 'boolean') throw new Error(`map rule ${k} must be true or false`);
+    if (v) out[k as keyof MapRules] = true;
+  }
+  return out;
+}
+
+/** Map selection 'random': a seeded pick (own stream) among the maps that fit `playerCount`. */
+export function randomMapFor(seed: number | string, playerCount: number): MapId {
+  const fits = MAP_IDS.filter(
+    (id) => playerCount >= MAPS[id].minPlayers && playerCount <= MAPS[id].maxPlayers,
+  );
+  return Rng.fromSeed(`map:${typeof seed === 'number' ? `n${seed}` : seed}`).pick(fits);
+}
+
+/** Map selection 'random' in a scenario: a seeded pick among its maps that fit `playerCount`. */
+function randomScenarioMap(
+  seed: number | string,
+  scenario: ScenarioDef,
+  playerCount: number,
+): MapId {
+  const fits = scenario.maps.filter((id) => {
+    const def = isMapId(id) ? mapById(id) : undefined;
+    return def !== undefined && playerCount >= def.minPlayers && playerCount <= def.maxPlayers;
+  });
+  const rng = Rng.fromSeed(`map:${typeof seed === 'number' ? `n${seed}` : seed}`);
+  return fits.length > 0 ? rng.pick(fits) : scenario.mapFor(playerCount);
+}
+
+function validateSetupPlacement(p: SetupPlacement): void {
+  for (const round of [p.first, p.second]) {
+    if (!SETUP_BUILDINGS.includes(round.building)) {
+      throw new Error(`unknown setup building ${String(round.building)}`);
+    }
+    if (!SETUP_RESTRICTIONS.includes(round.restriction)) {
+      throw new Error(`unknown setup restriction ${String(round.restriction)}`);
+    }
+  }
+}
+
+function isOfficialSetup(p: SetupPlacement): boolean {
+  const o = OFFICIAL_SETUP;
+  return (
+    p.first.building === o.first.building &&
+    p.first.restriction === o.first.restriction &&
+    p.second.building === o.second.building &&
+    p.second.restriction === o.second.restriction
+  );
+}
+
+function structuredCopy(p: SetupPlacement): SetupPlacement {
+  return { first: { ...p.first }, second: { ...p.second } };
+}
+
 /** Build the initial state: board generated, deck shuffled, phase = setup (starting player, settlement). */
 export function createGame(config: GameConfig): GameState {
   const settings = resolveSettings(config);
@@ -266,7 +448,21 @@ export function createGame(config: GameConfig): GameState {
   const supply = supplyOf({ settings });
 
   const rng = Rng.fromSeed(config.seed);
-  const { board, robber } = generateBoard(settings.map, rng, config.players.length);
+  const n = config.players.length;
+  const mapRules = mapRulesOf(settings);
+  const firstDesertOnly = rules56On(settings);
+  const { board, robber } = generateBoard(settings.map, rng, n, mapRules, firstDesertOnly);
+  // Map veto: more candidate boards from the same stream (only then, so other games keep
+  // their boards, decks and rolls per seed).
+  const candidates: MapCandidate[] =
+    settings.mapSelection === 'veto'
+      ? [
+          { board, robber },
+          ...Array.from({ length: MAP_VETO_CANDIDATES - 1 }, () =>
+            generateBoard(settings.map, rng, n, mapRules, firstDesertOnly),
+          ),
+        ]
+      : [];
 
   const deck: DevCardType[] = [];
   for (const t of DEV_CARD_TYPES) {
@@ -274,7 +470,9 @@ export function createGame(config: GameConfig): GameState {
   }
   const devDeck = rng.shuffle(deck);
 
-  const players: Player[] = config.players.map((p, id) => ({
+  const order = settings.seatOrder ?? config.players.map((_, i) => i);
+  const seated = order.map((i) => config.players[i] as PlayerConfig);
+  const players: Player[] = seated.map((p, id) => ({
     id,
     name: p.name,
     color: p.color,
@@ -294,6 +492,8 @@ export function createGame(config: GameConfig): GameState {
     settings.mode === 'base'
       ? `${def.name} map`
       : `${mode?.name ?? settings.mode}: ${settings.scenario ? (scenarioById(settings.scenario)?.name ?? settings.scenario) : def.name}`;
+  const veto = candidates.length > 0;
+  const vetoers = vetoOrder(players.length, first, candidates.length);
   const state: GameState = {
     schemaVersion: 5,
     settings,
@@ -303,8 +503,21 @@ export function createGame(config: GameConfig): GameState {
     players,
     bank,
     devDeck,
-    turn: { number: 0, current: first, devCardPlayed: false, tradeOffers: 0 },
-    phase: { kind: 'setup', index: 0, step: 'settlement', lastSettlement: null },
+    turn: {
+      number: 0,
+      current: veto ? (vetoers[0] as PlayerId) : first,
+      devCardPlayed: false,
+      tradeOffers: 0,
+    },
+    phase: veto
+      ? {
+          kind: 'mapVeto',
+          candidates,
+          vetoed: candidates.map((): null => null),
+          order: vetoers,
+          next: 0,
+        }
+      : { kind: 'setup', index: 0, step: 'settlement', lastSettlement: null },
     dice: null,
     diceDeck: [],
     awards: { longestRoad: null, largestArmy: null },
@@ -314,11 +527,18 @@ export function createGame(config: GameConfig): GameState {
         player: null,
         text: `Game created (${title}, seed ${String(config.seed)})`,
       },
+      ...(settings.seatOrder
+        ? [{ turn: 0, player: null, text: `Turn order: ${players.map((p) => p.name).join(', ')}` }]
+        : []),
       { turn: 0, player: first, text: `${players[first]?.name ?? `Player ${first + 1}`} starts` },
     ],
     rng: rng.state,
     winner: null,
     ext: {},
+    stats: emptyStats(players.length),
+    ...(settings.eventCards
+      ? { eventDeck: [], lastEvent: null, damagedRoads: players.map((): null => null) }
+      : {}),
   };
   // Expansions set up their slices last, drawing from the continuing game RNG (none in base games).
   const modules = activeModules(state);

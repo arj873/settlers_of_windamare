@@ -8,8 +8,28 @@ import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
 import {
+  addSeat,
   buildConfig,
   clamp,
+  clockLabel,
+  CLOCK_OPTIONS,
+  CUSTOM_BANK_MIN,
+  CUSTOM_INCREMENT_SEC,
+  MAP_RULE_OPTIONS,
+  mapRulesApply,
+  mapSelectionOf,
+  mapSelectionOptions,
+  ROBBER_OPTIONS,
+  RULES56_SEATS,
+  RULES56_VP,
+  SECOND_SETTLER_MIN_PLAYERS,
+  SETUP_BUILDING_OPTIONS,
+  SETUP_RESTRICTION_OPTIONS,
+  setClockPreset,
+  setSetupRound,
+  setTimerIdx,
+  toggle,
+  type ToggleKey,
   DISCARD_MAX,
   DISCARD_MIN,
   defaultStorage,
@@ -22,6 +42,7 @@ import {
   pickSeatColor,
   playerRange,
   rangeLabel,
+  removeSeat,
   saveSetup,
   scenarioOf,
   SEAT_COLORS,
@@ -68,6 +89,18 @@ const ICON = {
   hide: `<path d="M3 16s5-8 13-8 13 8 13 8-5 8-13 8S3 16 3 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
     <circle cx="16" cy="16" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
     <path d="M6 26 26 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`,
+  cards: `<rect x="5" y="7" width="15" height="21" rx="3" fill="currentColor" opacity=".16" transform="rotate(-10 12 17)"/>
+    <rect x="5" y="7" width="15" height="21" rx="3" fill="none" stroke="currentColor" stroke-width="2" transform="rotate(-10 12 17)"/>
+    <rect x="12" y="4" width="15" height="21" rx="3" fill="currentColor" opacity=".16"/>
+    <rect x="12" y="4" width="15" height="21" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="M19.5 9.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="currentColor"/>`,
+  rush: `<path d="M18 3 7 18h8l-2 11 11-15h-8z" fill="currentColor" opacity=".18"/>
+    <path d="M18 3 7 18h8l-2 11 11-15h-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`,
+  turbo: `<path d="M4 8l10 8-10 8zM16 8l10 8-10 8z" fill="currentColor" opacity=".18"/>
+    <path d="M4 8l10 8-10 8zM16 8l10 8-10 8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`,
+  seats: `<g fill="currentColor" opacity=".18"><circle cx="16" cy="9" r="4.5"/><circle cx="7" cy="14" r="3.5"/><circle cx="25" cy="14" r="3.5"/></g>
+    <g fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="9" r="4.5"/><circle cx="7" cy="14" r="3.5"/><circle cx="25" cy="14" r="3.5"/>
+    <path d="M7 27c0-5 4-8 9-8s9 3 9 8z" stroke-linejoin="round"/></g>`,
   logo: `<path d="M16 2 28 9v14l-12 7L4 23V9z" fill="currentColor" opacity=".18"/>
     <path d="M16 2 28 9v14l-12 7L4 23V9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
     <path d="M16 9v14M10 12.5l12 7M22 12.5l-12 7" stroke="currentColor" stroke-width="1.4" opacity=".7"/>`,
@@ -168,6 +201,7 @@ export class SetupScreen {
       h('strong', {}, title),
       ` · ${d.seats.length} players · ${d.vpToWin} VP`,
       TIMER_STEPS[d.timerIdx] ? ` · ${timerLabel(d.timerIdx)} timer` : '',
+      d.clockPreset !== 'off' ? ` · ${clockLabel(d)} clock` : '',
     );
   }
 
@@ -188,6 +222,7 @@ export class SetupScreen {
       ),
       this.modeSection(),
       this.mapSection(),
+      this.balanceSection(),
       this.rulesSection(),
       this.advancedSection(),
       this.seatsSection(),
@@ -361,21 +396,40 @@ export class SetupScreen {
     );
   }
 
+  /** Which neighbouring hexes may touch on random maps (all off = every constraint on). */
+  private balanceSection(): HTMLElement {
+    const d = this.draft;
+    const applies = mapRulesApply(d);
+    return this.section(
+      'Balance rules',
+      'balance',
+      h(
+        'div',
+        { class: 'su-card su-card-wide', attrs: { role: 'group', 'aria-label': 'Balance rules' } },
+        ...MAP_RULE_OPTIONS.map((o) => this.switchRow(o.key, o.title, o.desc, !applies)),
+        h(
+          'p',
+          { class: 'su-hint', attrs: { 'data-v': 'balance-note' } },
+          applies
+            ? 'Random maps only: with a switch off, the generator keeps those hexes apart.'
+            : d.mode !== 'base'
+              ? 'Scenario maps come with their own layout rules, so these do not apply.'
+              : 'The official beginner layout is fixed, so these do not apply. Pick a random map to use them.',
+        ),
+      ),
+    );
+  }
+
   private rulesSection(): HTMLElement {
     const d = this.draft;
-    const rule = (
-      key: 'balancedDice' | 'hideBankCards',
-      ico: keyof typeof ICON,
-      title: string,
-      desc: string,
-    ) =>
+    const rule = (key: ToggleKey, ico: keyof typeof ICON, title: string, desc: string) =>
       h(
         'button',
         {
           class: `su-tile su-rule${d[key] ? ' is-on' : ''}`,
           title: desc,
           attrs: { 'aria-pressed': String(d[key]), 'data-k': `rule-${key}` },
-          on: { click: () => this.set({ ...this.draft, [key]: !this.draft[key] }) },
+          on: { click: () => this.set(toggle(this.draft, key)) },
         },
         icon(ico, 30),
         h(
@@ -404,9 +458,212 @@ export class SetupScreen {
           'Hide Bank Cards',
           "The bank's resource stock is hidden from players.",
         ),
+        rule(
+          'eventCards',
+          'cards',
+          'Event Cards',
+          'A 36-card event deck replaces the dice: same odds, plus events.',
+        ),
+        rule(
+          'rushMode',
+          'rush',
+          'Rush Mode',
+          'Dice roll by themselves at the start of each turn. Sets discard 9 and the friendly robber.',
+        ),
+        rule(
+          'turboMode',
+          'turbo',
+          'Turbo Mode',
+          'Both starting settlements pay resources, for a faster start.',
+        ),
+        d.seats.length >= RULES56_SEATS &&
+          rule(
+            'rules56',
+            'seats',
+            '5+ player rules',
+            `Play one dev card in the build phase. Robber stays off the 2nd desert. Suggests ${RULES56_VP} VP.`,
+          ),
         ...this.optionTiles(),
       ),
     );
+  }
+
+  /** Compact select inside a card. `key` is the data-k of the select. */
+  private select<T extends string>(
+    label: string,
+    key: string,
+    options: readonly { id: T; label: string; desc?: string }[],
+    value: T,
+    onChange: (v: T) => void,
+  ): HTMLElement {
+    return h(
+      'label',
+      { class: 'su-field' },
+      h('span', {}, label),
+      h(
+        'select',
+        {
+          class: 'input su-select',
+          attrs: { 'aria-label': label, 'data-k': key },
+          on: { change: (e) => onChange((e.target as HTMLSelectElement).value as T) },
+        },
+        ...options.map((o) =>
+          h(
+            'option',
+            { attrs: { value: o.id, ...(o.id === value ? { selected: '' } : {}) } },
+            o.label,
+          ),
+        ),
+      ),
+    );
+  }
+
+  private switchRow(key: ToggleKey, title: string, desc: string, disabled = false): HTMLElement {
+    const on = this.draft[key];
+    return h(
+      'button',
+      {
+        class: `su-switchrow${on ? ' is-on' : ''}`,
+        title: desc,
+        disabled,
+        attrs: { 'aria-pressed': String(on), 'data-k': `rule-${key}` },
+        on: { click: () => this.set(toggle(this.draft, key)) },
+      },
+      h(
+        'span',
+        { class: 'su-rule-text' },
+        h('span', { class: 'su-switch-title' }, title),
+        h('span', { class: 'su-tile-sub' }, desc),
+      ),
+      h('span', { class: 'su-switch', attrs: { 'aria-hidden': 'true' } }, h('i')),
+    );
+  }
+
+  private variantCards(): HTMLElement[] {
+    const d = this.draft;
+    const robber = ROBBER_OPTIONS.find((o) => o.id === d.robberMode);
+    const mapSelOptions = mapSelectionOptions(d);
+    const mapSel = mapSelOptions.find((o) => o.id === mapSelectionOf(d));
+    const custom = d.clockPreset === 'custom';
+    const num = (
+      key: string,
+      label: string,
+      value: number,
+      r: { min: number; max: number },
+      set: (v: number) => void,
+    ) =>
+      h(
+        'label',
+        { class: 'su-field su-field-num' },
+        h('span', {}, label),
+        h('input', {
+          class: 'input',
+          type: 'number',
+          value: String(value),
+          attrs: {
+            min: String(r.min),
+            max: String(r.max),
+            step: '1',
+            'aria-label': label,
+            'data-k': key,
+          },
+          on: {
+            change: (e) => {
+              const v = Number((e.target as HTMLInputElement).value);
+              set(Number.isFinite(v) ? clamp(Math.round(v), r.min, r.max) : value);
+            },
+          },
+        }),
+      );
+    const round = (r: 'first' | 'second', n: string) =>
+      h(
+        'div',
+        { class: 'su-pair' },
+        this.select(
+          `${n} building`,
+          `setup-${r}-building`,
+          SETUP_BUILDING_OPTIONS,
+          d.setupPlacement[r].building,
+          (v) => this.set(setSetupRound(this.draft, r, { building: v })),
+        ),
+        this.select(
+          `${n} restriction`,
+          `setup-${r}-restriction`,
+          SETUP_RESTRICTION_OPTIONS,
+          d.setupPlacement[r].restriction,
+          (v) => this.set(setSetupRound(this.draft, r, { restriction: v })),
+        ),
+      );
+    return [
+      h(
+        'div',
+        { class: 'su-card', attrs: { role: 'group', 'aria-label': 'Robber' } },
+        this.select('Robber', 'robber', ROBBER_OPTIONS, d.robberMode, (v) =>
+          this.set({ ...this.draft, robberMode: v }),
+        ),
+        h('p', { class: 'su-hint' }, robber?.desc ?? ''),
+      ),
+      h(
+        'div',
+        { class: 'su-card', attrs: { role: 'group', 'aria-label': 'Chess clock' } },
+        this.select('Chess clock', 'clock', CLOCK_OPTIONS, d.clockPreset, (v) =>
+          this.set(setClockPreset(this.draft, v)),
+        ),
+        custom
+          ? h(
+              'div',
+              { class: 'su-pair' },
+              num('clock-bank', 'Bank (min)', d.customBankMin, CUSTOM_BANK_MIN, (v) =>
+                this.set({ ...this.draft, customBankMin: v }),
+              ),
+              num('clock-inc', 'Per turn (s)', d.customIncrementSec, CUSTOM_INCREMENT_SEC, (v) =>
+                this.set({ ...this.draft, customIncrementSec: v }),
+              ),
+            )
+          : h(
+              'p',
+              { class: 'su-hint', attrs: { 'data-v': 'clock' } },
+              d.clockPreset === 'off'
+                ? 'Bank per player + time added each turn'
+                : `${clockLabel(d)} per player`,
+            ),
+      ),
+      h(
+        'div',
+        { class: 'su-card', attrs: { role: 'group', 'aria-label': 'Map selection' } },
+        this.select('Map selection', 'mapSelection', mapSelOptions, mapSelectionOf(d), (v) =>
+          this.set({ ...this.draft, mapSelection: v }),
+        ),
+        h('p', { class: 'su-hint' }, mapSel?.desc ?? ''),
+      ),
+      h(
+        'div',
+        { class: 'su-card', attrs: { role: 'group', 'aria-label': 'Turn order' } },
+        this.switchRow(
+          'randomTurnOrder',
+          'Randomize Turn Order',
+          'Shuffle the seats when the game starts',
+        ),
+        this.switchRow(
+          'secondSettler',
+          'Second Settler Mode',
+          d.seats.length < SECOND_SETTLER_MIN_PLAYERS
+            ? 'Needs 4+ players'
+            : 'Paired turns: the 3rd player to the left builds after each turn',
+          d.seats.length < SECOND_SETTLER_MIN_PLAYERS,
+        ),
+      ),
+      h(
+        'div',
+        {
+          class: 'su-card su-card-wide',
+          attrs: { role: 'group', 'aria-label': 'Setup placement' },
+        },
+        h('div', { class: 'su-card-title' }, 'Setup placement'),
+        round('first', '1st'),
+        round('second', '2nd'),
+      ),
+    ];
   }
 
   private advancedSection(): HTMLElement {
@@ -423,11 +680,7 @@ export class SetupScreen {
           timerLabel(d.timerIdx),
           d.timerIdx > 0,
           d.timerIdx < TIMER_STEPS.length - 1,
-          (dir) =>
-            this.set({
-              ...this.draft,
-              timerIdx: clamp(this.draft.timerIdx + dir, 0, TIMER_STEPS.length - 1),
-            }),
+          (dir) => this.set(setTimerIdx(this.draft, this.draft.timerIdx + dir)),
         ),
         this.stepperCard(
           'Players',
@@ -448,6 +701,7 @@ export class SetupScreen {
           DISCARD_MAX,
           (v) => this.patch({ ...this.draft, discardLimit: v }),
         ),
+        ...this.variantCards(),
       ),
       h(
         'details',
@@ -558,6 +812,7 @@ export class SetupScreen {
 
   private seatsSection(): HTMLElement {
     const d = this.draft;
+    const range = playerRange(d);
     return this.section(
       'Seats',
       'seats',
@@ -631,8 +886,30 @@ export class SetupScreen {
                 ),
               ),
             ),
+            h(
+              'button',
+              {
+                class: 'su-seat-x',
+                disabled: d.seats.length <= range.min,
+                title: d.seats.length <= range.min ? `At least ${range.min} players` : 'Remove',
+                attrs: { 'aria-label': `Remove seat ${i + 1}`, 'data-k': `remove-${i}` },
+                on: { click: () => this.set(removeSeat(this.draft, i)) },
+              },
+              '×',
+            ),
           ),
         ),
+      ),
+      h(
+        'button',
+        {
+          class: 'btn su-add-seat',
+          disabled: d.seats.length >= range.max,
+          title: d.seats.length >= range.max ? `At most ${range.max} players` : undefined,
+          attrs: { 'data-k': 'add-seat' },
+          on: { click: () => this.set(addSeat(this.draft)) },
+        },
+        '+ Add player',
       ),
     );
   }

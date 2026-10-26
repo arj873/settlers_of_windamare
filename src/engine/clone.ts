@@ -6,6 +6,8 @@
  *  - expansion slices (`ext`) and expansion phases are deep-copied (or by `module.cloneExt`).
  *    An expansion may REPLACE `draft.board` copy-on-write (fog reveal), never mutate it.
  * Everything else is copied, so a handler may mutate any other part of its draft.
+ * Map-veto candidate boards are shared too (immutable, like `board`), and so is `stats` (stats.ts
+ * only ever replaces it).
  * If you add a field to GameState, copy it here (clone.test.ts checks nothing else is shared).
  */
 import { cloneJson } from './expansions/ext';
@@ -40,6 +42,20 @@ function clonePhase(phase: Phase): Phase {
         },
       };
     }
+    case 'mapVeto':
+      // Candidate boards are immutable (like state.board): the list is copied, boards shared.
+      return {
+        ...phase,
+        candidates: [...phase.candidates],
+        vetoed: [...phase.vetoed],
+        order: [...phase.order],
+      };
+    case 'event':
+      return {
+        kind: 'event',
+        event: phase.event,
+        tasks: phase.tasks.map((t) => ({ ...t, targets: [...t.targets] })),
+      };
     default:
       // Expansion phases carry arbitrary JSON: copy deeply. Base phases here are flat.
       return phase.kind.includes('/') ? cloneJson(phase) : { ...phase };
@@ -82,5 +98,11 @@ export function cloneState(s: GameState): GameState {
     rng: s.rng,
     winner: s.winner,
     ext: cloneExt(s),
+    // V1 variant fields exist only in games that use them; never add undefined keys.
+    ...(s.eventDeck ? { eventDeck: [...s.eventDeck] } : {}),
+    ...(s.lastEvent !== undefined ? { lastEvent: s.lastEvent } : {}),
+    ...(s.damagedRoads ? { damagedRoads: [...s.damagedRoads] } : {}),
+    // Immutable (stats.ts replaces it on change): shared like board.
+    ...(s.stats ? { stats: s.stats } : {}),
   };
 }

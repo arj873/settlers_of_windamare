@@ -15,7 +15,9 @@ import {
   modeById,
   type Action,
   type MapId,
+  type MapRules,
   type OptionValue,
+  type SetupPlacement,
 } from '../engine';
 import { createRandomBot, type PickMode } from './index';
 import {
@@ -28,6 +30,7 @@ import {
   type FailureDump,
   type GameResult,
   type GameSetup,
+  type VariantConfig,
 } from './runner';
 
 export interface SimArgs {
@@ -56,6 +59,40 @@ export interface SimArgs {
   maxDumps: number;
   replay: string | null;
   help: boolean;
+  /** V1 variants (--robber, --event-cards, --rush, --turbo, --second-settler, ...). */
+  variants: VariantConfig;
+}
+
+const ALLOW_FLAGS: Record<string, keyof MapRules> = {
+  red: 'allowRedTouch',
+  extreme: 'allowExtremeTouch',
+  number: 'allowSameNumberTouch',
+  resource: 'allowSameResourceTouch',
+};
+
+/** `--allow red,resource` -> MapRules. */
+export function parseMapRules(value: string): MapRules {
+  const out: MapRules = {};
+  for (const name of value.split(',').filter(Boolean)) {
+    const key = ALLOW_FLAGS[name];
+    if (!key) throw new Error(`--allow: "${name}" (red, extreme, number, resource)`);
+    out[key] = true;
+  }
+  return out;
+}
+
+/** `--setup city:any,settlement:normal` -> SetupPlacement (round 1, round 2). */
+export function parseSetupPlacement(value: string): SetupPlacement {
+  const rounds = value.split(',').map((part) => {
+    const [b, r = 'normal'] = part.split(':');
+    const building = b === 'city' || b === 'settlement' ? b : null;
+    const restriction = r === 'any' ? 'anyVertex' : r === 'normal' ? 'normal' : null;
+    if (!building || !restriction) throw new Error(`--setup: "${value}"`);
+    return { building, restriction } as const;
+  });
+  const [first, second] = rounds;
+  if (!first || !second || rounds.length !== 2) throw new Error(`--setup: "${value}"`);
+  return { first, second };
 }
 
 export const USAGE = `pnpm sim -- [options]
@@ -81,6 +118,20 @@ export const USAGE = `pnpm sim -- [options]
   --out-dir DIR   where failure dumps go (default sim-failures)
   --max-dumps K   at most K failure dumps per run (default 5)
   --replay FILE   re-run a failure dump and report what happens
+ variants (V1, docs/RULES.md §18):
+  --robber M      normal | friendly | none
+  --event-cards   the Event Cards deck replaces the dice
+  --rush          dice roll automatically at the start of each turn
+  --turbo         both setup rounds pay starting resources
+  --second-settler  paired players' turn (4+ players; turns SBP off)
+  --map-select M  fixed | random | veto
+  --random-order  shuffle the seats
+  --setup B:R,B:R setup buildings + restrictions, e.g. city:any,settlement:normal
+ map rules + 5+ rule set (docs/RULES.md §19, §20):
+  --allow L       comma list of adjacencies to allow on random maps: red, extreme, number,
+                  resource (default: none, i.e. all constrained)
+  --rules56       the 5+ player rule set (5+ players): a dev card in the build step, no robber on
+                  the second desert
 `;
 
 export function parseArgs(argv: readonly string[]): SimArgs {
@@ -104,8 +155,20 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     maxDumps: 5,
     replay: null,
     help: false,
+    variants: {},
   };
-  const flags = new Set(['--verbose', '--trace', '--help', '--balanced-dice']);
+  const flags = new Set([
+    '--verbose',
+    '--trace',
+    '--help',
+    '--balanced-dice',
+    '--event-cards',
+    '--rush',
+    '--turbo',
+    '--second-settler',
+    '--random-order',
+    '--rules56',
+  ]);
   for (let i = 0; i < argv.length; i++) {
     const raw = argv[i] as string;
     if (raw === '--') continue;
@@ -193,6 +256,40 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         break;
       case '--balanced-dice':
         args.balancedDice = true;
+        break;
+      case '--robber':
+        if (value !== 'normal' && value !== 'friendly' && value !== 'none')
+          throw new Error(`--robber: "${String(value)}"`);
+        args.variants.robberMode = value;
+        break;
+      case '--event-cards':
+        args.variants.eventCards = true;
+        break;
+      case '--rush':
+        args.variants.rushMode = true;
+        break;
+      case '--turbo':
+        args.variants.turboMode = true;
+        break;
+      case '--second-settler':
+        args.variants.secondSettler = true;
+        break;
+      case '--random-order':
+        args.variants.randomTurnOrder = true;
+        break;
+      case '--map-select':
+        if (value !== 'fixed' && value !== 'random' && value !== 'veto')
+          throw new Error(`--map-select: "${String(value)}"`);
+        args.variants.mapSelection = value;
+        break;
+      case '--setup':
+        args.variants.setupPlacement = parseSetupPlacement(value as string);
+        break;
+      case '--rules56':
+        args.variants.rules56 = true;
+        break;
+      case '--allow':
+        args.variants.mapRules = parseMapRules(value as string);
         break;
       case '--verbose':
         args.verbose = true;
@@ -359,6 +456,7 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   out(
     `rules: SBP ${sbp ? 'on' : 'off'}, balanced dice ${args.balancedDice ? 'on' : 'off'}, max steps ${maxSteps}`,
   );
+  if (Object.keys(args.variants).length > 0) out(`variants: ${JSON.stringify(args.variants)}`);
   out(`finished:             ${stats.finished}`);
   out(`hit --max-steps:      ${stats.maxSteps}`);
   out(`avg turns (finished): ${avgTurns}`);
@@ -394,6 +492,7 @@ export function simSetup(args: SimArgs, seed: number): GameSetup {
     ...(args.expansions.length === 0 ? {} : { expansions: args.expansions }),
     ...(args.scenario === null ? {} : { scenario: args.scenario }),
     ...(Object.keys(args.options).length === 0 ? {} : { options: args.options }),
+    ...(Object.keys(args.variants).length > 0 ? { variants: args.variants } : {}),
   };
 }
 

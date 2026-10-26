@@ -438,6 +438,36 @@ describe('upgradeState (saves)', () => {
     expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
   });
 
+  it('keeps V1/V2 variant fields and stats through v4 -> v5 and in v5 (no schema bump)', () => {
+    const s = createGame({
+      seed: 'variants',
+      players: players(4),
+      robberMode: 'friendly',
+      eventCards: true,
+      setupPlacement: {
+        first: { building: 'settlement', restriction: 'normal' },
+        second: { building: 'city', restriction: 'anyVertex' },
+      },
+      randomTurnOrder: true,
+      mapSelection: 'random',
+      rushMode: true,
+      turboMode: true,
+      secondSettler: true,
+      timer: { preset: 'blitz', bankSec: 300, incrementSec: 10 },
+      mapRules: { allowRedTouch: true },
+    });
+    expect(s.stats).toBeDefined();
+    expect(s.eventDeck).toBeDefined();
+    const { mode: _m, expansions: _e, scenario: _s, options: _o, ...v4Settings } = s.settings;
+    const { ext: _x, ...rest } = s;
+    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings };
+    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
+    expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
+    // A v5 expansion save with variants and stats passes through as well.
+    const oil = createGame({ seed: 3, players: players(4), mode: 'oil', robberMode: 'friendly' });
+    expect(upgradeState(JSON.parse(JSON.stringify(oil)))).toEqual(oil);
+  });
+
   it('rejects a v5 save with an unknown expansion, mode or scenario', () => {
     const s = freshGame();
     const bad = (settings: Record<string, unknown>) =>

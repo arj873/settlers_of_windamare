@@ -6,7 +6,6 @@ import { actingPlayers } from '../engine';
 import type { Action, EdgeId, GameConfig, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
 import type { Controller, NewGameConfig, PlaceMode } from '../ui';
-import { impliedExtActions, placeModeAction } from '../ui/expansions';
 
 /** `createGame` config for a setup-screen config (shared with the online room, src/net). */
 export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpToWin): GameConfig {
@@ -26,7 +25,8 @@ export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpT
     discardLimit: cfg.discardLimit,
     balancedDice: cfg.rules.balancedDice,
     hideBankCards: cfg.rules.hideBankCards,
-    turnTimerSec: cfg.turnTimerSec,
+    turnTimerSec: cfg.variants?.timer ? null : cfg.turnTimerSec,
+    ...cfg.variants,
   };
 }
 
@@ -43,13 +43,16 @@ function tableOrder(state: GameState): PlayerId[] {
 
 /**
  * Players who owe a response before the current player can continue: everyone still discarding,
- * or trade responders still 'pending'. In table order.
+ * trade responders still 'pending', or players with an open event-card task. In table order.
  */
 export function obligated(state: GameState): PlayerId[] {
   const phase = state.phase;
   if (phase.kind === 'discard') return tableOrder(state).filter((p) => (phase.pending[p] ?? 0) > 0);
   if (phase.kind === 'trade') {
     return tableOrder(state).filter((p) => phase.offer.responses[p] === 'pending');
+  }
+  if (phase.kind === 'event') {
+    return tableOrder(state).filter((p) => phase.tasks.some((t) => t.player === p));
   }
   // Expansion phases that several players act in (the module's `actors`): everyone but the
   // current player owes a response (the current player is handled as usual).
@@ -88,6 +91,21 @@ export function pickViewer(
   return fallback;
 }
 
+/**
+ * What boardActions needs from the expansions' HUD extensions: their implied (button-less) board
+ * action types, and the action type of a namespaced place mode. Registered by ui/expansions.ts
+ * when the UI loads; this file must not import UI code, because the room server (src/net) runs
+ * it in a worker / Node, where expansion stylesheets cannot load.
+ */
+export interface BoardExtensions {
+  implied: ReadonlySet<string>;
+  placeModeAction(mode: string): string | null;
+}
+let boardExtensions: BoardExtensions = { implied: new Set(), placeModeAction: () => null };
+export function setBoardExtensions(x: BoardExtensions): void {
+  boardExtensions = x;
+}
+
 /** Legal actions a board click may submit right now for `viewer` (implied prompts or build mode). */
 export function boardActions(
   legal: readonly Action[],
@@ -95,13 +113,14 @@ export function boardActions(
   placeMode: PlaceMode | null,
 ): Action[] {
   const mine = legal.filter((a) => a.player === viewer);
-  const extImplied = impliedExtActions();
+  const extImplied = boardExtensions.implied;
   const implied = mine.filter(
     (a) =>
       a.type === 'placeSetupSettlement' ||
       a.type === 'placeSetupRoad' ||
       a.type === 'moveRobber' ||
       a.type === 'placeFreeRoad' ||
+      a.type === 'eventDamageRoad' ||
       extImplied.has(a.type),
   );
   if (implied.length > 0) return implied;
@@ -113,7 +132,7 @@ export function boardActions(
         : placeMode === 'city'
           ? 'buildCity'
           : placeMode
-            ? placeModeAction(placeMode) // expansion build card (ui/expansions.ts)
+            ? boardExtensions.placeModeAction(placeMode) // expansion build card (ui/expansions.ts)
             : null;
   return buildType ? mine.filter((a) => a.type === buildType) : [];
 }

@@ -10,6 +10,34 @@ The orchestrator has started the session (`nice -n 19 pnpm pt:serve [--seats 3..
 opens a window a human can watch). A random seat starts (the log says "SeatN starts"). Your seat number is given to you (below: `K`). Every command is
 `pnpm -s pt K <command>`. Each call prints text and exits.
 
+## Online mode (each seat is its own browser, against the real room server)
+
+If the orchestrator started the session with `pnpm pt:serve --online ...`, you are one human
+seat of ONE online room; the other humans are other agents, empty seats are server bots. Same
+CLI, same loop below. What is different:
+
+- `wait` wakes on what the **server** says: your move, a discard you owe, a trade offer to answer
+  (also `GAME OVER`, or `DISCONNECTED for good` if the room closed on you). There is no cover:
+  ignore `pass`. After your action the reply may take up to a second (server round trip).
+- Bots play at their own pace; "thinking…" in the prompt is a bot. Other humans can be slow.
+- **Chat is allowed but optional**: `pnpm -s pt K chat "hello"`. `status` shows the last chat lines
+  and the server's seat list (human / away / bot). Do not spend turns on chat.
+- `drop` / `reconnect` / `reload` simulate a lost connection or a refreshed tab. Use them only if
+  the orchestrator asked, or once mid-game to look at what happens (banner shown? same seat back?
+  nothing lost? a bot played for you? the others saw you "away"?). Everything refused while offline is normal.
+- Bugs go to `playtest/bugs/` with `report`, as before. Online-specific things are **worth
+  reporting**:
+  - **desync**: your `status` disagrees with another seat's (hand counts, VP, whose turn, log);
+    or the board and the panel disagree after a click;
+  - **stale view**: you still see an old phase or an open dialog the others have already moved past;
+    a button that does nothing, or a toast like "Action rejected" / "not your turn" after a normal click;
+  - **reconnect**: no banner after `drop`, not back in your own seat after `reconnect`/`reload`,
+    missing log lines, someone stuck as "away" after returning, a bot still playing your seat;
+  - **timer** (`--timer`): the countdown differs a lot between seats, hits 0 with no auto-move,
+    or the auto-move is not what the rules say (minimum moves);
+  - a game that stops: nobody can act for minutes while `status` shows everyone connected.
+    Say which seat you are and what the other seats showed (ask them via chat if useful).
+
 ## The loop
 
 ```
@@ -43,6 +71,9 @@ opens a window a human can watch). A random seat starts (the log says "SeatN sta
 | `console`                 | new browser console errors                                        |
 | `click-board <id>`        | click any board id (`v:..`, `e:..`, `h:..`) to test odd clicks    |
 | `report ...`              | file a bug (see below)                                            |
+| `chat <text>`             | online only: say something in the room chat                       |
+| `drop` / `reconnect`      | online only: cut / restore your network                           |
+| `reload`                  | online only: reload your tab                                      |
 
 ## How to do things
 

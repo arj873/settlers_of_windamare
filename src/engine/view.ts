@@ -9,10 +9,14 @@
  *  - players[p].resources, devCards, newDevCards  -> all 0 (counts in view.handCounts / devCardCounts)
  *  - devDeck (order and composition)              -> HIDDEN_DEV_CARD x length
  *  - diceDeck (balanced dice order)               -> HIDDEN_DICE_CARD x length
+ *  - eventDeck (Event Cards order, V1)            -> HIDDEN_EVENT_CARD x length
+ * Public on purpose (V1): map-veto candidates and votes, event tasks, lastEvent, damagedRoads,
+ * settings.seatOrder (the seating is visible at the table anyway).
  *  - rng                                          -> 0
  *  - settings.seed and the seed in the "Game created" log line -> HIDDEN_SEED / removed
- * Once the game is over every hand and dev card is revealed (final scores show VP cards);
- * decks, rng and seed stay hidden.
+ *  - stats (UX2: stolen card types, dev cards bought, hidden VP over time) -> absent
+ * Once the game is over every hand and dev card is revealed (final scores show VP cards), and
+ * so are the stats; decks, rng and seed stay hidden.
  *
  * Pure and deterministic. The view shares unchanged parts (board, pieces, log entries...) with
  * `state`: treat it as read-only. Never pass a view to applyAction / legalActions.
@@ -30,6 +34,8 @@ export const HIDDEN_SEED = 'hidden';
 export const HIDDEN_DEV_CARD: DevCardType = 'knight';
 /** Placeholder for every undrawn dice card; only `diceDeck.length` is meaningful in a view. */
 export const HIDDEN_DICE_CARD = 0;
+/** Placeholder for every undrawn event card (V1); only `eventDeck.length` is meaningful. */
+export const HIDDEN_EVENT_CARD = 0;
 
 export interface ViewInfo {
   /** The seat this view belongs to; null = spectator. */
@@ -77,8 +83,10 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
   if (seat !== null && !state.players[seat]) throw new Error(`no player ${seat}`);
   const revealAll = state.phase.kind === 'gameOver';
   const masked = state.players.map((p) => !revealAll && p.id !== seat);
+  const { stats, ...rest } = state;
   return {
-    ...state,
+    ...rest,
+    ...(revealAll && stats ? { stats } : {}),
     settings: { ...state.settings, seed: HIDDEN_SEED },
     players: state.players.map((p, i) =>
       masked[i]
@@ -92,6 +100,7 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
     ),
     devDeck: state.devDeck.map(() => HIDDEN_DEV_CARD),
     diceDeck: state.diceDeck.map(() => HIDDEN_DICE_CARD),
+    ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => HIDDEN_EVENT_CARD) } : {}),
     log: state.log.map(maskLogEntry),
     rng: 0,
     view: {

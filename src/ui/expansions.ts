@@ -8,6 +8,7 @@ import { cropHud } from '../expansions/crop/ui';
 import { demoHud } from '../expansions/demo/ui';
 import { oilHud } from '../expansions/oil/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
+import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
 import type { GlyphName } from './icons';
 import type { HudView, PlaceMode } from './types';
@@ -95,3 +96,7 @@ export function placeModeAction(mode: string): string | null {
   }
   return null;
 }
+
+// boardActions (game/logic.ts) learns the extensions' board actions from here, so the headless room
+// server, which imports game/logic but no UI, never loads module stylesheets.
+setBoardExtensions({ implied: impliedExtActions(), placeModeAction });

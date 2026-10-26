@@ -527,3 +527,59 @@ describe('GameController: autosave', () => {
     expect(loadSession(store)).toBeNull();
   });
 });
+
+describe('GameController: game duration (UX2 stats)', () => {
+  /** richMidGame where Blue (9 VP) wins by buying the VP card on top of the deck. */
+  function oneBuyFromWinning(): GameState {
+    const s = richMidGame();
+    const players = s.players.map((p) =>
+      p.id === 1 ? { ...p, devCards: { ...p.devCards, victoryPoint: 5 } } : p,
+    );
+    return { ...s, players, devDeck: [...s.devDeck, 'victoryPoint'] };
+  }
+
+  function timed(clock: { t: number }): GameController {
+    return new GameController({ board, hud, storage: store, speed: 500, wallClock: () => clock.t });
+  }
+
+  it('measures wall-clock time from start to game over and passes it to the HUD', () => {
+    const clock = { t: 1_000_000 };
+    const c = timed(clock);
+    c.start(oneBuyFromWinning(), humans4);
+    expect(hud.last.gameDurationMs).toBeNull();
+    clock.t += 42 * 60_000;
+    hud.emit('action', { type: 'buyDevCard', player: 1 });
+    expect(c.state?.phase.kind).toBe('gameOver');
+    expect(hud.last.gameDurationMs).toBe(42 * 60_000);
+    clock.t += 10 * 60_000; // looking at the stats does not count
+    expect(c.snapshot()?.playedMs).toBe(42 * 60_000);
+  });
+
+  it('saves the time played; a resumed game does not count the time in between', () => {
+    const clock = { t: 0 };
+    const c = timed(clock);
+    c.start(oneBuyFromWinning(), humans4);
+    clock.t = 5 * 60_000;
+    const saved = c.snapshot()!;
+    expect(saved.playedMs).toBe(5 * 60_000);
+    store.setItem(SAVE_KEY, JSON.stringify(saved));
+    const loaded = loadSession(store)!;
+    expect(loaded.playedMs).toBe(5 * 60_000);
+
+    clock.t = 10 * 3_600_000; // hours later
+    c.destroy();
+    hud = new FakeHud();
+    const c2 = timed(clock);
+    c2.resume(loaded);
+    clock.t += 60_000;
+    hud.emit('action', { type: 'buyDevCard', player: 1 });
+    expect(hud.last.gameDurationMs).toBe(6 * 60_000);
+  });
+
+  it('an older save without playedMs shows no duration', () => {
+    const c = timed({ t: 0 });
+    c.resume({ version: 1, state: oneBuyFromWinning(), seats: [...humans4], viewer: 1, botRng: 1 });
+    hud.emit('action', { type: 'buyDevCard', player: 1 });
+    expect(hud.last.gameDurationMs).toBeNull();
+  });
+});

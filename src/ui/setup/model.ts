@@ -1,20 +1,32 @@
 /** Pure setup-screen logic: defaults, map/player coupling, colours, persistence. No DOM. */
 import {
   BASE_MODE,
+  OFFICIAL_SETUP,
+  RULES56_MIN_PLAYERS,
+  RULES56_VP,
+  TIMER_PRESET_VALUES,
   defaultVpToWin,
   expansionById,
   listModes,
   modeById,
   optionVpBonus,
   scenarioById,
+  timerSettings,
   type ExpansionModule,
+  type MapRules,
+  type MapSelection,
   type ModeDef,
   type OptionDef,
   type OptionValue,
   type PlayerRange,
+  type RobberMode,
   type ScenarioDef,
+  type SetupBuilding,
+  type SetupPlacement,
+  type SetupRestriction,
+  type TimerPreset,
 } from '../../engine';
-import type { Controller, MapId, NewGameConfig, SeatConfig } from '../types';
+import type { Controller, MapId, NewGameConfig, NewGameVariants, SeatConfig } from '../types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -99,12 +111,194 @@ export interface SetupDraft {
   seats: SeatDraft[];
   balancedDice: boolean;
   hideBankCards: boolean;
-  /** Index into TIMER_STEPS. */
+  /** Index into TIMER_STEPS (legacy per-turn timer; 0 while a chess clock is picked). */
   timerIdx: number;
   vpToWin: number;
   discardLimit: number;
   seed: string;
+  // --- V1 variants (defaults = official rules) ---------------------------------------------
+  robberMode: RobberMode;
+  eventCards: boolean;
+  rushMode: boolean;
+  turboMode: boolean;
+  secondSettler: boolean;
+  randomTurnOrder: boolean;
+  mapSelection: MapSelection;
+  setupPlacement: SetupPlacement;
+  /** The 5+ player rule set (only with 5+ seats). */
+  rules56: boolean;
+  /** Map rules, "allow" polarity: off (the default) = the adjacency is forbidden. */
+  allowRedTouch: boolean;
+  allowExtremeTouch: boolean;
+  allowSameNumberTouch: boolean;
+  allowSameResourceTouch: boolean;
+  /** Chess clock preset ('off' = none; the per-turn timer may be used instead). */
+  clockPreset: TimerPreset;
+  /** Custom clock: bank in minutes and increment in seconds. */
+  customBankMin: number;
+  customIncrementSec: number;
 }
+
+/** The variant fields of a draft with their defaults. */
+export const VARIANT_DEFAULTS: Pick<
+  SetupDraft,
+  | 'robberMode'
+  | 'eventCards'
+  | 'rushMode'
+  | 'turboMode'
+  | 'secondSettler'
+  | 'randomTurnOrder'
+  | 'mapSelection'
+  | 'setupPlacement'
+  | 'rules56'
+  | 'allowRedTouch'
+  | 'allowExtremeTouch'
+  | 'allowSameNumberTouch'
+  | 'allowSameResourceTouch'
+  | 'clockPreset'
+  | 'customBankMin'
+  | 'customIncrementSec'
+> = {
+  robberMode: 'normal',
+  eventCards: false,
+  rushMode: false,
+  turboMode: false,
+  secondSettler: false,
+  randomTurnOrder: false,
+  mapSelection: 'fixed',
+  setupPlacement: OFFICIAL_SETUP,
+  rules56: false,
+  allowRedTouch: false,
+  allowExtremeTouch: false,
+  allowSameNumberTouch: false,
+  allowSameResourceTouch: false,
+  clockPreset: 'off',
+  customBankMin: 15,
+  customIncrementSec: 20,
+};
+
+export const CUSTOM_BANK_MIN = { min: 1, max: 180 } as const;
+export const CUSTOM_INCREMENT_SEC = { min: 0, max: 600 } as const;
+/** Second Settler: Catanian 2 sits third to the left, so it needs 4+ players. */
+export const SECOND_SETTLER_MIN_PLAYERS = 4;
+/** Colonist Rush defaults: discard limit 9 and the friendly robber (colonist.io/catan-rules/colonist-rush). */
+export const RUSH_DISCARD_LIMIT = 9;
+
+/** The 5+ player rule set needs 5+ seats (the tile is hidden below that). */
+export const RULES56_SEATS = RULES56_MIN_PLAYERS;
+export { RULES56_VP };
+
+/** Balance rules (random maps), in screen order. Wording from the design mockup. */
+export const MAP_RULE_OPTIONS: readonly {
+  key: keyof Pick<
+    SetupDraft,
+    'allowRedTouch' | 'allowExtremeTouch' | 'allowSameNumberTouch' | 'allowSameResourceTouch'
+  >;
+  rule: keyof MapRules;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    key: 'allowRedTouch',
+    rule: 'allowRedTouch',
+    title: 'Allow 6 & 8 touching',
+    desc: 'Disabled by default — official red-number rule.',
+  },
+  {
+    key: 'allowExtremeTouch',
+    rule: 'allowExtremeTouch',
+    title: 'Allow 2 & 12 touching',
+    desc: 'Adjacent dead corners.',
+  },
+  {
+    key: 'allowSameNumberTouch',
+    rule: 'allowSameNumberTouch',
+    title: 'Same numbers may touch',
+    desc: 'Two 5s side-by-side, etc.',
+  },
+  {
+    key: 'allowSameResourceTouch',
+    rule: 'allowSameResourceTouch',
+    title: 'Same resources may touch',
+    desc: 'Resource clusters, more theme.',
+  },
+];
+
+/**
+ * The balance rules apply to every randomly generated base map. Only the fixed beginner layout is
+ * official and untouched (a veto or random map pick always lands on a random layout). Expansion
+ * modes play scenario maps, which have their own generators: the rules do not apply there.
+ */
+export function mapRulesApply(draft: SetupDraft): boolean {
+  if (draft.mode !== 'base') return false;
+  return draft.map !== 'base' || draft.mapSelection !== 'fixed';
+}
+
+export const ROBBER_OPTIONS: readonly { id: RobberMode; label: string; desc: string }[] = [
+  { id: 'normal', label: 'Normal', desc: 'Official rules' },
+  {
+    id: 'friendly',
+    label: 'Friendly robber',
+    desc: "Can't block or rob players with 2 or fewer points",
+  },
+  { id: 'none', label: 'No robber', desc: 'A 7 only makes players discard' },
+];
+
+export const MAP_SELECTION_OPTIONS: readonly { id: MapSelection; label: string; desc: string }[] = [
+  { id: 'fixed', label: 'Fixed', desc: 'The map picked above' },
+  { id: 'random', label: 'Random', desc: 'Any map that fits the players' },
+  { id: 'veto', label: 'Veto', desc: '3 boards; players veto until one is left' },
+];
+
+/**
+ * Map selections offered for the draft's mode. Expansion modes: no veto (the engine refuses it,
+ * since expansion state is built from the board); 'random' picks among the scenario's maps.
+ */
+export function mapSelectionOptions(
+  draft: Pick<SetupDraft, 'mode'>,
+): readonly { id: MapSelection; label: string; desc: string }[] {
+  if (draft.mode === 'base') return MAP_SELECTION_OPTIONS;
+  return MAP_SELECTION_OPTIONS.filter((o) => o.id !== 'veto').map((o) =>
+    o.id === 'random' ? { ...o, desc: "Any of the scenario's maps that fits the players" } : o,
+  );
+}
+
+/** The draft's map selection, if its mode offers it (else 'fixed'). */
+export function mapSelectionOf(draft: Pick<SetupDraft, 'mode' | 'mapSelection'>): MapSelection {
+  return mapSelectionOptions(draft).some((o) => o.id === draft.mapSelection)
+    ? draft.mapSelection
+    : 'fixed';
+}
+
+export const CLOCK_OPTIONS: readonly { id: TimerPreset; label: string }[] = [
+  { id: 'off', label: 'Off' },
+  { id: 'bullet', label: 'Bullet' },
+  { id: 'blitz', label: 'Blitz' },
+  { id: 'rapid', label: 'Rapid' },
+  { id: 'classic', label: 'Classic' },
+  { id: 'custom', label: 'Custom' },
+];
+
+/** "20m + 30s" for a preset (custom: the draft's values). */
+export function clockLabel(d: SetupDraft): string {
+  const p = d.clockPreset;
+  if (p === 'off') return 'Off';
+  const v =
+    p === 'custom'
+      ? { bankSec: d.customBankMin * 60, incrementSec: d.customIncrementSec }
+      : TIMER_PRESET_VALUES[p];
+  const bank = v.bankSec % 60 === 0 ? `${v.bankSec / 60}m` : `${v.bankSec}s`;
+  return `${bank} + ${v.incrementSec}s`;
+}
+
+export const SETUP_BUILDING_OPTIONS: readonly { id: SetupBuilding; label: string }[] = [
+  { id: 'settlement', label: 'Settlement' },
+  { id: 'city', label: 'City' },
+];
+export const SETUP_RESTRICTION_OPTIONS: readonly { id: SetupRestriction; label: string }[] = [
+  { id: 'normal', label: 'Distance rule' },
+  { id: 'anyVertex', label: 'None (any vertex)' },
+];
 
 function newSeat(index: number, taken: Set<string>): SeatDraft {
   const c =
@@ -133,6 +327,7 @@ export function defaultSetup(playerCount = 4): SetupDraft {
     vpToWin: VP_DEFAULT,
     discardLimit: DISCARD_DEFAULT,
     seed: '',
+    ...VARIANT_DEFAULTS,
   };
 }
 
@@ -165,7 +360,141 @@ export function setPlayerCount(draft: SetupDraft, count: number): SetupDraft {
   while (seats.length < n) seats.push(newSeat(seats.length, new Set(seats.map((s) => s.color))));
   let map = draft.map;
   if (!mapFits(map, n)) map = MAPS.find((m) => m.max >= n)?.id ?? 'base78';
-  return { ...draft, seats, map };
+  const secondSettler = draft.secondSettler && n >= SECOND_SETTLER_MIN_PLAYERS;
+  // Dropping below 5 seats turns the 5+ rule set off (and gives back its 12 VP preset).
+  const dropped = draft.rules56 && n < RULES56_SEATS;
+  const rules56 = draft.rules56 && !dropped;
+  const vpToWin = dropped && draft.vpToWin === RULES56_VP ? VP_DEFAULT : draft.vpToWin;
+  return { ...draft, seats, map, secondSettler, rules56, vpToWin };
+}
+
+// ---------------------------------------------------------------------------
+// Variant coupling
+// ---------------------------------------------------------------------------
+
+export type ToggleKey =
+  | 'balancedDice'
+  | 'hideBankCards'
+  | 'eventCards'
+  | 'rushMode'
+  | 'turboMode'
+  | 'secondSettler'
+  | 'randomTurnOrder'
+  | 'rules56'
+  | 'allowRedTouch'
+  | 'allowExtremeTouch'
+  | 'allowSameNumberTouch'
+  | 'allowSameResourceTouch';
+
+/**
+ * Flip a switch. Event Cards and Balanced Dice exclude each other (both replace the dice);
+ * turning Rush on applies the Colonist Rush defaults (discard limit 9, friendly robber);
+ * Second Settler needs 4+ players. The 5+ rule set needs 5+ players, excludes Second Settler
+ * (it is built on the special building phase) and suggests 12 VP: it moves the slider from
+ * the default 10 to 12 (any other value the player chose stays; turning it off undoes only that).
+ */
+export function toggle(draft: SetupDraft, key: ToggleKey): SetupDraft {
+  const on = !draft[key];
+  if (key === 'secondSettler' && on && draft.seats.length < SECOND_SETTLER_MIN_PLAYERS)
+    return draft;
+  if (key === 'rules56' && on && draft.seats.length < RULES56_SEATS) return draft;
+  const next: SetupDraft = { ...draft, [key]: on };
+  if (key === 'rules56') {
+    if (on) {
+      next.secondSettler = false;
+      if (next.vpToWin === VP_DEFAULT) next.vpToWin = RULES56_VP;
+    } else if (next.vpToWin === RULES56_VP) next.vpToWin = VP_DEFAULT;
+  }
+  if (on && key === 'secondSettler' && draft.rules56) {
+    next.rules56 = false;
+    if (next.vpToWin === RULES56_VP) next.vpToWin = VP_DEFAULT;
+  }
+  if (on && key === 'eventCards') next.balancedDice = false;
+  if (on && key === 'balancedDice') next.eventCards = false;
+  if (on && key === 'rushMode') {
+    next.discardLimit = RUSH_DISCARD_LIMIT;
+    if (next.robberMode === 'normal') next.robberMode = 'friendly';
+  }
+  return next;
+}
+
+/** Pick a chess-clock preset; any preset turns the per-turn timer off. */
+export function setClockPreset(draft: SetupDraft, preset: TimerPreset): SetupDraft {
+  return { ...draft, clockPreset: preset, timerIdx: preset === 'off' ? draft.timerIdx : 0 };
+}
+
+/** Step the per-turn timer; turning it on turns the chess clock off. */
+export function setTimerIdx(draft: SetupDraft, idx: number): SetupDraft {
+  const timerIdx = clamp(idx, 0, TIMER_STEPS.length - 1);
+  return { ...draft, timerIdx, clockPreset: timerIdx > 0 ? 'off' : draft.clockPreset };
+}
+
+export function setSetupRound(
+  draft: SetupDraft,
+  round: 'first' | 'second',
+  change: Partial<SetupPlacement['first']>,
+): SetupDraft {
+  const setupPlacement = {
+    ...draft.setupPlacement,
+    [round]: { ...draft.setupPlacement[round], ...change },
+  };
+  return { ...draft, setupPlacement };
+}
+
+/** The variants of a draft that differ from the official rules (undefined when none do). */
+export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
+  const v: NewGameVariants = {};
+  if (draft.robberMode !== 'normal') v.robberMode = draft.robberMode;
+  if (draft.eventCards) v.eventCards = true;
+  if (draft.rushMode) v.rushMode = true;
+  if (draft.turboMode) v.turboMode = true;
+  if (draft.secondSettler && draft.seats.length >= SECOND_SETTLER_MIN_PLAYERS) {
+    v.secondSettler = true;
+  }
+  if (draft.randomTurnOrder) v.randomTurnOrder = true;
+  if (draft.rules56 && draft.seats.length >= RULES56_SEATS) v.rules56 = true;
+  const mapRules: MapRules = {};
+  for (const o of MAP_RULE_OPTIONS) if (draft[o.key]) mapRules[o.rule] = true;
+  if (Object.keys(mapRules).length > 0) v.mapRules = mapRules;
+  const mapSelection = mapSelectionOf(draft);
+  if (mapSelection !== 'fixed') v.mapSelection = mapSelection;
+  const p = draft.setupPlacement;
+  const o = OFFICIAL_SETUP;
+  if (
+    p.first.building !== o.first.building ||
+    p.first.restriction !== o.first.restriction ||
+    p.second.building !== o.second.building ||
+    p.second.restriction !== o.second.restriction
+  ) {
+    v.setupPlacement = { first: { ...p.first }, second: { ...p.second } };
+  }
+  const timer = timerSettings(draft.clockPreset, {
+    bankSec: draft.customBankMin * 60,
+    incrementSec: draft.customIncrementSec,
+  });
+  if (timer) v.timer = timer;
+  return Object.keys(v).length > 0 ? v : undefined;
+}
+
+/** Append one seat (human by default, first unused colour). No-op at MAX_PLAYERS; the map auto-switches. */
+export function addSeat(draft: SetupDraft, controller: Controller = 'human'): SetupDraft {
+  if (draft.seats.length >= playerRange(draft).max) return draft;
+  const grown = setPlayerCount(draft, draft.seats.length + 1);
+  const last = grown.seats.length - 1;
+  return { ...grown, seats: grown.seats.map((s, i) => (i === last ? { ...s, controller } : s)) };
+}
+
+/**
+ * Remove exactly seat `index` (not the last one). No-op at the mode's minimum (playerRange) or for
+ * a bad index. Remaining seats keep their names, colours and controllers, so colours stay unique;
+ * the map is kept (it still fits). Seat-count couplings (Second Settler, 5+ rules) apply as in
+ * setPlayerCount.
+ */
+export function removeSeat(draft: SetupDraft, index: number): SetupDraft {
+  if (draft.seats.length <= playerRange(draft).min || !Number.isInteger(index)) return draft;
+  if (index < 0 || index >= draft.seats.length) return draft;
+  const fewer = { ...draft, seats: draft.seats.filter((_, i) => i !== index) };
+  return setPlayerCount(fewer, fewer.seats.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +660,11 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
   };
   const seed = draft.seed.trim();
   if (seed) cfg.seed = seed;
+  const variants = buildVariants(draft);
+  if (variants) {
+    cfg.variants = variants;
+    if (variants.timer) cfg.turnTimerSec = null;
+  }
   return cfg;
 }
 
@@ -433,9 +767,61 @@ export function sanitizeSetup(raw: unknown): SetupDraft {
       vpToWin: int(raw['vpToWin'], VP_MIN, VP_MAX, VP_DEFAULT),
       discardLimit: int(raw['discardLimit'], DISCARD_MIN, DISCARD_MAX, DISCARD_DEFAULT),
       seed: '',
+      ...sanitizeVariants(raw),
     },
     seats.length,
   );
+}
+
+const oneOf = <T extends string>(v: unknown, options: readonly { id: T }[], fallback: T): T =>
+  options.some((o) => o.id === v) ? (v as T) : fallback;
+
+function sanitizeRound(raw: unknown, fallback: SetupPlacement['first']): SetupPlacement['first'] {
+  const o = isRecord(raw) ? raw : {};
+  return {
+    building: oneOf(o['building'], SETUP_BUILDING_OPTIONS, fallback.building),
+    restriction: oneOf(o['restriction'], SETUP_RESTRICTION_OPTIONS, fallback.restriction),
+  };
+}
+
+/** Variant fields of a stored draft (older drafts have none: defaults). */
+function sanitizeVariants(raw: Record<string, unknown>): typeof VARIANT_DEFAULTS {
+  const d = VARIANT_DEFAULTS;
+  const sp = isRecord(raw['setupPlacement']) ? raw['setupPlacement'] : {};
+  const eventCards = raw['eventCards'] === true && raw['balancedDice'] !== true;
+  const clockPreset = oneOf(raw['clockPreset'], CLOCK_OPTIONS, d.clockPreset);
+  return {
+    robberMode: oneOf(raw['robberMode'], ROBBER_OPTIONS, d.robberMode),
+    eventCards,
+    rushMode: raw['rushMode'] === true,
+    turboMode: raw['turboMode'] === true,
+    secondSettler: raw['secondSettler'] === true,
+    randomTurnOrder: raw['randomTurnOrder'] === true,
+    // Seat count is re-checked by setPlayerCount (rules56 off below 5 seats).
+    rules56: raw['rules56'] === true && raw['secondSettler'] !== true,
+    allowRedTouch: raw['allowRedTouch'] === true,
+    allowExtremeTouch: raw['allowExtremeTouch'] === true,
+    allowSameNumberTouch: raw['allowSameNumberTouch'] === true,
+    allowSameResourceTouch: raw['allowSameResourceTouch'] === true,
+    mapSelection: oneOf(raw['mapSelection'], MAP_SELECTION_OPTIONS, d.mapSelection),
+    setupPlacement: {
+      first: sanitizeRound(sp['first'], d.setupPlacement.first),
+      second: sanitizeRound(sp['second'], d.setupPlacement.second),
+    },
+    clockPreset,
+    customBankMin: int(
+      raw['customBankMin'],
+      CUSTOM_BANK_MIN.min,
+      CUSTOM_BANK_MIN.max,
+      d.customBankMin,
+    ),
+    customIncrementSec: int(
+      raw['customIncrementSec'],
+      CUSTOM_INCREMENT_SEC.min,
+      CUSTOM_INCREMENT_SEC.max,
+      d.customIncrementSec,
+    ),
+  };
 }
 
 export function loadSetup(storage: SetupStorage | null): SetupDraft {

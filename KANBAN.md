@@ -10,8 +10,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M3** · Client: home + lobby (invite link, nickname, seats, host config), network controller + reconnect, chat, spectator HUD, in-browser dev server · `s4-mp-client` 🟦
-- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦
+- **BUG-B3** · Online trade flow (from M4b Haiku online playtest): bots withdraw accepted trades; other humans never prompted for a human's offer; offers vanish without a log line · `s4-online-trade` 🟦
 
 ## 📋 Backlog — Stage 4
 
@@ -22,7 +21,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **E1** · Oil Springs + Crop Trust scenarios (rules research + docs/rules/*.md) · `s3-oil-crop` 🟩
 
 ## 🏃 In Progress — Stage 2
 
@@ -57,6 +55,15 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
+- (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
+- (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
+- (UX1) board sea tint per theme (`--board-sea` tokens) · "1 human + N bots" quick-fill
+- (M4b triage) harness `status` should show hand deltas with their log source (2 Haiku false positives: production misread as trade effects)
+- (M3) remove-seat-N protocol message + lobby kick button · unread badge on collapsed chat · CI job on `scripts/e2e/online.ts --remote` · reconnect banner vs toast overlap
+- (E1) Oil Springs "Wide Open" variant · pick which hex a Crop Trust loss hits · shared wins (`winner` array) · core counts metropolis-only special builds
+- (V1) real-time Rush (simultaneous actors, server dice clock) · all players' chess-clock banks in the players panel · C&K notes on event cards · smarter bot event choices
+- (orch) board behind the winner modal isn't refit (sits left)
 - (M2) global rate limiting via WAF / rate-limit binding · fewer DO storage writes · send diffs not full views · run e2e:server in GitHub Actions
 - (B1) harness auto-clicks Fit board when a spot is off-screen · headed playtests guard wheel input · highlight Fit board while camera is manual
 - (M1) HUD spectator mode → in M3 · parallel timer for simultaneous discards · board once + log deltas over the wire · heuristic bot that plays from `viewFor` · private "you stole X" notice
@@ -116,6 +123,15 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **UX2** · Game Statistics at game over: Overview (VP breakdown + 8 awards), Dice (histogram vs expected), Resources (by type/source/loss), Activity (VP-over-turns chart), Dev Cards; engine `stats` slice, online-safe · `s4-game-stats` 🟦 · PR #12 → `main` · 1027 tests
+- **BUG-B2** · Board crisp at every zoom (text re-rasterised to zoom, renderer follows DPR) + fit the island not the sea (+18% on base78) · `s4-board-crisp` 🟦 · PR #11 → `main` · 987 tests
+- **V2** · Map **Balance rules** (4 Allow… toggles, all random maps) + optional **5+ player rule set** (dev card in build phase, no robber on 2nd desert, 12 VP) + component audit · `s4-rules-56` 🟩 · PR #10 → `main` · 981 tests
+- **M4b** · 3 Haiku agents played an online game to ~turn 87 (room on wrangler dev, headed); 5 reports → 2 false positives, 3 real trade-flow issues → BUG-B3 · `s4-haiku-1..3`
+- **UX1** · Seat × remove / + Add player; **GitHub Dark** + **Material Dark** themes (all screens incl. online + V1); 6P name-truncation fix · `s4-themes-seats` 🟩 · PR #9 → `main` · 921 tests
+- **M4a** · Online playtest harness (`pt:serve --online`, per-seat browser contexts vs wrangler dev, drop/reconnect/reload/chat) + GitHub Actions CI · `s4-mp-e2e` 🟩 · PR #8 → `main` · 917 tests
+- **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
+- **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
+- **E1** · Oil Springs + Crop Trust (official rulebooks; docs/rules/oil-springs.md, crop-trust.md) · `s3-oil-crop` 🟩 · PR #5 → `expansions` · 948 tests on expansions
 - **M2** · Room server: Worker + Durable Object per room (hibernation, alarms, snapshots), 6-char codes, origin check + rate limits, `pnpm dev:server` / `e2e:server` / `deploy:cf` · `s4-mp-server` 🟦 · PR #4 → `main` · 777 tests, e2e passed
 - **BUG-B1** · Camera stuck zoomed (stray wheel in headed playtest never left manual mode) → fit math fixed, manual mode only on real drag/wheel/pinch, **Fit board** button · `s3-camera-bug` 🟦 · PR #3 → `main` · 747 tests
 - **M1** · Multiplayer protocol, per-player views (leak-tested), GameSession, LocalNet, docs/MULTIPLAYER.md · `s4-mp-protocol` 🟦 · PR #2 → `main` · 733 tests
