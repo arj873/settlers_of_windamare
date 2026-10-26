@@ -89,7 +89,8 @@ the robber and harbours never see plazas. Helpers in `hex.ts`: `centreVertex`, `
 
 **Expansion maps (F1):** `MapId = BaseMapId | '<expansion>/<name>'`. A `CustomMapDef`
 (`layout: 'custom'`, `generate(rng, players)`) on a `HexListFrameDef` (any hex set + explicit sea
-and harbors). Board helpers `assembleBoard`, `dealTokens`. Details: `docs/EXPANSIONS.md` §6.
+and harbors). Board helpers `assembleBoard`, `dealTokens`. Details: `docs/EXPANSIONS.md` §6. A
+combination map built on another module's map names it in `basedOn` (C2, EXPANSIONS.md §11).
 
 **Topology** is derived from the frame, built once per frame and cached, **not stored in GameState**:
 
