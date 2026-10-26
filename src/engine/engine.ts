@@ -4,12 +4,13 @@ import { cloneState } from './clone';
 import { LOG_LIMIT } from './constants';
 import { changesRoads, updateAwards } from './rules/awards';
 import { checkVictory } from './rules/victory';
+import { recordAction } from './stats';
 import type { Action, ActionResult, ActionType, GameState, PlayerId } from './types';
 
 /**
  * Pure transition: never mutates `state`. Pipeline:
  *   generic checks -> cloneState -> HANDLERS[type](draft, action) -> updateAwards -> checkVictory
- *   -> trim log to LOG_LIMIT
+ *   -> recordAction (stats.ts) -> trim log to LOG_LIMIT
  */
 export function applyAction(state: GameState, action: Action): ActionResult {
   if (state.phase.kind === 'gameOver') return { ok: false, error: 'game is over' };
@@ -26,6 +27,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
   if (!result.ok) return result;
   updateAwards(result.state, { roads: changesRoads(action.type) });
   checkVictory(result.state);
+  recordAction(state, result.state, action);
   trimLog(result.state);
   return result;
 }

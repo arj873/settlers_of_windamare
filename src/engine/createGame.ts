@@ -23,6 +23,7 @@ import {
 } from './variants';
 import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
+import { emptyStats } from './stats';
 import type {
   DevCardType,
   GameSettings,
@@ -351,6 +352,7 @@ export function createGame(config: GameConfig): GameState {
     ],
     rng: rng.state,
     winner: null,
+    stats: emptyStats(players.length),
     ...(settings.eventCards
       ? { eventDeck: [], lastEvent: null, damagedRoads: players.map((): null => null) }
       : {}),

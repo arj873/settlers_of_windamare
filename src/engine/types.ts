@@ -387,6 +387,82 @@ export interface GameState {
   lastEvent?: EventKind | null;
   /** Event Cards (Earthquake): each player's damaged road, or null. Indexed by PlayerId. */
   damagedRoads?: (EdgeId | null)[];
+  // --- UX2 game statistics: optional (older saves start recording on their next action) ----
+  /**
+   * End-of-game statistics, kept up to date by applyAction (stats.ts). Immutable: a new object
+   * replaces it whenever it changes, so states share it (clone.ts). Secret until game over
+   * (viewFor drops it from mid-game views). Read it through `statsOf`.
+   */
+  stats?: GameStats;
+}
+
+// ---------------------------------------------------------------------------
+// Game statistics (UX2, stats.ts)
+// ---------------------------------------------------------------------------
+
+/** Where resource cards came from. 'other' must stay empty (an unclassified change; tested). */
+export type GainSource =
+  'production' | 'setup' | 'trade' | 'bank' | 'steal' | 'devCard' | 'event' | 'other';
+/**
+ * Where resource cards went: spent on pieces ('build') or dev cards ('buyDev'), given in player
+ * ('trade') or bank/port trades ('bank'), taken by a steal ('stolen'), discarded on a 7,
+ * taken by a Monopoly, given away in an event.
+ */
+export type LossSink =
+  'build' | 'buyDev' | 'trade' | 'bank' | 'stolen' | 'discard' | 'monopoly' | 'event' | 'other';
+
+export interface PlayerStats {
+  /** Resource cards gained, by source and type. */
+  gained: Record<GainSource, ResourceCounts>;
+  /** Resource cards lost, by sink and type. Σgained − Σlost = hand (when `complete`). */
+  lost: Record<LossSink, ResourceCounts>;
+  /** Production the robber blocked (what its hex would have paid; bank shortage ignored). */
+  blocked: ResourceCounts;
+  /**
+   * Expected production × 36 over this player's rolls-so-far (each roll adds Σ pips × yield of
+   * their buildings' unblocked hexes). Luck = production − expected36 / 36.
+   */
+  expected36: number;
+  /** Totals this player rolled: index = total − 2 (2..12). Event cards count their number. */
+  rolls: number[];
+  /** Pieces placed (setup and free roads included). */
+  built: { road: number; settlement: number; city: number };
+  /** Of `built.road`: roads from Road Building. */
+  freeRoads: number;
+  devBought: DevCardCounts;
+  /** Cards played; `victoryPoint` stays 0 (VP cards are revealed, never played). */
+  devPlayed: DevCardCounts;
+  /** Player trade offers made. */
+  offersMade: number;
+  /** Own offers that went through (confirmTrade). */
+  tradesAsOfferer: number;
+  /** Others' offers this player completed as the partner. */
+  tradesAsPartner: number;
+  /** 4:1 trades with the bank. */
+  bankTrades: number;
+  /** 3:1 and 2:1 harbor trades. */
+  portTrades: number;
+  robberMoves: number;
+  /** Cards stolen (robber and event steals). */
+  steals: number;
+  /** Times a card was stolen from this player. */
+  robbed: number;
+  /** Times this player had to discard on a 7. */
+  discards: number;
+}
+
+export interface GameStats {
+  /** True when recording began at createGame (false: an older save; counts start at fromTurn). */
+  complete: boolean;
+  /** turn.number when recording began. */
+  fromTurn: number;
+  players: PlayerStats[];
+  /** Event Cards drawn, by event (V1 eventCards games). */
+  events: Partial<Record<EventKind, number>>;
+  /** Everyone's VP (hidden VP cards included) at the end of each turn; turn 0 = after setup. */
+  vpHistory: { turn: number; vp: number[] }[];
+  /** Award holder changes, oldest first (player null = nobody holds it any more). */
+  awardHistory: { turn: number; award: 'longestRoad' | 'largestArmy'; player: PlayerId | null }[];
 }
 
 // ---------------------------------------------------------------------------

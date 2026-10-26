@@ -295,6 +295,14 @@ describe('GameSession game', () => {
     // Game over reveals hands, and the winner is announced.
     const final = net.last('eve', 'game')!;
     expect(final.view.view.masked.every((m) => !m)).toBe(true);
+    // UX2: the stats and the game's duration (room clock) come with the game-over view only.
+    expect(final.view.stats?.complete).toBe(true);
+    expect(final.durationMs).toBeGreaterThan(0);
+    const midGame = net.messages('eve', 'game').filter((m) => m.view.phase.kind !== 'gameOver');
+    expect(midGame.length).toBeGreaterThan(0);
+    expect(midGame.every((m) => m.view.stats === undefined && m.durationMs === undefined)).toBe(
+      true,
+    );
     expect(net.messages('eve', 'chat').some((c) => c.entry.text.endsWith('won the game!'))).toBe(
       true,
     );

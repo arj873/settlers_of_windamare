@@ -133,6 +133,7 @@ export class NetGameController {
       away,
       turnTimer: this.timerView(),
       spectator: viewer === null,
+      gameDurationMs: g.durationMs ?? null,
     };
   }
 
