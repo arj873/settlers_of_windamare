@@ -247,6 +247,15 @@ export function runAfterAction(draft: GameState, action: Action): void {
   for (const m of activeModules(draft)) m.hooks?.afterAction?.(draft, action);
 }
 
+/** A module's own win test for `player` (`wins` hook), or undefined for the VP target. */
+export function hookWins(state: GameState, player: PlayerId): boolean | undefined {
+  for (const m of activeModules(state)) {
+    const w = m.hooks?.wins?.(state, player);
+    if (w !== undefined) return w;
+  }
+  return undefined;
+}
+
 /** Does an active module take over the victory check (`deferVictory`)? */
 export function victoryDeferred(state: GameState): boolean {
   for (const m of activeModules(state)) if (m.hooks?.deferVictory?.(state)) return true;

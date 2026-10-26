@@ -238,6 +238,12 @@ export interface ExpansionHooks {
    * checked at the end of the turn, after the disaster phase).
    */
   deferVictory?(state: GameState): boolean;
+  /**
+   * first-wins. Does `player` (whose turn it is) win now? Replaces the core "VP ≥ target" test
+   * in checkVictory, which runs after the awards are updated (Seafarers: Pirate Islands needs the
+   * captured fortress too; Wonders a completed wonder or the highest one). undefined = default.
+   */
+  wins?(state: GameState, player: PlayerId): boolean | undefined;
 }
 
 export interface ExpansionModule {

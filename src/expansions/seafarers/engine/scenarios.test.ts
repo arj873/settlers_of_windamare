@@ -680,6 +680,36 @@ describe('The Wonders of Catan (§2.9, §4.11, E16-E18)', () => {
     );
   });
 
+  it('the 10th VP from Longest Trade Route wins (the check runs after the awards)', () => {
+    let s = mainPhase(seaGame('wondersOfCatan', 4));
+    const w = seaSlice(s).wonders!;
+    w.started[4] = 0;
+    w.level[0] = 1;
+    // 8 VP of cities, then a 5-ship route: the award's 2 VP make 10.
+    const vs = graph(s)
+      .vertices.filter((v) => canPlaceSettlement(s, 0, v, { requireRoad: false }))
+      .slice(0, 4);
+    for (const v of vs) s.pieces.buildings[v] = { owner: 0, kind: 'city' };
+    expect(victoryPoints(s, 0)).toBe(8);
+    for (let i = 0; i < 5 && s.winner === null; i++) {
+      setHand(s, 0, { lumber: 1, wool: 1 });
+      const a =
+        legalActions(s, 0).find(
+          (x) =>
+            x.type === 'seafarers/buildShip' &&
+            graph(s)
+              .ends.get((x as { edge: EdgeId }).edge)
+              ?.some((v) =>
+                (graph(s).edgesAt.get(v) ?? []).some((e) => seaSlice(s).ships[e]?.owner === 0),
+              ),
+        ) ?? legalActions(s, 0).find((x) => x.type === 'seafarers/buildShip');
+      if (!a) throw new Error('no ship spot');
+      s = expectOk(applyAction(s, a));
+    }
+    expect(s.awards.longestRoad).toBe(0);
+    expect(s.winner).toBe(0);
+  });
+
   it('level 4 wins at once; 10 VP win only with a strictly higher level', () => {
     const s = mainPhase(seaGame('wondersOfCatan', 4));
     const w = seaSlice(s).wonders!;

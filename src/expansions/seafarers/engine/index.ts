@@ -318,31 +318,24 @@ function declare(draft: GameState, p: PlayerId, why: string): void {
   log(draft, p, `${name(draft, p)} wins ${why}!`);
 }
 
-/** The core victory check's conditions: on your own turn, not in setup / special build. */
-function canWinNow(draft: GameState): boolean {
-  const kind = draft.phase.kind;
-  if (kind === 'gameOver' || kind === 'setup' || kind === 'specialBuild') return false;
-  return draft.winner === null && draft.turn.specialOwner === undefined;
-}
-
-function checkSeaVictory(draft: GameState): void {
-  if (!canWinNow(draft)) return;
-  const p = draft.turn.current;
-  const key = scenarioKey(draft);
-  const vp = victoryPoints(draft, p);
+/**
+ * The scenario's own win test for the player whose turn it is (the core victory check calls it
+ * after the awards are updated): Pirate Islands, your fortress taken AND the VP target (§4.10);
+ * Wonders, a completed wonder, or the VP target with a strictly higher wonder (§4.11).
+ */
+function seaWins(state: GameState, p: PlayerId): boolean | undefined {
+  const key = scenarioKey(state);
+  const vp = victoryPoints(state, p);
   if (key === 'pirateIslands') {
-    // Your own fortress captured AND the VP target (§4.10).
-    if (fortressOf(draft, p)?.chits === 0 && vp >= draft.settings.vpToWin) {
-      declare(draft, p, `with ${vp} victory points and their fortress taken`);
-    }
-  } else if (key === 'wondersOfCatan') {
-    const level = seaSlice(draft).wonders?.level ?? [];
-    const mine = level[p] ?? 0;
-    if (mine >= WONDER_LEVELS) declare(draft, p, 'by completing their wonder');
-    else if (vp >= draft.settings.vpToWin && level.every((l, o) => o === p || l < mine)) {
-      declare(draft, p, `with ${vp} victory points and the highest wonder`);
-    }
+    return fortressOf(state, p)?.chits === 0 && vp >= state.settings.vpToWin;
   }
+  if (key === 'wondersOfCatan') {
+    const level = seaSlice(state).wonders?.level ?? [];
+    const mine = level[p] ?? 0;
+    if (mine >= WONDER_LEVELS) return true;
+    return vp >= state.settings.vpToWin && level.every((l, o) => o === p || l < mine);
+  }
+  return undefined;
 }
 
 /** Cloth for Catan: when 3 or fewer villages hold cloth at the end of a turn, the game ends. */
@@ -590,13 +583,9 @@ export const seafarersModule: ExpansionModule = {
             ? { kind: 'steal', candidates, resume }
             : resumePhase(draft, resume);
       }
-      checkSeaVictory(draft);
     },
 
-    deferVictory(state) {
-      const key = scenarioKey(state);
-      return key === 'pirateIslands' || key === 'wondersOfCatan';
-    },
+    wins: seaWins,
   },
 };
 

@@ -18,7 +18,7 @@ Modules: `demo`, `oil` (Oil Springs), `crop` (Crop Trust), `seafarers` (Seafarer
 scenarios for 3-6 players, `docs/rules/seafarers.md` §11). Seafarers is the reference for
 board-heavy modules: scenario maps on `HexListFrameDef`s, sea-edge pieces (ships) with their own
 geometry over `seaEdges`, copy-on-write board changes (fog, placed harbours), setup interrupts,
-`setupOrder`, `armySize`, `deferVictory` with its own win rules.
+`setupOrder`, `armySize`, its own win rules through the `wins` hook.
 
 ---
 
@@ -201,6 +201,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `onStartTurn(draft, p)`                   | `beginTurn` (turn 1, after SBP, Catanian 2)    | additive                    | reset per-turn flags (ship moved, fast gold used)              |
 | `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |
 | `deferVictory(state)`                     | `checkVictory`                                 | additive OR                 | Oil Springs: the win is declared at the end of the turn        |
+| `wins(state, p)` → `boolean \| undefined` | `checkVictory` (after the awards)              | first-wins                  | Seafarers: fortress + 10 VP, a completed / highest wonder      |
 
 **Variant settings** (V1/V2, `docs/RULES.md` §18-20) apply in expansion modes too. Read the
 blocked hex and the city yield from `ctx` (or `hasRobber(settings)`), not `state.robber` / 2, so
