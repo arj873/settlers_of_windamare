@@ -1,0 +1,29 @@
+/* E&P + T&B HUD (classes are prefixed eptb-). Colours come from the theme tokens. */
+.eptb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.eptb-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.eptb-fact {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.eptb-fact.is-on {
+  border-left-color: var(--accent);
+}
+.eptb-uses {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.eptb-btn {
+  text-align: left;
+}

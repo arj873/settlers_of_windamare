@@ -123,6 +123,20 @@ describe('setup: city first, harbor settlement second', () => {
     expect(s.players[3]?.resources).toEqual(before);
   });
 
+  it('when the cities leave no marked corner free, the harbor goes on any free coast (ours)', () => {
+    let s = game();
+    for (let i = 0; i < 4; i++) s = run(s, legalOf(s, 'placeSetupSettlement')[0] as Action);
+    // Take every free marked corner (a stand-in for cities placed there).
+    for (const x of legalOf(s, 'placeSetupSettlement')) {
+      const v = (x as unknown as { vertex: keyof GameState['pieces']['buildings'] }).vertex;
+      s.pieces.buildings[v] ??= { owner: 3, kind: 'city' };
+    }
+    const coast = legalOf(s, 'placeSetupSettlement');
+    expect(coast.length).toBeGreaterThan(0);
+    s = run(s, coast[0] as Action);
+    expect(Object.keys(epSlice(s).harbors)).toHaveLength(1);
+  });
+
   it('then each player places a road at the city and a ship with a settler at the harbor', () => {
     let s = game();
     for (let i = 0; i < 100 && s.turn.number === 0; i++) {

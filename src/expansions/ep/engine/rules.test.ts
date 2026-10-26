@@ -238,6 +238,26 @@ describe('where roads and settlements go (§3.3, §4.11)', () => {
     expect(tryAct(s, 'buildSettlement', 0, { vertex: corner }).ok).toBe(true);
     expect(tryAct(s, 'buildRoad', 0, { edge: E(10, 1, 'SW') }).ok).toBe(true);
   });
+
+  it('a free road (Road Building, fish in the combinations) obeys the farms too', () => {
+    const s = openSea(blank());
+    const farm = H(9, 2);
+    reveal(s, farm, T.spice);
+    epSlice(s).spice[farm] = { kind: 'swift', sacks: [0, 1], crews: [1] };
+    reveal(s, H(10, 1), 'ore', 6);
+    settle(s, 0, V(10, 1, 'N'));
+    s.pieces.roads[E(10, 1, 'NW')] = 0;
+    s.pieces.roads[E(10, 1, 'W')] = 0;
+    s.phase = { kind: 'roadBuilding', remaining: 1, resume: 'main' };
+    const edge = E(10, 1, 'SW');
+    const free = () =>
+      legalActions(s, 0).some((a) => a.type === 'placeFreeRoad' && a.edge === edge);
+    expect(free()).toBe(false);
+    expect(tryAct(s, 'placeFreeRoad', 0, { edge }).ok).toBe(false);
+    epSlice(s).spice[farm]?.crews.push(0);
+    expect(free()).toBe(true);
+    expect(tryAct(s, 'placeFreeRoad', 0, { edge }).ok).toBe(true);
+  });
 });
 
 describe('the turn: Action phase, then Movement phase (§3.1, §3.4)', () => {

@@ -107,7 +107,10 @@ describe('E&P online views: no leak in bot games', () => {
     60_000,
   );
 
-  it.each([['ep+ck', 'full']] as const)(
+  it.each([
+    ['ep+ck', 'full'],
+    ['ep+tb', 'fish'],
+  ] as const)(
     'combination %s (%s): the E&P mask runs',
     (mode, key) => {
       const states = sampleStates(

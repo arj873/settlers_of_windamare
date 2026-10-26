@@ -13,6 +13,7 @@ import { epBots } from '../expansions/ep/bots';
 import { seackBots } from '../expansions/seack/bots';
 import { tbckBots } from '../expansions/tbck/bots';
 import { epckBots } from '../expansions/epck/bots';
+import { eptbBots } from '../expansions/eptb/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 
@@ -42,6 +43,7 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   seackBots,
   tbckBots,
   epckBots,
+  eptbBots,
   // new modules go here, one per line
 ];
 

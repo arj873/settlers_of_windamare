@@ -14,6 +14,7 @@ import { epHud } from '../expansions/ep/ui';
 import { seackHud } from '../expansions/seack/ui';
 import { tbckHud } from '../expansions/tbck/ui';
 import { epckHud } from '../expansions/epck/ui';
+import { eptbHud } from '../expansions/eptb/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -96,6 +97,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   seackHud,
   tbckHud,
   epckHud,
+  eptbHud,
   // new modules go here, one per line
 ];
 
