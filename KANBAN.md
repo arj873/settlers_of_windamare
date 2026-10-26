@@ -10,8 +10,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩
-- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦 · ✅ built (721 tests, 0 sim violations) → finishing online-protocol integration before merge · ⚠️ your call later: Rush = auto-roll (real Colonist Rush is real-time), Turbo = both setup settlements pay (no source), timer presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
+- **M4a** · Online playtest harness (`pt:serve --online`, one browser per seat vs wrangler dev, drop/reconnect) → then 3 Haiku agents play a remote game · `s4-mp-e2e` 🟩
+- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
 ## 📋 Backlog — Stage 4
 
@@ -119,6 +119,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
 - **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
 - **E1** · Oil Springs + Crop Trust (official rulebooks; docs/rules/oil-springs.md, crop-trust.md) · `s3-oil-crop` 🟩 · PR #5 → `expansions` · 948 tests on expansions
 - **M2** · Room server: Worker + Durable Object per room (hibernation, alarms, snapshots), 6-char codes, origin check + rate limits, `pnpm dev:server` / `e2e:server` / `deploy:cf` · `s4-mp-server` 🟦 · PR #4 → `main` · 777 tests, e2e passed
