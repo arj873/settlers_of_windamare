@@ -159,9 +159,15 @@ function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId,
 /** Where the knight on `from` may move: free, not on the castle; with the steps it takes. */
 export function knightTargets(state: GameState, from: EdgeId): Map<EdgeId, number> {
   const s = baOf(state);
-  const out = new Map<EdgeId, number>();
   const grain = (state.players[s.knights[from] ?? -1]?.resources.grain ?? 0) > 0;
-  for (const [e, d] of edgeDistances(state, from, grain ? KNIGHT_STEPS_GRAIN : KNIGHT_STEPS)) {
+  return knightReach(state, from, grain ? KNIGHT_STEPS_GRAIN : KNIGHT_STEPS);
+}
+
+/** Free, non-castle paths within `max` steps of the knight on `from` (Fishing + BA: 2 fish = 5). */
+export function knightReach(state: GameState, from: EdgeId, max: number): Map<EdgeId, number> {
+  const s = baOf(state);
+  const out = new Map<EdgeId, number>();
+  for (const [e, d] of edgeDistances(state, from, max)) {
     if (d === 0 || s.knights[e] !== undefined || isCastleEdge(state, e)) continue;
     out.set(e, d);
   }

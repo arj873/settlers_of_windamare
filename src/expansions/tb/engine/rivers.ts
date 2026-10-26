@@ -62,6 +62,12 @@ export function bridgeBlocker(state: GameState, p: PlayerId, e: unknown): string
   const hand = state.players[p]?.resources;
   const cost = costOf(state, BRIDGE_ITEM);
   if (!hand || !cost || !hasResources(hand, cost)) return 'cannot afford a bridge';
+  return bridgeSiteBlocker(state, p, e);
+}
+
+/** Why `p` cannot put a bridge on `e` (the site alone: no phase or cost; Fishing + Rivers pays fish). */
+export function bridgeSiteBlocker(state: GameState, p: PlayerId, e: unknown): string | null {
+  if (bridgesBuilt(state, p) >= BRIDGES_PER_PLAYER) return 'no bridges left';
   if (typeof e !== 'string' || !isBridgeSite(state, e as EdgeId)) return 'not a bridge site';
   const neutral = tbSlice(state).two?.neutrals.some((nt) => nt.roads.includes(e as EdgeId));
   if (state.pieces.roads[e as EdgeId] !== undefined || neutral) return 'there is a bridge already';

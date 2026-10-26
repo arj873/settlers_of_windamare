@@ -112,7 +112,7 @@ export const TB_BASE19: CustomMapDef = {
  * coastal hexes, not a harbour vertex); the ground touches the notch and its two coastal
  * neighbours. `numbers` are dealt at random.
  */
-function fishingGrounds(
+export function fishingGrounds(
   rng: Rng,
   topo: Topology,
   board: Board,

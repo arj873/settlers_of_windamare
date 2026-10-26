@@ -1035,7 +1035,8 @@ export const tbModule: ExpansionModule = {
     },
 
     production(state, roll, owed, ctx) {
-      if (has(state, 'rivers') && roll === 2) {
+      // Rivers (and Fishing + Caravans): the 12 hex produces on a 2 as well.
+      if (roll === 2 && tbBoard(state).twoOnTwelve) {
         const h = tbBoard(state).twoOnTwelve ?? null;
         const tile = h ? state.board.hexes[h] : undefined;
         if (h && tile && h !== ctx.blocked && isResource(tile.terrain)) {

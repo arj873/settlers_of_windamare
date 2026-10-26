@@ -450,11 +450,12 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module  | Composes          | Scenarios (VP)                                                                                 |
-| -------------- | ------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack` | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
-| `tb+ck`        | `tbck`  | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
-| `tb+seafarers` | `tbsea` | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
+| Mode           | Module   | Composes          | Scenarios (VP)                                                                                 |
+| -------------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
+| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
+| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
+| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                  |
 
 How a combination is built:
 
@@ -525,7 +526,8 @@ seafarers]`).
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
 - **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
   built (§11). Not built: T&B + Seafarers on the other Seafarers scenarios (per-scenario maps),
-  Barbarian Attack + C&K, Catan for Two + C&K, the T&B × T&B sheets (T6). Details in
+  Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
+  Fishing pairs are mode `tb+tb`). Details in
   `docs/rules/combos.md` §2b, §3.
 - **E&P combinations for card E5b** (official, not built yet): E&P + C&K (2025 sheet: city first,
   harbor second, +5 VP, knights stay on their island, Fast Gold with commodities) and E&P + T&B
