@@ -8,8 +8,8 @@
  *   view.setHighlights({ vertices: legalSettlementSpots });
  *   view.on('vertexClick', (id) => dispatch({ type: 'buildSettlement', player, vertex: id }));
  *
- * Pan (drag) / zoom (wheel, pinch) are built in; double-click refits. The view refits on
- * renderer resize unless the user has moved it.
+ * Pan (drag) / zoom (wheel, pinch) are built in; double-click refits. The view refits on every
+ * renderer resize, and on inset changes until the user pans or zooms.
  */
 import { Color, Container, Graphics, Text, type Application } from 'pixi.js';
 import {
@@ -216,7 +216,7 @@ export class BoardView {
     return () => void set.delete(fn);
   }
 
-  /** Re-read the renderer size (also called automatically on renderer resize). */
+  /** Re-read the renderer size (also called automatically on renderer resize); a new size refits. */
   resize(): void {
     this.viewport.resize();
   }
@@ -226,9 +226,18 @@ export class BoardView {
     this.viewport.fit();
   }
 
-  /** Screen margins covered by HTML overlays (HUD panels); the fitted board avoids them. */
-  setInsets(insets: Insets): void {
-    this.viewport.setInsets(insets);
+  /**
+   * Screen margins covered by the permanent HUD panels (the fitted board fits inside them) and
+   * by transient overlays (`avoid`: the fitted board slides away from them without zooming).
+   * A camera the user panned or zoomed keeps its framing.
+   */
+  setInsets(insets: Insets, avoid?: Insets): void {
+    this.viewport.setInsets(insets, avoid);
+  }
+
+  /** False once the user panned or zoomed, until the next refit. */
+  isFitted(): boolean {
+    return this.viewport.isFitted;
   }
 
   /**
