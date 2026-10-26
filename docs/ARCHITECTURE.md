@@ -112,8 +112,14 @@ GameState {
   log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
+  // V1 variants: present only in event-card games (absent otherwise, no schema bump)
+  eventDeck?:    number[]            // undrawn event cards (ids into EVENT_CARDS), pop()
+  lastEvent?:    EventKind | null    // event of the last card drawn
+  damagedRoads?: (EdgeId | null)[]   // Earthquake: each player's damaged road
 }
 ```
+
+`TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5).
 
 **GameSettings v2** (validated by `createGame`, which throws on bad values):
 
@@ -129,6 +135,22 @@ GameState {
 | `turnTimerSec`      | positive int \| null | null            | client-side only; engine ignores it (controller timer, §13b) |
 | `startingPlayer`    | PlayerId (v4, T14)   | drawn from seed | places first in setup, takes turn 1 (RULES.md 2.7)           |
 
+**V1 variant settings** — all **optional**, absent = official rule, written by `resolveSettings`
+only when they differ from it (so default settings and old saves are unchanged; no schema bump).
+Read them only through `variants.ts` / `clock.ts` accessors. Rules and sources: RULES.md §18.
+
+| Field            | Type                                           | Engine                                                                    |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| `robberMode`     | `'normal' \| 'friendly' \| 'none'`             | `robberTargets`, `isRobberProtected`, `startRobber`, production           |
+| `eventCards`     | `true`                                         | rolls draw from `eventDeck`; `event` phase; not with `balancedDice`       |
+| `setupPlacement` | `{ first, second: { building, restriction } }` | setup building kind (`settlement`/`city`), `normal`/`anyVertex`           |
+| `seatOrder`      | `number[]` (config index per seat)             | Randomize Turn Order (config `randomTurnOrder: true`); seat 0 starts      |
+| `mapSelection`   | `'random' \| 'veto'`                           | `randomMapFor` / `mapVeto` phase before setup                             |
+| `rushMode`       | `true`                                         | `beginTurn` rolls automatically (no `preRoll`)                            |
+| `turboMode`      | `true`                                         | both setup rounds pay starting resources                                  |
+| `secondSettler`  | `true`                                         | paired players' turn (4+ players, excludes `specialBuildPhase`)           |
+| `timer`          | `{ preset, bankSec, incrementSec }`            | chess clock, client/server enforced (`clock.ts`); excludes `turnTimerSec` |
+
 `startingPlayer` in the config is `PlayerId | 'random'` (default `'random'`): `randomStartingPlayer(seed, n)`
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
 before T14. `createGame` logs "Blue starts" right after "Game created …". Fixtures pin seat 0.
@@ -139,6 +161,8 @@ v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new field
 v3 → v4 (T14): `settings.startingPlayer: 0` (every older game started with seat 0). Log texts are
 never migrated: rolls before T14 read "Blue rolled 8", since T14 "Blue rolled 8 (3+5)".
 Bump `schemaVersion` and add a step there whenever GameState changes shape.
+Exception (V1): the variant fields are optional and absent in every older save, so they need no
+migration step; v4 stays current (v5 is taken by the `expansions` branch).
 
 - `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. `token` is `null` only on the desert.
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
@@ -188,6 +212,23 @@ any successful action ─► updateAwards ─► checkVictory ─(current player
                                          (skipped in setup and specialBuild)
 ```
 
+V1 variants (RULES.md §18):
+
+```
+createGame ─(mapSelection 'veto')─► mapVeto{candidates, vetoed, order, next} ─vetoMap…─► setup
+           turn.current = order[next]; ends when one candidate is left (it becomes board/robber)
+
+rollDice with eventCards: draw a card ─ robberAttacks ─► as a 7
+                                      ─ choices ─► event{tasks} ─eventGain/Give/Steal/DamageRoad…─► production ─► main
+                                      ─ otherwise ─► (epidemic / robberFlees effect) production ─► main
+rushMode: every turn start (and setup end) rolls at once: preRoll is never seen
+robberMode 'none': discard / knight ─► straight to the resume phase (no moveRobber/steal)
+secondSettler: main ──endTurn──► main with turn.current = owner+3, turn.secondSettlerOf = owner
+                    (bank trade, build, buy, one dev card; no offerTrade) ──endTurn──► owner+1 preRoll
+```
+
+Who acts in `event`: every player with a task (any order, like `discard`).
+
 Who may act (`actingPlayers(state)`): the current player (in `specialBuild` that is the builder), except
 `discard` (every player with `pending[p] > 0`, in any order) and `trade` (offerer + responders still `'pending'`).
 
@@ -220,6 +261,12 @@ Every action carries `player` (the actor). Full union in `types.ts`.
 | `rejectTrade`          | —                                | trade              | addressed player | `trade.ts`  | T3   |
 | `cancelTrade`          | —                                | trade              | offerer          | `trade.ts`  | T3   |
 | `confirmTrade`         | `partner`                        | trade              | offerer          | `trade.ts`  | T3   |
+| `vetoMap`              | `candidate` (index)              | mapVeto            | current vetoer   | `veto.ts`   | V1   |
+| `eventGain`            | `resource`                       | event              | task owner       | `events.ts` | V1   |
+| `eventGive`            | `to, resource`                   | event              | task owner       | `events.ts` | V1   |
+| `eventSteal`           | `victim` (null = pass, optional) | event              | task owner       | `events.ts` | V1   |
+| `eventDamageRoad`      | `edge` (own road)                | event              | task owner       | `events.ts` | V1   |
+| `repairRoad`           | — (1 brick + 1 lumber)           | main, specialBuild | current          | `build.ts`  | V1   |
 
 All files above live in `src/engine/actions/`. Each file's header comment lists the expected rules.
 
@@ -243,7 +290,9 @@ applyAction(state, action):
   log entries (the `log` array itself is copied). Everything else is copied. So handlers must
   **never mutate `board`, `settings` or an existing log entry** (append with `log()` only). A new
   GameState field must be copied in `clone.ts` (`clone.test.ts` fails otherwise). This replaced
-  `structuredClone`, which was ~85% of sim time.
+  `structuredClone`, which was ~85% of sim time. Map-veto candidate boards are shared like `board`;
+  the veto handler replaces `draft.board` with the chosen one (assigning, never mutating).
+  Optional variant fields are copied only when present (no `undefined` keys).
 - **Longest Road** is recomputed only after actions that add a road or occupy a vertex
   (`changesRoads`: setup settlement/road, buildRoad, buildSettlement, placeFreeRoad). A new action
   that changes roads or building occupancy must be added there. Largest Army is always recomputed.
@@ -265,20 +314,24 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 8. Shared helpers (already implemented + tested)
 
-| Module                 | Exports                                                                                                                                                                                                                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, DICE_DECK_SIZE, DICE_DECK_RESHUFFLE_AT, PLAYER_COLORS (8 default seat colours), tokenPips` …                         |
-| `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                                                       |
-| `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                                                       |
-| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                                                     |
-| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                                                                                                                                        |
-| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                                                                                                                                      |
-| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                                                                                                                                           |
-| `board.ts`             | `generateBoard(map, rng), beginnerBoard(), randomBoard(rng, map), redNumbersSeparated(hexes, map)`                                                                                                                                                                                                                          |
-| `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec?, startingPlayer? })` → setup phase, starting player first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. |
-| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                        |
-| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                             |
-| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill)                                                                                                                                                                                                     |
+| Module                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, DICE_DECK_SIZE, DICE_DECK_RESHUFFLE_AT, PLAYER_COLORS (8 default seat colours), tokenPips` …                                                                                                                                                                                                                                |
+| `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                                                                                                                                                                                                                                                            |
+| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                                                                                                                                                                                                                                                                                                                                             |
+| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                                                                                                                                                                                                                                                                                                                                                  |
+| `board.ts`             | `generateBoard(map, rng), beginnerBoard(), randomBoard(rng, map), redNumbersSeparated(hexes, map)`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec?, startingPlayer? })` → setup phase, starting player first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. V1 config keys: `robberMode?, eventCards?, setupPlacement?, randomTurnOrder?, mapSelection?, rushMode?, turboMode?, secondSettler?, timer?` (§4); `randomSeatOrder(seed, n)`, `randomMapFor(seed, n)`. |
+| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill); `secondSettlerFor(s, owner)` (V1)                                                                                                                                                                                                                                                                                                                                                                         |
+| `variants.ts` (V1)     | accessors with defaults (`robberModeOf, setupPlacementOf, eventCardsOn, hasRobber`), `robberTargets, isRobberProtected, roadsBlocked, nextToDamagedRoad`, option lists, `OFFICIAL_SETUP`                                                                                                                                                                                                                                                                                                                                           |
+| `clock.ts` (V1)        | chess clock, pure: `TIMER_PRESET_VALUES, timerSettings, timerOf` (legacy per-turn vs bank), `initialBanks, chargeBank, creditIncrement, turnKey, restoreBanks`                                                                                                                                                                                                                                                                                                                                                                     |
+| `rules/events.ts` (V1) | `EVENT_CARDS` (36), `EVENT_INFO` (names, texts), `facesFor`, `drawEventCard`                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `actions/veto.ts` (V1) | `MAP_VETO_CANDIDATES` (3), `vetoOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -400,6 +453,16 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   except the latest roll, which borrows its faces from `state.dice`.
 - Setup-screen map previews (`ui/setup/mapPreviews.ts`) come from `topologyFor` + `generateBoard`
   (beginner layout for `base`, a fixed sample seed for random maps): land, water ring, harbors.
+  `boardPreviewSvg(map, board)` draws a concrete board with its tokens (map veto dialog).
+- Variants on the setup screen (V1): Event Cards / Rush / Turbo are rule tiles; the Advanced grid
+  has Robber, Chess clock (+ custom bank/increment), Map selection, Turn order switches and Setup
+  placement. `NewGameConfig.variants?: NewGameVariants` holds only non-default choices (model:
+  `buildVariants`; coupling: `toggle`, `setClockPreset`, `setTimerIdx`). The per-turn timer stepper
+  stays; picking a clock preset turns it off and vice versa.
+- HUD (V1): `vetoMap` dialog (candidate previews), event-choice dialogs (gain / give / steal),
+  a docked "Damaged road" card with Repair, the last event's name under the dice. Board: damaged
+  roads are drawn faded and turned; no robber piece with `robberMode: 'none'`. `boardPrompt` can
+  return `'damageRoad'`.
 - Bank counts hide when `settings.hideBankCards` (or `settings.rules.hideBankCards`) is true; read
   defensively since the engine may not have the field yet.
 
@@ -430,7 +493,17 @@ c.destroy();
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
   `?layout`, `?map`, `?autoplay`) never autosave.
 - `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`.
-  The starting seat is random (seeded).
+  The starting seat is random (seeded). `cfg.variants` (V1) is spread into `createGame` as is; with
+  Randomize Turn Order the seat controllers follow `settings.seatOrder` (seat p = config player
+  `seatOrder[p]`).
+- Chess clock (V1, `settings.timer`, `timerOf(...).kind === 'bank'`): the controller keeps a bank
+  per player (ms). The same `timerSlot` says who is on the clock; `syncBankClock` loads that
+  player's bank, `flushBank` writes the running time back, and `apply` credits the increment
+  (`creditIncrement`) when a turn / placement / build step ends. An empty bank expires at once, so
+  `timeoutMove` plays the minimum moves. Banks are saved as `SavedSession.banks` (optional).
+- Event cards (V1): `obligated` includes players with an event task, so viewer, bots and the
+  timer treat them like discards. Earthquake roads are picked on the board (`eventDamageRoad` is
+  an implied board action).
 - Turn timer (T14, `settings.turnTimerSec`): pure logic in `game/turnTimer.ts` (unit-tested),
   ticked every `TIMER_TICK_MS` (250) by the controller, which passes `clockView` as
   `HudView.turnTimer` and calls `hud.setTurnTimer` when the shown second changes.

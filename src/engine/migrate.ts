@@ -10,6 +10,8 @@
  *             with specialBuildPhase on simply starts using it at its next endTurn.
  *   v3 -> v4: new settings.startingPlayer (T14). Every earlier game started with seat 0.
  * Log texts are not migrated: older logs say "Blue rolled 8" without the dice faces.
+ * V1 variant fields (settings.robberMode, eventDeck, ...) are optional and absent in older saves,
+ * where absent means the official rule, so they need no step and v4 stays current.
  */
 import { DEFAULT_DISCARD_LIMIT } from './constants';
 import { isMapId } from './maps';

@@ -5,6 +5,8 @@
  * After the last road: turn.number = 1, current = settings.startingPlayer, phase = preRoll.
  * Helpers: canPlaceSettlement(.., { requireRoad: false }), canPlaceRoad(.., { fromVertex }),
  * setupPlayerAt().
+ * V1 variants: settings.setupPlacement picks each round's building (settlement / city) and
+ * restriction (distance rule / any empty vertex); settings.turboMode pays in round 1 too.
  */
 import { RESOURCES } from '../constants';
 import { canPlaceRoad, canPlaceSettlement } from '../rules/placement';

@@ -14,6 +14,10 @@
  *   - otherwise / after the last builder: current = owner+1, turn.number++, phase = preRoll.
  *   Dice stay as the last roll.
  * passSpecialBuild (phase specialBuild, the builder): next builder, or the next turn as above.
+ * V1 variants (RULES.md §18): rollFor draws an event card instead with settings.eventCards
+ *   (actions/events.ts); settings.rushMode rolls automatically as each turn starts (beginTurn);
+ *   settings.secondSettler: endTurn hands a `main` step to the third player to the left
+ *   (turn.secondSettlerOf = owner), whose endTurn starts owner+1's turn.
  */
 import { DEV_CARD_TYPES } from '../constants';
 import { rollTwoDice } from '../rules/dice';

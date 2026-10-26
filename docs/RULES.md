@@ -21,6 +21,14 @@ Compiled by T8 (2026-10-25). Rule numbers (e.g. **5.3**) are stable; tests cite 
 | **FAQ56** | The 5-6 player questions on catan.com's FAQ page https://catan.com/node/68 (read 2026-10-25), e.g. "Can I win during the special building phase? No." See §16.A.1.                                                 |
 | **COL**   | Colonist.io rules page "5-6 / 7-8 Players": https://colonist.io/catan-rules/5-6-player (read 2026-10-25). **Unofficial** (a digital adaptation); used only for the 7-8 player supply, see §16.C.                   |
 
+Variant sources (V1, §18):
+
+| Key      | Source                                                                                                                                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TB**   | _CATAN – Traders & Barbarians_ rulebook (catan.com, 2020): https://www.catan.com/sites/default/files/2021-06/catan-t_b_2020_rule_book_200820.pdf. p.3 Friendly Robber, pp.4–5 Event Cards, p.23 card list.                                      |
+| **COLF** | Colonist.io Friendly Robber: room option text "Can't rob players under 3 VPs" (Colonist's en_strings locale file, read 2026-10-25); blog https://blog.colonist.io/ranked-1v1-comprehensive-strategy-guide-colonist-io/ (VP cards do not count). |
+| **COLR** | Colonist.io "Colonist Rush" rules page: https://colonist.io/catan-rules/colonist-rush (read 2026-10-25). **Unofficial** (a digital mode).                                                                                                       |
+
 R5 p.14: the 2015 rules take precedence over all earlier editions. We found no documented
 gameplay change between the 4th and 5th editions. R6 (2025) mostly renames things (see §14).
 
@@ -389,6 +397,9 @@ If an official 7-8 extension turns up, only `MAPS.base78` / `FRAME_HEX37` need c
   extension. `settings.specialBuildPhase` stays a boolean. Paired turns are a backlog idea; they
   would make the setting a 3-value turn mode (`'normal' | 'specialBuild' | 'pairedTurns'`).
 - 7-8 players (`base78`, our design): the same Special Building Phase, default on.
+- **Update (V1):** paired turns are now available as the option "Second Settler Mode"
+  (`settings.secondSettler`, §18.6). The Special Building Phase stays the default; the two exclude
+  each other.
 
 ### 16.E Other T10 settings (house rules / client options)
 
@@ -400,12 +411,14 @@ If an official 7-8 extension turns up, only `MAPS.base78` / `FRAME_HEX37` need c
 | `specialBuildPhase` | Implemented (T13), see 16.10 and §16.D.                                                                                                                  |
 | `hideBankCards`     | Client-side only: the UI hides bank counts. The engine ignores it.                                                                                       |
 | `turnTimerSec`      | House rule, client-side (T14): the controller times humans and on timeout makes only the minimum legal moves (ARCHITECTURE §13b). The engine ignores it. |
+| V1 variants         | Robber mode, Event Cards, Rush, Turbo, chess clock, turn order, map selection, setup placement: see §18.                                                 |
 
 ## 17. Balanced dice (`settings.balancedDice`, T13)
 
 A variant in the spirit of the official _Catan Event Cards_ / dice deck: rolls come from a deck
 instead of dice, so over a cycle every outcome appears as often as the odds say. The
-event-card texts of that product are **not** modelled; only the dice values are.
+event-card texts of that product are **not** modelled here; only the dice values are. The full
+Event Cards deck, with its events, is the separate option `settings.eventCards` (§18.2).
 
 | #    | Rule                                                                                                                                                   | Status | Where / notes                                                                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -415,3 +428,117 @@ event-card texts of that product are **not** modelled; only the dice values are.
 | 17.4 | A roll is still two dice values in `state.dice`; the roll log line is unchanged. A reshuffle adds the log line "The dice deck was shuffled".           | OK     |                                                                                                                                            |
 | 17.5 | Per cycle, drawn + unseen cards = the 36-card deck exactly. So over k cycles each total appears at most `ways × k` and at least `ways × k − 5k` times. | OK     | `r/dice.test.ts`. Because of 17.2, counts over 36·k rolls are **not** exact; they are exact per cycle once the 5 unseen cards are counted. |
 | 17.6 | Saves: the deck is part of the state (schema v3). Older saves get an empty deck, so their next balanced roll shuffles a fresh one.                     | OK     | `migrate.ts`                                                                                                                               |
+
+## 18. Game-setting variants (V1)
+
+Optional room settings in the style of Colonist.io's room options. Every one is an **optional**
+`GameSettings` field that is absent by default; absent means the official rules above. They are
+read only through `src/engine/variants.ts` / `clock.ts`. Tests: `src/engine/variants.test.ts`,
+`src/engine/clock.test.ts`, `src/game/variants.test.ts`, `src/ui/variants.test.ts`. Every variant
+runs in the sim with 0 violations (`pnpm sim -- --help` lists the flags).
+
+Status `ours` = no primary source defines it; the definition is ours (flagged for review).
+
+### 18.1 Robber mode (`settings.robberMode`: `'normal' | 'friendly' | 'none'`)
+
+| #     | Rule                                                                                                                                   | Source | Status | Where / notes                                                                                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ | -------------------------------------------------------------------------------------------------- |
+| 18.1a | Friendly robber: the robber may not be moved to a hex next to a player with 2 or fewer victory points.                                 | TB p.3 | OK     | `robberTargets`. Colonist: "Can't rob players under 3 VPs" (COLF).                                 |
+| 18.1b | Those players cannot be robbed either.                                                                                                 | TB p.3 | OK     | `stealCandidates` skips them (also when the robber had to go to the desert).                       |
+| 18.1c | Only **public** points count: settlements, cities, Longest Road, Largest Army. VP cards do not.                                        | COLF   | OK     | `publicVictoryPoints`. TB counts "victory points" too; the hidden cards are not visible anyway.    |
+| 18.1d | If no hex is allowed, the robber moves to (or stays on) the desert.                                                                    | TB p.3 | OK     | Then the robber may stay on its own desert hex (the only exception to 5.6).                        |
+| 18.1e | The mover's own buildings do not restrict them.                                                                                        | (ours) | ours   | Protection is for the victims; you may block yourself.                                             |
+| 18.1f | **No robber**: on a 7, players over the limit still discard; nobody moves the robber or steals. A Knight counts for Largest Army only. | (ours) | ours   | `startRobber`. Colonist has no such option; added as the third "common" choice. No hex is blocked. |
+
+### 18.2 Event Cards (`settings.eventCards`)
+
+The official _Catan Event Cards_ deck (in TB, also sold separately) replaces the dice.
+
+| #     | Rule                                                                                                                                                                                                | Source      | Status  | Where / notes                                                                                                                                                                                                                               |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 18.2a | 36 event cards. Each shows a number 2–12; per number the counts follow two dice (1-2-3-4-5-6-5-4-3-2-1).                                                                                            | TB pp.4, 23 | OK      | `EVENT_CARDS` in `r/events.ts` (list below).                                                                                                                                                                                                |
+| 18.2b | The New Year card lies under the last 5 cards; when it comes up, all 36 are reshuffled.                                                                                                             | TB p.4      | OK      | Reshuffle when ≤ 5 remain (as balanced dice, §17). Logged "New Year: the event deck was shuffled".                                                                                                                                          |
+| 18.2c | Each turn the card is revealed instead of rolling: the event is resolved first, then the number produces.                                                                                           | TB p.4      | OK      | `resolveEventRoll`. `state.dice` shows the number as two even faces (8 = 4+4); `state.lastEvent` is the event.                                                                                                                              |
+| 18.2d | **Robber Attacks!** (6 cards, all 7s): as a rolled 7 (discards, robber, steal).                                                                                                                     | TB          | OK      | `resolveSeven`                                                                                                                                                                                                                              |
+| 18.2e | **Epidemic** (6, 8): each city produces only 1 resource this turn.                                                                                                                                  | TB          | OK      | `produce(.., { cityYield: 1 })`                                                                                                                                                                                                             |
+| 18.2f | **Earthquake** (6): each player turns 1 of their roads sideways. They may not build roads until it is repaired (1 lumber + 1 brick), nor a settlement next to it. It still counts for Longest Road. | TB          | OK      | Task `damageRoad` (board click), `state.damagedRoads`, action `repairRoad`. "Next to it" = at either end of **your** damaged road. Also blocks Road Building (it builds roads). A player who already has a damaged road is not asked again. |
+| 18.2g | **Good Neighbors** (6): each player gives the player to their left 1 resource of their choice (if they have one).                                                                                   | TB          | OK      | "Left" = next in turn order. Task `give`.                                                                                                                                                                                                   |
+| 18.2h | **Tournament** (5): the player(s) with the most knights played take 1 resource of their choice from the bank.                                                                                       | TB          | OK      | Needs ≥ 1 knight. Task `gain`.                                                                                                                                                                                                              |
+| 18.2i | **Trade Advantage** (5): the Longest Road holder (if unclaimed: the player with more roads than any other) may take 1 resource card from any player.                                                | TB          | OK      | Optional (may pass); the card taken is random. Task `steal`.                                                                                                                                                                                |
+| 18.2j | **Calm Sea** (9, 12): the player(s) with the most harbors take 1 resource of their choice from the bank.                                                                                            | TB          | OK      | Needs ≥ 1 harbor.                                                                                                                                                                                                                           |
+| 18.2k | **Robber Flees** (4, 4): the robber returns to the desert. No card is taken.                                                                                                                        | TB          | OK      | With several deserts: the first one. Nothing happens without a robber (18.1f).                                                                                                                                                              |
+| 18.2l | **Neighborly Assistance** (10, 11): the player(s) with the most victory points give 1 resource of their choice to a player with fewer points (if they have a card).                                 | TB          | OK      | Public VP (hidden cards are secret). Nobody gives when everyone is tied. Task `give` with a choice of recipient.                                                                                                                            |
+| 18.2m | **Conflict** (3): the Largest Army holder (if unclaimed: the player with the most knights) takes 1 random resource card from a player of their choice. A tie for most knights: no effect.           | TB          | unclear | TB words the tie rule in two slightly different ways; we use the card's wording (holder first, else a unique leader).                                                                                                                       |
+| 18.2n | **Plentiful Year** (2): each player takes 1 resource of their choice from the bank.                                                                                                                 | TB          | OK      |                                                                                                                                                                                                                                             |
+| 18.2o | "Catan prospers" (16 cards): no event.                                                                                                                                                              | TB          | OK      | 3, 4, 5×2, 6×2, 8×4, 9×3, 10×2, 11.                                                                                                                                                                                                         |
+| 18.2p | Players act on event choices in any order (like discards). A choice that becomes impossible (empty bank, empty hands) is dropped.                                                                   | (ours)      | ours    | Phase `event{tasks}`, actions `eventGain / eventGive / eventSteal / eventDamageRoad`.                                                                                                                                                       |
+| 18.2q | Not combinable with balanced dice (both replace the dice).                                                                                                                                          | (ours)      | ours    | `createGame` throws.                                                                                                                                                                                                                        |
+
+The C&K notes printed on the cards are not modelled (base game only).
+
+### 18.3 Rush Mode (`settings.rushMode`) — **flagged**
+
+Colonist's Rush (COLR) is real-time: "No turns. Everyone builds & trades at the same time.
+Automatic dice rolls." on a fixed interval (5–20 s), "7 dice = alternating robber", discard limit 9,
+10 VP, friendly robber on by default, one dev card per player per roll, and turn-based initial
+placement. Our engine is turn-based, so **simultaneous play is not implemented**. What we
+implement:
+
+| #     | Rule                                                                                                 | Source | Status | Where / notes                                                        |
+| ----- | ---------------------------------------------------------------------------------------------------- | ------ | ------ | -------------------------------------------------------------------- |
+| 18.3a | Automatic dice rolls: the roll happens as the turn starts (no `preRoll`, so no knight before it).    | COLR   | ours   | `beginTurn` (also after setup). Works with event cards.              |
+| 18.3b | Choosing Rush on the setup screen sets the Colonist Rush defaults: discard limit 9, friendly robber. | COLR   | OK     | UI only (`toggle` in `ui/setup/model.ts`); both can be changed back. |
+
+A short chess clock (Bullet/Blitz) gives the time pressure. Real simultaneous play is a card idea.
+
+### 18.4 Turbo Mode (`settings.turboMode`) — **flagged, our definition**
+
+No source found: not in Colonist's UI strings or blog, no catan.com or forum hit. Our
+definition, chosen because it is a well-known speed-up house rule that fits "turbo":
+**both setup settlements pay starting resources** (18.4a, `a/setup.ts`), not only the second (2.19).
+
+### 18.5 Turn timer: chess clock (`settings.timer`) — presets are ours
+
+Colonist only has per-turn timers (15 s … 240 s). The chess-clock presets follow the request
+(Classic = 20 min bank + 30 s per turn) and scale the chess names down:
+
+| Preset  | Bank per player | Added after each turn |
+| ------- | --------------- | --------------------- |
+| Bullet  | 3 min           | 5 s                   |
+| Blitz   | 5 min           | 10 s                  |
+| Rapid   | 10 min          | 15 s                  |
+| Classic | 20 min          | 30 s                  |
+| Custom  | 1–180 min       | 0–600 s               |
+
+The bank of whoever is on the clock runs (the same slots as the per-turn timer: own turn and
+setup placements, discards, trade replies, event choices, special build / second settler steps).
+The increment is added when a player's turn, setup placement or build step ends. An empty bank
+means the minimum moves are made for that player (as with the per-turn timer) until their next
+increment. The engine stores only the settings; the clock maths is pure (`src/engine/clock.ts`)
+so a server can enforce it. `settings.turnTimerSec` (per turn) still works and old saves keep it.
+
+### 18.6 Turn order (`settings.seatOrder`, `settings.secondSettler`)
+
+| #     | Rule                                                                                                                                                                                                                     | Source | Status | Where / notes                                                                                                                                                  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 18.6a | **Randomize Turn Order**: the seats are shuffled when the game is created; seat 1 of the new order starts.                                                                                                               | (ours) | ours   | Colonist has "Play Order Selection" instead. Own seeded stream (`order:<seed>`), so the board and deck of a seed do not change. `seatOrder[p]` = config index. |
+| 18.6b | **Second Settler Mode** = the paired players' turn: after Catanian 1's turn, Catanian 2 (the **third player to the left**) may trade with the bank, build and play one development card; no roll, no trade with players. | PPT    | OK     | Name from CATAN Universe ("Settler 2"). `turn.secondSettlerOf`; the step is a `main` phase for Catanian 2. Then the next player's turn starts.                 |
+| 18.6c | A card bought as Catanian 2 can be played on that player's own later turn (not in the same step).                                                                                                                        | PPT    | OK     | It goes to `newDevCards`, merged when the step ends.                                                                                                           |
+| 18.6d | Both players are "taking their turn": Catanian 2 can win in their step; Catanian 1 wins first if both reach the goal.                                                                                                    | PPT    | OK     | `checkVictory` checks the current player (Catanian 2 in the step).                                                                                             |
+| 18.6e | Needs 4+ players (with 3, the third to the left is yourself). Replaces the special building phase (16.10).                                                                                                               | PPT    | ours   | `createGame` throws on 3 players or with `specialBuildPhase: true`; with 5+ players SBP defaults off when it is on.                                            |
+
+### 18.7 Map selection (`settings.mapSelection`: `'fixed' | 'random' | 'veto'`)
+
+| #     | Rule                                                                                                                                                                                                                                                   | Source | Status | Where / notes                                                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 18.7a | Fixed: the map picked on the setup screen (default).                                                                                                                                                                                                   |        | OK     |                                                                                                                                                           |
+| 18.7b | Random: a seeded pick among every map that fits the player count.                                                                                                                                                                                      | (COL)  | ours   | Colonist has a "Random" map choice. `randomMapFor` (own stream `map:<seed>`).                                                                             |
+| 18.7c | Veto: 3 candidate boards of the picked map are generated (the beginner map votes on random layouts). Players veto one map each, in turn, until one is left; that one is played. Vetoers go counter-clockwise from the seat before the starting player. | (ours) | ours   | Phase `mapVeto`, action `vetoMap`. With 3 maps only two players veto; starting with the players who place last balances the starting player's first pick. |
+
+### 18.8 Setup placement (`settings.setupPlacement`)
+
+Per round (1st and 2nd building): the building (**Settlement** or **City**) and the restriction
+(**Distance rule** = official, or **None (any vertex)** = any empty vertex). Colonist has no such
+options; C&K places a city as the 2nd building ("On your second initial placement, place a city",
+colonist.io/catan-rules/cities-and-knights). Starting resources stay 1 per adjacent hex also for a
+city (our reading of C&K). A city placed in setup uses a city piece. Status: ours.
