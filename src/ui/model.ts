@@ -9,19 +9,19 @@ import {
   canPlaceSettlement,
   COSTS,
   DEV_CARD_TYPES,
+  devCardCount,
   getPlayer,
-  handSize,
+  handCount,
   longestRoadLength,
   PIECE_LIMITS,
   piecesLeft,
   portsOf,
   publicVictoryPoints,
-  specialBuildQueue,
   supplyOf,
   topologyOf,
   RESOURCES,
-  totalDevCards,
   victoryPoints,
+  visibleSpecialBuildQueue,
   type Action,
   type ActionOf,
   type ActionType,
@@ -197,8 +197,9 @@ export function playerSummaries(
     color: p.color,
     publicVp: publicVictoryPoints(state, p.id),
     hiddenVp: p.id === viewer ? victoryPoints(state, p.id) - publicVictoryPoints(state, p.id) : 0,
-    cards: handSize(p),
-    devCards: totalDevCards(p.devCards) + totalDevCards(p.newDevCards),
+    // Public counts: on an online view other hands are masked (engine/view.ts).
+    cards: handCount(state, p.id),
+    devCards: devCardCount(state, p.id),
     knights: p.knightsPlayed,
     roadLength: longestRoadLength(state, p.id),
     longestRoad: state.awards.longestRoad === p.id,
@@ -372,7 +373,7 @@ export function turnInfo(state: GameState, view: HudView, placeMode: PlaceMode |
           : `${name}'s turn`;
   let next: string | null = null;
   if (phase.kind === 'specialBuild') {
-    const queue = specialBuildQueue(state);
+    const queue = visibleSpecialBuildQueue(state);
     const upNext = (phase.owner + 1) % state.players.length;
     next =
       queue.length > 0
