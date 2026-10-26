@@ -1,5 +1,6 @@
 /** Dev query parameters. */
 import { isMapId, modeById, scenarioById, type Layout, type MapId } from '../engine';
+import type { BotLevel } from '../bots/levels';
 import type { Controller } from '../ui';
 
 export interface DevParams {
@@ -21,6 +22,8 @@ export interface DevParams {
   first: number | null;
   /** `?seats=hbbb`: h = human, b = bot, per seat. */
   seats: Controller[] | null;
+  /** `?levels=hnee`: bot level per seat (e = Easy, n = Normal, h = Hard; B1). */
+  levels: BotLevel[] | null;
   /** `?hl=vertices|edges|hexes`: board highlight preview (render dev aid). */
   hl: 'vertices' | 'edges' | 'hexes' | null;
   /** `?names=Ann,Bob,Cy`: player names for games started from params (count must match). */
@@ -47,6 +50,8 @@ export function parseParams(search: string): DevParams {
   // 2 seats only make sense in a mode that allows them (createGame checks; T&B Catan for Two).
   const auto = /^([2-8])bots?$/.exec(p.get('autoplay') ?? '');
   const seats = /^[hb]{2,8}$/.exec(p.get('seats') ?? '');
+  const levels = /^[enh]{2,8}$/.exec(p.get('levels') ?? '');
+  const LEVEL: Record<string, BotLevel> = { e: 'easy', n: 'normal', h: 'hard' };
   const hl = p.get('hl');
   const names = (p.get('names') ?? '')
     .split(',')
@@ -63,6 +68,7 @@ export function parseParams(search: string): DevParams {
     timer: integer(num('timer', 1, 3600)),
     first: integer(num('first', 0, 7)),
     seats: seats ? [...seats[0]].map((c) => (c === 'h' ? 'human' : 'bot')) : null,
+    levels: levels ? [...levels[0]].map((c) => LEVEL[c] ?? 'normal') : null,
     hl: hl === 'vertices' || hl === 'edges' || hl === 'hexes' ? hl : null,
     names: names.length > 0 ? names : null,
     debug: p.get('debug') === '1',

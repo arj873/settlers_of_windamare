@@ -10,6 +10,16 @@ describe('parseParams', () => {
     expect(p.speed).toBe(0);
   });
 
+  it('reads the bot level per seat (B1)', () => {
+    expect(parseParams('?autoplay=4bots&levels=hnee').levels).toEqual([
+      'hard',
+      'normal',
+      'easy',
+      'easy',
+    ]);
+    expect(parseParams('?levels=hx').levels).toBeNull();
+  });
+
   it('reads the playtest names and debug switch', () => {
     const p = parseParams('?seats=hhh&names=Seat1, Seat2 ,,Seat3&debug=1');
     expect(p.names).toEqual(['Seat1', 'Seat2', 'Seat3']);

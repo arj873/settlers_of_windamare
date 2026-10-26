@@ -303,7 +303,9 @@ export class LobbyScreen {
           'div',
           { class: 'ol-seat-sub' },
           s.name === null
-            ? `Open — a ${BOT_LEVEL_LABELS[s.botLevel]} bot plays it`
+            ? s.canSetLevel
+              ? 'Open — a bot plays it:'
+              : `Open — a ${BOT_LEVEL_LABELS[s.botLevel]} bot plays it`
             : s.isAway
               ? 'Disconnected — the seat is kept for a minute'
               : s.colorLabel,
@@ -321,14 +323,14 @@ export class LobbyScreen {
               }),
             ),
           ),
-      ),
-      h(
-        'div',
-        { class: 'ol-seat-actions' },
         s.canSetLevel &&
           botLevelSelect(s.botLevel, { seat: s.index, key: 'seat-level' }, (level) =>
             a.setBotLevel(s.index, level),
           ),
+      ),
+      h(
+        'div',
+        { class: 'ol-seat-actions' },
         s.canSit &&
           h(
             'button',

@@ -46,7 +46,8 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 
 ## Lobby
 
-- Seats: open seats read "<Colour> Bot — a bot plays it". Named members can sit / move / stand up and
+- Seats: open seats read "<Colour> Bot — a Normal bot plays it" (the seat's level); the host gets
+  a difficulty picker (Easy / Normal / Hard, `setBotLevel`) on each open seat. Named members can sit / move / stand up and
   pick a free colour. Host: **Add bot** (+1 seat, the map follows like the setup screen's player
   stepper), **Remove bot** (only the last seat, when open, above the map minimum), **Start**
   (needs someone seated).

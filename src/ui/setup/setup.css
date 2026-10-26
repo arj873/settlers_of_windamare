@@ -584,6 +584,15 @@
     width: 28px;
     height: 28px;
   }
+  /* B1: the difficulty gets its own line under the swatches (rows wrap, no alignment needed) */
+  .su-seat .bot-level {
+    order: 4;
+    flex: 1 0 100%;
+    width: auto;
+  }
+  .su-seat .bot-level.is-hidden {
+    display: none;
+  }
   .su-map-art {
     height: 76px;
   }

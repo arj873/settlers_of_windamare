@@ -640,8 +640,12 @@ c.destroy();
   pending trade replies — first, then the current human; previous viewer kept during bot turns;
   all-bot = spectator viewer 0), `boardActions`/`highlightsFor`/`actionForClick` (implied prompts
   or HUD place mode), `nextBot` (bots owing a response first; a bot offerer waits for human replies).
-- Bots: `defaultBot = createRandomBot({ progressBias: 0.5 })`, private `Rng` seeded `bots:<seed>`
-  (saved with the session), one move per tick (`speed` ms, ×0.4 for discards / trade replies;
+- Bots (B1): each bot seat plays its level (`SeatConfig.botLevel`, the setup screen's per-seat
+  difficulty picker; `start(…, { botLevels })`, saved as `SavedSession.botLevels`, absent =
+  Normal): `botForLevel` (`src/bots/byLevel.ts`) → Easy = `defaultBot` =
+  `createRandomBot({ progressBias: 0.5 })`, Normal / Hard = the smart bots (`src/bots/smart`,
+  see "Smart bots" below). `ControllerOptions.bot` forces one bot on every seat (tests).
+  Private `Rng` seeded `bots:<seed>` (saved with the session), one move per tick (`speed` ms, ×0.4 for discards / trade replies;
   speed 0 = batches of moves per 12 ms slice). The controller hides `offerTrade` from a bot after
   `BOT_OFFERS_PER_TURN` (1) offers in a turn. The random bot confirms an accepted own offer with a
   random accepter (it withdraws only while nobody has accepted). Nobody able to act → error toast
@@ -696,6 +700,36 @@ c.destroy();
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
   (`pnpm pt:serve`, `pnpm pt`; see `playtest/PLAYBOOK.md`), which acts only through real clicks.
+
+## 13c. Smart bots (`src/bots/smart`, B1)
+
+Three levels (`src/bots/levels.ts`, no imports: UI and protocol use it): **Easy** = the random
+bot (`defaultBot`, unchanged: every sim and fuzz test runs it), **Normal** and **Hard** = one
+heuristic bot with two parameter sets (`NORMAL_PARAMS`: 12 % score noise, no Longest Road race,
+trades with anyone; `HARD_PARAMS`: no noise, Longest Road race, refuses trades that feed a player
+near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`. Default Normal.
+
+- **How it decides:** `scoreOptions` gives every option of the seat one score on a shared scale
+  (`smart/context.ts`: 100 ≈ one VP now, `endTurn` 0, `rollDice` 50) and the bot plays the best
+  (ties: its own RNG). Base actions: `smart/base.ts`. A `BotContext` caches the board view for
+  the decision: weighted pips per vertex (scarcity, game stage), production, ports, road
+  distances to open spots, goals (city / settlement + roads / dev card + module goals), the
+  target goal, `handScore` (trades, discards and Year of Plenty compare hands with it).
+- **Strategy in short:** setup by weighted pips, resource and number spread, ports and what the
+  first settlement lacks; builds best-first with a penalty when spending delays the target;
+  roads only toward a spot (or Longest Road when close, Hard); robber on the most threatening
+  production, never its own while another hex is legal; steals from the leader; bank / port and
+  1-for-1 player trades toward the target; plays Knights against the robber and for Largest
+  Army, Year of Plenty / Monopoly when they complete a build.
+- **Fair:** reads public information and its own hand only, so it decides the same on a full
+  state and on `viewFor(state, seat)` (tested). Deterministic: the bot's own `Rng` only.
+- **Modules:** `BotExtension.score(ctx, action)` scores a module's actions (and may re-score base
+  ones), `goals(ctx)` adds what to save for (EXPANSIONS.md §9). C&K and Seafarers have full
+  strategies (`src/expansions/{ck,seafarers}/strategy.ts`). Module actions nobody scores fall
+  back to the module's `steer` on half the decisions, else a type-first random pick on 40 % of
+  decisions (so no "select / cancel" loop runs forever).
+- **Benchmark:** `pnpm bench --hero normal --field easy --games 200 [--players N] [--mode M]`
+  (one hero seat rotated over the table, every step checked by the sim invariants).
 
 ## 14. Decisions and open questions
 
