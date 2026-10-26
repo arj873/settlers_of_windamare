@@ -7,7 +7,8 @@ disconnected players; text chat + quick reactions; a server-enforced turn timer;
 Cloudflare Workers + one Durable Object per room, in the same project as the static site
 (docs/HOSTING.md §3).
 
-M1 (this card) delivers the contract and the pure core. M2 (server) and M3 (client) build on it.
+M1 delivered the contract and the pure core. M2 built the room server on it (§18). M3 (client)
+builds on both.
 
 | Module                   | What                                                                    | Used by      |
 | ------------------------ | ----------------------------------------------------------------------- | ------------ |
@@ -16,6 +17,8 @@ M1 (this card) delivers the contract and the pure core. M2 (server) and M3 (clie
 | `src/net/guard.ts`       | tiny runtime validators (no dependencies)                               | protocol     |
 | `src/net/session.ts`     | `GameSession`: one room, transport-agnostic (§4)                        | M2, M3 tests |
 | `src/net/testHarness.ts` | `LocalNet` (in-memory transport + fake clock), `fakeDeps`               | tests, M3    |
+| `src/net/api.ts`         | HTTP API paths and shapes, room codes (M2, §18)                         | both         |
+| `src/server/`            | Cloudflare Worker + room Durable Object (M2, §18)                       | server       |
 
 `src/net` is lint-checked like the engine: no DOM, no `Date`, no `Math.random`, no timers.
 
@@ -24,10 +27,10 @@ M1 (this card) delivers the contract and the pure core. M2 (server) and M3 (clie
 ## 1. Architecture
 
 ```
- browser (M3)                         Cloudflare Worker (M2)                    Durable Object "room:<id>" (M2)
- ┌───────────────────┐  POST /api/rooms  ┌──────────────┐  idFromName(id)   ┌──────────────────────────────┐
+ browser (M3)                         Cloudflare Worker (M2)                    Durable Object "Room" (M2)
+ ┌───────────────────┐  POST /api/rooms  ┌──────────────┐  idFromName(code) ┌──────────────────────────────┐
  │ home: Create room │ ────────────────► │ route        │ ────────────────► │ GameSession (src/net)         │
- │ /room/<id> lobby  │  GET /ws/<id>     │ /api/*, /ws/* │   fetch upgrade  │   full GameState (secret)     │
+ │ /room/<code> lobby│ /api/rooms/<c>/ws │ /api/*, /ws/* │   fetch upgrade  │   full GameState (secret)     │
  │ NetController     │ ◄══ WebSocket ══► │ else: static │ ◄══════════════► │   seats, members, chat, clock │
  │ Hud + BoardView   │                   │ assets (SPA) │                   │   bots (src/bots)             │
  └───────────────────┘                   └──────────────┘                   │ storage: SessionSnapshot      │
@@ -64,9 +67,10 @@ M1 (this card) delivers the contract and the pure core. M2 (server) and M3 (clie
    any phase: no member connected for idleExpiryMs (24 h) → isExpired(now) → M2 deletes storage
 ```
 
-- **Create**: the Worker makes a random room id (12 chars `[a-z0-9]`, ≈ 62 bits) and calls
+- **Create**: the Worker makes a random room code (M2: 6 chars from `ROOM_CODE_ALPHABET`, no
+  0/O/1/I, ≈ 30 bits; a collision with a live room retries with a new code, §18) and calls
   `GameSession.create`. The response carries `{ roomId, hostToken }`; the client stores the token
-  (§8) and navigates to `/room/<id>`. The host member exists before anyone connects.
+  (§8) and navigates to `/room/<code>`. The host member exists before anyone connects.
 - **Lobby**: default config `DEFAULT_ROOM_CONFIG` (`baseRandom`, 4 seats, 90 s timer, 10 VP,
   discard limit 7). Seats are created with the palette colours in order. Seat count follows
   `config.seatCount` (map range is validated); shrinking unseats the members in removed seats.
@@ -166,7 +170,7 @@ Host browser              Worker              Room DO / GameSession             
     │                        │────────────────────────►│ host m1 (token T1)           │
     │ { roomId, hostToken }  │◄────────────────────────│                              │
     │◄───────────────────────│                         │                              │
-    │ localStorage[room]=T1; open /ws/<id>             │                              │
+    │ localStorage[room]=T1; open /api/rooms/<code>/ws │                              │
     │═════════════════════════════════════════════════►│ open(c1)                     │
     │ hello{token:T1, name:'Ann'}                      │                              │
     │─────────────────────────────────────────────────►│                              │
@@ -342,8 +346,8 @@ Bots read the full state (the random bot ignores hands anyway); a smarter bot mu
 - Secrets in `deps` come from the platform CSPRNG; room ids are not secrets (the token is).
 - Stale intents: send `seq`; a mismatch is rejected (`stale_state`) and the current state is
   re-sent, so a double click can never act on a state the player has not seen.
-- Abuse: rate limits, member cap, chat/name length caps, host kick. M2 should also cap
-  connections per IP and room creations per IP (Worker side).
+- Abuse: rate limits, member cap, chat/name length caps, host kick. M2 adds per-IP caps on
+  connections and room creations, a per-socket frame limit and an origin check (§18.4).
 - Known leaks by design (public in the physical game): hand sizes, dev card counts, discards,
   traded cards, monopoly/YoP takes. The steal log hides the card; only thief and victim can
   infer it from their own hands.
@@ -448,3 +452,114 @@ Clients should not auto-reconnect after 4000–4004.
 - Full view per message (≈ 17 KB late in a 4-player game, mostly the log); deltas or sending
   the board once could come later if needed.
 - The thief/victim of a steal get no explicit "you stole X" notice; the UI can diff the hand.
+
+## 18. Room server (M2: `src/server/`)
+
+One Cloudflare Worker serves the static game (`dist/`, Workers Static Assets) and the API. One
+Durable Object `Room` per room code (`ROOMS.idFromName(code)`) wraps a `GameSession`. Only
+`/api/*` and `/ws/*` run Worker code (`run_worker_first`); everything else is free static traffic.
+
+| File                        | What                                                                                |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `src/server/worker.ts`      | Worker entry + `Room` class: thin adapters to the runtime (only file with CF types) |
+| `src/server/router.ts`      | HTTP routes, origin check, per-IP limits, code collision retry (platform-free)      |
+| `src/server/room.ts`        | `RoomCore`: the Durable Object logic behind a `RoomPlatform` port; `roomFetch`      |
+| `src/server/limits.ts`      | `SERVER_LIMITS`, `TokenBucket`, `RateLimiter`                                       |
+| `src/server/origin.ts`      | `originAllowed`, `parseOrigins`                                                     |
+| `src/server/testRuntime.ts` | `FakeRuntime`: in-memory storage/alarm/sockets, `hibernate()`, `evict()` (tests)    |
+| `src/net/api.ts`            | paths, `CreateRoomResponse`, `RoomSummary`, room codes (shared with the client)     |
+| `scripts/e2e-server.ts`     | end-to-end: real `wrangler dev`, 3 WebSocket clients, a bot-filled game to the end  |
+
+### 18.1 HTTP API (`src/net/api.ts`)
+
+| Request                                       | Response                                                                      |
+| --------------------------------------------- | ----------------------------------------------------------------------------- |
+| `POST /api/rooms` (no body)                   | `201 { roomId, hostToken }`; `429` per-IP limit; `503` no free code (8 tries) |
+| `GET /api/rooms/:code`                        | `200 RoomSummary { roomId, phase, seats, taken, connected }`; `404`           |
+| `GET /api/rooms/:code/ws` (WebSocket upgrade) | `101`; `404` no room; `426` not an upgrade; `429` per-IP; `503` room full     |
+| `GET /ws/:code`                               | alias of the above (the M1 diagram's path)                                    |
+
+Every error body is `{ error: string }`; API responses are `no-store`. `403` = origin refused.
+Codes are case-insensitive in URLs (`normalizeRoomCode`), canonical upper case everywhere else
+(`room.id` in `RoomInfo`). Client side:
+
+```ts
+const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${scheme}://${location.host}${roomSocketPath(code)}`);
+```
+
+### 18.2 Room codes
+
+6 symbols from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (32, no 0/O/1/I): 2^30 ≈ 10^9 codes, 5 random
+bits per symbol from `crypto.getRandomValues`. Collision-safe: the Worker asks the code's
+Durable Object to `create`; the object (single-threaded) answers `409` if it already holds a live
+room, and the Worker retries with a fresh code (`SERVER_LIMITS.createAttempts` = 8). An expired
+room deletes its storage, so its code is free again. Codes are not secrets (§12): a guessed code
+only lets someone watch as a spectator; the per-IP lookup limit slows scanning.
+
+### 18.3 Durable Object lifecycle (`RoomCore`)
+
+- **Every event** (`fetch` upgrade, `webSocketMessage`, `webSocketClose/Error`, `alarm`): call the
+  session → send the Outbound list in order (`ws.send` / `ws.close`) → `storage.put('session',
+JSON)` if the snapshot changed (identical ones are skipped: free plan = 100k row writes/day) →
+  `setAlarm(session.nextWakeAt())` / `deleteAlarm()` if it moved.
+- **Hibernation API**: `ctx.acceptWebSocket`; the socket attachment holds `{ conn, ip, at,
+joined }`; `ping` → `pong` via `setWebSocketAutoResponse` (no wake-up).
+- **Restart** (hibernation wake-up or eviction): the constructor runs `RoomCore.load` inside
+  `blockConcurrencyWhile`: `GameSession.restore(snapshot)`, then `reconcile(live sockets)` so
+  members whose sockets are gone become away (and bots take over after `graceMs`).
+- **Alarm** = `tick`: bot moves (one per `botDelayMs`), turn timeouts, grace periods, host
+  succession, expiry. Expired (`isExpired`) → close sockets 4004, `deleteAlarm` + `deleteAll`.
+- **Session error** (a bug throwing inside GameSession): the event is dropped, the in-memory
+  session is rebuilt from the last saved snapshot, due work retries after 5 s. Logged.
+
+### 18.4 Security (on top of §12)
+
+- **Origin check** on every API request and upgrade: no `Origin` (not a browser) passes; else it
+  must be the Worker's own host, an `ALLOWED_ORIGINS` entry (wrangler var, comma separated), or
+  loopback when the server is on loopback (`wrangler dev` + Vite). Otherwise `403`.
+- **Per IP** (`CF-Connecting-IP`): room creations 5 burst then 1/min, lookups and upgrades 30
+  burst then 2/s (per Worker isolate: best effort; see HOSTING.md §6.3 for a global rule); at most
+  12 sockets per room from one IP.
+- **Per room**: at most `LIMITS.members + 8` (40) sockets; at capacity, the oldest socket that has
+  not sent `hello` within 15 s is closed (1008) to make room.
+- **Per socket**, before parsing: binary frames and frames over `LIMITS.messageChars` (8000) →
+  `bad_message`; a frame bucket of all `RATE_LIMITS` together (41 burst, 13.5/s) → `rate_limited`,
+  and 20 drops in a row close the socket (1008). The session then applies its per-member limits.
+- **Secrets**: tokens are 32 symbols × 6 bits (192 bits), seeds 128 bits, both from the CSPRNG.
+  Clients only get `viewFor` output (checked by `room.test.ts` and the e2e script). The
+  `x-room-client-ip` header to the object is always overwritten by the Worker.
+
+### 18.5 Running it
+
+```
+nice -n 19 pnpm dev:server      # vite build, then wrangler dev on http://localhost:8787
+nice -n 19 pnpm e2e:server      # wrangler dev on a free port + 3 clients play a 3-VP game (a few s)
+```
+
+- `wrangler dev` serves the built client from `dist/`; rebuild (`pnpm build`) after client
+  changes, or run Vite (`pnpm dev`, port 5173) with a proxy for `/api` (`ws: true`) to 8787 —
+  loopback origins are allowed, so no extra config is needed.
+- Dev overrides (`--var KEY:VALUE` or `.dev.vars`): `BOT_DELAY_MS` (bot speed), `GRACE_MS`.
+- Local state lives in `.wrangler/` (gitignored). The e2e script uses a temp dir.
+- Deploying: docs/HOSTING.md §6 (`pnpm deploy:cf`, by the user; plain `pnpm deploy` is a pnpm
+  builtin).
+
+### 18.6 Changes to the M1 contract (all backward compatible)
+
+- Room ids are 6-char codes (§18.2) instead of 12 chars `[a-z0-9]`; `GameSession` is unchanged.
+- WebSocket path `/api/rooms/:code/ws`; the M1 path `/ws/:code` still works.
+- New: `src/net/api.ts` (HTTP shapes). No protocol message changed; `PROTOCOL_VERSION` stays 1.
+
+### 18.7 Known gaps
+
+- Per-IP HTTP limits live in Worker isolate memory (not global). A Cloudflare rate-limiting rule
+  (HOSTING.md §6.3) is the real fence for a public deploy.
+- One `put` per state change: a 4-player game with bots is roughly 1–2k writes, so the free plan
+  fits ≈ 50–100 games a day. Batching writes (e.g. only on human moves + every N bot moves) is
+  possible if that becomes the limit.
+- Bot moves are driven by alarms (one wake-up per move, ≥ `botDelayMs` apart); fine for turn
+  pacing, not for sub-100 ms timing.
+- No `@cloudflare/vitest-pool-workers`: the Durable Object logic is tested through `RoomCore` with
+  `FakeRuntime`, and the real runtime only by the e2e script (not part of `pnpm test`, it needs
+  workerd and spawns a server).

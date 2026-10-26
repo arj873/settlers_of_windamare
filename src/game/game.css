@@ -70,3 +70,41 @@
   gap: 10px;
   margin-top: 8px;
 }
+
+/* "Fit board" camera reset, top-left under the HUD menu (below the HUD layer, so the open menu covers it). */
+.board-fit {
+  position: fixed;
+  top: 62px;
+  left: 14px;
+  z-index: 9;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #f3e3c3;
+  background: linear-gradient(180deg, #b47a49, #93603a);
+  border: 2px solid #2b170b;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 222, 176, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.28),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s ease;
+}
+.board-fit:hover {
+  transform: translateY(-1px);
+  color: #ffd27a;
+}
+.board-fit:active {
+  transform: translateY(1px);
+}
+.board-fit:focus-visible {
+  outline: 2px solid #ffd27a;
+  outline-offset: 2px;
+}
+/* Hidden while the hotseat cover or the new-game screen is up. */
+.is-covered ~ .board-fit {
+  display: none;
+}

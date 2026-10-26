@@ -18,7 +18,7 @@ import { OnlineApp } from './game/online/app';
 import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
-import { measureHudInsets } from './game/layout';
+import { createFitButton, measureHudInsets } from './game/layout';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import {
@@ -112,9 +112,10 @@ async function boot() {
   const hud = new Hud(uiRoot);
 
   const fitBoard = () => {
-    const insets = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
-    if (insets) board.setInsets(insets);
+    const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
+    if (layout) board.setInsets(layout.insets, layout.avoid);
   };
+  uiRoot.after(createFitButton(() => board.fit()));
   window.addEventListener('resize', fitBoard);
   // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
   uiRoot.addEventListener('click', () => requestAnimationFrame(fitBoard));
