@@ -14,6 +14,7 @@ import { oilModule } from '../../expansions/oil/engine';
 import { ckModule } from '../../expansions/ck/engine';
 import { seafarersModule } from '../../expansions/seafarers/engine';
 import { tbModule } from '../../expansions/tb/engine';
+import { epModule } from '../../expansions/ep/engine';
 import { seackModule } from '../../expansions/seack/engine';
 import { tbckModule } from '../../expansions/tbck/engine';
 import { MAPS, type MapDef } from '../maps';
@@ -28,6 +29,7 @@ function builtinModules(): ExpansionModule[] {
     ckModule,
     seafarersModule,
     tbModule,
+    epModule,
     seackModule,
     tbckModule,
     // new modules go here, one per line

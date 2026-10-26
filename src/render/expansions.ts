@@ -11,6 +11,7 @@ import { oilDrawer } from '../expansions/oil/render';
 import { ckDrawer } from '../expansions/ck/render';
 import { seafarersDrawer } from '../expansions/seafarers/render';
 import { tbDrawer } from '../expansions/tb/render';
+import { epDrawer } from '../expansions/ep/render';
 import type { ExpansionId, GameState, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 
@@ -50,6 +51,7 @@ export const BOARD_DRAWERS: readonly BoardDrawer[] = [
   ckDrawer,
   seafarersDrawer,
   tbDrawer,
+  epDrawer,
   // new modules go here, one per line
 ];
 

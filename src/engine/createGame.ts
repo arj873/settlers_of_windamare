@@ -306,7 +306,8 @@ export function resolveSettings(config: GameConfig): GameSettings {
     }
     timerSettings(clock.preset, clock); // validates the ranges (throws)
   }
-  const secondSettler = config.secondSettler ?? false;
+  // A scenario may default 5+ player games to the paired players' turn (E&P 5-6).
+  const secondSettler = config.secondSettler ?? (n >= 5 && scenario?.pairedTurns56 === true);
   if (secondSettler && n < 4) {
     throw new Error('second settler needs 4+ players (Catanian 2 sits third to the left)');
   }

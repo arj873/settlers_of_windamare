@@ -27,7 +27,7 @@ import {
   validateDraft,
   type TradeDraft,
 } from './composer';
-import { hudExtensionsFor } from './expansions';
+import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
@@ -808,69 +808,71 @@ export class Hud {
     const build = h(
       'div',
       { class: 'build-bar wood', style: playerStyle(me.color) },
-      ...buildCards(state, view.viewer, av).map((c) => {
-        const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
-        const button = h(
-          'button',
-          {
-            class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
-            disabled: !c.enabled || over,
-            ...(why.length > 0
-              ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
-              : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
-            on: {
-              click:
-                c.kind === 'dev'
-                  ? () => this.send({ type: 'buyDevCard', player: view.viewer })
-                  : toggleMode(c.kind),
+      ...buildCards(state, view.viewer, av)
+        .filter((c) => !hiddenBaseCards(state).has(c.kind))
+        .map((c) => {
+          const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
+          const button = h(
+            'button',
+            {
+              class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
+              disabled: !c.enabled || over,
+              ...(why.length > 0
+                ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
+                : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
+              on: {
+                click:
+                  c.kind === 'dev'
+                    ? () => this.send({ type: 'buyDevCard', player: view.viewer })
+                    : toggleMode(c.kind),
+              },
             },
-          },
-          h(
-            'span',
-            { class: 'bcard-art' },
-            c.kind === 'dev' ? devCardFace(null, 26) : glyph(c.kind, 30),
-          ),
-          h('span', { class: 'bcard-label' }, BUILD_LABEL[c.kind]),
-          h('span', { class: 'bcard-left' }, `${c.left}/${c.total}`),
-          h(
-            'span',
-            { class: 'cost', attrs: { 'aria-hidden': 'true' } },
-            ...Object.entries(BUILD_COST[c.kind]).flatMap(([r, n]) =>
-              Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+            h(
+              'span',
+              { class: 'bcard-art' },
+              c.kind === 'dev' ? devCardFace(null, 26) : glyph(c.kind, 30),
             ),
-          ),
-        );
-        if (why.length === 0) return h('span', { class: 'bslot' }, button);
-        // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
-        return h(
-          'span',
-          {
-            class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
-            on: { click: () => this.showWhy(c.kind) },
-          },
-          button,
-          h(
-            'span',
-            { class: 'why', attrs: { role: 'tooltip' } },
-            h('b', {}, BUILD_LABEL[c.kind]),
-            ...why.map((w) =>
-              h(
-                'span',
-                { class: 'why-line' },
-                w.text,
-                w.missing &&
-                  h(
-                    'span',
-                    { class: 'why-cards' },
-                    ...Object.entries(w.missing).flatMap(([r, n]) =>
-                      Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
-                    ),
-                  ),
+            h('span', { class: 'bcard-label' }, BUILD_LABEL[c.kind]),
+            h('span', { class: 'bcard-left' }, `${c.left}/${c.total}`),
+            h(
+              'span',
+              { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+              ...Object.entries(BUILD_COST[c.kind]).flatMap(([r, n]) =>
+                Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
               ),
             ),
-          ),
-        );
-      }),
+          );
+          if (why.length === 0) return h('span', { class: 'bslot' }, button);
+          // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
+          return h(
+            'span',
+            {
+              class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
+              on: { click: () => this.showWhy(c.kind) },
+            },
+            button,
+            h(
+              'span',
+              { class: 'why', attrs: { role: 'tooltip' } },
+              h('b', {}, BUILD_LABEL[c.kind]),
+              ...why.map((w) =>
+                h(
+                  'span',
+                  { class: 'why-line' },
+                  w.text,
+                  w.missing &&
+                    h(
+                      'span',
+                      { class: 'why-cards' },
+                      ...Object.entries(w.missing).flatMap(([r, n]) =>
+                        Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+                      ),
+                    ),
+                ),
+              ),
+            ),
+          );
+        }),
     );
 
     // Expansion build cards (docs/EXPANSIONS.md §8): same look, enabled from legal actions only.
