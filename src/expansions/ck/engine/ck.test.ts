@@ -749,3 +749,49 @@ describe('variants', () => {
     expect(s.settings.robberMode).toBe('friendly');
   });
 });
+
+describe('optional rules (§2.5)', () => {
+  it('Easy start: no event die and no 7 in a player’s first two turns, normal from the third', () => {
+    const s = ckMain(4, { options: { ck: { easyStart: true } } });
+    ckSlice(s).turns[0] = 1;
+    const r = roll(s, 3, 4, 'ship');
+    expect(ckSlice(r).event).toBeNull();
+    expect(ckSlice(r).barbarian).toBe(0);
+    expect(r.dice![0] + r.dice![1]).not.toBe(7);
+    expect(r.phase.kind).toBe('main');
+    ckSlice(s).turns[0] = 3;
+    const later = roll(s, 3, 4, 'ship');
+    expect(ckSlice(later).barbarian).toBe(1);
+    expect(later.dice).toEqual([3, 4]);
+  });
+
+  it('Easy start counts own turns (turn start), and cannot combine with Event Cards', () => {
+    const s = ckMain(4, { options: { ck: { easyStart: true } } });
+    const r = ok(s, { type: 'endTurn', player: 0 });
+    expect(ckSlice(r).turns[1]).toBe(1);
+    expect(() => ckGame(4, { options: { ck: { easyStart: true } }, eventCards: true })).toThrow(
+      /Easy start/,
+    );
+  });
+
+  it('Knight-errant: an active knight next to the robber may chase it before the roll', () => {
+    const plain = ckMain();
+    plain.phase = { kind: 'preRoll' };
+    ckSlice(plain).attacks = 1;
+    plain.robber = 'h:0,0';
+    knight(plain, 0, V(0, 0, 'N'), 1, true, 1);
+    expect(legalOf(plain, 'ck/selectKnight')).toEqual([]);
+    const s = ckMain(4, { options: { ck: { knightErrant: true } } });
+    s.phase = { kind: 'preRoll' };
+    ckSlice(s).attacks = 1;
+    s.robber = 'h:0,0';
+    knight(s, 0, V(0, 0, 'N'), 1, true, 1);
+    let r = ok(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'N') });
+    expect(legalOf(r, 'ck/pickVertex')).toEqual([]);
+    expect(legalOf(r, 'ck/activateKnight')).toEqual([]);
+    r = ok(r, { type: 'ck/chaseRobber', player: 0 });
+    expect(r.phase).toEqual({ kind: 'moveRobber', resume: 'preRoll' });
+    r = ok(r, { type: 'moveRobber', player: 0, hex: 'h:-1,0' });
+    expect(r.phase.kind).toBe('preRoll');
+  });
+});

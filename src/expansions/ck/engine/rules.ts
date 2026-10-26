@@ -7,6 +7,7 @@ import { PIECE_LIMITS, RESOURCES } from '../../../engine/constants';
 import { log, resumePhase } from '../../../engine/actions/common';
 import { startRobber } from '../../../engine/actions/robber';
 import { continueRoll } from '../../../engine/actions/turn';
+import { rollTwoDice } from '../../../engine/rules/dice';
 import { costOf, pieceLimit } from '../../../engine/expansions/hooks';
 import { Rng } from '../../../engine/rng';
 import { hasResources, isResource, subtractResources } from '../../../engine/resources';
@@ -40,6 +41,7 @@ import {
   activeStrength,
   barbarianStrength,
   ckPlayer,
+  CK,
   ckSlice,
   defenderStrength,
   isCommodity,
@@ -285,10 +287,19 @@ function knightTurn(state: GameState, p: PlayerId, v: VertexId): string | null {
   const phase = phaseOf(state);
   if (phase.kind === 'ck/knight') {
     if (state.turn.current !== p) return 'not your turn';
+    if (phase.resume === 'preRoll') return 'before the roll a knight can only chase the robber';
     return phase.vertex === v ? null : 'another knight is selected';
   }
   return buildTurn(state, p);
 }
+
+/** Option 'knightErrant' (S5 p.13): an active knight may chase the robber before the roll. */
+export const knightErrantOn = (state: GameState): boolean =>
+  state.settings.options[CK]?.['knightErrant'] === true;
+
+/** Option 'easyStart' (S5 p.13): no event die and no 7 in each player's first two turns. */
+export const easyStartOn = (state: GameState): boolean =>
+  state.settings.options[CK]?.['easyStart'] === true;
 
 export function activateBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
   const t = knightTurn(state, p, v);
@@ -357,13 +368,22 @@ export function canChase(state: GameState, p: PlayerId, v: VertexId): boolean {
 /** Why the knight on `v` cannot act now (or null). */
 export function knightActionBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
   const phase = phaseOf(state);
-  const selected = phase.kind === 'ck/knight' && phase.vertex === v && phase.resume === 'main';
+  const selected =
+    phase.kind === 'ck/knight' && phase.vertex === v && phase.resume !== 'specialBuild';
+  // Knight-Errant: before the roll, chasing the robber is the only action.
+  const errant =
+    (selected && phase.resume === 'preRoll') ||
+    (!selected && state.phase.kind === 'preRoll' && knightErrantOn(state));
   if (!selected) {
-    const m = mainTurn(state, p);
+    const m = errant ? (state.turn.current === p ? null : 'not your turn') : mainTurn(state, p);
     if (m) return m;
   } else if (state.turn.current !== p) return 'not your turn';
   const k = ownKnight(state, p, v);
   if (!k) return 'not your knight';
+  if (errant) {
+    if (!k.active) return 'only an active knight can act';
+    return canChase(state, p, v) ? null : 'that knight cannot reach the robber';
+  }
   if (!k.active) return 'only an active knight can act';
   if (k.activatedOn === state.turn.number) return 'a knight activated this turn cannot act yet';
   const can =
@@ -378,6 +398,11 @@ export function knightActionBlocker(state: GameState, p: PlayerId, v: VertexId):
  * an action (main phase), activating or promoting (main or special build).
  */
 export function selectKnightBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
+  if (state.phase.kind === 'preRoll' && knightErrantOn(state)) {
+    if (ckSlice(state).turn.cancels >= MAX_KNIGHT_CANCELS)
+      return 'no more knight commands this turn';
+    return knightActionBlocker(state, p, v);
+  }
   const t = buildTurn(state, p);
   if (t) return t;
   if (!ownKnight(state, p, v)) return 'not your knight';
@@ -596,6 +621,27 @@ const FACE_TEXT: Readonly<Record<EventFace, string>> = {
 export function fromRoller(state: GameState): PlayerId[] {
   const n = state.players.length;
   return state.players.map((_, i) => (state.turn.current + i) % n);
+}
+
+/**
+ * onRoll: the event die, except in a player's first two turns with Easy start (S5 p.13): then
+ * no event die, and a rolled 7 is rolled again (an Alchemist's 7 stays).
+ */
+export function rollStep(draft: GameState, roll: number): Phase | undefined {
+  const s = ckSlice(draft);
+  if (!easyStartOn(draft) || (s.turns[draft.turn.current] ?? 0) > 2) return eventDieStep(draft);
+  if (roll === 7 && !s.turn.alchemist) {
+    let dice = draft.dice ?? [3, 4];
+    while (dice[0] + dice[1] === 7) dice = rollTwoDice(draft).dice;
+    draft.dice = dice;
+    log(
+      draft,
+      draft.turn.current,
+      `Easy start: the 7 is rolled again: ${dice[0] + dice[1]} (${dice[0]}+${dice[1]})`,
+    );
+  }
+  log(draft, null, 'Easy start: no event die in a player’s first two turns');
+  return undefined;
 }
 
 /**

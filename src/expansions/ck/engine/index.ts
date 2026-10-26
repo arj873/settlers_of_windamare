@@ -43,7 +43,7 @@ import {
   canChase,
   claimMetropolis,
   commodityProduction,
-  eventDieStep,
+  rollStep,
   finishDiscards,
   holdsGoods,
   improveBlocker,
@@ -214,7 +214,8 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     if (typeof v !== 'string') return fail('invalid vertex');
     const err = selectKnightBlocker(draft, action.player, v);
     if (err) return fail(err);
-    const resume = draft.phase.kind === 'specialBuild' ? 'specialBuild' : 'main';
+    const k = draft.phase.kind;
+    const resume = k === 'specialBuild' ? 'specialBuild' : k === 'preRoll' ? 'preRoll' : 'main';
     draft.phase = asPhase({ kind: 'ck/knight', vertex: v, resume });
     return ok(draft);
   },
@@ -230,7 +231,8 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     const k = ckSlice(draft).knights[phase.vertex];
     if (k) k.active = false;
     log(draft, action.player, `${pn(draft, action.player)}'s knight chased the robber away`);
-    draft.phase = { kind: 'moveRobber', resume: 'main' };
+    // Knight-Errant: chased before the roll, the turn goes on with the roll.
+    draft.phase = { kind: 'moveRobber', resume: phase.resume === 'preRoll' ? 'preRoll' : 'main' };
     return ok(draft);
   },
 
@@ -301,6 +303,7 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
       `${pn(draft, action.player)} played the Alchemist: ${yellow + red} (${yellow}+${red})`,
     );
     recordRoll(draft, action.player);
+    ckSlice(draft).turn.alchemist = true;
     const interrupt = runOnRoll(draft, yellow + red);
     if (interrupt) draft.phase = interrupt;
     else continueRoll(draft);
@@ -437,7 +440,8 @@ function init(draft: GameState, rng: Rng): void {
     merchant: null,
     decks,
     event: null,
-    turn: { cranes: 0, fleet: [], cancels: 0 },
+    turn: { cranes: 0, fleet: [], cancels: 0, alchemist: false },
+    turns: draft.players.map(() => 0),
     trade: null,
   };
   draft.ext[CK] = slice;
@@ -467,6 +471,7 @@ function cloneExt(slice: unknown): CkSlice {
       science: [...s.decks.science],
     },
     turn: { ...s.turn, fleet: [...s.turn.fleet] },
+    turns: [...s.turns],
     trade: s.trade ? { give: { ...s.trade.give }, want: { ...s.trade.want } } : null,
   };
 }
@@ -508,9 +513,30 @@ export const ckModule: ExpansionModule = {
     },
   ],
 
+  options: [
+    {
+      key: 'easyStart',
+      label: 'Easy start',
+      description:
+        'In each player’s first two turns a 7 is re-rolled and the event die is not rolled',
+      type: 'boolean',
+      default: false,
+    },
+    {
+      key: 'knightErrant',
+      label: 'Knight-errant',
+      description: 'An active knight may chase the robber before the roll',
+      type: 'boolean',
+      default: false,
+    },
+  ],
+
   validate(settings) {
     if (settings.rushMode) {
       return 'Cities & Knights needs a step before the roll (Alchemist): Rush mode is not supported';
+    }
+    if (settings.eventCards && settings.options[CK]?.['easyStart'] === true) {
+      return 'Easy start re-rolls 7s: it cannot be combined with Event Cards';
     }
     return null;
   },
@@ -621,7 +647,7 @@ export const ckModule: ExpansionModule = {
   hooks: {
     setupBuilding: (state, index) => (index >= state.players.length ? 'city' : undefined),
 
-    onRoll: (draft) => eventDieStep(draft),
+    onRoll: (draft, roll) => rollStep(draft, roll),
 
     onSeven(draft, pending) {
       if (isRobberActive(draft)) return undefined;
@@ -679,8 +705,11 @@ export const ckModule: ExpansionModule = {
 
     bankTradeRatio: resourceRatio,
 
-    onStartTurn(draft) {
-      ckSlice(draft).turn = { cranes: 0, fleet: [], cancels: 0 };
+    onStartTurn(draft, p) {
+      const s = ckSlice(draft);
+      s.turn = { cranes: 0, fleet: [], cancels: 0, alchemist: false };
+      // Own turns started (Easy start); a second settler step is not one.
+      if (draft.turn.secondSettlerOf === undefined) s.turns[p] = (s.turns[p] ?? 0) + 1;
     },
 
     afterAction(draft) {

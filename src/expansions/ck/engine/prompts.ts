@@ -82,7 +82,9 @@ export function promptFor(state: GameState): Prompt | null {
       return { actor: phase.player, options: vertices(freeCities(state, phase.player)) };
     case 'ck/knight': {
       const p = state.turn.current;
-      if (knightActionBlocker(state, p, phase.vertex) !== null) return { actor: p, options: [] };
+      if (phase.resume === 'preRoll' || knightActionBlocker(state, p, phase.vertex) !== null) {
+        return { actor: p, options: [] };
+      }
       return {
         actor: p,
         options: vertices([

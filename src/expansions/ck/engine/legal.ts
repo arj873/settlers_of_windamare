@@ -138,6 +138,12 @@ export function ckLegal(state: GameState): Action[] {
           }
         }
       }
+      // Knight-Errant: an active knight may chase the robber before the roll.
+      for (const v of Object.keys(ckSlice(state).knights) as VertexId[]) {
+        if (selectKnightBlocker(state, p, v) === null) {
+          out.push(act({ type: 'ck/selectKnight', player: p, vertex: v }));
+        }
+      }
       return out;
     }
     case 'main':

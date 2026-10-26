@@ -306,7 +306,11 @@ export interface CkSlice {
     fleet: Good[];
     /** Knight selections put down this turn (MAX_KNIGHT_CANCELS). */
     cancels: number;
+    /** The roll of this turn was set by an Alchemist (Easy start keeps its 7). */
+    alchemist: boolean;
   };
+  /** Own turns each player has started (option Easy start: the first two are easy). */
+  turns: number[];
   /** Commodity parts of the open player trade offer (base `trade` phase), or null. */
   trade: { give: CommodityCounts; want: CommodityCounts } | null;
 }
@@ -333,7 +337,7 @@ export type CkPhase =
    * The current player selected the knight on `vertex` (command dialog): activate, promote,
    * or (main phase only) move / displace / chase the robber. Back to `resume` afterwards.
    */
-  | { kind: 'ck/knight'; vertex: VertexId; resume: 'main' | 'specialBuild' }
+  | { kind: 'ck/knight'; vertex: VertexId; resume: 'main' | 'specialBuild' | 'preRoll' }
   /** `player`'s displaced knight (`knight`, from `from`) goes to a new spot. */
   | {
       kind: 'ck/relocate';

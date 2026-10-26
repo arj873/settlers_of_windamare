@@ -3,7 +3,8 @@
 Researched 2026-10-25 on branch `s3/rules-ck`. Written in our own words for engine agents. **Target
 edition: the current English 5th edition** (rules of Jan 1 2015, Catan Studio 2020 printing), with
 the 5-6 player extension. The 6th edition (2025) is cross-checked; every difference is in §0.3.
-No code was changed.
+**Implemented (E3)** as the `ck` expansion module (`src/expansions/ck`); the engine status of
+every rule is in **§11**.
 
 Rule numbers (**CK-n**) are stable so tests and cards can cite them. Where a source is silent the
 text says **UNCLEAR** and §10 gives our recommended ruling.
@@ -768,8 +769,9 @@ official rules for the Traders & Barbarians mix were found**):
 
 ## 9. Implementation notes for our engine
 
-This section is advice for the framework agent and later engine agents; none of it is implemented.
-Names are suggestions that follow `types.ts`/ARCHITECTURE.md conventions.
+This section was the advice written before the implementation; what was actually built (and
+where it differs) is in §11. Names are suggestions that follow `types.ts`/ARCHITECTURE.md
+conventions.
 
 ### 9.1 New state
 
@@ -955,6 +957,71 @@ exist in `longestRoad.test.ts`.
 | Q16 | Knight-Errant vs FAQ Q57/Q121                                                                   | The variant is optional (S5 p.13)                                                                            | Default off; the variant lets an active knight chase the robber pre-roll.                                                                                              |
 
 ---
+
+## 11. Engine status (E3)
+
+Module `ck` (`src/expansions/ck/engine`): mode **Cities & Knights**, scenarios `ck/classic`
+(random base board: `baseRandom` for 3-4, `base56` for 5-6) and `ck/starter` (the fixed §2.2
+board, map `ck/starter19`, 3-4). Both 13 VP. Tests: `engine/ck.test.ts` (core rules),
+`engine/cards.test.ts` (every progress card), `engine/sound.test.ts` (every legal action accepted,
+JSON-safe), `bots.test.ts` (sim + invariants), `ui.test.ts`. Sim invariants: `bots.ts`.
+
+**Status legend:** OK = implemented as written and tested; ours = our ruling where the sources are
+silent or unclear (see §10); — = not implemented.
+
+### 11.1 Rules
+
+| Rule(s)             | Status   | How (engine)                                                                                                                                                                                                                                                                                                              |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1.2 supply         | OK       | Commodities 12 (18 with 5-6) each in `slice.bank`; 54 progress cards in 3 stacks; knights 2 per level, 3 walls (`pieceLimit`); Defender cards are a count (FAQ Q6).                                                                                                                                                       |
+| §1.3 tracks         | OK       | `ck/improve`: level n costs n of the track commodity; red die values {1..level+1} (Q1, `redDieDraws`).                                                                                                                                                                                                                    |
+| §1.4 knights        | OK       | `ck/buildKnight` (1 wool + 1 ore), activate (1 grain), promote (1 wool + 1 ore); `costOf('ck/knight' / 'ck/activate' / 'ck/promote' / 'ck/wall')`.                                                                                                                                                                        |
+| §1.5, CK-46         | OK       | `production` hook takes a city's second card on forest / pasture / mountains, `afterProduction` pays the commodity (bank shortage per type, as resources).                                                                                                                                                                |
+| CK-1, CK-2          | OK       | `setupBuilding` hook: the second setup building is a city, 1 card per hex, no commodity; the core's starting player.                                                                                                                                                                                                      |
+| CK-3, CK-4          | OK       | Builds, trades, cards, knight actions only in `main` (Alchemist before the roll; Knight-errant option).                                                                                                                                                                                                                   |
+| CK-5, CK-20..22     | OK       | `onRoll` hook (`rollStep` / `eventDieStep`): event die before production; ship +1, 7th ship attacks, reset to 0; a gate draws for every player from the roller.                                                                                                                                                           |
+| CK-10..CK-18        | OK       | `attack`: barbarians = cities (metropolis once), defenders = all active knights; ties go to the defenders; weakest players with a pillageable city each lose one, chosen by them (`ck/pillage` phase, automatic with one city); metropolis-only / city-less players skipped; walls lost; knights all deactivated.         |
+| CK-19               | OK       | A pillaged city with no settlement left: `pieceLimit` lets the player own one more settlement and one city less (Q13: "must upgrade it first" is 6th ed, not modelled).                                                                                                                                                   |
+| CK-23, CK-33        | OK, ours | One strongest: Defender card (1 VP). Tie: each tied player picks a stack (`ck/defender` phase, roller first). Top strength 0: nobody.                                                                                                                                                                                     |
+| CK-24, CK-42        | OK       | Levels and abilities are kept without cities; improving needs a city.                                                                                                                                                                                                                                                     |
+| CK-25, CK-26        | OK       | Routes (`routes.ts`): walk own roads, over own pieces, never past a foreign building or knight. Recruit on an empty spot touched by an own road and linked to an own building. A displaced knight retreats along its owner's roads from the spot (the vacated spot included), automatic with one spot, removed with none. |
+| CK-27, CK-28        | OK       | Displace = move onto a strictly weaker enemy knight; promote once per knight per turn, status kept; activated this turn = cannot act.                                                                                                                                                                                     |
+| CK-29, CK-31        | OK       | `vertexBlocked` (settlements), `blocksRoute` (roads, Longest Road) for foreign knights, active or not. The robber is not blocked by knights.                                                                                                                                                                              |
+| CK-30               | OK       | `onSeven`: before the first attack a 7 only makes players discard; no robber move, no steal; Bishop and chasing illegal.                                                                                                                                                                                                  |
+| CK-32               | OK       | Recruit then promote in the same turn.                                                                                                                                                                                                                                                                                    |
+| CK-40, CK-41, CK-56 | OK       | Crane = −1 commodity on the next improvement this turn (level 1 free); several improvements per turn.                                                                                                                                                                                                                     |
+| CK-43, CK-44, §4.4  | OK, ours | First to level 4 takes the metropolis (2 VP), level 5 takes it from a level-4 owner, level-5 owners keep it; one per city; immune to pillage. CK-52: a level that would win a metropolis needs a city without one (our narrow reading).                                                                                   |
+| CK-45, CK-47, CK-48 | OK       | Steal / discard take resources and commodities; 7 + 2 per wall (`discardLimit` hook); commodities count for the 7 (`handSize`).                                                                                                                                                                                           |
+| §3.5 Aqueduct       | OK       | Science 3+: no card at all from a non-7 roll → 1 resource of choice (`ck/aqueduct` phase; uses what the core paid, `afterProduction`'s `paid`).                                                                                                                                                                           |
+| §3.7 trade          | OK       | `ck/bankTrade` for any trade with a commodity: 4:1, generic harbour 3:1, Trade level 3 2:1, Merchant Fleet 2:1; a 2:1 harbour only for its resource; merchant 2:1 for its hex's resource (`bankTradeRatio` hook). `ck/offerTrade`: player offers with commodities (the commodity part rides on the base `trade` phase).   |
+| CK-49, §4.5         | OK, ours | Merchant on any land hex (not gold) next to own buildings: 1 VP + 2:1; moves with the next Merchant card. Q12: control stays without nearby buildings.                                                                                                                                                                    |
+| CK-50, CK-51        | OK       | Progress hand 4: out of turn the 5th is discarded at once (`ck/progressDiscard`), on your turn by its end (endTurn refused, `ck/discardProgress`). VP cards laid out.                                                                                                                                                     |
+| CK-53               | OK       | A card that cannot have an effect is not playable (`effectBlocker`); unknowable cases (monopolies) are.                                                                                                                                                                                                                   |
+| CK-54..CK-64, §4.6  | OK, ours | All 25 card kinds, one test each. Choices go through the generic prompts (`prompts.ts`). Ours: Commercial Harbor resolves at play time (Q8); Deserter places the same level, else a basic, else nothing; the Diplomat's own road is removed and re-placed as one move (Longest Road, Q88).                                |
+| §5 victory          | OK       | 13 VP (scenario target); VP from metropolises, Defender cards, Printer / Constitution, merchant (`victoryPoints` hook, named parts for the stats screen); no Largest Army, no development cards (`supply` hook).                                                                                                          |
+| §2.5 options        | OK / —   | Easy start (option `easyStart`: first two own turns, no event die, a rolled 7 is rolled again) and Knight-errant (`knightErrant`) OK. Nasty variant —.                                                                                                                                                                    |
+| §8.1 5-6            | OK       | `base56` board, 18 commodities, special build phase: builds, knights (recruit; activate / promote from the knight dialog), walls, improvements; no cards, trades or knight actions. Paired players (`secondSettler`) works too.                                                                                           |
+| §8.2 Seafarers      | —        | Combination waits for Seafarers (card C1).                                                                                                                                                                                                                                                                                |
+
+### 11.2 Variants (docs/RULES.md §18-20)
+
+| Variant              | With C&K                                                                                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Event Cards          | OK: the card is the roll (its second face is the red die), the event die is rolled before the card's event (T&B FAQ 14); Robber Attacks = 7 (sleeping robber before the first attack); Epidemic: cities yield 1 card, no commodity; the Alchemist replaces the card (FAQ 15/16). Refused with Easy start. |
+| Balanced dice        | OK (the two numbered dice; the event die stays a die).                                                                                                                                                                                                                                                    |
+| Friendly / no robber | OK (Bishop and chasing follow `robberTargets`; no robber: both unplayable).                                                                                                                                                                                                                               |
+| Chess clock, timers  | OK (client side).                                                                                                                                                                                                                                                                                         |
+| Rush mode            | Refused (no step before the roll for the Alchemist / Knight-errant).                                                                                                                                                                                                                                      |
+| Map rules            | OK on the random board (`ck/classic`); the starter board is fixed.                                                                                                                                                                                                                                        |
+| Map veto             | Refused by the framework (every expansion).                                                                                                                                                                                                                                                               |
+
+### 11.3 Known gaps
+
+- Online play: C&K is not in the network protocol (base only). `viewFor` does not mask expansion
+  slices yet: progress hands and stack orders would leak; a masking hook is needed first.
+- Statistics count resources only: commodities, progress cards and knights have no statistics of
+  their own (C&K resource changes are classified, not "Other").
+- Nasty (commit knights) variant, the C&K + Seafarers combination.
 
 ## Appendix A: card name map (5th → 6th)
 
