@@ -46,6 +46,17 @@ export function canPlaceSettlement(
 }
 
 /**
+ * The edge borders a land hex (terrainKind 'land'): a road edge. Always true on base boards; an
+ * edge between revealed-sea / fog board hexes is not.
+ */
+export function edgeTouchesLand(state: GameState, e: EdgeId): boolean {
+  return (topologyOf(state).edge[e]?.hexes ?? []).some((h) => {
+    const tile = state.board.hexes[h];
+    return tile !== undefined && terrainKind(tile.terrain) === 'land';
+  });
+}
+
+/**
  * The vertex touches a land hex (terrainKind 'land'). Always true on base boards; on scenario
  * boards a vertex between sea / fog board hexes is not settleable.
  */
@@ -76,7 +87,7 @@ export function canPlaceRoad(
 ): boolean {
   const t = topologyOf(state);
   if (!isBoardEdge(t, e) || state.pieces.roads[e] !== undefined) return false;
-  if (edgeBlocked(state, e)) return false;
+  if (edgeBlocked(state, e) || !edgeTouchesLand(state, e)) return false;
   const ends = edgeVertices(t, e);
   if (opts.fromVertex !== undefined) return ends.includes(opts.fromVertex);
   return ends.some((v) => {

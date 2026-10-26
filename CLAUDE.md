@@ -10,6 +10,7 @@ src/bots/     random bot + headless simulator
 src/render/   PixiJS board view + hit-testing
 src/ui/       HTML/CSS overlay (HUD, dialogs)
 src/game/     controller wiring engine ⇄ render ⇄ ui ⇄ bots
+src/expansions/<id>/  one expansion module per folder (engine/ = engine rules); contract: docs/EXPANSIONS.md
 docs/ARCHITECTURE.md   the contract. Read it first. Update it if you change a public type.
 ```
 

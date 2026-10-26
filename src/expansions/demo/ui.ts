@@ -5,6 +5,7 @@ import type { HudExtension } from '../../ui/expansions';
 import { RESOURCE_LABEL } from '../../ui/icons';
 import { playerStyle, resCardFace } from '../../ui/widgets';
 import { DEMO, WELL, demoSlice, wellsOf } from './engine';
+import './demo.css';
 
 const isPick = (a: Action): a is ExpansionAction & { resource: Resource } =>
   a.type === 'demo/pickBloom';

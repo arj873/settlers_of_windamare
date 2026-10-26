@@ -57,6 +57,11 @@ export interface WaterHexInfo {
   edges: EdgeId[];
   /** Adjacent hexes of the frame, land and water. */
   neighbors: HexId[];
+  /**
+   * Listed in the frame's `sea` (playable sea). false for the automatic ring around the board,
+   * which is the frame: Seafarers ships may not use edges between two frame hexes.
+   */
+  playable: boolean;
 }
 
 export interface VertexInfo {
@@ -241,7 +246,8 @@ function buildTopology(frame: FrameDef): Topology {
   const startAt = ring.findIndex((c) => c === topLeft);
   const waterCoords = [...ring.slice(startAt), ...ring.slice(0, startAt)];
   // Explicit extra sea of a hex-list frame (interior seas, open ocean), row-major after the ring.
-  const extraSea = ('rows' in frame ? [] : (frame.sea ?? []))
+  const listedSea = new Set<HexId>('rows' in frame ? [] : (frame.sea ?? []));
+  const extraSea = [...listedSea]
     .map((id) => parseHexId(id))
     .filter((c) => !isLand(c.q, c.r) && !waterMap.has(hexId(c.q, c.r)))
     .sort((a, b) => a.r - b.r || a.q - b.q);
@@ -263,7 +269,17 @@ function buildTopology(frame: FrameDef): Topology {
     const neighbors = SIDES.map((s) => neighbor(q, r, s))
       .filter((n) => inFrame(n.q, n.r))
       .map((n) => hexId(n.q, n.r));
-    water[id] = { id, q, r, x: c.x, y: c.y, vertices, edges, neighbors };
+    water[id] = {
+      id,
+      q,
+      r,
+      x: c.x,
+      y: c.y,
+      vertices,
+      edges,
+      neighbors,
+      playable: listedSea.has(id),
+    };
     for (const v of vertices) {
       let info = vertex[v] ?? seaVertex[v];
       if (!info) {

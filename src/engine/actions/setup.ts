@@ -83,21 +83,30 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
 
     draft.pieces.roads[action.edge] = action.player;
     log(draft, action.player, `${playerName(draft, action.player)} placed a road`);
-
-    const n = draft.players.length;
-    const next = phase.index + 1;
-    if (next >= 2 * n) {
-      draft.turn.number = 1;
-      draft.turn.current = draft.settings.startingPlayer;
-      draft.phase = { kind: 'preRoll' };
-      log(draft, null, 'Setup complete');
-    } else {
-      draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
-      draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
-    }
+    advanceSetup(draft);
     return ok(draft);
   },
 };
+
+/**
+ * Finish the current setup step (after its road): next player's settlement, or the first turn.
+ * Exported for expansions whose setup piece replaces the road (a Seafarers ship).
+ */
+export function advanceSetup(draft: GameState): void {
+  const phase = draft.phase;
+  if (phase.kind !== 'setup') return;
+  const n = draft.players.length;
+  const next = phase.index + 1;
+  if (next >= 2 * n) {
+    draft.turn.number = 1;
+    draft.turn.current = draft.settings.startingPlayer;
+    draft.phase = { kind: 'preRoll' };
+    log(draft, null, 'Setup complete');
+  } else {
+    draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
+    draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
+  }
+}
 
 export const setupLegal: LegalGenerator = (state: GameState): Action[] => {
   const phase = state.phase;
