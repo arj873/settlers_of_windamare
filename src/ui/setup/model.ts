@@ -10,6 +10,7 @@ import {
   listModes,
   modeById,
   optionVpBonus,
+  resolveSettings,
   scenarioById,
   timerSettings,
   type ExpansionModule,
@@ -634,6 +635,36 @@ export function pickSeatColor(draft: SetupDraft, index: number, color: string): 
 // ---------------------------------------------------------------------------
 
 /** Trim names, fill blanks, make duplicates unique, drop an empty seed. */
+/**
+ * Why the engine would refuse this setup, or null: a variant combination an expansion's
+ * `validate` rejects (C&K + Rush), or any other createGame error. The Start button is off then.
+ */
+export function setupError(draft: SetupDraft): string | null {
+  const cfg = buildConfig(draft);
+  try {
+    resolveSettings({
+      seed: 'setup-check',
+      players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
+      ...(cfg.mode === undefined || cfg.mode === 'base'
+        ? { map: cfg.map }
+        : {
+            mode: cfg.mode,
+            ...(cfg.scenario === undefined ? {} : { scenario: cfg.scenario }),
+            ...(cfg.options === undefined ? {} : { options: cfg.options }),
+          }),
+      vpToWin: cfg.vpToWin,
+      discardLimit: cfg.discardLimit,
+      balancedDice: cfg.rules.balancedDice,
+      hideBankCards: cfg.rules.hideBankCards,
+      turnTimerSec: cfg.variants?.timer ? null : cfg.turnTimerSec,
+      ...cfg.variants,
+    });
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 export function buildConfig(draft: SetupDraft): NewGameConfig {
   const taken = new Set<string>();
   const players: SeatConfig[] = draft.seats.map((s, i) => {

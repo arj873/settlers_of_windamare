@@ -521,6 +521,11 @@
 .su-summary strong {
   color: var(--ink);
 }
+.su-error {
+  display: block;
+  color: var(--bad);
+  font-weight: 700;
+}
 .su-start {
   min-width: 160px;
 }
