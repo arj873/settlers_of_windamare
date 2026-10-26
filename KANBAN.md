@@ -21,6 +21,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 1 polish (pick after playtest)
 
+- Disabled build buttons explain why on hover/tap (no legal spot / can't afford / no pieces left) (Haiku Seat2)
 - HUD log: detect new entries by last entry, not length (log is capped at 200) (from T8)
 - Spectator flag: hide hand + "you" tag in all-bot games (from T7)
 - Starting player: roll / shuffle seat order (official rule) (from T8)
@@ -92,3 +93,5 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **BUG** · Haiku playtest (3 reports, Seat1+Seat4): 5-6P-only spots refused as 'not a board id' — BoardView.screenPos used base topology · orchestrator · `056254c` · game restarted on the fix
 - **T17** · HUD redesign (your reference: Colonist layout + wooden theme): right sidebar (events w/ inline icons, bank stacks, players bars up to 8), turn pill, menu button, hand + build cards w/ pieces left, dice bottom-right · `s2-hud-redesign` 🟦 · merged · 555 tests
 - **FIX** · Favicon 404 in console (Haiku playtest, 2 reports) · orchestrator · `b9a2eb4`
+- **BUG** · Discard dialog kept the previous player's picks in hotseat (Haiku Seat2+Seat5) · orchestrator · `239fd62` · regression test
+- **BUG** · Build card showed dev deck 34/25 on 5-6P (spotted by orchestrator while triaging) · `1909494`
