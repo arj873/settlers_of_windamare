@@ -72,7 +72,10 @@ async function main() {
       const p = await ctx.newPage();
       p.on('pageerror', (e) => errors.push(e.message));
       p.on('console', (m) => {
-        if (m.type() === 'error') errors.push(m.text());
+        // Reconnect attempts during the emulated network drop are expected to fail.
+        if (m.type() === 'error' && !m.text().includes('ERR_INTERNET_DISCONNECTED')) {
+          errors.push(m.text());
+        }
       });
       await p.goto(url);
       return p;
@@ -170,6 +173,19 @@ async function main() {
     await ann.waitForSelector('.reaction-bubble');
     check(true, 'in-game chat and reaction');
     await shot(ann, '5-game-ann');
+
+    if (REMOTE) {
+      // Network drop (real sockets only): banner, then back with the same seat.
+      await ann.context().setOffline(true);
+      // Emulated offline does not touch open sockets: drop this one like a dead network would.
+      await ann.evaluate(`${clientExpr}.transport.close()`);
+      await ann.waitForSelector('.conn-banner:not([hidden])', { timeout: 20_000 });
+      await shot(ann, '5b-reconnecting');
+      await ann.context().setOffline(false);
+      await ann.waitForSelector('.conn-banner[hidden]', { state: 'attached', timeout: 30_000 });
+      const viewer = await ann.evaluate(`${clientExpr}.game.view.view.viewer`);
+      check(viewer === 0, 'network drop: reconnecting banner, then back in seat 0');
+    }
 
     // Spectator.
     const eve = await open(invite);
