@@ -8,6 +8,7 @@ import { cropHud } from '../expansions/crop/ui';
 import { demoHud } from '../expansions/demo/ui';
 import { oilHud } from '../expansions/oil/ui';
 import { ckHud } from '../expansions/ck/ui';
+import { tbHud } from '../expansions/tb/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -38,6 +39,8 @@ export interface ExtBuildCard {
   glyph?: GlyphName;
   /** Cost item for costOf() (shown as card faces). Default: `mode`. */
   costItem?: string;
+  /** E4: whether the card is shown in this game at all (one module, several scenarios). Default: always. */
+  available?(state: GameState): boolean;
   /** Pieces left / total for the counter (omit for no counter). */
   left?(state: GameState, player: PlayerId): number;
   total?(state: GameState, player: PlayerId): number;
@@ -70,6 +73,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   oilHud,
   cropHud,
   ckHud,
+  tbHud,
   // new modules go here, one per line
 ];
 
@@ -92,6 +96,15 @@ export function extensionHint(state: GameState, view: HudView): string | null {
 /** Every implied (button-less) board action type of every extension. */
 export function impliedExtActions(): ReadonlySet<string> {
   return new Set(HUD_EXTENSIONS.flatMap((x) => x.impliedActions ?? []));
+}
+
+/** The build card label of a namespaced place mode ('tb/wagon' -> 'Wagon'), or null. */
+export function placeModeLabel(mode: string): string | null {
+  for (const x of HUD_EXTENSIONS) {
+    const card = x.buildCards?.find((c) => c.mode === mode);
+    if (card) return card.label;
+  }
+  return null;
 }
 
 /** The action type a namespaced place mode submits, or null. */

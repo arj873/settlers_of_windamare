@@ -8,6 +8,7 @@ import {
   type PlayerId,
   type Rng,
 } from '../engine';
+import { botExtensionsFor } from './expansions';
 
 /**
  * `legal` may be passed when the caller already computed `legalActions(state, player)`
@@ -80,6 +81,11 @@ export function createRandomBot(options: RandomBotOptions = {}): Bot {
     if (confirms.length > 0) return rng.pick(confirms);
     // Only consume randomness for the bias when it is enabled, so bias 0 is a plain pick.
     if (bias > 0 && rng.float() < bias) {
+      // An expansion's own idea of progress first (BotExtension.steer).
+      for (const x of botExtensionsFor(state)) {
+        const a = x.steer?.(state, player, options, rng);
+        if (a) return a;
+      }
       const progress = options.filter((a) => !avoid.includes(a.type));
       if (progress.length > 0) return pick(progress, rng);
     }

@@ -9,6 +9,7 @@ import { cropDrawer } from '../expansions/crop/render';
 import { demoDrawer } from '../expansions/demo/render';
 import { oilDrawer } from '../expansions/oil/render';
 import { ckDrawer } from '../expansions/ck/render';
+import { tbDrawer } from '../expansions/tb/render';
 import type { ExpansionId, GameState, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 
@@ -46,6 +47,7 @@ export const BOARD_DRAWERS: readonly BoardDrawer[] = [
   oilDrawer,
   cropDrawer,
   ckDrawer,
+  tbDrawer,
   // new modules go here, one per line
 ];
 

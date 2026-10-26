@@ -31,7 +31,7 @@ import {
   type PlayerId,
   type Resource,
 } from '../engine';
-import { extensionHint, placeModeAction } from './expansions';
+import { extensionHint, placeModeAction, placeModeLabel } from './expansions';
 import type { BasePlaceMode, HudView, PlaceMode } from './types';
 
 /** Legal actions the viewer may submit. */
@@ -416,6 +416,12 @@ function names(state: GameState, ids: PlayerId[]): string {
   return ids.map((i) => state.players[i]?.name ?? `Player ${i + 1}`).join(', ');
 }
 
+/** "Place a city — …", or an expansion card's label for a namespaced mode ("Wagon — …"). */
+function placeText(mode: PlaceMode): string {
+  const label = mode.includes('/') ? placeModeLabel(mode) : null;
+  return `${label ?? `Place a ${mode}`} — pick a highlighted spot (Esc to cancel)`;
+}
+
 /** The banner telling the viewer what the board expects (or whom we are waiting for). */
 export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | null): Hint | null {
   const phase = state.phase;
@@ -444,7 +450,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : { text: 'Your turn — build, trade or end your turn', tone: 'action' };
     case 'discard':
       return {
@@ -463,7 +469,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         : { text: 'Respond to the trade offer', tone: 'action' };
     case 'specialBuild':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : {
             text: state.settings.rules56
               ? 'Build, buy or play one card, then pass'

@@ -12,6 +12,7 @@ import { demoModule } from '../../expansions/demo/engine';
 import { cropModule } from '../../expansions/crop/engine';
 import { oilModule } from '../../expansions/oil/engine';
 import { ckModule } from '../../expansions/ck/engine';
+import { tbModule } from '../../expansions/tb/engine';
 import { MAPS, type MapDef } from '../maps';
 import type { ExpansionId, GameSettings, MapId, ModeId, ScenarioId } from '../types';
 import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
@@ -22,6 +23,7 @@ function builtinModules(): ExpansionModule[] {
     oilModule,
     cropModule,
     ckModule,
+    tbModule,
     // new modules go here, one per line
   ];
 }

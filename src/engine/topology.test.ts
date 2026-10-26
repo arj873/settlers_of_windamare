@@ -11,7 +11,7 @@ import {
   vertexId,
   type Side,
 } from './hex';
-import { TOPOLOGY as T } from './topology';
+import { TOPOLOGY as T, topologyOfFrame } from './topology';
 import type { HexId } from './types';
 
 describe('topology counts', () => {
@@ -209,5 +209,54 @@ describe('port slots', () => {
         return sideEdge(q, r, side);
       }),
     );
+  });
+});
+
+describe('plazas (F2: T&B trade hexes)', () => {
+  const frame = {
+    id: 'test/plaza19' as const,
+    rows: [3, 4, 5, 4, 3],
+    harbors: 'alternate' as const,
+    plazas: [{ hex: 'h:2,-2' as HexId, corners: ['SE', 'S', 'SW', 'NW'] as const }],
+  };
+  const P = topologyOfFrame(frame);
+
+  it('adds a centre vertex and one spoke edge per listed corner', () => {
+    expect(P.vertices).toHaveLength(55);
+    expect(P.edges).toHaveLength(76);
+    const c = P.vertex['v:2,-2,C'];
+    expect(c?.hexes).toEqual(['h:2,-2']);
+    expect(c?.coastal).toBe(false);
+    expect(c?.edges.sort()).toEqual(['e:2,-2,CNW', 'e:2,-2,CS', 'e:2,-2,CSE', 'e:2,-2,CSW']);
+    const spoke = P.edge['e:2,-2,CS'];
+    expect(spoke?.vertices).toEqual(['v:2,-2,C', 'v:2,-2,S']);
+    expect(spoke?.coastal).toBe(false);
+    expect(spoke?.x).toBeCloseTo((hexCenter(2, -2).x + hexCenter(2, -2).x) / 2);
+    // The corner vertex now reaches the plaza too.
+    expect(P.vertex['v:2,-2,S']?.vertices).toContain('v:2,-2,C');
+  });
+
+  it('keeps the hex corners, sides, land counts and harbours as on the plain frame', () => {
+    expect(P.hex['h:2,-2']?.vertices).toEqual(T.hex['h:2,-2']?.vertices);
+    expect(P.hex['h:2,-2']?.edges).toEqual(T.hex['h:2,-2']?.edges);
+    expect(P.coastalEdges).toEqual(T.coastalEdges);
+    expect(P.portSlots).toEqual(T.portSlots);
+  });
+
+  it('ids round-trip through the parsers', () => {
+    expect(parseVertexId('v:2,-2,C')).toEqual({ q: 2, r: -2, corner: 'C' });
+    expect(parseEdgeId('e:2,-2,CNW')).toEqual({ q: 2, r: -2, side: 'CNW' });
+    expect(vertexId(2, -2, 'C')).toBe('v:2,-2,C');
+    expect(edgeId(2, -2, 'CNW')).toBe('e:2,-2,CNW');
+  });
+
+  it('rejects a plaza off the land', () => {
+    expect(() =>
+      topologyOfFrame({
+        ...frame,
+        id: 'test/plazaBad',
+        plazas: [{ hex: 'h:9,9', corners: ['N'] }],
+      }),
+    ).toThrow(/not a land hex/);
   });
 });

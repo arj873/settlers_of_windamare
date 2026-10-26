@@ -14,7 +14,8 @@ Status: framework implemented (F1). Modules: the **demo** (`src/expansions/demo`
 mode, the worked example of every extension point: copy its shape; hidden on the setup screen
 unless the URL has `?modes=all`; `?mode=demo` starts it directly), **Oil Springs** and **Crop
 Trust** (E1), **Cities & Knights** (`ck`, E3: the largest module; `docs/rules/cities-knights.md`
-§11).
+§11), **Traders & Barbarians** (`tb`, E4: five scenarios + the variants incl. Catan for Two, one
+module with a feature per scenario; `docs/rules/traders-barbarians.md` §11).
 
 ---
 
@@ -304,6 +305,9 @@ interface HudExtension {
   shrink and scroll (see `ck.css`).
 - The Buy card button is hidden when the game has no development deck (`supply` hook).
 
+- E4: a build card's optional `available(state)` hides it in games that do not use it (one
+  module, several scenarios: T&B's Bridge / Wagon / Move knights); the turn pill names an active
+  module place mode by its card label (`placeModeLabel`).
 - A build card toggles its namespaced `PlaceMode`; the controller (`game/logic.ts`
   `boardActions`) highlights the legal actions of its `actionType` and maps clicks to them.
   Implied actions (setup ship, pirate move, knight move) are highlighted whenever legal.
@@ -322,11 +326,15 @@ interface BotExtension {
   id;
   invariants?(state): Violation[]; // code 'expansion'; checked after every sim step
   relax?: ViolationCode[]; // base checks that do not hold with your module
+  steer?(state, player, options, rng): Action | null; // E4: progress pick (bias draws only)
 }
 ```
 
 - The random bot needs nothing: it picks from `legalActions` (module actions included). Keep
   phases finite (no action loops that never end the turn), or sims hit `--max-steps`.
+- `steer` (E4): when a module's VP need purposeful play the random bot never finds (T&B
+  deliveries, BA knights), return the action that makes progress. It is asked only when the bot's
+  `progressBias` draw triggers, so bias 0 stays a plain random pick (and base sims are unchanged).
 - `checkInvariants` = base checks (minus every active module's `relax`) + each module's
   `invariants`. The base VP recount trusts `expansionVictoryPoints`; check your own VP sources.
   Typical relaxes: `'award-mismatch'` (roadLength / blocksRoute change Longest Road),
@@ -405,17 +413,18 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
 | Event die + red/yellow dice, barbarian track, pillage (C&K)         | `rollDice`, `onRoll` interrupt + `continueRoll`, `actors`                                          |
 | Commodities, walls (+2 hand limit), knights on vertices (C&K)       | slice, `handSize`, `discardLimit`, `vertexBlocked`, `blocksRoute`                                  |
 | City setup round, no dev cards, VP 13 (C&K)                         | `setupBuilding`, `supply`, scenario `vpToWin` — **done (E3, `src/expansions/ck`)**                 |
-| Event cards instead of dice, bridges, lake, fishing grounds (T&B)   | `rollDice`, `edgeBlocked`, `board.ext`, `production`                                               |
-| Harbormaster +1 VP target, event cards vs balanced dice (T&B)       | `OptionDef.vpBonus`, `validate`                                                                    |
-| Catan for Two: 2 players + neutrals (T&B)                           | map/mode `minPlayers: 2`, neutrals in slice + blocker hooks                                        |
+| Event cards instead of dice, bridges, lake, fishing grounds (T&B)   | core Event Cards (V1), `edgeBlocked`, `board.ext`, `afterProduction` — **done (E4, `tb`)**         |
+| Harbormaster +1 VP target, event cards vs balanced dice (T&B)       | `OptionDef.vpBonus`, `validate` — **done (E4)**                                                    |
+| Catan for Two: 2 players + neutrals (T&B)                           | map/mode `minPlayers: 2`, neutrals in slice + blocker hooks — **done (E4)**                        |
+| T&B trade-hex plazas (centre vertex + spokes)                       | frame `plazas` (F2): `v:q,r,C` vertices + `e:q,r,C<corner>` spoke edges — **done (E4)**            |
 | No robber, harbour settlements, missions, per-scenario VP (E&P)     | `NO_ROBBER`, slice flag on a city piece, `victoryPoints`, scenario `vpToWin`                       |
 | Combination matrix, VP increments                                   | modes only, `conflicts`, `vpBonus`, `scenarioVp`                                                   |
 
 **Known gaps (framework follow-ups, not blocking the first modes):**
 
-- **T&B trade-hex plazas** (main "Traders & Barbarians" scenario): a centre vertex + spoke edges
-  inside a hex need new id kinds (`v:q,r,C`, spoke edges). Ask for it when T&B reaches that
-  scenario; the other T&B scenarios work without it.
+- ~~T&B trade-hex plazas~~ — done (F2, E4): a frame's `plazas: { hex, corners }[]` adds the
+  centre vertex `v:q,r,C` and spoke edges `e:q,r,C<corner>` to its topology (plain vertices /
+  edges: roads, pieces, highlights, clicks; the hex's 6 corners / sides are unchanged).
 - **Setup rounds other than 2** (Cloth for Catan's third round, E&P harbour-first order): override
   `placeSetupRoad` (`next` then adjust the phase) for now; a `setupRounds` hook can be added.
 - **Bank-trade HUD ratios** still show harbour ratios only; expansions with `bankTradeRatio` hooks
@@ -423,7 +432,14 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
 - **Secret expansion state online:** `viewFor` passes `state.ext` unmasked (C&K progress hands
   and stack orders, oil is public anyway). Online play is base-only for now; a module masking
   hook is needed before an expansion with secrets goes online.
-- **Statistics** count resources only; expansion goods (commodities, oil, crops) have none.
+- **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
+- **T&B combinations for card C1** (official, per scenario, not built yet): T&B + Seafarers
+  (rulebook "in theory" for every variant/scenario; FAQ 6, 19-20, 53, 58, 65: ships next to
+  camels, pirate is friendly, ships on dotted lines, wagons onto ships) and T&B + C&K (FAQ 3-5,
+  43, 62-64: only the 2 production dice re-roll 2/12, Aqueduct with fish, gold not for 3:1/4:1,
+  diplomat and knights vs barbarians). The 2025 T&B × T&B sheets are T6 rulesets
+  (docs/rules/traders-barbarians.md §8.1); the `tb` feature design (`featuresOf`) can host them as
+  extra scenarios switching on two features.
 
 ## 13. File ownership for parallel expansion agents
 

@@ -7,7 +7,8 @@ import { cropBots } from '../expansions/crop/bots';
 import { demoBots } from '../expansions/demo/bots';
 import { oilBots } from '../expansions/oil/bots';
 import { ckBots } from '../expansions/ck/bots';
-import type { ExpansionId, GameState } from '../engine';
+import { tbBots } from '../expansions/tb/bots';
+import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 
 export interface BotExtension {
@@ -16,6 +17,12 @@ export interface BotExtension {
   invariants?(state: GameState): Violation[];
   /** Base invariant codes that do not hold under this module (e.g. 'award-mismatch'). */
   relax?: readonly ViolationCode[];
+  /**
+   * The random bot's sense of progress in this module (T&B wagons, knights): an action from
+   * `options` to play instead of a random pick, or null for no opinion. Asked only when the
+   * bot's progress bias triggers (bias 0 stays a plain random pick). Use `rng`, never the game's.
+   */
+  steer?(state: GameState, player: PlayerId, options: readonly Action[], rng: Rng): Action | null;
 }
 
 export const BOT_EXTENSIONS: readonly BotExtension[] = [
@@ -23,6 +30,7 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   oilBots,
   cropBots,
   ckBots,
+  tbBots,
   // new modules go here, one per line
 ];
 
