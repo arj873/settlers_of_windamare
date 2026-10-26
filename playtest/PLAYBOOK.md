@@ -86,8 +86,10 @@ CLI, same loop below. What is different:
 - **Bank trade:** `click Bank` -> `click Give: <Resource>` -> `click Receive: <Resource>` ->
   `click Trade`. Ratios (4:1, 3:1, 2:1) are in `status`.
 - **Player trade:** `click Trade` -> `set give wool 1` -> `set want ore 1` -> optional
-  `click to: SeatN` to drop a recipient -> `click Send offer`. Then `wait`; when you wake,
-  `click SeatN: Trade` to confirm with someone who accepted, or `click Cancel offer`.
+  `click to: SeatN` to drop a recipient -> `click Send offer`. Then `wait`: it wakes once every
+  recipient has answered (or the offer ended); then `click SeatN: Trade` to confirm with someone
+  who accepted, or `click Cancel offer`. If everyone rejects, the offer closes by itself
+  ("Everyone rejected the offer" in the log).
 - **Answering an offer:** `click Accept` or `click Reject`.
 - **Special build step (5+ players):** after each turn, every other player in order may build
   or buy a dev card (no trading, no playing dev cards). Build as usual, then `click Pass`

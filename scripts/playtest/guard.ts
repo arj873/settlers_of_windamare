@@ -42,10 +42,16 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
       return 'Choose who to rob: `click <player name>`.';
     case 'roadBuilding':
       return `Place a free road (${phase.remaining} left): \`spots\`, then \`click-spot N\`.`;
-    case 'trade':
-      return phase.offer.from === seat
-        ? 'Your trade offer is open: confirm with an accepting player (`click <name>: Trade`) or `click Cancel offer`.'
-        : `${nameOf(state, phase.offer.from)} offers you a trade: \`click Accept\` or \`click Reject\`.`;
+    case 'trade': {
+      if (phase.offer.from !== seat) {
+        return `${nameOf(state, phase.offer.from)} offers you a trade: \`click Accept\` or \`click Reject\`.`;
+      }
+      const pending = pendingReplies(state, seat).map((p) => nameOf(state, p));
+      if (pending.length > 0) {
+        return `Your trade offer is open; waiting for ${pending.join(', ')} to answer: \`wait\` (wakes when all have answered), or \`click Cancel offer\`.`;
+      }
+      return 'Your trade offer is open: confirm with an accepting player (`click <name>: Trade`) or `click Cancel offer`.';
+    }
     case 'specialBuild':
       return 'Special build step (5+ players): build or buy a dev card if you like (no trading, no dev cards), then `click Pass`.';
     case 'mapVeto':
@@ -55,6 +61,28 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
     default:
       return `Expansion step (${phase.kind}): use the dialog or \`spots\` / \`click-spot N\`.`;
   }
+}
+
+/** Addressees who still owe an answer to `seat`'s own open trade offer (empty otherwise). */
+export function pendingReplies(state: GameState, seat: PlayerId): PlayerId[] {
+  const phase = state.phase;
+  if (phase.kind !== 'trade' || phase.offer.from !== seat) return [];
+  return phase.offer.responses.flatMap((r, p) => (r === 'pending' ? [p] : []));
+}
+
+/**
+ * A click on a trade button that is gone because the offer already ended: say how it ended (the
+ * newest closing log line) instead of "no button matches". Null when that is not the case.
+ */
+export function staleTradeHint(state: GameState, query: string): string | null {
+  if (state.phase.kind === 'trade') return null;
+  if (!/offer|accept|reject|trade/i.test(query) || /^(bank|trade)$/i.test(query.trim()))
+    return null;
+  const end = [...state.log]
+    .reverse()
+    .find((e) => /withdrew the offer|^Everyone rejected| traded .* to /.test(e.text));
+  const how = end ? ` Last trade news: "T${end.turn} ${end.text}".` : '';
+  return `The trade offer is already closed, so its buttons are gone.${how} Run \`status\`.`;
 }
 
 /** Why `seat` should wake from `wait`, or null to keep waiting. */
@@ -70,6 +98,8 @@ export function wakeReason(snap: Snapshot, seat: PlayerId): string | null {
     return `STALLED: nobody has a legal action in phase "${state.phase.kind}". Report this as a blocker.`;
   }
   if (snap.viewer !== seat || !snap.legal.some((a) => a.player === seat)) return null;
+  // Own trade offer: Cancel is always legal, so keep waiting until every addressee answered.
+  if (pendingReplies(state, seat).length > 0) return null;
   const covered = snap.ui.cover !== null;
   return `YOUR MOVE${covered ? ' (screen is covered: run `pass` first)' : ''}: ${mustDo(state, seat, snap.legal)}`;
 }

@@ -10,7 +10,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **BUG-B3** · Online trade flow (from M4b Haiku online playtest): bots withdraw accepted trades; other humans never prompted for a human's offer; offers vanish without a log line · `s4-online-trade` 🟦
 
 ## 📋 Backlog — Stage 4
 
@@ -21,6 +20,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
+- **S1** · Sync `main` → `expansions` (24 conflicted files: V1/V2 variants, stats, online vs F1 hooks); then start E2 Seafarers + E3 C&K from the synced branch · `s3-exp-sync` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -55,6 +55,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (B3) parallel trade-reply timers · hotseat end-of-offer toasts · "time ran out" wording · harness `wait` prints newest log lines
 - (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
 - (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
 - (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
@@ -123,6 +124,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **BUG-B3** · Online trade flow: bots now confirm accepted offers; offerer `wait` blocks until answers; end-of-offer toasts; flaky e2e-server fixed · `s4-online-trade` 🟦 · PR #13 → `main` · 1042 tests
 - **UX2** · Game Statistics at game over: Overview (VP breakdown + 8 awards), Dice (histogram vs expected), Resources (by type/source/loss), Activity (VP-over-turns chart), Dev Cards; engine `stats` slice, online-safe · `s4-game-stats` 🟦 · PR #12 → `main` · 1027 tests
 - **BUG-B2** · Board crisp at every zoom (text re-rasterised to zoom, renderer follows DPR) + fit the island not the sea (+18% on base78) · `s4-board-crisp` 🟦 · PR #11 → `main` · 987 tests
 - **V2** · Map **Balance rules** (4 Allow… toggles, all random maps) + optional **5+ player rule set** (dev card in build phase, no robber on 2nd desert, 12 VP) + component audit · `s4-rules-56` 🟩 · PR #10 → `main` · 981 tests

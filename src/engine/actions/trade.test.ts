@@ -289,3 +289,32 @@ describe('tradeLegal', () => {
     for (const s of [midGame(), as(0), as(3), pre, tradeOfferGame(), accepting]) expectSound(s);
   });
 });
+
+// BUG-B3: an offer that "vanished" online. Every way out of the trade phase leaves a log line,
+// and the turn cannot end around an open offer.
+describe('every way an offer ends is logged', () => {
+  const open = () => {
+    const s = tradeOfferGame();
+    for (const p of s.players) p.resources = { ...p.resources, ore: 2, brick: 2 };
+    return s;
+  };
+  const last = (s: GameState) => s.log[s.log.length - 1]?.text;
+
+  it('cancel, confirm and all-reject each log a closing line', () => {
+    expect(last(apply(open(), { type: 'cancelTrade', player: 1 }))).toBe('Blue withdrew the offer');
+    expect(last(apply(open(), { type: 'confirmTrade', player: 1, partner: 3 }))).toBe(
+      'Blue traded 1 ore to Orange for 1 brick',
+    );
+    const s = open();
+    if (s.phase.kind === 'trade') s.phase.offer.responses[3] = 'rejected';
+    const closed = apply(s, { type: 'rejectTrade', player: 2 });
+    expect(closed.phase.kind).toBe('main');
+    expect(last(closed)).toBe('Everyone rejected the offer');
+  });
+
+  it('endTurn is not possible while an offer is open', () => {
+    const s = open();
+    expect(legalActions(s).some((a) => a.type === 'endTurn')).toBe(false);
+    expect(err(s, { type: 'endTurn', player: 1 })).not.toBe('ok');
+  });
+});
