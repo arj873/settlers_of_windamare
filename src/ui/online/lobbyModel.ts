@@ -1,8 +1,15 @@
 /** Pure lobby logic (no DOM): what each seat shows and which buttons the viewer gets. */
-import { MAPS } from '../../engine';
+import { MAPS, modeById, scenarioById } from '../../engine';
 import type { MemberId, MemberInfo, RoomConfig, RoomInfo } from '../../net/protocol';
 import { ROOM_COLORS } from '../../net/protocol';
-import { colorName, MAX_PLAYERS, timerLabel, TIMER_STEPS, mapInfo } from '../setup/model';
+import {
+  colorName,
+  MAX_PLAYERS,
+  mapInfo,
+  playerRange,
+  timerLabel,
+  TIMER_STEPS,
+} from '../setup/model';
 
 export interface SeatView {
   index: number;
@@ -34,8 +41,14 @@ export interface LobbyView {
   summary: string;
 }
 
+/** Seats the config's map (base) or mode + scenario (expansions) allow. */
+export function seatRange(config: RoomConfig): { min: number; max: number } {
+  if (config.mode === 'base') return { min: MAPS[config.map].minPlayers, max: MAX_PLAYERS };
+  return playerRange({ mode: config.mode, scenario: config.scenario ?? null });
+}
+
 export function minSeats(config: RoomConfig): number {
-  return MAPS[config.map].minPlayers;
+  return seatRange(config).min;
 }
 
 export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
@@ -71,7 +84,7 @@ export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
     me,
     isHost,
     hostName: room.host ? (byId.get(room.host)?.name ?? null) || null : null,
-    canAddSeat: isHost && room.seats.length < MAX_PLAYERS,
+    canAddSeat: isHost && room.seats.length < seatRange(room.config).max,
     startBlocked: !isHost
       ? 'Only the host can start'
       : !seated
@@ -82,7 +95,15 @@ export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
 }
 
 export function configSummary(c: RoomConfig): string {
-  const parts = [mapInfo(c.map).label, `${c.seatCount} seats`, `${c.vpToWin} VP`];
+  const mode = modeById(c.mode);
+  const scenario = c.scenario ? scenarioById(c.scenario) : undefined;
+  const board =
+    c.mode === 'base' || !mode
+      ? mapInfo(c.map).label
+      : scenario
+        ? `${mode.name}: ${scenario.name}`
+        : mode.name;
+  const parts = [board, `${c.seatCount} seats`, `${c.vpToWin} VP`];
   const idx = TIMER_STEPS.indexOf(c.turnTimerSec);
   if (c.turnTimerSec !== null && idx >= 0) parts.push(`${timerLabel(idx)} timer`);
   return parts.join(' · ');

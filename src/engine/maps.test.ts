@@ -9,18 +9,19 @@ import { DEV_CARD_TYPES, PLAYER_COLORS, RESOURCES } from './constants';
 import { createGame, resolveSettings } from './createGame';
 import { FIXTURE_PLAYERS, freshGame } from './fixtures';
 import { hexDistance, parseHexId } from './hex';
-import { MAPS, MAP_IDS, defaultMapFor, supplyOf } from './maps';
+import { supplyOf } from './mapLookup';
+import { MAPS, MAP_IDS, defaultMapFor } from './maps';
 import { upgradeState } from './migrate';
 import { Rng } from './rng';
 import { setupPlayerAt } from './selectors';
 import { TOPOLOGY, topologyFor, topologyOf } from './topology';
-import type { GameState, MapId, Terrain } from './types';
+import type { BaseMapId, GameState, MapId, Terrain } from './types';
 
 const players = (n: number) =>
   Array.from({ length: n }, (_, i) => PLAYER_COLORS[i % PLAYER_COLORS.length]!);
 
 describe('topology per map', () => {
-  const expected: Record<MapId, [number, number, number, number, number, number]> = {
+  const expected: Record<BaseMapId, [number, number, number, number, number, number]> = {
     // land, water, vertices, edges, coastal edges, harbors
     base: [19, 18, 54, 72, 30, 9],
     baseRandom: [19, 18, 54, 72, 30, 9],
@@ -181,7 +182,7 @@ describe('board generators', () => {
 });
 
 describe('supply per map', () => {
-  const cases: [MapId, number, number, number][] = [
+  const cases: [BaseMapId, number, number, number][] = [
     // map, bank per resource, dev cards, knights
     ['base', 19, 25, 14],
     ['baseRandom', 19, 25, 14],
@@ -312,7 +313,7 @@ describe('starting player (RULES.md 2.7, 2.13, 2.20)', () => {
 describe('settings v2', () => {
   it('defaults', () => {
     const s = createGame({ seed: 1, players: players(4), map: 'baseRandom' });
-    expect(s.schemaVersion).toBe(4);
+    expect(s.schemaVersion).toBe(5);
     expect(s.settings).toEqual({
       seed: 1,
       map: 'baseRandom',
@@ -323,7 +324,12 @@ describe('settings v2', () => {
       hideBankCards: false,
       turnTimerSec: null,
       startingPlayer: s.settings.startingPlayer,
+      mode: 'base',
+      expansions: [],
+      scenario: null,
+      options: {},
     });
+    expect(s.ext).toEqual({});
     expect(createGame({ seed: 1, players: players(5) }).settings.specialBuildPhase).toBe(true);
   });
 
@@ -387,10 +393,11 @@ describe('upgradeState (saves)', () => {
     return { ...s, schemaVersion: 1, settings: { seed: 'fixture', layout, vpToWin: 8 } };
   }
 
-  it('upgrades v1 -> v4 with defaults', () => {
+  it('upgrades v1 -> v5 with defaults', () => {
     const up = upgradeState(v1Save('beginner'));
-    expect(up?.schemaVersion).toBe(4);
+    expect(up?.schemaVersion).toBe(5);
     expect(up?.diceDeck).toEqual([]);
+    expect(up?.ext).toEqual({});
     expect(up?.settings).toEqual({
       seed: 'fixture',
       map: 'base',
@@ -401,6 +408,10 @@ describe('upgradeState (saves)', () => {
       hideBankCards: false,
       turnTimerSec: null,
       startingPlayer: 0,
+      mode: 'base',
+      expansions: [],
+      scenario: null,
+      options: {},
     });
     expect(upgradeState(v1Save('random'))?.settings.map).toBe('baseRandom');
   });
@@ -419,12 +430,61 @@ describe('upgradeState (saves)', () => {
     expect(upgradeState(JSON.parse(JSON.stringify(v3)))).toEqual(s);
   });
 
-  it('passes v4 through and rejects garbage', () => {
+  it('upgrades v4 -> v5: base mode, no expansions, empty ext', () => {
+    const s = freshGame();
+    const { mode: _m, expansions: _e, scenario: _s, options: _o, ...v4Settings } = s.settings;
+    const { ext: _x, ...rest } = s;
+    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings };
+    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
+  });
+
+  it('keeps V1/V2 variant fields and stats through v4 -> v5 and in v5 (no schema bump)', () => {
+    const s = createGame({
+      seed: 'variants',
+      players: players(4),
+      robberMode: 'friendly',
+      eventCards: true,
+      setupPlacement: {
+        first: { building: 'settlement', restriction: 'normal' },
+        second: { building: 'city', restriction: 'anyVertex' },
+      },
+      randomTurnOrder: true,
+      mapSelection: 'random',
+      rushMode: true,
+      turboMode: true,
+      secondSettler: true,
+      timer: { preset: 'blitz', bankSec: 300, incrementSec: 10 },
+      mapRules: { allowRedTouch: true },
+    });
+    expect(s.stats).toBeDefined();
+    expect(s.eventDeck).toBeDefined();
+    const { mode: _m, expansions: _e, scenario: _s, options: _o, ...v4Settings } = s.settings;
+    const { ext: _x, ...rest } = s;
+    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings };
+    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
+    expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
+    // A v5 expansion save with variants and stats passes through as well.
+    const oil = createGame({ seed: 3, players: players(4), mode: 'oil', robberMode: 'friendly' });
+    expect(upgradeState(JSON.parse(JSON.stringify(oil)))).toEqual(oil);
+  });
+
+  it('rejects a v5 save with an unknown expansion, mode or scenario', () => {
+    const s = freshGame();
+    const bad = (settings: Record<string, unknown>) =>
+      upgradeState(JSON.parse(JSON.stringify({ ...s, settings: { ...s.settings, ...settings } })));
+    expect(bad({ expansions: ['moon'] })).toBeNull();
+    expect(bad({ mode: 'moon' })).toBeNull();
+    expect(bad({ scenario: 'moon/x' })).toBeNull();
+    const { ext: _x, ...noExt } = s;
+    expect(upgradeState(noExt)).toBeNull();
+  });
+
+  it('passes v5 through and rejects garbage', () => {
     const s = freshGame();
     expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(upgradeState(null)).toBeNull();
     expect(upgradeState({})).toBeNull();
-    expect(upgradeState({ ...s, schemaVersion: 5 })).toBeNull();
+    expect(upgradeState({ ...s, schemaVersion: 6 })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, startingPlayer: 4 } })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, map: 'moon' } })).toBeNull();
     expect(

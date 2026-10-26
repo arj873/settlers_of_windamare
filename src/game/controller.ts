@@ -207,7 +207,7 @@ export class GameController {
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
     const state = createGame(gameConfigOf(cfg, seed, extra.vpToWin));
-    console.info(`New game: map=${state.settings.map} seed=${seed}`);
+    console.info(`New game: mode=${state.settings.mode} map=${state.settings.map} seed=${seed}`);
     // Randomize Turn Order moved the players: seat p holds config player seatOrder[p].
     const order = state.settings.seatOrder ?? cfg.players.map((_, i) => i);
     this.start(

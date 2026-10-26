@@ -10,7 +10,10 @@ import {
   CORNERS,
   TOPOLOGY,
   cornerPoint,
+  edgeInfo,
   isLandHex,
+  isWaterHex,
+  vertexInfo,
   type EdgeId,
   type HexId,
   type Point,
@@ -199,6 +202,17 @@ export function distToSegment(p: Point, a: Point, b: Point): number {
 
 /** The land hex containing unit point `p`, or null (water / off board). */
 export function hexAt(p: Point, topo: Topology = TOPOLOGY): HexId | null {
+  const id = anyHexAt(p);
+  return isLandHex(topo, id) ? id : null;
+}
+
+/** The water hex of the frame containing unit point `p`, or null. */
+export function waterHexAt(p: Point, topo: Topology = TOPOLOGY): HexId | null {
+  const id = anyHexAt(p);
+  return isWaterHex(topo, id) ? id : null;
+}
+
+function anyHexAt(p: Point): HexId {
   // Pointy-top pixel -> fractional axial, then cube rounding.
   const fq = (Math.sqrt(3) / 3) * p.x - p.y / 3;
   const fr = (2 / 3) * p.y;
@@ -211,8 +225,7 @@ export function hexAt(p: Point, topo: Topology = TOPOLOGY): HexId | null {
   const ds = Math.abs(s - fs);
   if (dq > dr && dq > ds) q = -r - s;
   else if (dr > ds) r = -q - s;
-  const id: string = `h:${q + 0},${r + 0}`; // `+ 0` turns -0 into 0
-  return isLandHex(topo, id) ? id : null;
+  return `h:${q + 0},${r + 0}`; // `+ 0` turns -0 into 0
 }
 
 /**
@@ -229,9 +242,10 @@ export function pick(
   let best: Hit | null = null;
   let bestScore = Infinity;
 
+  // Candidates may be sea-only vertices/edges (ships, docs/EXPANSIONS.md §7).
   const vertices = cand ? (cand.vertices ?? []) : topo.vertices;
   for (const id of vertices) {
-    const v = topo.vertex[id];
+    const v = vertexInfo(topo, id);
     if (!v) continue;
     const score = Math.hypot(p.x - v.x, p.y - v.y) / radii.vertex;
     if (score <= 1 && score < bestScore) {
@@ -242,9 +256,9 @@ export function pick(
 
   const edges = cand ? (cand.edges ?? []) : topo.edges;
   for (const id of edges) {
-    const e = topo.edge[id];
-    const a = e && topo.vertex[e.vertices[0]];
-    const b = e && topo.vertex[e.vertices[1]];
+    const e = edgeInfo(topo, id);
+    const a = e && vertexInfo(topo, e.vertices[0]);
+    const b = e && vertexInfo(topo, e.vertices[1]);
     if (!a || !b) continue;
     // Only the middle half of the edge counts, so near the ends the vertex wins.
     const near = { x: a.x + (b.x - a.x) * 0.25, y: a.y + (b.y - a.y) * 0.25 };
@@ -260,5 +274,8 @@ export function pick(
 
   const hex = hexAt(p, topo);
   if (hex && (!cand || cand.hexes?.includes(hex))) return { kind: 'hex', id: hex };
+  // A highlighted water hex (pirate moves) is clickable too.
+  const water = cand?.hexes?.length ? waterHexAt(p, topo) : null;
+  if (water && cand?.hexes?.includes(water)) return { kind: 'hex', id: water };
   return null;
 }

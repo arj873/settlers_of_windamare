@@ -515,7 +515,7 @@ describe('GameController: autosave', () => {
     const seats = ['human', 'bot', 'bot', 'bot'];
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: v1, seats, viewer: 0, botRng: 5 }));
     const saved = loadSession(store);
-    expect(saved?.state.schemaVersion).toBe(4);
+    expect(saved?.state.schemaVersion).toBe(5);
     expect(saved?.state.settings).toMatchObject({ map: 'base', discardLimit: 7, vpToWin: 10 });
     expect(saved?.state.pieces).toEqual(midGame().pieces);
   });

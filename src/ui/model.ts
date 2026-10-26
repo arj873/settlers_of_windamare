@@ -4,11 +4,12 @@
  */
 import {
   actingPlayers,
+  bankTradeRatio,
   canPlaceCity,
   canPlaceRoad,
   canPlaceSettlement,
   COSTS,
-  DEV_CARD_TYPES,
+  devDeckCounts,
   devCardCount,
   EVENT_INFO,
   getPlayer,
@@ -18,7 +19,6 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
-  supplyOf,
   topologyOf,
   RESOURCES,
   victoryPoints,
@@ -31,7 +31,8 @@ import {
   type PlayerId,
   type Resource,
 } from '../engine';
-import type { HudView, PlaceMode } from './types';
+import { extensionHint, placeModeAction, placeModeActions, placeModeLabel } from './expansions';
+import type { BasePlaceMode, HudView, PlaceMode } from './types';
 
 /** Legal actions the viewer may submit. */
 export function viewerLegal(view: HudView): Action[] {
@@ -79,8 +80,19 @@ export function availability(legal: readonly Action[]): Availability {
   };
 }
 
-export function placeModeAvailable(av: Availability, mode: PlaceMode): boolean {
-  return mode === 'road' ? av.buildRoad : mode === 'settlement' ? av.buildSettlement : av.buildCity;
+/** Is the build mode usable now? Expansion modes need `legal` (their action type must be in it). */
+export function placeModeAvailable(
+  av: Availability,
+  mode: PlaceMode,
+  legal: readonly Action[] = [],
+): boolean {
+  if (mode === 'road') return av.buildRoad;
+  if (mode === 'settlement') return av.buildSettlement;
+  if (mode === 'city') return av.buildCity;
+  const types = placeModeActions(mode);
+  if (types.length > 0) return legal.some((a) => types.includes(a.type));
+  const type = placeModeAction(mode);
+  return type !== null && legal.some((a) => a.type === type);
 }
 
 /** Bank ratio per resource for `player`: 2 (matching port), 3 (generic port) or 4. */
@@ -89,6 +101,10 @@ export function bestRatios(state: GameState, player: PlayerId): Record<Resource,
   const generic = kinds.includes('generic');
   const out = {} as Record<Resource, 2 | 3 | 4>;
   for (const r of RESOURCES) out[r] = kinds.includes(r) ? 2 : generic ? 3 : 4;
+  // Expansion rates (bankTradeRatio hooks: E&P 3:1, C&K merchants): the engine has the last word.
+  if (state.settings.expansions.length > 0) {
+    for (const r of RESOURCES) out[r] = bankTradeRatio(state, player, r) as 2 | 3 | 4;
+  }
   return out;
 }
 
@@ -236,11 +252,11 @@ export function bankView(state: GameState): BankView {
       resource,
       count: hidden ? null : state.bank[resource],
     })),
-    devDeck: state.devDeck.length,
+    devDeck: devDeckCounts(state).left,
   };
 }
 
-export type BuildKind = 'dev' | PlaceMode;
+export type BuildKind = 'dev' | BasePlaceMode;
 
 export interface BuildCard {
   kind: BuildKind;
@@ -254,10 +270,15 @@ export interface BuildCard {
 /** The build bar: dev card, road, settlement, city with what is left of each. */
 export function buildCards(state: GameState, viewer: PlayerId, av: Availability): BuildCard[] {
   const left = piecesLeft(state, viewer);
-  const deck = supplyOf(state).devDeck; // depends on the map (25 base, 34 for 5-6P, ...)
-  const deckTotal = DEV_CARD_TYPES.reduce((n, t) => n + deck[t], 0);
+  // Depends on the map (25 base, 34 for 5-6P, ...) and on modules' extra cards (Swift Journeys).
+  const deck = devDeckCounts(state);
+  // No development deck in this game (an expansion's supply, e.g. C&K): no Buy card button.
+  const dev: BuildCard[] =
+    deck.total > 0
+      ? [{ kind: 'dev', left: deck.left, total: deck.total, enabled: av.buyDevCard }]
+      : [];
   return [
-    { kind: 'dev', left: state.devDeck.length, total: deckTotal, enabled: av.buyDevCard },
+    ...dev,
     { kind: 'road', left: left.road, total: PIECE_LIMITS.road, enabled: av.buildRoad },
     {
       kind: 'settlement',
@@ -269,7 +290,7 @@ export function buildCards(state: GameState, viewer: PlayerId, av: Availability)
   ];
 }
 
-const PIECE_PLURAL: Record<PlaceMode, string> = {
+const PIECE_PLURAL: Record<BasePlaceMode, string> = {
   road: 'roads',
   settlement: 'settlements',
   city: 'cities',
@@ -282,7 +303,7 @@ export interface BlockReason {
 }
 
 /** Is there any spot for `kind`, ignoring cost and phase? (geometry + own network only) */
-function anySpot(state: GameState, viewer: PlayerId, kind: PlaceMode): boolean {
+function anySpot(state: GameState, viewer: PlayerId, kind: BasePlaceMode): boolean {
   const t = topologyOf(state);
   if (kind === 'road') return t.edges.some((e) => canPlaceRoad(state, viewer, e));
   if (kind === 'city') return t.vertices.some((v) => canPlaceCity(state, viewer, v));
@@ -401,6 +422,12 @@ function names(state: GameState, ids: PlayerId[]): string {
   return ids.map((i) => state.players[i]?.name ?? `Player ${i + 1}`).join(', ');
 }
 
+/** "Place a city — …", or an expansion card's label for a namespaced mode ("Wagon — …"). */
+function placeText(mode: PlaceMode): string {
+  const label = mode.includes('/') ? placeModeLabel(mode) : null;
+  return `${label ?? `Place a ${mode}`} — pick a highlighted spot (Esc to cancel)`;
+}
+
 /** The banner telling the viewer what the board expects (or whom we are waiting for). */
 export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | null): Hint | null {
   const phase = state.phase;
@@ -415,6 +442,9 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
     }
     return { text: `Waiting for ${names(state, who)}…`, tone: 'wait' };
   }
+  // An expansion may word any phase its own way (Seafarers: "Place a road or a ship").
+  const ext = placeMode === null ? extensionHint(state, view) : null;
+  if (ext) return { text: ext, tone: 'action' };
 
   switch (phase.kind) {
     case 'setup':
@@ -422,14 +452,16 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         text:
           phase.step === 'settlement'
             ? 'Place a settlement'
-            : 'Place a road next to your new settlement',
+            : placeMode
+              ? placeText(placeMode) // a module's build card in setup (the Seafarers Ship)
+              : 'Place a road next to your new settlement',
         tone: 'action',
       };
     case 'preRoll':
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : { text: 'Your turn — build, trade or end your turn', tone: 'action' };
     case 'discard':
       return {
@@ -448,7 +480,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         : { text: 'Respond to the trade offer', tone: 'action' };
     case 'specialBuild':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : {
             text: state.settings.rules56
               ? 'Build, buy or play one card, then pass'
@@ -465,6 +497,9 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
           : `${EVENT_INFO[phase.event].name} — make your choice`;
       return { text: what, tone: 'action' };
     }
+    default:
+      // An expansion phase: its HudExtension.hint, or a generic prompt.
+      return { text: extensionHint(state, view) ?? 'Your move', tone: 'action' };
   }
 }
 

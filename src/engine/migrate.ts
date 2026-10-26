@@ -1,6 +1,6 @@
 /**
  * Saved-state upgrades. `upgradeState(raw)` accepts any schema version we ever wrote and returns a
- * current (v4) GameState, or null when `raw` is not a state we understand.
+ * current (v5) GameState, or null when `raw` is not a state we understand.
  *
  *   v1 -> v2: settings.layout ('beginner'|'random') becomes settings.map ('base'|'baseRandom');
  *             new settings get their defaults (discardLimit 7, specialBuildPhase false — v1 games
@@ -9,15 +9,21 @@
  *             v2 states never contain the specialBuild phase (it did not exist), so a v2 game
  *             with specialBuildPhase on simply starts using it at its next endTurn.
  *   v3 -> v4: new settings.startingPlayer (T14). Every earlier game started with seat 0.
+ *   v4 -> v5: expansion framework (F1): settings.mode 'base', expansions [], scenario null,
+ *             options {}, and state.ext {}. A v5 save naming an expansion, mode or scenario this
+ *             build does not know is rejected (null). Expansions version their own slices.
  * Log texts are not migrated: older logs say "Blue rolled 8" without the dice faces.
- * V1 variant fields (settings.robberMode, eventDeck, ...) are optional and absent in older saves,
- * where absent means the official rule, so they need no step and v4 stays current.
+ * V1/V2 variant fields (settings.robberMode, mapRules, rules56, eventDeck, ...) and UX2 stats are
+ * optional and absent in older saves, where absent means the official rule (stats: recording
+ * starts at the next action), so they need no step: every upgrade above keeps them as they are.
  */
 import { DEFAULT_DISCARD_LIMIT } from './constants';
-import { isMapId } from './maps';
+import { isExpansionId, modeById, scenarioById } from './expansions/registry';
+import { isMapId } from './mapLookup';
+import { isBaseMapId } from './maps';
 import type { GameSettings, GameState } from './types';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 interface SettingsV1 {
   seed: number | string;
@@ -29,7 +35,9 @@ function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-function upgradeSettingsV1(s: SettingsV1): Omit<GameSettings, 'startingPlayer'> {
+function upgradeSettingsV1(
+  s: SettingsV1,
+): Omit<GameSettings, 'startingPlayer' | 'mode' | 'expansions' | 'scenario' | 'options'> {
   return {
     seed: s.seed,
     map: s.layout === 'beginner' ? 'base' : 'baseRandom',
@@ -42,10 +50,33 @@ function upgradeSettingsV1(s: SettingsV1): Omit<GameSettings, 'startingPlayer'> 
   };
 }
 
-/** v3 -> v4 on an already validated v3 state. */
+/** v4 -> v5 on an already validated v4 state: base-game expansion fields (F1). */
+function upgradeV4(raw: Record<string, unknown>): GameState {
+  const settings: GameSettings = {
+    ...(raw.settings as GameSettings),
+    mode: 'base',
+    expansions: [],
+    scenario: null,
+    options: {},
+  };
+  return { ...(raw as unknown as GameState), schemaVersion: 5, settings, ext: {} };
+}
+
+/** v3 -> v4 (-> v5) on an already validated v3 state. */
 function upgradeV3(raw: Record<string, unknown>): GameState {
   const settings = { ...(raw.settings as GameSettings), startingPlayer: 0 };
-  return { ...(raw as unknown as GameState), schemaVersion: 4, settings };
+  return upgradeV4({ ...raw, schemaVersion: 4, settings });
+}
+
+/** v5: every expansion, mode and scenario must be known to this build. */
+function validV5(raw: Record<string, unknown>): boolean {
+  const s = raw.settings as Record<string, unknown>;
+  if (!Array.isArray(s.expansions) || !s.expansions.every(isExpansionId)) return false;
+  if (typeof s.mode !== 'string' || !modeById(s.mode)) return false;
+  if (s.scenario !== null && (typeof s.scenario !== 'string' || !scenarioById(s.scenario))) {
+    return false;
+  }
+  return isObject(s.options) && isObject(raw.ext);
 }
 
 /** v2 -> v3 (-> v4) on an already validated v2 state. */
@@ -68,13 +99,14 @@ export function upgradeState(raw: unknown): GameState | null {
     if (!isMapId(raw.settings.map) || !Array.isArray(raw.diceDeck)) return null;
     return upgradeV3(raw);
   }
-  if (raw.schemaVersion === 4) {
+  if (raw.schemaVersion === 4 || raw.schemaVersion === 5) {
     const s = raw.settings;
     if (!isMapId(s.map) || !Array.isArray(raw.diceDeck)) return null;
     const first = s.startingPlayer;
     if (typeof first !== 'number' || !Number.isInteger(first)) return null;
     if (first < 0 || first >= raw.players.length) return null;
-    return raw as unknown as GameState;
+    if (raw.schemaVersion === 4) return isBaseMapId(s.map) ? upgradeV4(raw) : null;
+    return validV5(raw) ? (raw as unknown as GameState) : null;
   }
   return null;
 }

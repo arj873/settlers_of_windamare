@@ -16,11 +16,11 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **M4** · Multi-browser e2e tests + Haiku remote playtest (each agent its own browser) · deps: M2, M3
 - **M5** · Go live on Cloudflare (needs your account) · deps: M4
 
-## 🏃 In Progress — Stage 3 (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
+## ✅ Stage 3 complete — merged to `main` (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **X1** · Expansions online: protocol for expansion actions/settings, `maskFor` hook in `viewFor` (fog, gifts, fish, progress cards, hidden tokens), lobby expansion picker, e2e C&K + E&P games, `pt:serve` expansion flag · `s3-online` (Opus) 🟦
+- Stage 3 shipped: F1, E1–E5, C1, X1 squash-merged into `expansions`, then `expansions` → `main` in one squash PR. All 9 modes on the setup screen and online. 1916 tests.
 
 ## 🏃 In Progress — Stage 2
 
@@ -33,7 +33,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - **F2** · T&B trade-hex plaza IDs (centre vertex + spoke edges) · deps: F1
 - **F3** · setupRounds / setup-order hook (Cloth for Catan, E&P) · deps: F1
-- **F4** · HUD bank ratios from engine hooks; reusable "pick N resources" dialog; hide demo mode in prod
+- **F4** · HUD bank ratios from engine hooks; reusable "pick N resources" dialog (demo mode is already hidden in prod: `?modes=all` only)
 - **E4** · Traders & Barbarians engine, all scenarios + Catan for Two (+5-6P) · 🟦
 - **U1–U5** · Render + HUD per expansion · 🟩
 - **Q1–Q5** · Haiku playtest per expansion
@@ -59,6 +59,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
 - (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
 - (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
+- (X1) deck colour on opponents' face-down C&K progress cards · lint check that client code never runs the engine on a masked view
 - (E5) **E5b** E&P + C&K / E&P + T&B official combos · player trades with gold (`ep/offerTrade`) · Land Ho! 5-6P has no official map
 - (UX1) board sea tint per theme (`--board-sea` tokens) · "1 human + N bots" quick-fill
 - (M4b triage) harness `status` should show hand deltas with their log source (2 Haiku false positives: production misread as trade effects)
@@ -125,6 +126,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **X1** · Expansions online: registry-checked `configure`, move guard by action type, `maskFor` hook in `viewFor` (C&K, Seafarers, T&B, E&P masks + marker-planting leak tests), `extraDevCards` hook (T&B deck 25/25), lobby reuses setup mode tiles, `pt:serve --mode/--scenario`; e2e base/C&K/Seafarers/E&P games to a win on wrangler dev · `s3-online` 🟦 · PR #19 (squashed) → `expansions` · 1916 tests
 - **E5** · Explorers & Pirates: settler/crew ships, harbor settlements, exploration, pirate lairs + ships, fish, spices, Council missions; Land Ho!, Pirate Lairs, Fish, Spices, full game (+5-6P paired turns); shared `seaGraph`/`seaArt` · `s3-ep` 🟦 · PR #18 (squashed) → `expansions` · 1816 tests
 - **C1** · Official combos: Seafarers + C&K (New Shores, Through the Desert, +2 VP), T&B + C&K per 2025 sheets (Fishermen, Rivers, Caravans, Traders, variants); framework `before`/`wraps`/`routeEdges`; Rivers Diplomat stall fixed · `s3-combos` 🟦 · PR #17 (squashed) → `expansions` · 1712 tests
 - **E2** · Seafarers: ships, pirate, gold, Longest Trade Route, all 9 scenarios × 3p/4p/5-6p (20 maps), F3 setupOrder hook; unified VP-chip/stats/refusal/bot-steer mechanisms with C&K + T&B · `s3-seafarers` 🟦 · PR #16 (squashed) → `expansions` · 1621 tests

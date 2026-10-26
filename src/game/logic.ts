@@ -2,16 +2,25 @@
  * Pure controller decisions (no DOM, no timers): who views the screen, what the board
  * highlights, which legal action a board click means, and which bot moves next.
  */
+import { actingPlayers } from '../engine';
 import type { Action, EdgeId, GameConfig, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
 import type { Controller, NewGameConfig, PlaceMode } from '../ui';
 
 /** `createGame` config for a setup-screen config (shared with the online room, src/net). */
 export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpToWin): GameConfig {
+  const base = (cfg.mode ?? 'base') === 'base';
   return {
     seed,
     players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-    map: cfg.map,
+    // Expansion modes take the map from their scenario (docs/EXPANSIONS.md §3).
+    ...(base
+      ? { map: cfg.map }
+      : {
+          mode: cfg.mode,
+          ...(cfg.scenario === undefined ? {} : { scenario: cfg.scenario }),
+          ...(cfg.options === undefined ? {} : { options: cfg.options }),
+        }),
     vpToWin,
     discardLimit: cfg.discardLimit,
     balancedDice: cfg.rules.balancedDice,
@@ -45,6 +54,13 @@ export function obligated(state: GameState): PlayerId[] {
   if (phase.kind === 'event') {
     return tableOrder(state).filter((p) => phase.tasks.some((t) => t.player === p));
   }
+  // Expansion phases that several players act in (the module's `actors`): everyone but the
+  // current player owes a response (the current player is handled as usual).
+  if (phase.kind.includes('/')) {
+    return tableOrder(state).filter(
+      (p) => p !== state.turn.current && actingPlayers(state).includes(p),
+    );
+  }
   return [];
 }
 
@@ -75,6 +91,23 @@ export function pickViewer(
   return fallback;
 }
 
+/**
+ * What boardActions needs from the expansions' HUD extensions: their implied (button-less) board
+ * action types, and the action type of a namespaced place mode. Registered by ui/expansions.ts
+ * when the UI loads; this file must not import UI code, because the room server (src/net) runs
+ * it in a worker / Node, where expansion stylesheets cannot load.
+ */
+export interface BoardExtensions {
+  implied: ReadonlySet<string>;
+  placeModeAction(mode: string): string | null;
+  /** Every action type of a namespaced place mode (ExtBuildCard.alsoActions). */
+  placeModeActions?(mode: string): readonly string[];
+}
+let boardExtensions: BoardExtensions = { implied: new Set(), placeModeAction: () => null };
+export function setBoardExtensions(x: BoardExtensions): void {
+  boardExtensions = x;
+}
+
 /** Legal actions a board click may submit right now for `viewer` (implied prompts or build mode). */
 export function boardActions(
   legal: readonly Action[],
@@ -82,13 +115,25 @@ export function boardActions(
   placeMode: PlaceMode | null,
 ): Action[] {
   const mine = legal.filter((a) => a.player === viewer);
+  // An expansion build mode wins over the implied prompts when it has moves (Seafarers: the
+  // Ship card during setup / Road Building, where a coast edge would otherwise take a road).
+  const modeTypes =
+    placeMode && placeMode.includes('/')
+      ? boardExtensions.placeModeActions?.(placeMode)
+      : undefined;
+  if (modeTypes && modeTypes.length > 0) {
+    const inMode = mine.filter((a) => modeTypes.includes(a.type));
+    if (inMode.length > 0) return inMode;
+  }
+  const extImplied = boardExtensions.implied;
   const implied = mine.filter(
     (a) =>
       a.type === 'placeSetupSettlement' ||
       a.type === 'placeSetupRoad' ||
       a.type === 'moveRobber' ||
       a.type === 'placeFreeRoad' ||
-      a.type === 'eventDamageRoad',
+      a.type === 'eventDamageRoad' ||
+      extImplied.has(a.type),
   );
   if (implied.length > 0) return implied;
   const buildType =
@@ -98,7 +143,9 @@ export function boardActions(
         ? 'buildSettlement'
         : placeMode === 'city'
           ? 'buildCity'
-          : null;
+          : placeMode
+            ? boardExtensions.placeModeAction(placeMode) // expansion build card (ui/expansions.ts)
+            : null;
   return buildType ? mine.filter((a) => a.type === buildType) : [];
 }
 
@@ -108,9 +155,10 @@ export function highlightsFor(actions: readonly Action[], color?: string): Highl
   const edges: EdgeId[] = [];
   const hexes: HexId[] = [];
   for (const a of actions) {
-    if ('vertex' in a) vertices.push(a.vertex);
-    else if ('edge' in a) edges.push(a.edge);
-    else if ('hex' in a) hexes.push(a.hex);
+    const at = locationOf(a);
+    if (at?.kind === 'vertex') vertices.push(at.id);
+    else if (at?.kind === 'edge') edges.push(at.id);
+    else if (at?.kind === 'hex') hexes.push(at.id);
   }
   if (vertices.length + edges.length + hexes.length === 0) return {};
   return { vertices, edges, hexes, ...(color ? { color } : {}) };
@@ -119,15 +167,20 @@ export function highlightsFor(actions: readonly Action[], color?: string): Highl
 export type BoardClick =
   { kind: 'vertex'; id: VertexId } | { kind: 'edge'; id: EdgeId } | { kind: 'hex'; id: HexId };
 
+/** The board location an action targets (its `vertex`, `edge` or `hex` field), or null. */
+export function locationOf(a: Action): BoardClick | null {
+  if ('vertex' in a && typeof a.vertex === 'string') return { kind: 'vertex', id: a.vertex };
+  if ('edge' in a && typeof a.edge === 'string') return { kind: 'edge', id: a.edge };
+  if ('hex' in a && typeof a.hex === 'string') return { kind: 'hex', id: a.hex };
+  return null;
+}
+
 /** The board action matching a click, or undefined when the click means nothing right now. */
 export function actionForClick(actions: readonly Action[], click: BoardClick): Action | undefined {
-  return actions.find((a) =>
-    click.kind === 'vertex'
-      ? 'vertex' in a && a.vertex === click.id
-      : click.kind === 'edge'
-        ? 'edge' in a && a.edge === click.id
-        : 'hex' in a && a.hex === click.id,
-  );
+  return actions.find((a) => {
+    const at = locationOf(a);
+    return at !== null && at.kind === click.kind && at.id === click.id;
+  });
 }
 
 export interface BotTurn {

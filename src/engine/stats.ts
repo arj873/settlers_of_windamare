@@ -20,7 +20,9 @@
  * the first action stores them. No schema bump (optional field, like the V1 variant fields).
  */
 import { DEV_CARD_TYPES, RESOURCES, tokenPips } from './constants';
-import { emptyDevCards, emptyResources } from './resources';
+import { namespaceOf } from './expansions/ext';
+import { hookStatsCategory } from './expansions/hooks';
+import { emptyDevCards, emptyResources, isResource } from './resources';
 import { victoryPoints } from './selectors';
 import { hexVertices, topologyOf } from './topology';
 import type {
@@ -196,7 +198,8 @@ export function recordRoll(draft: GameState, player: PlayerId): void {
   const expected: number[] = draft.players.map(() => 0);
   for (const id of Object.keys(draft.board.hexes) as HexId[]) {
     const hex = draft.board.hexes[id];
-    if (!hex || hex.token === null || hex.terrain === 'desert' || id === blocked) continue;
+    // Only resource terrains produce in the core (expansion terrains: their production hooks).
+    if (!hex || hex.token === null || !isResource(hex.terrain) || id === blocked) continue;
     const pips = tokenPips(hex.token);
     for (const v of hexVertices(t, id)) {
       const b = draft.pieces.buildings[v];
@@ -226,7 +229,7 @@ export function recordProduction(
     for (const r of RESOURCES) prod[r] += gain[r];
   });
   const robberHex = hasRobber(draft.settings) ? draft.board.hexes[draft.robber] : undefined;
-  if (robberHex && robberHex.token === roll && robberHex.terrain !== 'desert') {
+  if (robberHex && robberHex.token === roll && isResource(robberHex.terrain)) {
     const terrain = robberHex.terrain;
     for (const v of hexVertices(topologyOf(draft), robberHex.id)) {
       const b = draft.pieces.buildings[v];
@@ -241,7 +244,11 @@ export function recordProduction(
 // ---------------------------------------------------------------------------
 
 /** Where a positive hand change of `p` caused by `action` came from. */
-function gainSource(action: Action, p: PlayerId): GainSource {
+function gainSource(state: GameState, action: Action, p: PlayerId): GainSource {
+  // An expansion may classify any action's hand changes (statsCategory hook).
+  const ext = hookStatsCategory(state, action, p)?.gain;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'placeSetupSettlement':
       return 'setup';
@@ -264,7 +271,10 @@ function gainSource(action: Action, p: PlayerId): GainSource {
 }
 
 /** Where a negative hand change of `p` caused by `action` went. */
-function lossSink(action: Action, p: PlayerId): LossSink {
+function lossSink(state: GameState, action: Action, p: PlayerId): LossSink {
+  const ext = hookStatsCategory(state, action, p)?.loss;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'buildRoad':
     case 'buildSettlement':
@@ -302,6 +312,37 @@ const PLAYED_CARD: Partial<Record<Action['type'], DevCardType>> = {
 };
 
 /**
+ * An expansion action (type '<id>/...'): count its base parts from the state diff, whoever they
+ * belong to: pieces placed (a new road, settlement or city on the board), development cards
+ * bought (more held + played) and played (knightsPlayed / progressCardsPlayed). Its hand changes
+ * are classified 'other' (recordAction); expansion-only things (oil, crops ...) are not counted.
+ */
+function recordExpansionAction(prev: GameState, next: GameState, ed: StatsEditor): void {
+  for (const [e, owner] of Object.entries(next.pieces.roads)) {
+    if (prev.pieces.roads[e as keyof typeof prev.pieces.roads] !== owner) {
+      ed.player(owner).built.road += 1;
+    }
+  }
+  for (const [v, b] of Object.entries(next.pieces.buildings)) {
+    const old = prev.pieces.buildings[v as keyof typeof prev.pieces.buildings];
+    if (old?.owner === b.owner && old.kind === b.kind) continue;
+    ed.player(b.owner).built[b.kind] += 1;
+  }
+  next.players.forEach((pl, p) => {
+    const old = prev.players[p];
+    if (!old) return;
+    for (const t of DEV_CARD_TYPES) {
+      const played = (s: typeof pl) =>
+        t === 'knight' ? s.knightsPlayed : t === 'victoryPoint' ? 0 : s.progressCardsPlayed[t];
+      const dPlayed = played(pl) - played(old);
+      if (dPlayed > 0) ed.player(p).devPlayed[t] += dPlayed;
+      const dHeld = unplayed(next, p, t) + played(pl) - unplayed(prev, p, t) - played(old);
+      if (dHeld > 0) ed.player(p).devBought[t] += dHeld;
+    }
+  });
+}
+
+/**
  * Update `next.stats` for `action`, which took `prev` to `next` (next is applyAction's draft,
  * after awards and the victory check). The hooks above may already have replaced next.stats.
  */
@@ -317,8 +358,8 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     if (!old) return;
     for (const r of RESOURCES) {
       const d = pl.resources[r] - old.resources[r] - (prod(during, p, r) - prod(before, p, r));
-      if (d > 0) ed.player(p).gained[gainSource(action, p)][r] += d;
-      else if (d < 0) ed.player(p).lost[lossSink(action, p)][r] -= d;
+      if (d > 0) ed.player(p).gained[gainSource(prev, action, p)][r] += d;
+      else if (d < 0) ed.player(p).lost[lossSink(prev, action, p)][r] -= d;
     }
   });
 
@@ -384,6 +425,7 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     default: {
       const card = PLAYED_CARD[action.type];
       if (card) me().devPlayed[card] += 1;
+      else if (namespaceOf(action.type) !== null) recordExpansionAction(prev, next, ed);
     }
   }
 

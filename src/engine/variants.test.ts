@@ -7,7 +7,7 @@ import { cloneState } from './clone';
 import { createGame, randomMapFor, randomSeatOrder, type GameConfig } from './createGame';
 import { applyAction, legalActions } from './engine';
 import { FIXTURE_PLAYERS, discardGame, freshGame, midGame } from './fixtures';
-import { MAPS } from './maps';
+import { mapById } from './mapLookup';
 import { EVENT_CARDS, EVENT_INFO } from './rules/events';
 import { stealCandidates } from './actions/robber';
 import { payableProduction } from './rules/production';
@@ -557,7 +557,7 @@ describe('map selection (§18.7)', () => {
     for (let seed = 0; seed < 20; seed++) {
       const s = createGame({ seed, players: PLAYERS, mapSelection: 'random' });
       expect(s.settings.map).toBe(randomMapFor(seed, 4));
-      expect(MAPS[s.settings.map].maxPlayers).toBeGreaterThanOrEqual(4);
+      expect(mapById(s.settings.map).maxPlayers).toBeGreaterThanOrEqual(4);
       expect(s.settings.mapSelection).toBe('random');
     }
   });

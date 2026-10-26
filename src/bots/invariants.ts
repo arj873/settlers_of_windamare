@@ -12,17 +12,20 @@ import {
   setupPlacementOf,
   LARGEST_ARMY_MIN,
   LONGEST_ROAD_MIN,
-  MAPS,
-  PIECE_LIMITS,
   RESOURCES,
   actingPlayers,
+  cardsInHand,
   edgeVertices,
+  expansionVictoryPoints,
+  isExpansionId,
+  mapOf,
+  pieceLimit,
   firstDesert,
   isBoardEdge,
   isBoardVertex,
   isLandHex,
   isMapId,
-  setupPlayerAt,
+  setupOrderOf,
   sumCounts,
   supplyOf,
   topologyOf,
@@ -34,6 +37,7 @@ import {
   type PlayerId,
   type VertexId,
 } from '../engine';
+import { botExtensionsFor } from './expansions';
 
 export type ViolationCode =
   | 'structure'
@@ -50,7 +54,9 @@ export type ViolationCode =
   | 'stats'
   | 'winner'
   | 'phase-actor'
-  | 'dice-deck';
+  | 'dice-deck'
+  /** Reported by an expansion's own invariants (src/bots/expansions.ts). */
+  | 'expansion';
 
 export interface Violation {
   code: ViolationCode;
@@ -64,7 +70,9 @@ const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isI
  * Game statistics (UX2) agree with the state they describe: per player and resource,
  * Σ gained − Σ lost = hand; nothing unclassified ('other'); dev cards bought = held + played;
  * played counts = knightsPlayed / progressCardsPlayed; roads and cities built = on the board.
- * Only for stats recorded since createGame (`complete`).
+ * Only for stats recorded since createGame (`complete`). Expansion games: expansion actions
+ * change hands ('other') and may remove pieces (Oil Springs floods), so those two checks are
+ * base-game only; the hand equation and the dev card counts still hold.
  */
 function checkStats(
   state: GameState,
@@ -79,6 +87,7 @@ function checkStats(
   const officialSetup = setupPlacementOf(state.settings);
   const noSetupCities =
     officialSetup.first.building === 'settlement' && officialSetup.second.building === 'settlement';
+  const baseGame = state.settings.expansions.length === 0;
   state.players.forEach((p, i) => {
     const s = stats.players[i];
     if (!s) return;
@@ -87,7 +96,7 @@ function checkStats(
     for (const r of RESOURCES) {
       if (gained[r] - lost[r] !== p.resources[r])
         add('stats', `${r}: gained ${gained[r]} − lost ${lost[r]} ≠ hand ${p.resources[r]}`, i);
-      if (s.gained.other[r] !== 0 || s.lost.other[r] !== 0)
+      if (baseGame && (s.gained.other[r] !== 0 || s.lost.other[r] !== 0))
         add('stats', `${r}: unclassified hand change`, i);
     }
     for (const t of DEV_CARD_TYPES) {
@@ -98,6 +107,7 @@ function checkStats(
       const held = p.devCards[t] + p.newDevCards[t] + played;
       if (s.devBought[t] !== held) add('stats', `${t}: bought ${s.devBought[t]} ≠ ${held}`, i);
     }
+    if (!baseGame) return;
     const kinds = Object.values(state.pieces.buildings).filter((b) => b.owner === i);
     const cities = kinds.filter((b) => b.kind === 'city').length;
     const settlements = kinds.length - cities;
@@ -155,7 +165,28 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   return best;
 }
 
+/**
+ * Every invariant of a game: the base checks (minus the codes its expansions `relax`), then each
+ * active expansion's own checks (src/bots/expansions.ts).
+ */
 export function checkInvariants(state: GameState): Violation[] {
+  const base = checkBaseInvariants(state);
+  const exts = botExtensionsFor(state);
+  if (exts.length === 0) return base;
+  const relaxed = new Set(exts.flatMap((x) => x.relax ?? []));
+  const out = relaxed.size > 0 ? base.filter((v) => !relaxed.has(v.code)) : base;
+  for (const x of exts) {
+    try {
+      out.push(...(x.invariants?.(state) ?? []));
+    } catch (e) {
+      out.push({ code: 'structure', message: `${x.id} invariants threw: ${String(e)}` });
+    }
+  }
+  return out;
+}
+
+/** The base-game invariants only. */
+export function checkBaseInvariants(state: GameState): Violation[] {
   const out: Violation[] = [];
   const add = (code: ViolationCode, message: string, player?: PlayerId) =>
     out.push(player === undefined ? { code, message } : { code, message, player });
@@ -167,7 +198,12 @@ export function checkInvariants(state: GameState): Violation[] {
     add('structure', `unknown map ${String(state.settings.map)}`);
     return out; // every board check below needs the map's topology
   }
-  const map = MAPS[state.settings.map];
+  const unknown = (state.settings.expansions ?? []).filter((id) => !isExpansionId(id));
+  if (unknown.length > 0) {
+    add('structure', `unknown expansions ${unknown.join(', ')}`);
+    return out;
+  }
+  const map = mapOf(state);
   const t = topologyOf(state);
   const supply = supplyOf(state);
   if (n < map.minPlayers || n > map.maxPlayers) {
@@ -272,12 +308,9 @@ export function checkInvariants(state: GameState): Violation[] {
       city: mine.filter(([v]) => state.pieces.buildings[v]?.kind === 'city').length,
     };
     for (const kind of ['road', 'settlement', 'city'] as const) {
-      if (counts[kind] > PIECE_LIMITS[kind]) {
-        add(
-          'piece-limit',
-          `player ${p.id} has ${counts[kind]} ${kind}s (max ${PIECE_LIMITS[kind]})`,
-          p.id,
-        );
+      const limit = pieceLimit(state, p.id, kind);
+      if (counts[kind] > limit) {
+        add('piece-limit', `player ${p.id} has ${counts[kind]} ${kind}s (max ${limit})`, p.id);
       }
     }
   }
@@ -363,7 +396,9 @@ export function checkInvariants(state: GameState): Violation[] {
       (longestRoad === p.id ? AWARD_VP : 0) +
       (largestArmy === p.id ? AWARD_VP : 0) +
       p.devCards.victoryPoint +
-      p.newDevCards.victoryPoint;
+      p.newDevCards.victoryPoint +
+      // Expansion VP are trusted here; each module checks its own sources (BotExtension).
+      ((x) => x.public + x.hidden)(expansionVictoryPoints(state, p.id));
     const reported = victoryPoints(state, p.id);
     if (vp !== reported)
       add(
@@ -413,10 +448,11 @@ function checkPhase(
 ): void {
   const phase = state.phase;
   const n = state.players.length;
-  const hand = (p: PlayerId) =>
-    RESOURCES.reduce((s, r) => s + (state.players[p]?.resources[r] ?? 0), 0);
+  // Cards as the 7 rule counts them (expansions add oil, commodities ... via the handSize hook).
+  const hand = (p: PlayerId) => (state.players[p] ? cardsInHand(state, p) : 0);
   const setupPhase = phase.kind === 'setup' || phase.kind === 'mapVeto';
-  if (setupPhase !== (state.turn.number === 0)) {
+  // An expansion phase may interrupt setup (Seafarers: a gold pick for a starting settlement).
+  if (!phase.kind.includes('/') && setupPhase !== (state.turn.number === 0)) {
     add('phase-actor', `phase ${phase.kind} with turn.number ${state.turn.number}`);
   }
   const actors = actingPlayers(state);
@@ -427,11 +463,12 @@ function checkPhase(
 
   switch (phase.kind) {
     case 'setup': {
-      if (!isCount(phase.index) || phase.index >= 2 * n) {
+      const { order } = setupOrderOf(state);
+      if (!isCount(phase.index) || phase.index >= order.length) {
         add('phase-actor', `setup index ${phase.index} out of range`);
         break;
       }
-      const expected = setupPlayerAt(phase.index, n, state.settings.startingPlayer);
+      const expected = order[phase.index];
       if (state.turn.current !== expected) {
         add(
           'phase-actor',

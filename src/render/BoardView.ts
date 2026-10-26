@@ -14,8 +14,11 @@
 import { Color, Container, Graphics, Text, type Application } from 'pixi.js';
 import {
   TOPOLOGY,
+  edgeInfo,
+  terrainKind,
   tokenPips,
   topologyOf,
+  vertexInfo,
   type EdgeId,
   type GameState,
   type HexId,
@@ -35,6 +38,8 @@ import {
   hexPoints,
   shade,
 } from './art';
+import * as art from './art';
+import { drawersFor, terrainPainter, type DrawContext } from './expansions';
 import {
   HEX_SIZE as S,
   backdropRadius,
@@ -48,7 +53,7 @@ import {
   type PickCandidates,
   type ViewTransform,
 } from './geometry';
-import { BEACH, HIGHLIGHT, INK, SEA, TERRAIN_PALETTE, TOKEN, portColor } from './theme';
+import { BEACH, HIGHLIGHT, INK, SEA, TOKEN, portColor, terrainPalette } from './theme';
 import { Viewport, type Insets } from './viewport';
 
 export interface Highlights extends PickCandidates {
@@ -124,6 +129,12 @@ export class BoardView {
   private readonly roadLayer = new Container();
   private readonly buildingLayer = new Container();
   private readonly robberLayer = new Container();
+  /** Expansion drawer layers (render/expansions.ts), by z-slot. */
+  private readonly extBoardLayer = new Container();
+  private readonly extPiecesLayer = new Container();
+  private readonly extTopLayer = new Container();
+  /** `${expansion}:${key}` -> what is drawn and its signature. */
+  private readonly extNodes = new Map<string, PieceNode>();
   private readonly glowLayer = new Container();
   private readonly hoverLayer = new Graphics();
 
@@ -164,10 +175,13 @@ export class BoardView {
       this.landLayer,
       this.portLayer,
       this.tokenLayer,
+      this.extBoardLayer,
       this.roadLayer,
       this.jointLayer,
       this.buildingLayer,
+      this.extPiecesLayer,
       this.robberLayer,
+      this.extTopLayer,
       this.glowLayer,
       this.hoverLayer,
     );
@@ -208,6 +222,7 @@ export class BoardView {
     const sig = JSON.stringify([
       Object.values(state.board.hexes).map((h) => [h.id, h.terrain, h.token]),
       state.board.ports.map((p) => [p.kind, p.edge, p.waterHex]),
+      state.settings.expansions,
     ]);
     if (sig !== this.boardSig) {
       this.boardSig = sig;
@@ -218,6 +233,7 @@ export class BoardView {
     }
     this.syncPieces(state);
     this.syncRobber(state);
+    this.syncExtLayers(state);
   }
 
   /** Mark legal spots (they pulse and become hoverable/clickable); `{}` clears. */
@@ -266,9 +282,10 @@ export class BoardView {
    */
   screenPos(id: string): Point | null {
     const info =
-      this.topo.vertex[id as VertexId] ??
-      this.topo.edge[id as EdgeId] ??
-      this.topo.hex[id as HexId];
+      vertexInfo(this.topo, id as VertexId) ??
+      edgeInfo(this.topo, id as EdgeId) ??
+      this.topo.hex[id as HexId] ??
+      this.topo.water[id as HexId];
     if (!info) return null;
     const p = unitToScreen(this.viewport.view, info);
     const r = this.app.canvas.getBoundingClientRect();
@@ -445,7 +462,8 @@ export class BoardView {
     for (const id of this.topo.landHexes) {
       const tile = state.board.hexes[id];
       const info = this.topo.hex[id];
-      if (!tile || !info) continue;
+      // Board hexes that are sea or fog (scenario boards) get no beach.
+      if (!tile || !info || terrainKind(tile.terrain) !== 'land') continue;
       const cx = info.x * S;
       const cy = info.y * S;
       shallow.poly(hexPoints(cx, cy, S * 1.2)).fill({ color: 0x5fb1e0, alpha: 0.35 });
@@ -455,9 +473,16 @@ export class BoardView {
       const tile = state.board.hexes[id];
       const info = this.topo.hex[id];
       if (!tile || !info) continue;
-      const pal = TERRAIN_PALETTE[tile.terrain];
       const cx = info.x * S;
       const cy = info.y * S;
+      const painter = terrainPainter(state, tile.terrain);
+      if (painter) {
+        const m = new Graphics();
+        painter(m, cx, cy, S);
+        motifs.addChild(m);
+        continue;
+      }
+      const pal = terrainPalette(tile.terrain);
       tiles
         .poly(hexPoints(cx, cy, S * 1.0))
         .fill(pal.base)
@@ -476,7 +501,8 @@ export class BoardView {
     const badges = new Container();
     const R = 0.37 * S;
     for (const port of state.board.ports) {
-      const w = this.topo.water[port.waterHex];
+      // A harbour lies on a frame water hex, or on a board hex revealed as sea (New World).
+      const w = this.topo.water[port.waterHex] ?? this.topo.hex[port.waterHex];
       if (!w) continue;
       const [cx, cy] = [w.x * S, w.y * S];
       for (const v of port.vertices) {
@@ -681,10 +707,42 @@ export class BoardView {
     this.buildingLayer.children.sort((a, b) => a.y - b.y);
   }
 
+  /** Expansion layers: rebuilt only when their signature changes; dropped when no longer active. */
+  private syncExtLayers(state: GameState) {
+    const slot = { board: this.extBoardLayer, pieces: this.extPiecesLayer, top: this.extTopLayer };
+    const seen = new Set<string>();
+    const ctx: DrawContext = {
+      topo: this.topo,
+      S,
+      colorOf: (owner) => this.colorOf(state, owner),
+      pt,
+      art,
+    };
+    for (const d of drawersFor(state)) {
+      for (const layer of d.layers ?? []) {
+        const key = `${d.id}:${layer.key}`;
+        seen.add(key);
+        const sig = layer.sig(state);
+        const old = this.extNodes.get(key);
+        if (old && old.sig === sig) continue;
+        old?.node.destroy({ children: true });
+        const node = layer.draw(state, ctx);
+        slot[layer.z].addChild(node);
+        this.extNodes.set(key, { sig, node });
+      }
+    }
+    for (const [key, entry] of this.extNodes) {
+      if (seen.has(key)) continue;
+      entry.node.destroy({ children: true });
+      this.extNodes.delete(key);
+    }
+  }
+
   private syncRobber(state: GameState) {
-    // settings.robberMode 'none': there is no robber piece.
-    this.robber.visible = state.settings.robberMode !== 'none';
+    // settings.robberMode 'none': there is no robber piece; NO_ROBBER (off the board, e.g. the
+    // Seafarers robber waiting beside the board, T&B without a robber): hidden.
     const info = this.topo.hex[state.robber];
+    this.robber.visible = state.settings.robberMode !== 'none' && info !== undefined;
     if (!info) return;
     const hasToken = state.board.hexes[state.robber]?.token != null;
     const target = { x: info.x * S + (hasToken ? -0.47 * S : 0), y: info.y * S + 0.32 * S };
@@ -720,7 +778,7 @@ export class BoardView {
     };
 
     for (const id of this.highlights.hexes ?? []) {
-      const info = this.topo.hex[id];
+      const info = this.topo.hex[id] ?? this.topo.water[id];
       if (!info) continue;
       add('hex', info, (g) => {
         g.poly(hexPoints(0, 0, S * 0.94))
@@ -729,9 +787,9 @@ export class BoardView {
       });
     }
     for (const id of this.highlights.edges ?? []) {
-      const info = this.topo.edge[id];
-      const a = info && this.topo.vertex[info.vertices[0]];
-      const b = info && this.topo.vertex[info.vertices[1]];
+      const info = edgeInfo(this.topo, id);
+      const a = info && vertexInfo(this.topo, info.vertices[0]);
+      const b = info && vertexInfo(this.topo, info.vertices[1]);
       if (!info || !a || !b) continue;
       add('edge', info, (g) => {
         const [ax, ay] = [(a.x - info.x) * S, (a.y - info.y) * S];
@@ -748,7 +806,7 @@ export class BoardView {
       });
     }
     for (const id of this.highlights.vertices ?? []) {
-      const info = this.topo.vertex[id];
+      const info = vertexInfo(this.topo, id);
       if (!info) continue;
       add('vertex', info, (g) => {
         g.circle(0, 0, 0.2 * S).fill({ color, alpha: 0.3 });
@@ -765,15 +823,15 @@ export class BoardView {
     if (!hit) return;
     const color = this.glowColor();
     if (hit.kind === 'vertex') {
-      const v = this.topo.vertex[hit.id];
+      const v = vertexInfo(this.topo, hit.id);
       if (!v) return;
       g.circle(v.x * S, v.y * S, 0.27 * S)
         .fill({ color: 0xffffff, alpha: 0.35 })
         .stroke({ width: 3.5, color: 0xffffff });
     } else if (hit.kind === 'edge') {
-      const e = this.topo.edge[hit.id];
-      const a = e && this.topo.vertex[e.vertices[0]];
-      const b = e && this.topo.vertex[e.vertices[1]];
+      const e = edgeInfo(this.topo, hit.id);
+      const a = e && vertexInfo(this.topo, e.vertices[0]);
+      const b = e && vertexInfo(this.topo, e.vertices[1]);
       if (!a || !b) return;
       const k = 0.2;
       const [ax, ay, bx, by] = [a.x * S, a.y * S, b.x * S, b.y * S];
@@ -786,7 +844,7 @@ export class BoardView {
         .lineTo(x1, y1)
         .stroke({ width: 0.1 * S, color: 0xffffff, cap: 'round' });
     } else {
-      const h = this.topo.hex[hit.id];
+      const h = this.topo.hex[hit.id] ?? this.topo.water[hit.id];
       if (!h) return;
       g.poly(hexPoints(h.x * S, h.y * S, S * 0.97))
         .fill({ color, alpha: 0.28 })

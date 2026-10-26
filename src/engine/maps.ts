@@ -10,47 +10,105 @@ import {
   PORT_KINDS,
   TERRAIN_COUNTS,
 } from './constants';
-import type { DevCardCounts, HexId, MapId, PortKind, Terrain } from './types';
+import type { Corner } from './hex';
+import type { Rng } from './rng';
+import type { BaseMapId, BaseTerrain, Board, DevCardCounts, HexId, MapId, PortKind } from './types';
 
-export type FrameId = 'std19' | 'std30' | 'hex37';
+/** Base frames, or an expansion frame namespaced by its module ('demo/oasis'). */
+export type FrameId = 'std19' | 'std30' | 'hex37' | `${string}/${string}`;
+
+/** An explicit list of harbor spots: [water hex, land hex it faces], clockwise. */
+export type HarborSpots = readonly (readonly [water: HexId, land: HexId])[];
 
 /**
- * Board shape. `rows` = land hexes per row, top to bottom (odd count, rows centered; pointy-top).
- * `harbors`: 'alternate' = every other hex of the clockwise water ring, starting at its top-left
- * hex; a harbor hex touching two land hexes faces the non-corner one (ties: the clockwise one).
- * Or an explicit clockwise list of [water hex, land hex it faces].
+ * A plaza (F2, T&B trade hexes): the centre of land hex `hex` becomes a vertex (`v:q,r,C`) joined
+ * by spoke edges (`e:q,r,C<corner>`) to the listed corners of the hex. Plazas and spokes are
+ * ordinary topology vertices / edges (roads, pieces, clicks); the hex's own 6 corners and 6
+ * sides are unchanged (production, the robber and harbours ignore plazas).
  */
-export interface FrameDef {
-  id: FrameId;
-  rows: readonly number[];
-  harbors: 'alternate' | readonly (readonly [water: HexId, land: HexId])[];
+export interface PlazaDef {
+  hex: HexId;
+  corners: readonly Corner[];
 }
 
-export interface MapDef {
+/**
+ * Base board shape. `rows` = land hexes per row, top to bottom (odd count, rows centered;
+ * pointy-top). `harbors`: 'alternate' = every other hex of the clockwise water ring, starting at
+ * its top-left hex; a harbor hex touching two land hexes faces the non-corner one (ties: the
+ * clockwise one). Or an explicit clockwise list.
+ */
+export interface RowsFrameDef {
+  id: FrameId;
+  rows: readonly number[];
+  harbors: 'alternate' | HarborSpots;
+  /** F2: hex-centre plazas with spokes (T&B trade hexes). */
+  plazas?: readonly PlazaDef[];
+}
+
+/**
+ * Scenario board shape (docs/EXPANSIONS.md §6): any set of board hexes (land or fog; islands
+ * allowed), in the order layouts fill them. `sea`: extra water hexes (interior seas, open ocean
+ * for ships) on top of the ring of every non-board hex touching the board.
+ */
+export interface HexListFrameDef {
+  id: FrameId;
+  hexes: readonly HexId[];
+  sea?: readonly HexId[];
+  harbors: HarborSpots;
+  /** F2: hex-centre plazas with spokes (T&B trade hexes). */
+  plazas?: readonly PlazaDef[];
+}
+
+export type FrameDef = RowsFrameDef | HexListFrameDef;
+
+/** A generated board plus the hex the robber starts on. */
+export interface GeneratedBoard {
+  board: Board;
+  robber: HexId;
+}
+
+interface MapDefCommon {
   id: MapId;
   name: string;
   frame: FrameDef;
   minPlayers: number;
   maxPlayers: number;
-  /** 'beginner' = the fixed rulebook layout (base only); 'random' = shuffled each game. */
-  layout: 'beginner' | 'random';
-  terrain: Readonly<Record<Terrain, number>>;
-  /** One token per non-desert hex. */
-  tokens: readonly number[];
-  /** One kind per harbor slot (shuffled for random layouts). */
-  harbors: readonly PortKind[];
   bankPerResource: number;
   devDeck: Readonly<DevCardCounts>;
 }
 
+/** A base map: the beginner layout or random terrain/tokens/harbors from the counts. */
+export interface StdMapDef extends MapDefCommon {
+  /** 'beginner' = the fixed rulebook layout (base only); 'random' = shuffled each game. */
+  layout: 'beginner' | 'random';
+  terrain: Readonly<Record<BaseTerrain, number>>;
+  /** One token per non-desert hex. */
+  tokens: readonly number[];
+  /** One kind per harbor slot (shuffled for random layouts). */
+  harbors: readonly PortKind[];
+}
+
+/** A scenario map: its own generator (fixed or random, using the board.ts helpers). */
+export interface CustomMapDef extends MapDefCommon {
+  layout: 'custom';
+  /** Deterministic: draw only from `rng`. Must fill every frame hex and return the robber hex. */
+  generate(rng: Rng, players: number): GeneratedBoard;
+}
+
+export type MapDef = StdMapDef | CustomMapDef;
+
 /** Standard 5th-edition frame: 19 hexes (3-4-5-4-3), 9 harbors. */
-export const FRAME_STD19: FrameDef = { id: 'std19', rows: [3, 4, 5, 4, 3], harbors: 'alternate' };
+export const FRAME_STD19: RowsFrameDef = {
+  id: 'std19',
+  rows: [3, 4, 5, 4, 3],
+  harbors: 'alternate',
+};
 
 /**
  * 5-6 player extension frame: 30 hexes (3-4-5-6-5-4-3), 11 harbors. Harbor hexes read from the
  * extension rulebook's Illustration A (2020 printing); see RULES.md §16.B.
  */
-export const FRAME_STD30: FrameDef = {
+export const FRAME_STD30: RowsFrameDef = {
   id: 'std30',
   rows: [3, 4, 5, 6, 5, 4, 3],
   harbors: [
@@ -69,7 +127,7 @@ export const FRAME_STD30: FrameDef = {
 };
 
 /** 7-8 player board (our design, RULES.md §16.C): 37 hexes (4-5-6-7-6-5-4), 12 harbors. */
-export const FRAME_HEX37: FrameDef = {
+export const FRAME_HEX37: RowsFrameDef = {
   id: 'hex37',
   rows: [4, 5, 6, 7, 6, 5, 4],
   harbors: 'alternate',
@@ -77,7 +135,7 @@ export const FRAME_HEX37: FrameDef = {
 
 const BASE_SUPPLY = { bankPerResource: BANK_PER_RESOURCE, devDeck: DEV_DECK_COMPOSITION };
 
-export const MAPS: Readonly<Record<MapId, MapDef>> = {
+export const MAPS: Readonly<Record<BaseMapId, StdMapDef>> = {
   base: {
     id: 'base',
     name: 'Beginner (19 hexes)',
@@ -132,28 +190,18 @@ export const MAPS: Readonly<Record<MapId, MapDef>> = {
   },
 };
 
-export const MAP_IDS: readonly MapId[] = ['base', 'baseRandom', 'base56', 'base78'];
+/** The base maps. Expansion maps: `MapDef`s of modules (`mapDef(id)` in mapLookup.ts). */
+export const MAP_IDS: readonly BaseMapId[] = ['base', 'baseRandom', 'base56', 'base78'];
 
-export function isMapId(x: unknown): x is MapId {
+export function isBaseMapId(x: unknown): x is BaseMapId {
   return typeof x === 'string' && (MAP_IDS as readonly string[]).includes(x);
 }
 
-/** The map definition of a state (or of anything carrying `settings.map`). */
-export function mapOf(state: { settings: { map: MapId } }): MapDef {
-  return MAPS[state.settings.map];
-}
-
 /** Smallest random map designed for `players` (3-4 baseRandom, 5-6 base56, 7-8 base78). */
-export function defaultMapFor(players: number): MapId {
+export function defaultMapFor(players: number): BaseMapId {
   if (players <= 4) return 'baseRandom';
   return players <= 6 ? 'base56' : 'base78';
 }
 
-/** Bank stock per resource and dev deck composition for this game's map. */
-export function supplyOf(state: { settings: { map: MapId } }): {
-  bankPerResource: number;
-  devDeck: Readonly<DevCardCounts>;
-} {
-  const m = mapOf(state);
-  return { bankPerResource: m.bankPerResource, devDeck: m.devDeck };
-}
+// isMapId / mapOf / supplyOf live in mapLookup.ts: they need the expansion registry, which this
+// file must not import (expansion modules read the frames above at their top level).

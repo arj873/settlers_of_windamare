@@ -6,7 +6,8 @@
  * nobody gets it — unless only one player is owed, who then gets what's left.
  */
 import { RESOURCES } from '../constants';
-import { emptyResources } from '../resources';
+import { runProductionHooks } from '../expansions/hooks';
+import { emptyResources, isResource } from '../resources';
 import { hexVertices, topologyOf } from '../topology';
 import type { GameState, HexId, ResourceCounts } from '../types';
 import { recordProduction } from '../stats';
@@ -30,13 +31,17 @@ export function computeProduction(
   const blocked = hasRobber(state.settings) ? state.robber : null;
   for (const id of Object.keys(state.board.hexes) as HexId[]) {
     const hex = state.board.hexes[id];
-    if (!hex || hex.token !== roll || hex.terrain === 'desert' || id === blocked) continue;
+    if (!hex || hex.token !== roll || id === blocked) continue;
+    const terrain = hex.terrain;
+    // Only resource terrains produce in the core (gold etc.: expansion production hooks).
+    if (!isResource(terrain)) continue;
     for (const v of hexVertices(t, id)) {
       const b = state.pieces.buildings[v];
       const hand = b && owed[b.owner];
-      if (hand) hand[hex.terrain] += b.kind === 'city' ? cityYield : 1;
+      if (hand) hand[terrain] += b.kind === 'city' ? cityYield : 1;
     }
   }
+  runProductionHooks(state, roll, owed, { cityYield, blocked });
   return owed;
 }
 

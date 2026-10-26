@@ -154,6 +154,11 @@ const GLYPH = {
   trophy: `<path d="M10 5h12v6a6 6 0 0 1-12 0z" fill="#f2c35a" stroke="#2a1708" stroke-width="1.5"/>
     <path d="M10 7H6c0 4 2 6 4.5 6.5M22 7h4c0 4-2 6-4.5 6.5" fill="none" stroke="#2a1708" stroke-width="1.5"/>
     <path d="M14 17h4v5h-4zM10 23h12v4H10z" fill="#c99a3a" stroke="#2a1708" stroke-width="1.5"/>`,
+  // Seafarers: a ship in the player's colour.
+  ship: `<path d="M3 19h26l-4 7H7z" style="fill:var(--pc,#e9dcc0)" stroke="#2a1708" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M16 19V4" stroke="#2a1708" stroke-width="1.8"/>
+    <path d="M17 5v12h9z" fill="#f3ead2" stroke="#2a1708" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M15 7v10H8z" fill="#f3ead2" stroke="#2a1708" stroke-width="1.4" stroke-linejoin="round"/>`,
   // Online play (M3): chat, spectating, disconnected, invite link.
   chat: `<path d="M5 7.5A3.5 3.5 0 0 1 8.5 4h15A3.5 3.5 0 0 1 27 7.5v10a3.5 3.5 0 0 1-3.5 3.5H14l-6 5v-5h.5A3.5 3.5 0 0 1 5 17.5z" fill="currentColor"/>`,
   eye: `<path d="M3 16s5-8 13-8 13 8 13 8-5 8-13 8S3 16 3 16z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><circle cx="16" cy="16" r="4" fill="currentColor"/>`,

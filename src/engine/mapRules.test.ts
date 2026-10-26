@@ -91,8 +91,8 @@ describe('map rules: determinism and the fixed map', () => {
 
   it('the beginner layout ignores the rules (it is official)', () => {
     const fixed = beginnerBoard();
-    expect(generateBoard('base', Rng.fromSeed(1), {}).board).toEqual(fixed.board);
-    expect(generateBoard('base', Rng.fromSeed(2), ALL_ALLOWED).board).toEqual(fixed.board);
+    expect(generateBoard('base', Rng.fromSeed(1), 4, {}).board).toEqual(fixed.board);
+    expect(generateBoard('base', Rng.fromSeed(2), 4, ALL_ALLOWED).board).toEqual(fixed.board);
     // The official layout itself touches equal numbers/resources? It must stay exactly as printed.
     expect(fixed.board.hexes['h:0,0']?.terrain).toBe('desert');
   });

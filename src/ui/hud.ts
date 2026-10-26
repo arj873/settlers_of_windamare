@@ -3,6 +3,7 @@
  * Everything clickable is enabled from `view.legal` only; clicks emit Actions (or 'placeMode').
  */
 import {
+  costOf,
   emptyResources,
   EVENT_INFO,
   getPlayer,
@@ -26,6 +27,7 @@ import {
   validateDraft,
   type TradeDraft,
 } from './composer';
+import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
@@ -65,7 +67,8 @@ import './hud.css';
 
 type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
-type Section = 'log' | 'bank' | 'players' | 'chat';
+/** Base sections, or `ext:<expansionId>` for an expansion panel. */
+type Section = 'log' | 'bank' | 'players' | 'chat' | `ext:${string}`;
 type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
 
 const BUILD_LABEL: Record<BuildKind, string> = {
@@ -87,7 +90,12 @@ const costText = (k: BuildKind) =>
     .map(([r, n]) => `${n} ${r}`)
     .join(', ');
 
-const SECTION_TITLE: Record<Section, string> = {
+const describeCost = (cost: ResourceCounts) =>
+  RESOURCES.filter((r) => cost[r] > 0)
+    .map((r) => `${cost[r]} ${r}`)
+    .join(', ');
+
+const SECTION_TITLE: Record<'log' | 'bank' | 'players' | 'chat', string> = {
   log: 'Game Events',
   bank: 'Bank',
   players: 'Players',
@@ -273,10 +281,12 @@ export class Hud {
     }
 
     // Leave build mode after anything was placed, or when it stops being legal.
-    const sig = `${Object.keys(state.pieces.buildings).length}/${Object.keys(state.pieces.roads).length}/${state.turn.number}/${state.phase.kind}`;
+    // (Expansion pieces live in state.ext: its size stands in for "a module piece was placed".)
+    const extSig = state.settings.expansions.length > 0 ? JSON.stringify(state.ext).length : 0;
+    const sig = `${Object.keys(state.pieces.buildings).length}/${Object.keys(state.pieces.roads).length}/${state.turn.number}/${state.phase.kind}/${extSig}`;
     const sigChanged = sig !== this.pieceSig;
     this.pieceSig = sig;
-    if (this.placeMode && (sigChanged || !placeModeAvailable(av, this.placeMode))) {
+    if (this.placeMode && (sigChanged || !placeModeAvailable(av, this.placeMode, legal))) {
       this.setPlaceMode(null);
     }
 
@@ -627,9 +637,14 @@ export class Hud {
 
     const list = logList(state);
     side.classList.toggle('is-open', this.drawerOpen);
+    const extPanels = hudExtensionsFor(state).flatMap((x) => {
+      const p = x.panel?.(state, view, (a) => this.send(a));
+      return p ? [this.section(`ext:${x.id}`, p.body, false, p.title)] : [];
+    });
     side.replaceChildren(
       this.section('log', list),
       this.section('bank', bankPanel(state)),
+      ...extPanels,
       this.section('players', playersList(state, view)),
     );
     if (this.chatSec) side.append(this.chatSec);
@@ -656,23 +671,32 @@ export class Hud {
     );
   }
 
-  /** `persistent`: the section is reused across renders, so collapsing toggles it in place. */
-  private section(key: Section, body: HTMLElement, persistent = false): HTMLElement {
+  /**
+   * `persistent`: the section is reused across renders, so collapsing toggles it in place.
+   * `title`: heading of an expansion panel (default: the section's base title).
+   */
+  private section(
+    key: Section,
+    body: HTMLElement,
+    persistent = false,
+    title?: string,
+  ): HTMLElement {
     const closed = this.collapsed.has(key);
+    const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log' | 'chat']);
     const sec: HTMLElement = h(
       'section',
-      { class: `side-sec sec-${key}${closed ? ' is-collapsed' : ''}` },
+      { class: `side-sec sec-${key.replace(':', '-')}${closed ? ' is-collapsed' : ''}` },
       h(
         'header',
         { class: 'sec-head' },
-        h('h2', { class: 'plaque' }, SECTION_TITLE[key]),
+        h('h2', { class: 'plaque' }, heading),
         h(
           'button',
           {
             class: 'sec-toggle',
             title: closed ? 'Expand' : 'Collapse',
             attrs: {
-              'aria-label': `${closed ? 'Expand' : 'Collapse'} ${SECTION_TITLE[key]}`,
+              'aria-label': `${closed ? 'Expand' : 'Collapse'} ${heading}`,
               'aria-expanded': String(!closed),
             },
             on: {
@@ -687,10 +711,7 @@ export class Hud {
                 sec.classList.toggle('is-collapsed', now);
                 const btn = e.currentTarget as HTMLElement;
                 btn.title = now ? 'Expand' : 'Collapse';
-                btn.setAttribute(
-                  'aria-label',
-                  `${now ? 'Expand' : 'Collapse'} ${SECTION_TITLE[key]}`,
-                );
+                btn.setAttribute('aria-label', `${now ? 'Expand' : 'Collapse'} ${heading}`);
                 btn.setAttribute('aria-expanded', String(!now));
               },
             },
@@ -753,10 +774,14 @@ export class Hud {
       );
     });
 
+    const extCards = hudExtensionsFor(state).flatMap(
+      (x) => x.handCards?.(state, view, (a) => this.send(a)) ?? [],
+    );
     const hand = h(
       'div',
       { class: 'hand wood' },
       ...resCards,
+      ...extCards,
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
@@ -783,70 +808,112 @@ export class Hud {
     const build = h(
       'div',
       { class: 'build-bar wood', style: playerStyle(me.color) },
-      ...buildCards(state, view.viewer, av).map((c) => {
-        const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
-        const button = h(
-          'button',
-          {
-            class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
-            disabled: !c.enabled || over,
-            ...(why.length > 0
-              ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
-              : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
-            on: {
-              click:
-                c.kind === 'dev'
-                  ? () => this.send({ type: 'buyDevCard', player: view.viewer })
-                  : toggleMode(c.kind),
+      ...buildCards(state, view.viewer, av)
+        .filter((c) => !hiddenBaseCards(state).has(c.kind))
+        .map((c) => {
+          const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
+          const button = h(
+            'button',
+            {
+              class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
+              disabled: !c.enabled || over,
+              ...(why.length > 0
+                ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
+                : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
+              on: {
+                click:
+                  c.kind === 'dev'
+                    ? () => this.send({ type: 'buyDevCard', player: view.viewer })
+                    : toggleMode(c.kind),
+              },
             },
-          },
-          h(
-            'span',
-            { class: 'bcard-art' },
-            c.kind === 'dev' ? devCardFace(null, 26) : glyph(c.kind, 30),
-          ),
-          h('span', { class: 'bcard-label' }, BUILD_LABEL[c.kind]),
-          h('span', { class: 'bcard-left' }, `${c.left}/${c.total}`),
-          h(
-            'span',
-            { class: 'cost', attrs: { 'aria-hidden': 'true' } },
-            ...Object.entries(BUILD_COST[c.kind]).flatMap(([r, n]) =>
-              Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+            h(
+              'span',
+              { class: 'bcard-art' },
+              c.kind === 'dev' ? devCardFace(null, 26) : glyph(c.kind, 30),
             ),
-          ),
-        );
-        if (why.length === 0) return h('span', { class: 'bslot' }, button);
-        // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
-        return h(
-          'span',
-          {
-            class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
-            on: { click: () => this.showWhy(c.kind) },
-          },
-          button,
-          h(
-            'span',
-            { class: 'why', attrs: { role: 'tooltip' } },
-            h('b', {}, BUILD_LABEL[c.kind]),
-            ...why.map((w) =>
-              h(
-                'span',
-                { class: 'why-line' },
-                w.text,
-                w.missing &&
-                  h(
-                    'span',
-                    { class: 'why-cards' },
-                    ...Object.entries(w.missing).flatMap(([r, n]) =>
-                      Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
-                    ),
-                  ),
+            h('span', { class: 'bcard-label' }, BUILD_LABEL[c.kind]),
+            h('span', { class: 'bcard-left' }, `${c.left}/${c.total}`),
+            h(
+              'span',
+              { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+              ...Object.entries(BUILD_COST[c.kind]).flatMap(([r, n]) =>
+                Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
               ),
             ),
+          );
+          if (why.length === 0) return h('span', { class: 'bslot' }, button);
+          // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
+          return h(
+            'span',
+            {
+              class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
+              on: { click: () => this.showWhy(c.kind) },
+            },
+            button,
+            h(
+              'span',
+              { class: 'why', attrs: { role: 'tooltip' } },
+              h('b', {}, BUILD_LABEL[c.kind]),
+              ...why.map((w) =>
+                h(
+                  'span',
+                  { class: 'why-line' },
+                  w.text,
+                  w.missing &&
+                    h(
+                      'span',
+                      { class: 'why-cards' },
+                      ...Object.entries(w.missing).flatMap(([r, n]) =>
+                        Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
+                      ),
+                    ),
+                ),
+              ),
+            ),
+          );
+        }),
+    );
+
+    // Expansion build cards (docs/EXPANSIONS.md §8): same look, enabled from legal actions only.
+    for (const x of hudExtensionsFor(state)) {
+      for (const c of x.buildCards ?? []) {
+        // `available`: is the card in this game at all; `alsoActions`: more types it places.
+        if (c.available && !c.available(state)) continue;
+        const enabled =
+          !over && legal.some((a) => a.type === c.actionType || c.alsoActions?.includes(a.type));
+        const cost = costOf(state, c.costItem ?? c.mode);
+        const left = c.left?.(state, view.viewer);
+        const total = c.total?.(state, view.viewer);
+        build.append(
+          h(
+            'span',
+            { class: 'bslot' },
+            h(
+              'button',
+              {
+                class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
+                disabled: !enabled,
+                title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
+                attrs: enabled ? {} : { 'data-why': 'Not possible right now' },
+                on: { click: toggleMode(c.mode) },
+              },
+              h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),
+              h('span', { class: 'bcard-label' }, c.label),
+              left !== undefined && h('span', { class: 'bcard-left' }, `${left}/${total ?? left}`),
+              cost &&
+                h(
+                  'span',
+                  { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+                  ...RESOURCES.flatMap((r) =>
+                    Array.from({ length: cost[r] }, () => resCardFace(r, 16)),
+                  ),
+                ),
+            ),
           ),
         );
-      }),
-    );
+      }
+    }
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
@@ -1001,6 +1068,10 @@ export class Hud {
     }
     if (phase.kind === 'event') {
       const d = this.eventDialog(state, view, legal);
+      if (d) return d;
+    }
+    for (const x of hudExtensionsFor(state)) {
+      const d = x.dialog?.(state, view, legal, (a) => this.send(a));
       if (d) return d;
     }
 
@@ -1430,14 +1501,20 @@ export class Hud {
     };
   }
 
-  private bundleRow(bundle: ResourceCounts): HTMLElement {
+  private bundleRow(bundle: ResourceCounts, extra: Child[] = []): HTMLElement {
     return h(
       'span',
       { class: 'bundle' },
       ...RESOURCES.filter((r) => bundle[r] > 0).map((r) =>
         h('span', { class: 'bundle-item' }, resCardFace(r, 24), `×${bundle[r]}`),
       ),
+      ...extra,
     );
+  }
+
+  /** Expansion items of the open offer (offerExtras hook). */
+  private offerExtras(state: GameState, side: 'give' | 'want'): Child[] {
+    return hudExtensionsFor(state).flatMap((x) => x.offerExtras?.(state, side) ?? []);
   }
 
   private offererDialog(state: GameState, legal: Action[]) {
@@ -1483,10 +1560,10 @@ export class Hud {
           'div',
           { class: 'offer-line' },
           h('span', {}, 'You give'),
-          this.bundleRow(offer.give),
+          this.bundleRow(offer.give, this.offerExtras(state, 'give')),
           h('span', { class: 'swap' }, '⇄'),
           h('span', {}, 'you get'),
-          this.bundleRow(offer.want),
+          this.bundleRow(offer.want, this.offerExtras(state, 'want')),
         ),
         h('div', { class: 'resps' }, ...rows),
         h(
@@ -1521,10 +1598,10 @@ export class Hud {
           'div',
           { class: 'offer-line', style: { '--pc': from.color } },
           h('span', {}, `${from.name} gives`),
-          this.bundleRow(offer.give),
+          this.bundleRow(offer.give, this.offerExtras(state, 'give')),
           h('span', { class: 'swap' }, '⇄'),
           h('span', {}, 'you give'),
-          this.bundleRow(offer.want),
+          this.bundleRow(offer.want, this.offerExtras(state, 'want')),
         ),
         !accept && h('p', { class: 'summary is-error' }, "You don't have the cards to accept"),
         h(

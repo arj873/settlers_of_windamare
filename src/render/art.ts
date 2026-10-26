@@ -6,7 +6,7 @@
 import type { Graphics } from 'pixi.js';
 import { Rng, type Resource, type Terrain } from '../engine';
 import { HEX_SIZE as S } from './geometry';
-import { INK, TERRAIN_PALETTE } from './theme';
+import { INK, TERRAIN_PALETTE, terrainPalette } from './theme';
 
 type Pt = [number, number];
 
@@ -198,7 +198,7 @@ export function drawTerrainMotif(
   q: number,
   r: number,
 ) {
-  const pal = TERRAIN_PALETTE[t];
+  const pal = terrainPalette(t);
   const rng = new Rng(motifSeed(q, r));
 
   switch (t) {

@@ -3,10 +3,14 @@
  * layouts for every other map. Harbor POSITIONS are fixed by the frame (topology.portSlots); only
  * their kinds vary.
  */
-import { MAPS } from './maps';
+import { mapById } from './mapLookup';
+import type { GeneratedBoard, StdMapDef } from './maps';
+import { isResource } from './resources';
 import type { Rng } from './rng';
 import { hexNeighbors, topologyFor, type Topology } from './topology';
 import type { Board, HexId, HexTile, MapId, MapRules, Port, PortKind, Terrain } from './types';
+
+export type { GeneratedBoard } from './maps';
 
 /**
  * Beginner layout from the base-game rulebook ("Starting Map for Beginners", Illustration A of the
@@ -28,24 +32,38 @@ const BEGINNER_PORTS: readonly PortKind[] = [
   'generic', 'grain', 'ore', 'generic', 'wool', 'generic', 'generic', 'brick', 'lumber',
 ];
 
-export interface GeneratedBoard {
-  board: Board;
-  /**
-   * Desert hex where the robber starts: a random one on maps with several deserts, or the first
-   * one (landHexes order) when generated with `firstDesertOnly` (the 5+ player rule set).
-   */
-  robber: HexId;
-}
-
+/**
+ * The board of a new game. Base maps: the robber starts on the desert (a random one of them on
+ * maps with several deserts, or the first one with `firstDesertOnly`, the 5+ player rule set);
+ * random layouts follow `mapRules` (RULES.md §19). Custom (scenario) maps: their own `generate`
+ * (map rules do not apply).
+ */
 export function generateBoard(
   map: MapId,
   rng: Rng,
+  players = 4,
   mapRules: MapRules = {},
   firstDesertOnly = false,
 ): GeneratedBoard {
-  return MAPS[map].layout === 'beginner'
+  const def = mapById(map);
+  if (def.layout === 'custom') return def.generate(rng, players);
+  return def.layout === 'beginner'
     ? beginnerBoard()
     : randomBoard(rng, map, mapRules, firstDesertOnly);
+}
+
+/**
+ * Build a Board from per-hex terrain and tokens (in `topo.landHexes` order) and harbor kinds (in
+ * `topo.portSlots` order; missing = generic). `deserts` = hexes of terrain 'desert'.
+ * For scenario generators (docs/EXPANSIONS.md §6).
+ */
+export function assembleBoard(
+  topo: Topology,
+  terrains: readonly Terrain[],
+  tokens: readonly (number | null)[],
+  portKinds: readonly PortKind[],
+): { board: Board; deserts: HexId[] } {
+  return assemble(topo, terrains, tokens, portKinds);
 }
 
 function assemble(
@@ -53,6 +71,7 @@ function assemble(
   terrains: readonly Terrain[],
   tokens: readonly (number | null)[],
   portKinds: readonly PortKind[],
+  requireDesert = false,
 ): { board: Board; deserts: HexId[] } {
   const hexes: Record<HexId, HexTile> = {};
   const deserts: HexId[] = [];
@@ -64,7 +83,7 @@ function assemble(
     hexes[id] = { id, q: info.q, r: info.r, terrain, token };
     if (terrain === 'desert') deserts.push(id);
   });
-  if (deserts.length === 0) throw new Error('layout has no desert');
+  if (requireDesert && deserts.length === 0) throw new Error('layout has no desert');
   const ports: Port[] = topo.portSlots.map((slot, i) => ({
     kind: portKinds[i] ?? 'generic',
     edge: slot.edge,
@@ -80,6 +99,7 @@ export function beginnerBoard(): GeneratedBoard {
     BEGINNER_HEXES.map(([t]) => t),
     BEGINNER_HEXES.map(([, n]) => n),
     BEGINNER_PORTS,
+    true,
   );
   return { board, robber: deserts[0] as HexId };
 }
@@ -215,7 +235,49 @@ export function randomBoard(
   mapRules: MapRules = {},
   firstDesertOnly = false,
 ): GeneratedBoard {
-  const def = MAPS[map];
+  const def = mapById(map);
+  if (def.layout === 'custom') throw new Error(`${map} has its own generator`);
+  return randomStdBoard(rng, def, mapRules, firstDesertOnly);
+}
+
+const MAX_TOKEN_ATTEMPTS = 100_000;
+
+/**
+ * Tokens for `terrains` (in landHexes order): a shuffled `tokens` bag dealt to every hex where
+ * `needsToken(terrain)` (default: resources and gold), redrawn until no 6/8 are adjacent.
+ * For scenario generators. Throws if the counts differ.
+ */
+export function dealTokens(
+  rng: Rng,
+  topo: Topology,
+  terrains: readonly Terrain[],
+  tokens: readonly number[],
+  needsToken: (t: Terrain) => boolean = (t) => isResource(t) || t === 'gold',
+): (number | null)[] {
+  const slots = terrains.filter(needsToken).length;
+  if (slots !== tokens.length) throw new Error(`need ${slots} tokens, got ${tokens.length}`);
+  const ids = topo.landHexes;
+  for (let attempt = 0; attempt < MAX_TOKEN_ATTEMPTS; attempt++) {
+    const bag = rng.shuffle(tokens);
+    const dealt = terrains.map((t) => (needsToken(t) ? (bag.pop() ?? null) : null));
+    const at = new Map(ids.map((id, i) => [id, dealt[i] ?? null]));
+    const ok = ids.every(
+      (id) =>
+        !isRed(at.get(id) ?? null) ||
+        hexNeighbors(topo, id).every((n) => !isRed(at.get(n) ?? null)),
+    );
+    if (ok) return dealt;
+  }
+  throw new Error('could not place number tokens');
+}
+
+function randomStdBoard(
+  rng: Rng,
+  def: StdMapDef,
+  mapRules: MapRules,
+  firstDesertOnly: boolean,
+): GeneratedBoard {
+  const map = def.id;
   const topo = topologyFor(map);
   const terrainBag: Terrain[] = [];
   for (const [t, n] of Object.entries(def.terrain) as [Terrain, number][]) {
@@ -246,7 +308,7 @@ export function randomBoard(
   const byHex = new Map(landIds.map((id, i) => [id, placed[i] as number]));
   const tokens = topo.landHexes.map((id) => byHex.get(id) ?? null);
 
-  const { board, deserts } = assemble(topo, terrains, tokens, portKinds);
+  const { board, deserts } = assemble(topo, terrains, tokens, portKinds, true);
   const robber = deserts.length === 1 || firstDesertOnly ? deserts[0] : rng.pick(deserts);
   return { board, robber: robber as HexId };
 }

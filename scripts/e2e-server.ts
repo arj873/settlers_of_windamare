@@ -2,6 +2,8 @@
  * End-to-end check of the room server (M2): starts `wrangler dev` on a free port, creates a room
  * over HTTP, connects 3 WebSocket clients (host + 2 friends; the 4th seat is a server bot), plays
  * a 3-VP game to the end with random-bot clients, and drops + reconnects one player mid-game.
+ * Then one game each of Cities & Knights, Seafarers (Fog Islands) and Explorers & Pirates
+ * (Land Ho!): 2 clients + 2 server bots to the end, every view checked for masked secrets.
  *
  *   pnpm e2e:server            (builds dist/ first if it is missing)
  *
@@ -12,7 +14,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Rng, type Action, type GameState } from '../src/engine';
+import { Rng, type Action, type GameState, type GameView } from '../src/engine';
 import { defaultBot } from '../src/game/controller';
 import type { CreateRoomResponse, RoomSummary } from '../src/net/api';
 import { roomApiPath, roomSocketPath } from '../src/net/api';
@@ -20,10 +22,13 @@ import {
   DEFAULT_ROOM_CONFIG,
   parseServerMessage,
   PROTOCOL_VERSION,
+  type RoomConfig,
   type ServerMessage,
 } from '../src/net/protocol';
 
-const TIMEOUT_MS = 180_000;
+const TIMEOUT_MS = 900_000;
+/** One expansion game, start to win. */
+const EXPANSION_TIMEOUT_MS = 240_000;
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -197,10 +202,127 @@ class Client {
     const legal = game.legal.filter((a: Action) => a.type !== 'offerTrade');
     if (seat === null || legal.length === 0) return;
     this.actedOn = game.seq;
-    const pick =
-      defaultBot(game.view as GameState, seat, this.rng, legal) ?? must(legal[0], 'move');
+    // The random bot reads the masked view here (the server's bots get the full state).
+    let pick: Action;
+    try {
+      pick = defaultBot(game.view as GameState, seat, this.rng, legal) ?? must(legal[0], 'move');
+    } catch {
+      pick = this.rng.pick(legal);
+    }
     this.send({ type: 'intent', action: pick, seq: game.seq });
   }
+}
+
+interface ExpansionGame {
+  label: string;
+  config: Partial<RoomConfig>;
+  /** Secrets of other seats / face-down stacks are masked in this client's view (or why not). */
+  hidden: (view: GameView) => string | null;
+}
+
+const opponents = (view: GameView) => view.players.filter((p) => p.id !== view.view.viewer);
+
+const EXPANSION_GAMES: ExpansionGame[] = [
+  {
+    label: 'Cities & Knights',
+    config: { mode: 'ck', scenario: 'ck/classic', vpToWin: 6 },
+    hidden: (view) => {
+      const ck = view.ext['ck'] as {
+        players: { progress: string[] }[];
+        decks: Record<string, string[]>;
+      };
+      const decks = Object.values(ck.decks).flat();
+      if (new Set(decks).size > 1) return 'progress deck order is visible';
+      for (const p of opponents(view)) {
+        if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
+      }
+      return null;
+    },
+  },
+  {
+    label: 'Seafarers: The Fog Islands',
+    config: { mode: 'seafarers', scenario: 'seafarers/fogIslands', vpToWin: 5 },
+    hidden: (view) => {
+      const fog = (view.ext['seafarers'] as { fog?: { terrains: string[]; tokens: number[] } }).fog;
+      if (!fog) return 'no fog stacks';
+      if (fog.terrains.some((t) => t !== 'fog') || fog.tokens.some((t) => t !== 0)) {
+        return 'fog stack contents are visible';
+      }
+      return null;
+    },
+  },
+  {
+    label: 'Explorers & Pirates: Land Ho!',
+    config: { mode: 'ep', scenario: 'ep/landHo', vpToWin: 5 },
+    hidden: (view) => {
+      const ep = view.ext['ep'] as { hidden: Record<string, { terrain: string }> };
+      if (Object.values(ep.hidden).some((h) => h.terrain !== 'ep/hidden')) {
+        return 'unexplored hexes are visible';
+      }
+      return null;
+    },
+  },
+];
+
+async function playExpansionGame(base: string, game: ExpansionGame): Promise<void> {
+  console.log(`\n${game.label} ...`);
+  const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
+  const { roomId, hostToken } = (await created.json()) as CreateRoomResponse;
+  const wsUrl = `${base.replace('http', 'ws')}${roomSocketPath(roomId)}`;
+  const ann = new Client('Ann', wsUrl, hostToken);
+  const bob = new Client('Bob', wsUrl, null);
+  const clients = [ann, bob];
+  for (const c of clients) await c.connect();
+  ann.send({
+    type: 'configure',
+    config: { ...DEFAULT_ROOM_CONFIG, seatCount: 4, turnTimerSec: null, ...game.config },
+  });
+  await ann.waitFor((m) => m.type === 'room' && m.room.config.mode === game.config.mode);
+  check(true, `${game.label}: host configured the mode`);
+  for (const [i, c] of clients.entries()) {
+    c.send({ type: 'takeSeat', seat: i });
+    await c.waitFor((m) => m.type === 'room' && m.room.seats[i]?.status === 'human');
+  }
+  for (const c of clients) c.autopilot = true;
+  ann.send({ type: 'start' });
+  await Promise.all(clients.map((c) => c.waitFor((m) => m.type === 'game')));
+  const first = must(ann.last('game'), 'game');
+  check(first.view.settings.mode === game.config.mode, `${game.label}: game started`);
+  const over = await Promise.all(
+    clients.map((c) =>
+      c.waitFor((m) => m.type === 'game' && m.view.winner !== null, EXPANSION_TIMEOUT_MS),
+    ),
+  ).catch((e: unknown) => {
+    for (const c of clients) {
+      const g = c.last('game');
+      console.error(
+        `${c.name}: seq ${g?.seq} turn ${g?.view.turn.number} phase ${g?.view.phase.kind} legal ${JSON.stringify(g?.legal.map((a) => a.type))}`,
+      );
+    }
+    throw e;
+  });
+  // Every view each client got along the way kept the secrets hidden.
+  for (const c of clients) {
+    const games = c.inbox.filter((m) => m.type === 'game');
+    const leaks = games
+      .filter((m) => m.view.phase.kind !== 'gameOver')
+      .map((m) => game.hidden(m.view))
+      .filter((x) => x !== null);
+    check(
+      leaks.length === 0,
+      `${game.label}: ${c.name}'s ${games.length} views hide secrets ${leaks[0] ?? ''}`,
+    );
+    const errs = c.inbox.filter((m) => m.type === 'error');
+    check(
+      errs.every((e) => e.code === 'rate_limited' || e.code === 'stale_state'),
+      `${game.label}: ${c.name} had no refused moves ${JSON.stringify(errs.slice(0, 2))}`,
+    );
+  }
+  const final = must(over[0], 'final');
+  if (final.type !== 'game') throw new Error('unreachable');
+  const winner = must(final.view.players[must(final.view.winner, 'winner')], 'winner');
+  check(true, `${game.label}: over after turn ${final.view.turn.number}, ${winner.name} won`);
+  for (const c of clients) c.ws.close();
 }
 
 async function main(): Promise<void> {
@@ -294,9 +416,7 @@ async function main(): Promise<void> {
 
     console.log('playing to the end ...');
     const over = await Promise.all(
-      clients.map((c) =>
-        c.waitFor((m) => m.type === 'game' && m.view.winner !== null, TIMEOUT_MS - 20_000),
-      ),
+      clients.map((c) => c.waitFor((m) => m.type === 'game' && m.view.winner !== null, 160_000)),
     ).catch((e: unknown) => {
       // Say where it hung: phase, log tail and each client's legal moves.
       for (const c of clients) {
@@ -317,6 +437,9 @@ async function main(): Promise<void> {
     const end = (await (await fetch(`${base}${roomApiPath(roomId)}`)).json()) as RoomSummary;
     check(end.phase === 'over', 'room phase is over');
     for (const c of clients) c.ws.close();
+
+    // Expansion games (X1): two network clients + two server bots, played to the end.
+    for (const game of EXPANSION_GAMES) await playExpansionGame(base, game);
     console.log('e2e passed');
   } finally {
     clearTimeout(deadline);

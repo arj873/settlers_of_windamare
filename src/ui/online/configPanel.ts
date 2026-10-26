@@ -6,8 +6,10 @@
  * (seats, seed, footer) with CSS. Non-hosts get the same screen, inert and read-only.
  */
 import type { RoomConfig } from '../../net/protocol';
+import type { NewGameVariants } from '../types';
 import {
   buildConfig,
+  MAP_RULE_OPTIONS,
   sanitizeSetup,
   setPlayerCount,
   STORAGE_KEY,
@@ -19,22 +21,28 @@ import {
 import { SetupScreen } from '../setup/screen';
 import { h } from '../dom';
 
+/** The variants of a room config as the setup draft's flat fields (buildVariants' inverse). */
+function variantFields(v: NewGameVariants | undefined): Partial<SetupDraft> {
+  if (!v) return {};
+  const { mapRules, timer, ...flat } = v;
+  const out: Partial<SetupDraft> = { ...flat };
+  for (const o of MAP_RULE_OPTIONS) if (mapRules?.[o.rule]) out[o.key] = true;
+  if (timer) {
+    out.clockPreset = timer.preset;
+    out.customBankMin = Math.round(timer.bankSec / 60);
+    out.customIncrementSec = timer.incrementSec;
+  }
+  return out;
+}
+
 /** RoomConfig -> setup draft (seats are placeholders: only their count matters here). */
 export function draftOf(config: RoomConfig): SetupDraft {
-  const {
-    seatCount,
-    map,
-    rules,
-    turnTimerSec,
-    vpToWin,
-    discardLimit,
-    mode: _mode,
-    ...extra
-  } = config;
+  const { seatCount, map, rules, turnTimerSec, vpToWin, discardLimit, variants, ...extra } = config;
   const timerIdx = Math.max(0, TIMER_STEPS.indexOf(turnTimerSec));
   return sanitizeSetup({
-    // Rule options added to both shapes later pass through by name.
+    // Rule options added to both shapes later pass through by name (mode, scenario, options).
     ...extra,
+    ...variantFields(variants),
     ...rules,
     map,
     seats: Array.from({ length: seatCount }, (_, i) => ({

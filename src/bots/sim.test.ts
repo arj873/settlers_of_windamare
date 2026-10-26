@@ -42,7 +42,7 @@ describe('parseArgs', () => {
   });
   it('rejects bad input', () => {
     expect(() => parseArgs(['--players', '9'])).toThrow();
-    expect(() => parseArgs(['--players', '2'])).toThrow();
+    expect(() => parseArgs(['--players', '1'])).toThrow();
     expect(() => parseArgs(['--map', 'huge'])).toThrow();
     expect(() => parseArgs(['--games', '0'])).toThrow();
     expect(() => parseArgs(['--bias', '1.5'])).toThrow();

@@ -15,7 +15,8 @@
  *   playYearOfPlenty  -> take 2 from bank (must be available)
  *   playMonopoly      -> all other players give all of that resource
  */
-import { COSTS, RESOURCES } from '../constants';
+import { RESOURCES } from '../constants';
+import { costOf } from '../expansions/hooks';
 import { addResources, hasResources, isResource, subtractResources } from '../resources';
 import { canPlaceRoad } from '../rules/placement';
 import { getPlayer, piecesLeft } from '../selectors';
@@ -58,7 +59,7 @@ export function canBuyDevCard(state: GameState, player: PlayerId): string | null
   }
   if (!isCurrent(state, player)) return 'not your turn';
   if (state.devDeck.length === 0) return 'no development cards left';
-  if (!hasResources(getPlayer(state, player).resources, COSTS.devCard)) {
+  if (!hasResources(getPlayer(state, player).resources, costOf(state, 'devCard'))) {
     return 'not enough resources';
   }
   return null;
@@ -124,8 +125,9 @@ export const devHandlers: HandlerMap<
     const err = canBuyDevCard(draft, player);
     if (err) return fail(err);
     const p = getPlayer(draft, player);
-    p.resources = subtractResources(p.resources, COSTS.devCard);
-    draft.bank = addResources(draft.bank, COSTS.devCard);
+    const cost = costOf(draft, 'devCard');
+    p.resources = subtractResources(p.resources, cost);
+    draft.bank = addResources(draft.bank, cost);
     const card = draft.devDeck.pop() as DevCardType;
     // Bought outside your own turn (special build) -> playable on your next turn (FAQ). With the
     // 5+ rule set a card may be played in the step, but not one bought in it: it waits in

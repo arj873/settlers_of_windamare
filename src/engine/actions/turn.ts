@@ -20,6 +20,8 @@
  *   (turn.secondSettlerOf = owner), whose endTurn starts owner+1's turn.
  */
 import { DEV_CARD_TYPES } from '../constants';
+import { hookRollDice, runOnEndTurn, runOnRoll, runOnStartTurn } from '../expansions/hooks';
+import { activeModules } from '../expansions/registry';
 import { rollTwoDice } from '../rules/dice';
 import { playerName } from '../rules/text';
 import { emptyDevCards } from '../resources';
@@ -29,38 +31,49 @@ import { eventCardsOn } from '../variants';
 import { buildLegal } from './build';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 import { canBuyDevCard, devLegal } from './dev';
-import { payProduction, resolveEventRoll } from './events';
+import { drawEventRoll, produceAndContinue, resolveDrawnEvent } from './events';
 import { discardAmounts, resolveSeven } from './robber';
 
 export { discardAmounts };
 
 /**
- * The roll of `player` (turn.current, phase preRoll): two dice (plain or balanced), or an
- * event card (settings.eventCards). Sets the next phase.
+ * The roll of `player` (turn.current, phase preRoll): two dice (plain, balanced, or an
+ * expansion's rollDice hook), then the onRoll hooks (an interrupt) or continueRoll; or an event
+ * card (settings.eventCards, which ends in continueRoll's afterProduction step too). Sets the
+ * next phase.
  */
 export function rollFor(draft: GameState, player: PlayerId): void {
   if (eventCardsOn(draft.settings)) {
-    resolveEventRoll(draft, player);
+    // The card's number is the roll: the onRoll hooks run before its event (C&K event die).
+    drawEventRoll(draft, player);
+    const interrupt = runOnRoll(draft, draft.dice ? draft.dice[0] + draft.dice[1] : 0);
+    if (interrupt) draft.phase = interrupt;
+    else resolveDrawnEvent(draft);
     recordRoll(draft, player);
     return;
   }
-  const { dice, reshuffled } = rollTwoDice(draft);
+  const custom = hookRollDice(draft);
+  const { dice, reshuffled } = custom ? { dice: custom, reshuffled: false } : rollTwoDice(draft);
   draft.dice = dice;
   const roll = dice[0] + dice[1];
   if (reshuffled) log(draft, null, 'The dice deck was shuffled');
   log(draft, player, `${playerName(draft, player)} rolled ${roll} (${dice[0]}+${dice[1]})`);
   recordRoll(draft, player);
-  if (roll === 7) {
-    resolveSeven(draft);
+  const interrupt = runOnRoll(draft, roll);
+  if (interrupt) {
+    draft.phase = interrupt;
     return;
   }
-  payProduction(draft, roll);
-  draft.phase = { kind: 'main' };
+  continueRoll(draft);
 }
 
-/** A turn of turn.current begins: preRoll, or (Rush Mode) the automatic roll. */
+/**
+ * A turn of turn.current begins: preRoll, the expansions' onStartTurn hooks, then (Rush Mode)
+ * the automatic roll.
+ */
 export function beginTurn(draft: GameState): void {
   draft.phase = { kind: 'preRoll' };
+  runOnStartTurn(draft, draft.turn.current);
   if (draft.settings.rushMode) rollFor(draft, draft.turn.current);
 }
 
@@ -69,13 +82,35 @@ export function secondSettlerFor(state: GameState, owner: PlayerId): PlayerId {
   return (owner + 3) % state.players.length;
 }
 
+/**
+ * The rest of a roll after the dice are set and logged (and after any onRoll interrupt): a 7
+ * goes to discard / moveRobber (or an expansion's onSeven phase: resolveSeven), anything else
+ * produces and goes to main (or an expansion's afterProduction phase). Expansions that
+ * interrupted the roll call this when their phase is done.
+ */
+export function continueRoll(draft: GameState): void {
+  // Event Cards: the drawn card's event (lastEvent), then its production.
+  if (eventCardsOn(draft.settings)) {
+    resolveDrawnEvent(draft);
+    return;
+  }
+  const roll = draft.dice ? draft.dice[0] + draft.dice[1] : 0;
+  if (roll === 7) {
+    resolveSeven(draft);
+    return;
+  }
+  produceAndContinue(draft, roll);
+}
+
 /** In a specialBuild phase for `state.turn.current`: can they build or buy anything? */
 function canSpecialBuild(state: GameState): boolean {
   return (
     canBuyDevCard(state, state.turn.current) === null ||
     buildLegal(state).length > 0 ||
     // 5+ rule set: a playable development card is also something to do in the step.
-    devLegal(state).some((a) => a.type !== 'buyDevCard')
+    devLegal(state).some((a) => a.type !== 'buyDevCard') ||
+    // An expansion's own builds (C&K knights, walls, improvements).
+    activeModules(state).some((m) => (m.legal?.(state).length ?? 0) > 0)
   );
 }
 
@@ -151,6 +186,7 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
     log(draft, action.player, `${playerName(draft, action.player)} ended the turn`);
     draft.turn.devCardPlayed = false;
     draft.turn.tradeOffers = 0;
+    runOnEndTurn(draft, action.player);
     const pairedOwner = draft.turn.secondSettlerOf;
     if (pairedOwner !== undefined) {
       // Catanian 2 is done: the next player's turn starts.
@@ -161,6 +197,8 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
       draft.turn.secondSettlerOf = action.player;
       draft.phase = { kind: 'main' };
       log(draft, second, `${playerName(draft, second)} takes the second settler step`);
+      // Catanian 2 is taking their turn too (RULES.md 18.6d): reset their per-turn flags.
+      runOnStartTurn(draft, second);
     } else if (draft.settings.specialBuildPhase) {
       advanceSpecialBuild(draft, action.player, action.player);
     } else {

@@ -8,6 +8,9 @@ import {
   loadSetup,
   mapDisabledReason,
   mapRulesApply,
+  mapSelectionOptions,
+  playerRange,
+  setMode,
   MAPS,
   MAX_PLAYERS,
   pickSeatColor,
@@ -304,7 +307,7 @@ describe('SetupScreen', () => {
     document.body.append(screen.element);
   });
 
-  it('renders the sections, 4 seats and only a Base mode tile', () => {
+  it('renders the sections, 4 seats and the Base mode tile first (then the ready expansions)', () => {
     const titles = [...screen.element.querySelectorAll('h2')].map((h) => h.textContent);
     expect(titles).toEqual([
       'Game mode',
@@ -315,7 +318,10 @@ describe('SetupScreen', () => {
       'Seats',
     ]);
     expect(screen.element.querySelectorAll('.su-seat')).toHaveLength(4);
-    expect(screen.element.querySelectorAll('[data-k^="mode-"]')).toHaveLength(1);
+    const modes = [...screen.element.querySelectorAll('[data-k^="mode-"]')];
+    expect(modes[0]?.getAttribute('data-k')).toBe('mode-base');
+    // Work-in-progress and demo modes stay hidden.
+    expect(modes.map((m) => m.getAttribute('data-k'))).not.toContain('mode-demo');
     expect(screen.element.querySelectorAll('.su-map')).toHaveLength(4);
     expect(screen.element.textContent).toContain('3–4 players');
     expect(screen.element.textContent).toContain('7–8 players');
@@ -601,5 +607,27 @@ describe('balance rules and the 5+ player rule set', () => {
     // a stored rules56 with too few seats is dropped
     st.setItem(STORAGE_KEY, JSON.stringify({ rules56: true, seats: [{}, {}, {}, {}] }));
     expect(loadSetup(st).rules56).toBe(false);
+  });
+});
+
+describe('variants in expansion modes (main x expansions merge)', () => {
+  it('no map veto and no balance rules for scenario modes; random stays', () => {
+    const oil = { ...setMode(defaultSetup(4), 'oil'), mapSelection: 'veto' as const };
+    expect(mapSelectionOptions(oil).map((o) => o.id)).toEqual(['fixed', 'random']);
+    expect(buildConfig(oil).variants?.mapSelection).toBeUndefined();
+    expect(buildConfig({ ...oil, mapSelection: 'random' }).variants?.mapSelection).toBe('random');
+    expect(mapRulesApply({ ...oil, mapSelection: 'random' })).toBe(false);
+    const base = { ...defaultSetup(4), mapSelection: 'veto' as const };
+    expect(mapSelectionOptions(base).map((o) => o.id)).toContain('veto');
+    expect(buildConfig(base).variants?.mapSelection).toBe('veto');
+  });
+
+  it('seat x / + follow the mode player range', () => {
+    const crop = setMode(defaultSetup(4), 'crop');
+    expect(playerRange(crop).max).toBe(4);
+    expect(addSeat(crop).seats).toHaveLength(4);
+    const three = removeSeat(crop, 1);
+    expect(three.seats).toHaveLength(3);
+    expect(removeSeat(three, 0).seats).toHaveLength(3);
   });
 });

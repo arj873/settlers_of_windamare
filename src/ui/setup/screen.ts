@@ -2,6 +2,7 @@
  * The new-game setup screen: stacked sections (mode, map, rules, advanced, seats) and a sticky
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
+import { scenarioById } from '../../engine';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
@@ -9,14 +10,16 @@ import { mapPreviewSvg } from './mapPreviews';
 import {
   addSeat,
   buildConfig,
+  setupError,
   clamp,
   clockLabel,
   CLOCK_OPTIONS,
   CUSTOM_BANK_MIN,
   CUSTOM_INCREMENT_SEC,
   MAP_RULE_OPTIONS,
-  MAP_SELECTION_OPTIONS,
   mapRulesApply,
+  mapSelectionOf,
+  mapSelectionOptions,
   ROBBER_OPTIONS,
   RULES56_SEATS,
   RULES56_VP,
@@ -33,18 +36,24 @@ import {
   defaultStorage,
   loadSetup,
   MAPS,
-  MAX_PLAYERS,
-  MIN_PLAYERS,
   NAME_MAX,
   mapDisabledReason,
+  modeOf,
+  modeOptions,
   pickSeatColor,
+  playerRange,
   rangeLabel,
   removeSeat,
   saveSetup,
+  scenarioOf,
   SEAT_COLORS,
   SEED_MAX,
   setMap,
+  setMode,
+  setOption,
   setPlayerCount,
+  setScenario,
+  visibleModes,
   TIMER_STEPS,
   timerLabel,
   VP_MAX,
@@ -60,6 +69,17 @@ export interface SetupScreenOptions {
   onBack?: () => void;
   /** Where the last-used settings live. Default: localStorage (null = don't remember). */
   storage?: SetupStorage | null;
+  /** Also offer 'wip' / 'demo' modes. Default: the page URL has ?modes=all. */
+  showAllModes?: boolean;
+}
+
+/** ?modes=all in the page URL (guarded: tests and workers have no location). */
+function urlShowsAllModes(): boolean {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? '').get('modes') === 'all';
+  } catch {
+    return false;
+  }
 }
 
 const ICON = {
@@ -101,10 +121,16 @@ export class SetupScreen {
   private readonly inner: HTMLElement;
   private readonly summary: HTMLElement;
   private seedOpen = false;
+  private readonly showAllModes: boolean;
 
   constructor(private readonly opts: SetupScreenOptions) {
     this.storage = opts.storage === undefined ? defaultStorage() : opts.storage;
+    this.showAllModes = opts.showAllModes ?? urlShowsAllModes();
     this.draft = loadSetup(this.storage);
+    // A remembered hidden mode (e.g. last game was the demo) falls back to base when not offered.
+    if (!visibleModes(this.showAllModes).some((m) => m.id === this.draft.mode)) {
+      this.draft = setMode(this.draft, 'base');
+    }
     this.seedOpen = false;
 
     this.inner = h('div', { class: 'su-inner' });
@@ -168,12 +194,21 @@ export class SetupScreen {
   private renderSummary(): void {
     const d = this.draft;
     const map = MAPS.find((m) => m.id === d.map);
+    const title =
+      d.mode === 'base'
+        ? (map?.label ?? 'Base')
+        : `${modeOf(d).name}${scenarioOf(d) ? `: ${scenarioOf(d)?.name ?? ''}` : ''}`;
+    // A combination the engine refuses (an expansion's validate): say why, no Start.
+    const error = setupError(d);
     this.summary.replaceChildren(
-      h('strong', {}, map?.label ?? 'Base'),
+      h('strong', {}, title),
       ` · ${d.seats.length} players · ${d.vpToWin} VP`,
       TIMER_STEPS[d.timerIdx] ? ` · ${timerLabel(d.timerIdx)} timer` : '',
       d.clockPreset !== 'off' ? ` · ${clockLabel(d)} clock` : '',
+      error ? h('span', { class: 'su-error', attrs: { role: 'alert' } }, error) : '',
     );
+    const start = this.element.querySelector<HTMLButtonElement>('.su-start');
+    if (start) start.disabled = error !== null;
   }
 
   private render(): void {
@@ -215,24 +250,129 @@ export class SetupScreen {
     );
   }
 
+  /** Mode tiles come from the engine registry (docs/EXPANSIONS.md §8); base first. */
   private modeSection(): HTMLElement {
+    const modes = visibleModes(this.showAllModes);
     return this.section(
       'Game mode',
       'mode',
       h(
         'div',
         { class: 'su-tiles', attrs: { role: 'group', 'aria-labelledby': 'su-h-mode' } },
-        h(
-          'button',
-          { class: 'su-tile is-on', attrs: { 'aria-pressed': 'true', 'data-k': 'mode-base' } },
-          h('span', { class: 'su-tile-title' }, 'Base'),
-          h('span', { class: 'su-tile-sub' }, 'Settle, build, trade'),
-        ),
+        ...modes.map((m) => {
+          const on = this.draft.mode === m.id;
+          return h(
+            'button',
+            {
+              class: `su-tile${on ? ' is-on' : ''}`,
+              title: `${m.name}: ${m.players.min}–${m.players.max} players`,
+              attrs: { 'aria-pressed': String(on), 'data-k': `mode-${m.id}` },
+              on: { click: () => this.set(setMode(this.draft, m.id)) },
+            },
+            h('span', { class: 'su-tile-title' }, m.name),
+            h('span', { class: 'su-tile-sub' }, m.blurb),
+            m.status !== 'ready' && h('span', { class: 'su-tile-reason' }, m.status),
+          );
+        }),
       ),
     );
   }
 
+  /** Expansion modes: one tile per scenario of the mode, with its map preview. */
+  private scenarioSection(): HTMLElement {
+    const mode = modeOf(this.draft);
+    const n = this.draft.seats.length;
+    return this.section(
+      'Scenario',
+      'map',
+      h(
+        'div',
+        { class: 'su-tiles su-maps', attrs: { role: 'group', 'aria-labelledby': 'su-h-map' } },
+        ...mode.scenarios.map((id) => {
+          const s = scenarioById(id);
+          if (!s) return null;
+          const on = this.draft.scenario === id;
+          const players = clamp(n, s.players.min, s.players.max);
+          return h(
+            'button',
+            {
+              class: `su-tile su-map${on ? ' is-on' : ''}`,
+              title: `${s.name}: ${s.blurb}`,
+              attrs: { 'aria-pressed': String(on), 'data-k': `scenario-${id}` },
+              on: { click: () => this.set(setScenario(this.draft, id)) },
+            },
+            h('span', { class: 'su-map-art' }, mapPreviewSvg(s.mapFor(players))),
+            h('span', { class: 'su-tile-title' }, s.name),
+            h('span', { class: 'su-tile-sub' }, `${s.players.min}–${s.players.max} players`),
+          );
+        }),
+      ),
+    );
+  }
+
+  /** Expansion options of the draft's mode: booleans as rule tiles, ints / choices as selects. */
+  private optionTiles(): HTMLElement[] {
+    const d = this.draft;
+    return modeOptions(modeOf(d)).map(({ ext, def }) => {
+      const value = d.options[ext]?.[def.key] ?? def.default;
+      const key = `opt-${ext}-${def.key}`;
+      if (def.type === 'boolean') {
+        return h(
+          'button',
+          {
+            class: `su-tile su-rule${value === true ? ' is-on' : ''}`,
+            title: def.description ?? def.label,
+            attrs: { 'aria-pressed': String(value === true), 'data-k': key },
+            on: { click: () => this.set(setOption(this.draft, ext, def.key, value !== true)) },
+          },
+          h(
+            'span',
+            { class: 'su-rule-text' },
+            h('span', { class: 'su-tile-title' }, def.label),
+            def.description && h('span', { class: 'su-tile-sub' }, def.description),
+          ),
+          h('span', { class: 'su-switch', attrs: { 'aria-hidden': 'true' } }, h('i')),
+        );
+      }
+      const choices =
+        def.type === 'choice'
+          ? def.choices
+          : Array.from({ length: def.max - def.min + 1 }, (_, i) => ({
+              value: String(def.min + i),
+              label: String(def.min + i),
+            }));
+      return h(
+        'label',
+        { class: 'su-tile su-rule su-opt', title: def.description ?? def.label },
+        h('span', { class: 'su-tile-title' }, def.label),
+        h(
+          'select',
+          {
+            class: 'input',
+            attrs: { 'data-k': key, 'aria-label': def.label },
+            on: {
+              change: (e) => {
+                const raw = (e.target as HTMLSelectElement).value;
+                this.set(
+                  setOption(this.draft, ext, def.key, def.type === 'int' ? Number(raw) : raw),
+                );
+              },
+            },
+          },
+          ...choices.map((c) =>
+            h(
+              'option',
+              { value: c.value, attrs: String(value) === c.value ? { selected: '' } : {} },
+              c.label,
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
   private mapSection(): HTMLElement {
+    if (this.draft.mode !== 'base') return this.scenarioSection();
     const players = this.draft.seats.length;
     return this.section(
       'Map',
@@ -278,7 +418,9 @@ export class SetupScreen {
           { class: 'su-hint', attrs: { 'data-v': 'balance-note' } },
           applies
             ? 'Random maps only: with a switch off, the generator keeps those hexes apart.'
-            : 'The official beginner layout is fixed, so these do not apply. Pick a random map to use them.',
+            : d.mode !== 'base'
+              ? 'Scenario maps come with their own layout rules, so these do not apply.'
+              : 'The official beginner layout is fixed, so these do not apply. Pick a random map to use them.',
         ),
       ),
     );
@@ -347,6 +489,7 @@ export class SetupScreen {
             '5+ player rules',
             `Play one dev card in the build phase. Robber stays off the 2nd desert. Suggests ${RULES56_VP} VP.`,
           ),
+        ...this.optionTiles(),
       ),
     );
   }
@@ -405,7 +548,8 @@ export class SetupScreen {
   private variantCards(): HTMLElement[] {
     const d = this.draft;
     const robber = ROBBER_OPTIONS.find((o) => o.id === d.robberMode);
-    const mapSel = MAP_SELECTION_OPTIONS.find((o) => o.id === d.mapSelection);
+    const mapSelOptions = mapSelectionOptions(d);
+    const mapSel = mapSelOptions.find((o) => o.id === mapSelectionOf(d));
     const custom = d.clockPreset === 'custom';
     const num = (
       key: string,
@@ -493,7 +637,7 @@ export class SetupScreen {
       h(
         'div',
         { class: 'su-card', attrs: { role: 'group', 'aria-label': 'Map selection' } },
-        this.select('Map selection', 'mapSelection', MAP_SELECTION_OPTIONS, d.mapSelection, (v) =>
+        this.select('Map selection', 'mapSelection', mapSelOptions, mapSelectionOf(d), (v) =>
           this.set({ ...this.draft, mapSelection: v }),
         ),
         h('p', { class: 'su-hint' }, mapSel?.desc ?? ''),
@@ -548,8 +692,8 @@ export class SetupScreen {
           'Players',
           'players',
           String(d.seats.length),
-          d.seats.length > MIN_PLAYERS,
-          d.seats.length < MAX_PLAYERS,
+          d.seats.length > playerRange(d).min,
+          d.seats.length < playerRange(d).max,
           (dir) => this.set(setPlayerCount(this.draft, this.draft.seats.length + dir)),
         ),
         this.sliderCard('Points to win', 'vp', d.vpToWin, VP_MIN, VP_MAX, (v) =>
@@ -674,6 +818,7 @@ export class SetupScreen {
 
   private seatsSection(): HTMLElement {
     const d = this.draft;
+    const range = playerRange(d);
     return this.section(
       'Seats',
       'seats',
@@ -751,8 +896,8 @@ export class SetupScreen {
               'button',
               {
                 class: 'su-seat-x',
-                disabled: d.seats.length <= MIN_PLAYERS,
-                title: d.seats.length <= MIN_PLAYERS ? `At least ${MIN_PLAYERS} players` : 'Remove',
+                disabled: d.seats.length <= range.min,
+                title: d.seats.length <= range.min ? `At least ${range.min} players` : 'Remove',
                 attrs: { 'aria-label': `Remove seat ${i + 1}`, 'data-k': `remove-${i}` },
                 on: { click: () => this.set(removeSeat(this.draft, i)) },
               },
@@ -765,8 +910,8 @@ export class SetupScreen {
         'button',
         {
           class: 'btn su-add-seat',
-          disabled: d.seats.length >= MAX_PLAYERS,
-          title: d.seats.length >= MAX_PLAYERS ? `At most ${MAX_PLAYERS} players` : undefined,
+          disabled: d.seats.length >= range.max,
+          title: d.seats.length >= range.max ? `At most ${range.max} players` : undefined,
           attrs: { 'data-k': 'add-seat' },
           on: { click: () => this.set(addSeat(this.draft)) },
         },

@@ -58,6 +58,8 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
       return 'Map vote: veto one of the candidate maps (`click Veto map N`).';
     case 'event':
       return 'Event card: make your choice in the event dialog (`click <option>`).';
+    default:
+      return `Expansion step (${phase.kind}): use the dialog or \`spots\` / \`click-spot N\`.`;
   }
 }
 

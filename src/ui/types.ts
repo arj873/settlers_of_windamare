@@ -1,9 +1,13 @@
 import type {
   Action,
+  ExpansionId,
   MapRules,
   MapSelection,
+  ModeId,
+  OptionValue,
   PlayerId,
   RobberMode,
+  ScenarioId,
   SetupPlacement,
   TimerSettings,
 } from '../engine';
@@ -21,7 +25,13 @@ export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';
 
 /** Emitted by the setup screen. The controller maps `players` to `createGame` and spawns bots for 'bot' seats. */
 export interface NewGameConfig {
-  mode: 'base';
+  /** 'base' or an expansion mode (engine `listModes()`). */
+  mode: ModeId;
+  /** Expansion modes: the scenario (absent = the mode's first). */
+  scenario?: ScenarioId;
+  /** Expansion modes: options per expansion. */
+  options?: Record<ExpansionId, Record<string, OptionValue>>;
+  /** Base mode: the board (expansion modes take theirs from the scenario). */
   map: MapId;
   /** 3–8 seats in turn order. */
   players: SeatConfig[];
@@ -96,8 +106,13 @@ export interface BotSpeedControl {
   onChange: (ms: number) => void;
 }
 
-/** Build modes the HUD can enter; the board layer shows the matching targets and calls `buildX` on click. */
-export type PlaceMode = 'road' | 'settlement' | 'city';
+/** Base build modes; the board layer shows the matching targets and calls `buildX` on click. */
+export type BasePlaceMode = 'road' | 'settlement' | 'city';
+/**
+ * Build modes the HUD can enter: a base one or an expansion build card's namespaced mode
+ * ('demo/well'; ui/expansions.ts maps it to its action type).
+ */
+export type PlaceMode = BasePlaceMode | `${string}/${string}`;
 
 export interface HudEvents {
   action: Action;

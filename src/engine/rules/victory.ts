@@ -8,6 +8,7 @@
  * No. You can only win during your own turn."). A builder at vpToWin wins when their own turn
  * starts (the pass that hands them the turn runs this check), unless someone wins first.
  */
+import { hookWins, victoryDeferred } from '../expansions/hooks';
 import { victoryPoints } from '../selectors';
 import type { GameState } from '../types';
 import { playerName } from './text';
@@ -16,12 +17,14 @@ export function checkVictory(draft: GameState): void {
   const kind = draft.phase.kind;
   if (kind === 'gameOver' || kind === 'setup' || kind === 'specialBuild') return;
   if (draft.winner !== null) return;
+  if (victoryDeferred(draft)) return;
   // A Knight / Road Building played inside a special build step (5+ rule set) is still the
   // special building phase: nobody wins until a real turn starts.
   if (draft.turn.specialOwner !== undefined) return;
   const current = draft.turn.current;
   const vp = victoryPoints(draft, current);
-  if (vp < draft.settings.vpToWin) return;
+  // An expansion may have its own win condition (the `wins` hook); default: the VP target.
+  if (!(hookWins(draft, current) ?? vp >= draft.settings.vpToWin)) return;
   draft.winner = current;
   draft.phase = { kind: 'gameOver' };
   draft.log.push({

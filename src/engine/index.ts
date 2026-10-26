@@ -4,17 +4,43 @@ export * from './constants';
 export * from './hex';
 export * from './topology';
 export * from './maps';
+export * from './mapLookup';
+export * from './expansions/types';
+export * from './expansions/ext';
+export {
+  BASE_MODE,
+  activeModules,
+  allModules,
+  allScenarios,
+  expansionById,
+  isActive,
+  isExpansionId,
+  listModes,
+  mapDef,
+  modeById,
+  scenarioById,
+} from './expansions/registry';
+export {
+  costOf,
+  expansionVictoryParts,
+  expansionVictoryPoints,
+  pieceLimit,
+  terrainKind,
+  type BaseCostItem,
+} from './expansions/hooks';
 export { upgradeState, SCHEMA_VERSION } from './migrate';
 export * from './rng';
 export * from './resources';
 export * from './selectors';
 export * from './rules/placement';
 export {
-  generateBoard,
+  assembleBoard,
   beginnerBoard,
+  dealTokens,
+  generateBoard,
+  mapRuleViolations,
   randomBoard,
   redNumbersSeparated,
-  mapRuleViolations,
   type MapRuleViolations,
 } from './board';
 export * from './variants';
@@ -25,12 +51,16 @@ export { secondSettlerFor } from './actions/turn';
 export { canRepairRoad } from './actions/build';
 export {
   createGame,
+  defaultVpToWin,
   layoutToMap,
+  optionVpBonus,
+  resolveMode,
   randomMapFor,
   randomSeatOrder,
   resolveSettings,
   type GameConfig,
   type PlayerConfig,
+  type ResolvedMode,
 } from './createGame';
 export { applyAction, legalActions } from './engine';
 export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';

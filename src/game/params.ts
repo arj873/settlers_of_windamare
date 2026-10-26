@@ -1,5 +1,5 @@
 /** Dev query parameters. */
-import { isMapId, type Layout, type MapId } from '../engine';
+import { isMapId, modeById, scenarioById, type Layout, type MapId } from '../engine';
 import type { Controller } from '../ui';
 
 export interface DevParams {
@@ -27,6 +27,10 @@ export interface DevParams {
   names: string[] | null;
   /** `?debug=1`: install the read-only `window.__catanDebug` hook (playtest harness). */
   debug: boolean;
+  /** `?mode=demo`: start an expansion mode at once (its first scenario; docs/EXPANSIONS.md). */
+  mode: string | null;
+  /** `?scenario=tb/traders` / `seafarers/fogIslands`: with `?mode=`, one of its scenarios. */
+  scenario: string | null;
 }
 
 export function parseParams(search: string): DevParams {
@@ -40,8 +44,9 @@ export function parseParams(search: string): DevParams {
   const integer = (n: number | null) => (n !== null && Number.isInteger(n) ? n : null);
   const layout = p.get('layout');
   const map = p.get('map');
-  const auto = /^([3-8])bots?$/.exec(p.get('autoplay') ?? '');
-  const seats = /^[hb]{3,8}$/.exec(p.get('seats') ?? '');
+  // 2 seats only make sense in a mode that allows them (createGame checks; T&B Catan for Two).
+  const auto = /^([2-8])bots?$/.exec(p.get('autoplay') ?? '');
+  const seats = /^[hb]{2,8}$/.exec(p.get('seats') ?? '');
   const hl = p.get('hl');
   const names = (p.get('names') ?? '')
     .split(',')
@@ -61,5 +66,7 @@ export function parseParams(search: string): DevParams {
     hl: hl === 'vertices' || hl === 'edges' || hl === 'hexes' ? hl : null,
     names: names.length > 0 ? names : null,
     debug: p.get('debug') === '1',
+    mode: modeById(p.get('mode') ?? '') ? p.get('mode') : null,
+    scenario: scenarioById(p.get('scenario') ?? '') ? p.get('scenario') : null,
   };
 }

@@ -12,12 +12,17 @@ src/bots/    bots + headless sim      imports engine only
 src/render/  PixiJS board view        imports engine (read-only)
 src/ui/      HTML/CSS overlay         imports engine (read-only)
 src/game/    controller               owns the current GameState; wires everything
+src/expansions/<id>/  one folder per expansion module: engine/ (engine rules apply), render.ts,
+             ui.ts, bots.ts — the framework contract is docs/EXPANSIONS.md (F1)
 src/net/     online multiplayer       protocol + GameSession (server room core); no DOM, no Date (lint)
 src/server/  Cloudflare room server   Worker + Durable Object around GameSession (MULTIPLAYER.md §18)
 ```
 
 Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
-clients get `viewFor(state, seat)` (§8) and their legal actions. Browser client (home, lobby,
+clients get `viewFor(state, seat)` (§8) and their legal actions. Every mode, scenario, option and
+combo plays online (X1): the lobby wraps the setup screen (mode tiles included), `RoomConfig`
+carries `mode/scenario/options`, expansion actions go over the wire, and each module masks its
+own secrets in views with the `maskFor` hook (docs/EXPANSIONS.md §5 "Online views"). Browser client (home, lobby,
 `RoomClient`, `NetGameController`, `src/game/online`, `src/ui/online`; `HudView.spectator` /
 `.away`, `Hud.setChat` / `.setSessionActions`): `docs/ONLINE-CLIENT.md`.
 
@@ -39,12 +44,14 @@ board is all hexes with distance ≤ 2 from `h:0,0`.
             S
 ```
 
-| Kind   | Format            | Example    | Canonical rule                                        |
-| ------ | ----------------- | ---------- | ----------------------------------------------------- |
-| Hex    | `h:q,r`           | `h:0,-2`   | —                                                     |
-| Vertex | `v:q,r,N` or `,S` | `v:1,-2,S` | every vertex is the N or S corner of exactly one hex  |
-| Edge   | `e:q,r,NE/E/SE`   | `e:0,0,NE` | every edge is the NE, E or SE side of exactly one hex |
-| Player | number `0..n-1`   | `2`        | index into `state.players`, also turn order           |
+| Kind   | Format            | Example     | Canonical rule                                          |
+| ------ | ----------------- | ----------- | ------------------------------------------------------- |
+| Hex    | `h:q,r`           | `h:0,-2`    | —                                                       |
+| Vertex | `v:q,r,N` or `,S` | `v:1,-2,S`  | every vertex is the N or S corner of exactly one hex    |
+| Edge   | `e:q,r,NE/E/SE`   | `e:0,0,NE`  | every edge is the NE, E or SE side of exactly one hex   |
+| Player | number `0..n-1`   | `2`         | index into `state.players`, also turn order             |
+| Plaza  | `v:q,r,C`         | `v:2,-2,C`  | F2: centre of a hex listed in the frame's `plazas`      |
+| Spoke  | `e:q,r,C<corner>` | `e:2,-2,CS` | F2: plaza → that corner of hex (q,r); plaza frames only |
 
 The owning hex of a vertex/edge may be water or off-board — IDs are pure coordinates.
 Never build ID strings by hand from a corner name; use `cornerVertex(q, r, 'NE')` and `sideEdge(q, r, 'SW')` (they canonicalize).
@@ -65,11 +72,24 @@ The board is chosen at `createGame` as `settings.map: MapId` and never changes.
 | `base56`     | 30 hexes (3-4-5-6-5-4-3), random     | 3–6     | 30 / 22 / 80 / 109 / 11                   | 24   | 34       |
 | `base78`     | 37 hexes (4-5-6-7-6-5-4, our design) | 3–8     | 37 / 24 / 96 / 132 / 12                   | 29   | 43       |
 
-`MAPS[id]: MapDef` = `{ frame, minPlayers, maxPlayers, layout: 'beginner'|'random', terrain, tokens,
-harbors, bankPerResource, devDeck }`. A `FrameDef` = land row widths + harbor spots. Sources and
-design notes: `docs/RULES.md` §16. Helpers: `MAP_IDS, isMapId, mapOf(state), supplyOf(state)`
-(bank per resource + dev deck composition of the game's map), `defaultMapFor(players)`
-(3–4 → `baseRandom`, 5–6 → `base56`, 7–8 → `base78`).
+`MAPS[id]: StdMapDef` = `{ frame, minPlayers, maxPlayers, layout: 'beginner'|'random', terrain, tokens,
+harbors, bankPerResource, devDeck }` for the base ids (`BaseMapId`). A `RowsFrameDef` = land row
+widths + harbor spots. Sources and design notes: `docs/RULES.md` §16. Helpers (`maps.ts`):
+`MAP_IDS` (base), `isBaseMapId`, `defaultMapFor(players)` (3–4 → `baseRandom`, 5–6 → `base56`,
+7–8 → `base78`). Helpers over base **and expansion** maps (`mapLookup.ts`): `isMapId`, `mapById`,
+`mapOf(state)`, `supplyOf(state)` (bank per resource + dev deck of the game: map supply changed by
+expansion `supply` hooks).
+
+**Plazas (F2, T&B trade hexes):** a frame (rows or hex list) may list `plazas: { hex, corners }[]`;
+its topology then has the centre vertex `v:q,r,C` (`hexes: [hex]`, not coastal) and one spoke
+edge `e:q,r,C<corner>` per listed corner, as ordinary vertices / edges (adjacency, roads, pieces,
+highlights, hit-testing). `hex[h].vertices` / `.edges` stay the 6 corners / sides, so production,
+the robber and harbours never see plazas. Helpers in `hex.ts`: `centreVertex`, `spokeEdge`,
+`isCentreVertex`, `isSpokeEdge`.
+
+**Expansion maps (F1):** `MapId = BaseMapId | '<expansion>/<name>'`. A `CustomMapDef`
+(`layout: 'custom'`, `generate(rng, players)`) on a `HexListFrameDef` (any hex set + explicit sea
+and harbors). Board helpers `assembleBoard`, `dealTokens`. Details: `docs/EXPANSIONS.md` §6.
 
 **Topology** is derived from the frame, built once per frame and cached, **not stored in GameState**:
 
@@ -92,10 +112,15 @@ valid only for base-map games (fixtures, old tests, UI dev pages).
 | `hex[id]`           | `vertices` (6, clockwise from N), `edges` (6, clockwise from NE), `neighbors` (land) |
 | `vertex[id]`        | `hexes` (1–3 land), `edges` (2–3), `vertices` (2–3), `coastal`                       |
 | `edge[id]`          | `vertices` [2], `edges` (2–4), `hexes` (1–2 land), `coastal`                         |
+| `water[id]` (F1)    | + `vertices`, `edges`, `neighbors` (frame hexes), `playable` (listed sea, not ring)  |
+| `seas` (F1)         | on every vertex/edge info: adjacent water hexes                                      |
+| `seaVertices/Edges` | (F1) ids touching only water (`seaVertex` / `seaEdge` infos): ship routes            |
 
 Accessors take the topology first and return `[]` for unknown ids: `hexVertices(t, h), hexEdges,
 hexNeighbors, vertexHexes, vertexEdges, vertexNeighbors, edgeVertices, edgeNeighbors`.
-Validators for untrusted input: `isLandHex(t, id), isBoardVertex(t, id), isBoardEdge(t, id)`.
+Validators for untrusted input: `isLandHex(t, id), isBoardVertex(t, id), isBoardEdge(t, id)`,
+and (F1) `isWaterHex`, `isSeaEdge`, `vertexInfo` / `edgeInfo` (land or sea). Base frames' land
+fields, counts and orders are unchanged by the sea geometry.
 
 ## 4. GameState (`src/engine/types.ts`)
 
@@ -103,7 +128,7 @@ Plain JSON. `JSON.parse(JSON.stringify(s))` must equal `s`. Never mutate a state
 
 ```ts
 GameState {
-  schemaVersion: 4
+  schemaVersion: 5
   settings: GameSettings             // see below; fixed after createGame
   board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
@@ -119,6 +144,7 @@ GameState {
   log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
+  ext:     Record<ExpansionId, Json> // v5 (F1): one slice per active expansion; {} in base games
   // V1 variants: present only in event-card games (absent otherwise, no schema bump)
   eventDeck?:    number[]            // undrawn event cards (ids into EVENT_CARDS), pop()
   lastEvent?:    EventKind | null    // event of the last card drawn
@@ -127,6 +153,11 @@ GameState {
   stats?:        GameStats           // end-of-game statistics, see "Game statistics" below
 }
 ```
+
+`Terrain` (F1) = `Resource | 'desert' | 'gold' | 'sea' | 'fog' | '<expansion>/<name>'`; only
+resource terrains produce in the core (`terrainKind` says land / sea / fog). `Action` and `Phase`
+also admit namespaced expansion members (`ExpansionAction`, `ExpansionPhase`); `BaseAction` /
+`BaseActionType` are the base ones. `Board.ext?` holds optional per-game expansion board data.
 
 **Game statistics (UX2, `stats.ts`).** `GameStats = { complete, fromTurn, players: PlayerStats[],
 events, vpHistory: {turn, vp[]}[], awardHistory: {turn, award, player}[] }`. `PlayerStats` has
@@ -144,14 +175,16 @@ discard, monopoly, event, other), `blocked` (what the robber's hex would have pa
   production) and `recordProduction` (`produce`: paid production, blocked cards). Everything else
   is `recordAction(prev, next, action)` in `applyAction` (after `checkVictory`): each hand change
   production did not explain is classified by action type, so **Σ gained − Σ lost = hand** holds
-  by construction (sim invariant `stats`; `other` must stay 0). A new action that moves resources
-  needs a case in `gainSource` / `lossSink`.
+  by construction (sim invariant `stats`; `other` must stay 0 in base games). A new base action that moves resources
+  needs a case in `gainSource` / `lossSink`. Expansion actions (`<id>/...`): their hand changes count as
+  the module's `statsCategory` hook says (default `other`), their base parts (pieces placed, dev cards bought / played) are counted from the state diff
+  (`recordExpansionAction`); expansion-only goods (oil, crops) are not counted. `recordRoll` /
+  `recordProduction` count only resource terrains (like `computeProduction`).
 - `statsOf(state)` reads with defaults (`complete: false`, `fromTurn` = now for older saves).
   Hand-built fixtures have no stats.
 - Secret until game over: `viewFor` drops `stats` from mid-game views (stolen card types, dev
   cards bought, hidden VP history) and passes it unchanged at game over.
 
-`TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5).
 `TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5) and
 `specialOwner?: PlayerId` (V2: the owner during a special build phase, so a card played there with
 `rules56` can resume into `specialBuild{builder, owner}`; `ResumePhase` is now
@@ -170,6 +203,10 @@ discard, monopoly, event, other), `blocked` (what the robber's hex would have pa
 | `hideBankCards`     | boolean              | false           | client-side only (UI hides bank counts); engine ignores it   |
 | `turnTimerSec`      | positive int \| null | null            | client-side only; engine ignores it (controller timer, §13b) |
 | `startingPlayer`    | PlayerId (v4, T14)   | drawn from seed | places first in setup, takes turn 1 (RULES.md 2.7)           |
+| `mode`              | ModeId (v5, F1)      | `'base'`        | setup preset of expansions + scenarios (EXPANSIONS.md §3)    |
+| `expansions`        | ExpansionId[] (v5)   | mode's          | active modules, registry order; `[]` = base                  |
+| `scenario`          | ScenarioId \| null   | mode's first    | picks the map per player count, default VP                   |
+| `options`           | per-expansion record | option defaults | every option of every active module                          |
 
 **V1 variant settings** — all **optional**, absent = official rule, written by `resolveSettings`
 only when they differ from it (so default settings and old saves are unchanged; no schema bump).
@@ -193,14 +230,30 @@ Read them only through `variants.ts` / `clock.ts` accessors. Rules and sources: 
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
 before T14. `createGame` logs "Blue starts" right after "Game created …". Fixtures pin seat 0.
 
-**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v4 state from a v1, v2, v3 or v4 one, or null.
+**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v5 state from a v1–v5 one, or null.
+v4 → v5 (F1): `mode 'base', expansions [], scenario null, options {}`, `ext: {}`; a v5 save naming
+an unknown expansion / mode / scenario → null.
 v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new fields get their defaults
 (`specialBuildPhase: false`). v2 → v3 (T13): `diceDeck: []` (the next balanced roll shuffles).
 v3 → v4 (T14): `settings.startingPlayer: 0` (every older game started with seat 0). Log texts are
 never migrated: rolls before T14 read "Blue rolled 8", since T14 "Blue rolled 8 (3+5)".
 Bump `schemaVersion` and add a step there whenever GameState changes shape.
-Exception (V1): the variant fields are optional and absent in every older save, so they need no
-migration step; v4 stays current (v5 is taken by the `expansions` branch).
+Exception (V1/V2/UX2): the variant fields and `stats` are optional and absent in every older
+save, so they need no migration step; each upgrade keeps them (v4 → v5 included) and v5 is
+current.
+
+**Variants × expansions.** The variant settings work in expansion modes too, through the same
+code paths as the hooks: dice and Event Cards both end in the production step
+(`produceAndContinue`: pay, then `afterProduction` hooks with what was paid), an Event Card is
+the roll for the `onRoll` hooks too (`drawEventRoll`, then the hooks, then `resolveDrawnEvent`;
+an interrupt resumes with `continueRoll`, which resolves the card), a 7 or Robber Attacks goes through
+`resolveSeven` (`onSeven` hook, `handSize` / `discardLimit` hooks), `beginTurn` runs `onStartTurn`
+(also for the first turn, and for Catanian 2's Second Settler step), and the `production` hook gets
+`ctx = { cityYield, blocked }` (Epidemic, `robberMode 'none'`). A module's `setupBuilding` hook wins
+over `setupPlacement`; 'any vertex' still needs land and an unblocked vertex. Map rules and
+`rules56`'s first desert apply to base random layouts only (scenario maps have their own
+generators). Refused: `mapSelection 'veto'` with expansions (module `init` builds slices from the
+board, which must not change afterwards); `'random'` in a scenario picks among its maps that fit.
 
 - `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. `token` is `null` only on the desert.
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
@@ -211,7 +264,9 @@ migration step; v4 stays current (v5 is taken by the `expansions` branch).
 - `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
 - Hidden info (hands, dev cards, deck orders, rng, seed) lives in state. Fine for hotseat; online,
   `viewFor(state, seat | 'spectator')` (`view.ts`, M1) masks it and adds public counts
-  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`).
+  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`);
+  a module's secrets in its `maskFor` hook (`hiddenFrom` / `addPublicCounts` in `viewer.ts`,
+  tests with `src/expansions/maskTestkit.ts`).
 
 ## 5. Phase state machine
 
@@ -222,6 +277,7 @@ createGame
 setup{index 0..2n-1, step settlement→road}   snake order from s = settings.startingPlayer:
    │  s,s+1,…,s-1,s-1,…,s+1,s (mod n; setupPlayerAt(index, n, s))
    │  index ≥ n: settlement yields 1 resource per adjacent non-desert hex
+   │  (setupOrderOf(state): an expansion's setupOrder hook may change both, e.g. 3 rounds)
    │  after last road: turn.number=1, current=s
    ▼
 preRoll ──playKnight──► moveRobber{resume:preRoll} ──► [steal] ──► preRoll
@@ -315,16 +371,22 @@ All files above live in `src/engine/actions/`. Each file's header comment lists 
 ```
 applyAction(state, action):
   phase gameOver?          → { ok:false, error:'game is over' }
-  unknown action.type?     → error
+  unknown action.type?     → error    ('<x>/...' only if module x is active)
   action.player not 0..n-1 → error
   draft = cloneState(state)                         // clone.ts, see below
-  result = HANDLERS[action.type](draft, action)     // handler mutates draft, returns ok(draft) | fail(msg)
-  if ok: updateAwards(draft, { roads: changesRoads(type) }) (rules/awards.ts)
-         checkVictory(draft) (rules/victory.ts)
+  result = handler(draft, action)                   // HANDLERS[type] wrapped by active modules' overrides,
+                                                    // or the module's own handler (EXPANSIONS.md §4)
+  if ok: afterAction hooks
+         updateAwards(draft, { roads: changesRoads(type) || module changesRoads }) (rules/awards.ts)
+         checkVictory(draft) (rules/victory.ts; a module's `deferVictory` hook can switch it off)
          recordAction(state, draft, action) (stats.ts, UX2)
          trim draft.log to the newest LOG_LIMIT entries
   return result
 ```
+
+Core rules call expansion hooks only through `src/engine/expansions/hooks.ts` (`costOf`,
+`pieceLimit`, `cardsInHand`, production, roll, 7, VP, trade ratio, road length, turn start/end,
+placement blockers; table in EXPANSIONS.md §5). With no active module every runner is a no-op.
 
 - **Pure:** the input state is never mutated (tested with a deep-frozen state).
 - **Structural sharing (`cloneState`)**: `board`, `settings` and `stats` (UX2, immutable) are shared
@@ -333,11 +395,14 @@ applyAction(state, action):
   GameState field must be copied in `clone.ts` (`clone.test.ts` fails otherwise). This replaced
   `structuredClone`, which was ~85% of sim time. Map-veto candidate boards are shared like `board`;
   the veto handler replaces `draft.board` with the chosen one (assigning, never mutating).
-  Optional variant fields are copied only when present (no `undefined` keys).
+  Optional variant fields are copied only when present (no `undefined` keys). Expansion slices
+  (`ext`) and expansion phases are deep-copied (`cloneJson`, or the module's `cloneExt`); an
+  expansion may replace `draft.board` copy-on-write (fog reveal) but never mutate it.
 - **Longest Road** is recomputed only after actions that add a road or occupy a vertex
   (`changesRoads`: setup settlement/road, buildRoad, buildSettlement, placeFreeRoad). A new action
   that changes roads or building occupancy must be added there. Largest Army is always recomputed.
-- `legalActions(state, player?)` = concat of every area's `LegalGenerator`, optionally filtered by actor.
+- `legalActions(state, player?)` = concat of every area's `LegalGenerator`, then active modules'
+  `legal`, then their `filterLegal`, optionally filtered by actor.
   **Sound** (everything returned is accepted by applyAction — tested) and **complete**, except
   `offerTrade`, which is open-ended: return a bounded sample (e.g. 1-for-1 offers).
   Discard combos can be numerous (≤ ~1000) — acceptable.
@@ -355,26 +420,28 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 8. Shared helpers (already implemented + tested)
 
-| Module                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, DICE_DECK_SIZE, DICE_DECK_RESHUFFLE_AT, PLAYER_COLORS (8 default seat colours), tokenPips` …                                                                                                                                                                                                                                |
-| `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                                                                                                                                                                                                                                                            |
-| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                                                                                                                                                                                                                                                                                                                                             |
-| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                                                                                                                                                                                                                                                                                                                                                  |
-| `board.ts`             | `generateBoard(map, rng), beginnerBoard(), randomBoard(rng, map), redNumbersSeparated(hexes, map)`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec?, startingPlayer? })` → setup phase, starting player first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. V1 config keys: `robberMode?, eventCards?, setupPlacement?, randomTurnOrder?, mapSelection?, rushMode?, turboMode?, secondSettler?, timer?` (§4); `randomSeatOrder(seed, n)`, `randomMapFor(seed, n)`. |
-| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill); `secondSettlerFor(s, owner)` (V1)                                                                                                                                                                                                                                                                                                                                                                         |
-| `variants.ts` (V1)     | accessors with defaults (`robberModeOf, setupPlacementOf, eventCardsOn, hasRobber`), `robberTargets, isRobberProtected, roadsBlocked, nextToDamagedRoad`, option lists, `OFFICIAL_SETUP`                                                                                                                                                                                                                                                                                                                                           |
-| `clock.ts` (V1)        | chess clock, pure: `TIMER_PRESET_VALUES, timerSettings, timerOf` (legacy per-turn vs bank), `initialBanks, chargeBank, creditIncrement, turnKey, restoreBanks`                                                                                                                                                                                                                                                                                                                                                                     |
-| `rules/events.ts` (V1) | `EVENT_CARDS` (36), `EVENT_INFO` (names, texts), `facesFor`, `drawEventCard`                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `actions/veto.ts` (V1) | `MAP_VETO_CANDIDATES` (3), `vetoOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`, `HIDDEN_EVENT_CARD` (V1: the event deck order is masked; veto candidates, event tasks, `lastEvent`, `damagedRoads` and `seatOrder` are public)                                                           |
-| `stats.ts` (UX2)       | `statsOf`, `emptyStats`, `sumCounts`, `GAIN_SOURCES`, `LOSS_SINKS`, `DICE_TOTALS` (exported); `recordRoll`, `recordProduction`, `recordAction` (engine-internal hooks) — §4 "Game statistics"                                                                                                                                                                                                                                                                                                                                      |
+| Module                 | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, DICE_DECK_SIZE, DICE_DECK_RESHUFFLE_AT, PLAYER_COLORS (8 default seat colours), tokenPips` …                                                                                                                                                                                                                                                                                                            |
+| `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `selectors.ts`         | `setupPlayerAt, setupOrderOf, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `board.ts`             | `generateBoard(map, rng, players?, mapRules?, firstDesertOnly?)` (custom scenario maps: their own `generate`), `beginnerBoard()`, `randomBoard(rng, map, mapRules?, firstDesertOnly?)`, `redNumbersSeparated(hexes, map)`, `mapRuleViolations`; for scenario generators (F1) `assembleBoard`, `dealTokens`                                                                                                                                                                                                                                                                                                     |
+| `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec?, startingPlayer? })` → setup phase, starting player first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. F1 keys: `mode?, expansions?, scenario?, options?`. V1/V2 config keys: `robberMode?, eventCards?, setupPlacement?, randomTurnOrder?, mapSelection?, rushMode?, turboMode?, secondSettler?, timer?, mapRules?, rules56?` (§4); `randomSeatOrder(seed, n)`, `randomMapFor(seed, n)`. |
+| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill); `secondSettlerFor(s, owner)` (V1); `continueRoll(draft)`, `discardAmounts(s)` (F1)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `variants.ts` (V1)     | accessors with defaults (`robberModeOf, setupPlacementOf, eventCardsOn, hasRobber`), `robberTargets, isRobberProtected, roadsBlocked, nextToDamagedRoad`, option lists, `OFFICIAL_SETUP`                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `clock.ts` (V1)        | chess clock, pure: `TIMER_PRESET_VALUES, timerSettings, timerOf` (legacy per-turn vs bank), `initialBanks, chargeBank, creditIncrement, turnKey, restoreBanks`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `rules/events.ts` (V1) | `EVENT_CARDS` (36), `EVENT_INFO` (names, texts), `facesFor`, `drawEventCard`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `actions/veto.ts` (V1) | `MAP_VETO_CANDIDATES` (3), `vetoOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `expansions/*` (F1)    | registry (`listModes, modeById, scenarioById, expansionById, activeModules, isActive, mapDef`), hook values (`costOf, pieceLimit, terrainKind, expansionVictoryPoints`), `extSlice, cloneJson, NO_ROBBER, doubledToHexId`; `createGame.ts`: `resolveMode, defaultVpToWin, optionVpBonus`. See `docs/EXPANSIONS.md`.                                                                                                                                                                                                                                                                                            |
+| `selectors.ts` (F1)    | `cardsInHand(s, p)` (resources + expansion cards, for the 7 rule and stealing); `piecesLeft` uses `pieceLimit`; VP selectors add expansion VP                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`, `HIDDEN_EVENT_CARD` (V1: the event deck order is masked; veto candidates, event tasks, `lastEvent`, `damagedRoads` and `seatOrder` are public)                                                                                                                                       |
+| `stats.ts` (UX2)       | `statsOf`, `emptyStats`, `sumCounts`, `GAIN_SOURCES`, `LOSS_SINKS`, `DICE_TOTALS` (exported); `recordRoll`, `recordProduction`, `recordAction` (engine-internal hooks) — §4 "Game statistics"                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -409,15 +476,16 @@ Each returns a fresh, internally consistent state on the beginner board (map `ba
 
 ## 11. Task ownership
 
-| Task               | Owns                                                                                                                                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1 foundation      | `types.ts, hex.ts, topology.ts, rng.ts, board.ts, constants.ts, resources.ts, selectors.ts, rules/placement.ts, createGame.ts, engine.ts, actions/index.ts, actions/common.ts, fixtures.ts`, tooling |
-| **T2 rules-core**  | `actions/setup.ts, actions/turn.ts` (incl. production), `actions/build.ts, actions/robber.ts, rules/victory.ts`; may add `rules/production.ts` etc.                                                  |
-| **T3 rules-trade** | `actions/trade.ts, actions/dev.ts, rules/awards.ts` (longest road, largest army); may add `rules/longestRoad.ts` etc.                                                                                |
-| **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                     |
-| **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                    |
-| T6 UI              | `src/ui/**`                                                                                                                                                                                          |
-| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                         |
+| Task               | Owns                                                                                                                                                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1 foundation      | `types.ts, hex.ts, topology.ts, rng.ts, board.ts, constants.ts, resources.ts, selectors.ts, rules/placement.ts, createGame.ts, engine.ts, actions/index.ts, actions/common.ts, fixtures.ts`, tooling           |
+| **T2 rules-core**  | `actions/setup.ts, actions/turn.ts` (incl. production), `actions/build.ts, actions/robber.ts, rules/victory.ts`; may add `rules/production.ts` etc.                                                            |
+| **T3 rules-trade** | `actions/trade.ts, actions/dev.ts, rules/awards.ts` (longest road, largest army); may add `rules/longestRoad.ts` etc.                                                                                          |
+| **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                               |
+| **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                              |
+| T6 UI              | `src/ui/**`                                                                                                                                                                                                    |
+| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                                   |
+| F1 framework       | `src/engine/expansions/**`, `src/engine/mapLookup.ts`, `src/{render,ui,bots}/expansions.ts`, `docs/EXPANSIONS.md`, `src/expansions/demo/**`; expansion agents own `src/expansions/<id>/**` (EXPANSIONS.md §13) |
 
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
 files (a selector, a constant) are fine — mention them in your report.
@@ -454,6 +522,9 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
+- Expansions (F1): active modules' `BoardDrawer`s (`render/expansions.ts`) paint their terrains and
+  draw layers in three slots (board / pieces / top), rebuilt when their `sig` changes. Highlights,
+  hover, clicks and `screenPos` also work on sea vertices/edges and water hexes.
 
 ## 13. UI contract (`src/ui`, T6)
 
@@ -464,8 +535,8 @@ hud.render(state, { viewer, legal, isBotTurn, bots?, turnTimer? }); // call afte
                                                               // bots: boolean[] by PlayerId (bot marker); turnTimer: { remainingSec, totalSec } | null (T14)
 hud.setBotSpeed({ value, presets, onChange } | null);         // bot-speed picker inside the HUD menu (main.ts wires it)
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
-hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode:'base', map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[3..8], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
-hud.on('placeMode', (m: 'road'|'settlement'|'city'|null) => …); // build button toggled: board shows targets, click -> buildX
+hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode, scenario?, options?, map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
+hud.on('placeMode', (m: PlaceMode|null) => …);                // 'road'|'settlement'|'city' or an expansion build card's '<id>/<x>'; board shows targets
 hud.showNewGame();                                            // open the new-game screen (also the winner screen's button)
 hud.isCovered();                                              // hotseat cover or new-game screen up (controller pauses the turn timer)
 hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders: redraws only the turn pill (T14)
@@ -480,6 +551,14 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   `pointer-events: none`, so the slot gets hover (`.why` bubble) and tap (opens it for 3.5 s). The
   reason is also in the button's `data-why` (playtest harness).
 
+- Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
+  build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
+  hand bar (`handCards`) and items in the trade offer rows (`offerExtras`). The setup
+  screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
+  modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
+  `validate`, e.g. C&K + Rush) shows the reason and disables Start. The build bar has no Buy card
+  when the game has no development deck. The stats screen's standings show expansions' named VP
+  (`victoryPoints` hook `parts`) as chips. See `docs/EXPANSIONS.md` §8.
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
 - The HUD renders a `GameView` (online, M1) as well as a full state: other players' card counts
   come from `handCount` / `devCardCount`, the special-build queue from `visibleSpecialBuildQueue`.
@@ -611,7 +690,8 @@ c.destroy();
   builders, and the timer gives each human step its own slot.
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
-  timer in s, also on fixtures), `?first=0` (starting seat). `window.catan` = `{ controller, board, hud }`.
+  timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
+  mode), `?modes=all` (setup screen also offers wip / demo modes). `window.catan` = `{ controller, board, hud }`.
 - Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`

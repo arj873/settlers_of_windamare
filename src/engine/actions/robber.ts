@@ -8,10 +8,11 @@
  * steal (phase steal): victim in candidates; take one random card via Rng -> phase = resume.
  */
 import { RESOURCES } from '../constants';
+import { hookDiscardLimit, hookSevenPhase } from '../expansions/hooks';
 import { describeBundle, playerName } from '../rules/text';
 import { Rng } from '../rng';
 import { hasResources, isValidBundle, totalResources } from '../resources';
-import { handSize } from '../selectors';
+import { cardsInHand } from '../selectors';
 import { hexVertices, isLandHex, topologyOf } from '../topology';
 import { hasRobber, isRobberProtected, robberTargets } from '../variants';
 import type {
@@ -44,23 +45,32 @@ export function stealCandidates(state: GameState, player: PlayerId, hex: HexId):
   return [...owners]
     .filter((p) => {
       const pl = state.players[p];
-      return pl !== undefined && handSize(pl) > 0 && !isRobberProtected(state, p);
+      return pl !== undefined && cardsInHand(state, p) > 0 && !isRobberProtected(state, p);
     })
     .sort((a, b) => a - b);
 }
 
-/** Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit). */
+/**
+ * Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit).
+ * Expansions change the count and the limit through the handSize / discardLimit hooks.
+ */
 export function discardAmounts(state: GameState): number[] {
   return state.players.map((p) => {
-    const n = handSize(p);
-    return n > state.settings.discardLimit ? Math.floor(n / 2) : 0;
+    const n = cardsInHand(state, p.id);
+    const limit = hookDiscardLimit(state, p.id, state.settings.discardLimit);
+    return n > limit ? Math.floor(n / 2) : 0;
   });
 }
 
-/** A 7 (rolled, or the Robber Attacks event card): discards if anyone is over, then the robber. */
+/**
+ * A 7 (rolled, or the Robber Attacks event card): an expansion's onSeven phase, else discards
+ * if anyone is over, then the robber.
+ */
 export function resolveSeven(draft: GameState): void {
   const pending = discardAmounts(draft);
-  if (pending.some((n) => n > 0)) draft.phase = { kind: 'discard', pending };
+  const custom = hookSevenPhase(draft, pending);
+  if (custom) draft.phase = custom;
+  else if (pending.some((n) => n > 0)) draft.phase = { kind: 'discard', pending };
   else startRobber(draft, 'main');
 }
 

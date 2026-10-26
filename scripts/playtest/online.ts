@@ -112,7 +112,16 @@ export async function createAndStart(
   const code = (await host.evaluate('window.catan.online.roomId')) as string;
 
   // Table settings go over the wire like the lobby's own configure does.
+  const x = o.expansion;
   const patch = JSON.stringify({
+    ...(x
+      ? {
+          mode: x.mode,
+          ...(x.scenario ? { scenario: x.scenario } : {}),
+          options: x.options,
+          vpToWin: x.vpToWin,
+        }
+      : {}),
     map: o.map,
     seatCount: o.total,
     turnTimerSec: o.timer,
@@ -123,7 +132,7 @@ export async function createAndStart(
   );
   if (sent !== true) throw new Error('The host could not send the table settings.');
   await host.waitForFunction(
-    `${CLIENT}.room.config.seatCount === ${o.total} && ${CLIENT}.room.config.map === ${JSON.stringify(o.map)}`,
+    `${CLIENT}.room.config.seatCount === ${o.total} && ${CLIENT}.room.config.map === ${JSON.stringify(o.map)} && ${CLIENT}.room.config.mode === ${JSON.stringify(x?.mode ?? 'base')}`,
     null,
     { timeout: 15_000 },
   );

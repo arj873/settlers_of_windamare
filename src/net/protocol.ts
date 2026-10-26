@@ -7,6 +7,17 @@
  * a shallow check (`parseServerMessage`).
  */
 import {
+  BASE_MODE,
+  expansionById,
+  listModes,
+  modeById,
+  namespaceOf,
+  resolveSettings,
+  type ExpansionAction,
+  type ExpansionActionType,
+  type ExpansionId,
+  type ModeDef,
+  type OptionValue,
   MAP_IDS,
   MAP_RULE_KEYS,
   MAP_SELECTIONS,
@@ -22,11 +33,11 @@ import {
   TIMER_PRESETS,
   timerSettings,
   type Action,
-  type ActionType,
+  type BaseActionType,
   type EdgeId,
   type GameView,
   type HexId,
-  type MapId,
+  type BaseMapId,
   type PlayerId,
   type Resource,
   type ResourceBundle,
@@ -35,9 +46,17 @@ import {
   type TimerSettings,
   type VertexId,
 } from '../engine';
+import { gameConfigOf } from '../game/logic';
 import type { SlotKind } from '../game/turnTimer';
 import type { NewGameConfig, NewGameVariants } from '../ui/types';
-import { NAME_MAX, SEAT_COLORS, SECOND_SETTLER_MIN_PLAYERS, TIMER_STEPS } from '../ui/setup/model';
+import {
+  modeOptions,
+  NAME_MAX,
+  playerRange,
+  SEAT_COLORS,
+  SECOND_SETTLER_MIN_PLAYERS,
+  TIMER_STEPS,
+} from '../ui/setup/model';
 import {
   arrayOf,
   bool,
@@ -326,7 +345,7 @@ const BUNDLE: Check<ResourceBundle> = (x, path) => {
 };
 
 type ActionParsers = {
-  [T in ActionType]: (o: Record<string, unknown>, player: PlayerId, p: string) => Action;
+  [T in BaseActionType]: (o: Record<string, unknown>, player: PlayerId, p: string) => Action;
 };
 
 /** Per type: the payload fields (the `player` and `type` are handled by parseAction). */
@@ -432,11 +451,68 @@ const ACTIONS: ActionParsers = {
   repairRoad: (_o, player) => ({ type: 'repairRoad', player }),
 };
 
-const ACTION_TYPES = Object.keys(ACTIONS) as ActionType[];
+const ACTION_TYPES = Object.keys(ACTIONS) as BaseActionType[];
 
-/** Structural check of an engine Action (the rules are applyAction's job). */
+/** Payload limits of an expansion action (their own fields are checked by the module handler). */
+export const EXT_ACTION_LIMITS = { depth: 4, nodes: 200, string: 64, array: 64 } as const;
+/** Payload keys: plain identifiers (no `__proto__`, `constructor` is harmless on a rebuilt copy). */
+const EXT_KEY = /^[A-Za-z][A-Za-z0-9]{0,31}$/;
+
+/**
+ * An expansion action's payload, rebuilt as plain JSON: strings, finite numbers, booleans, null,
+ * arrays and objects with identifier keys, within EXT_ACTION_LIMITS. The module's handler
+ * validates the meaning of every field (docs/EXPANSIONS.md §4).
+ */
+function extPayload(x: unknown, path: string, depth: number, budget: { nodes: number }): unknown {
+  if (--budget.nodes < 0) throw new Invalid(path, 'action too large');
+  if (x === null || typeof x === 'boolean') return x;
+  if (typeof x === 'number') {
+    if (!Number.isFinite(x)) throw new Invalid(path, 'expected a finite number');
+    return x;
+  }
+  if (typeof x === 'string') return str(EXT_ACTION_LIMITS.string)(x, path);
+  if (depth >= EXT_ACTION_LIMITS.depth) throw new Invalid(path, 'nested too deep');
+  if (Array.isArray(x)) {
+    if (x.length > EXT_ACTION_LIMITS.array) throw new Invalid(path, 'array too long');
+    return x.map((v, i) => extPayload(v, `${path}[${i}]`, depth + 1, budget));
+  }
+  const o = record(x, path);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (!EXT_KEY.test(k)) throw new Invalid(`${path}.${k}`, 'bad key');
+    out[k] = extPayload(v, `${path}.${k}`, depth + 1, budget);
+  }
+  return out;
+}
+
+/** Action types of every registered expansion module (`<id>/<name>`). */
+function isExpansionActionType(type: string): type is ExpansionActionType {
+  const ns = namespaceOf(type);
+  return ns !== null && Object.hasOwn(expansionById(ns)?.actions ?? {}, type);
+}
+
+/** An expansion action: a registered `<id>/<name>` type, a player, a plain JSON payload. */
+function parseExpansionAction(o: Record<string, unknown>, path: string): ExpansionAction {
+  const type = field(o, 'type', str(64), path);
+  if (!isExpansionActionType(type)) throw new Invalid(`${path}.type`, `unknown action ${type}`);
+  const player = field(o, 'player', PLAYER_ID, path);
+  const budget = { nodes: EXT_ACTION_LIMITS.nodes };
+  const out: ExpansionAction = { type, player };
+  for (const [k, v] of Object.entries(o)) {
+    if (k === 'type' || k === 'player') continue;
+    if (!EXT_KEY.test(k)) throw new Invalid(`${path}.${k}`, 'bad key');
+    out[k] = extPayload(v, `${path}.${k}`, 1, budget);
+  }
+  return out;
+}
+
+/**
+ * Structural check of an engine Action (the rules are applyAction's job). Base actions are
+ * rebuilt field by field; expansion actions (`<id>/<name>`) must be a registered module's.
+ */
 export const parseAction: Check<Action> = (x, path) => {
   const o = record(x, path);
+  if (typeof o.type === 'string' && o.type.includes('/')) return parseExpansionAction(o, path);
   const type = field(o, 'type', oneOf(ACTION_TYPES), path);
   const player = field(o, 'player', PLAYER_ID, path);
   return ACTIONS[type](o, player, path);
@@ -445,16 +521,66 @@ export const parseAction: Check<Action> = (x, path) => {
 const NAME = str(LIMITS.name * 4); // trimmed + clipped by the server (cleanName)
 const TOKEN = str(LIMITS.tokenMax, { min: LIMITS.tokenMin, pattern: /^[A-Za-z0-9_-]+$/ });
 
+/** Options of the mode's modules: known keys only, typed and in range, in the setup screen's order. */
+function parseOptions(
+  x: unknown,
+  mode: ModeDef,
+  path: string,
+): Record<ExpansionId, Record<string, OptionValue>> {
+  const o = record(x, path);
+  const defs = modeOptions(mode);
+  onlyKeys(o, [...new Set(defs.map((d) => d.ext))], path);
+  const out: Record<ExpansionId, Record<string, OptionValue>> = {};
+  for (const { ext, def } of defs) {
+    const group = optional(o, ext, record, path);
+    if (!group) continue;
+    const gp = `${path}.${ext}`;
+    onlyKeys(
+      group,
+      defs.filter((d) => d.ext === ext).map((d) => d.def.key),
+      gp,
+    );
+    const check: Check<OptionValue> =
+      def.type === 'boolean'
+        ? bool
+        : def.type === 'int'
+          ? int(def.min, def.max)
+          : oneOf(def.choices.map((c) => c.value));
+    const value = optional(group, def.key, check, gp);
+    if (value !== undefined) out[ext] = { ...out[ext], [def.key]: value };
+  }
+  return out;
+}
+
+/** Mode, scenario and options (registry ids only); base games carry neither of the latter. */
+function parseMode(o: Record<string, unknown>, path: string) {
+  const ids = listModes().map((m) => m.id);
+  const mode = modeById(field(o, 'mode', oneOf(ids), path)) ?? BASE_MODE;
+  if (mode.id === 'base') {
+    if (o.scenario !== undefined || o.options !== undefined) {
+      throw new Invalid(path, 'the base game has no scenario or options');
+    }
+    return { mode };
+  }
+  const scenario = optional(o, 'scenario', oneOf(mode.scenarios), path);
+  const options = optional(o, 'options', (v, p) => parseOptions(v, mode, p), path);
+  return { mode, scenario, options };
+}
+
 export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
   const o = record(x, path);
-  const map = field(o, 'map', oneOf(MAP_IDS), path) as MapId;
-  const def = MAPS[map];
+  const { mode, scenario, options } = parseMode(o, path);
+  const map = field(o, 'map', oneOf(MAP_IDS), path) as BaseMapId;
+  const range =
+    mode.id === 'base'
+      ? { min: MAPS[map].minPlayers, max: MAPS[map].maxPlayers }
+      : playerRange({ mode: mode.id, scenario: scenario ?? mode.scenarios[0] ?? null });
   const rules = record(o.rules, `${path}.rules`);
   const timer = field(o, 'turnTimerSec', nullable(int(1, 3600)), path);
   if (timer !== null && !TIMER_STEPS.includes(timer)) {
     throw new Invalid(`${path}.turnTimerSec`, `expected one of ${TIMER_STEPS.join(', ')}`);
   }
-  const seatCount = field(o, 'seatCount', int(def.minPlayers, def.maxPlayers), path);
+  const seatCount = field(o, 'seatCount', int(range.min, range.max), path);
   const balancedDice = field(rules, 'balancedDice', bool, `${path}.rules`);
   const variants = optional(o, 'variants', parseVariants, path);
   // Cross-field rules createGame enforces too: reject here so `start` cannot fail later.
@@ -477,10 +603,11 @@ export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
       'the 5+ rules use the special building phase: turn second settler off',
     );
   }
-  return {
-    mode: field(o, 'mode', oneOf(['base'] as const), path),
+  const config: RoomConfig = {
+    mode: mode.id,
+    ...(scenario === undefined ? {} : { scenario }),
+    ...(options === undefined ? {} : { options }),
     map,
-    seatCount,
     rules: {
       balancedDice,
       hideBankCards: field(rules, 'hideBankCards', bool, `${path}.rules`),
@@ -489,8 +616,30 @@ export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
     vpToWin: field(o, 'vpToWin', int(3, 20), path),
     discardLimit: field(o, 'discardLimit', int(5, 20), path),
     ...(variants ? { variants } : {}),
+    seatCount,
   };
+  // Everything else createGame checks (players per scenario, a module's `validate` refusing a
+  // variant, ...): the same check as the setup screen's Start button, so `start` cannot fail.
+  const error = roomConfigError(config);
+  if (error !== null) throw new Invalid(path, error);
+  return config;
 };
+
+/** Why createGame would refuse this room config (placeholder players), or null. */
+export function roomConfigError(config: RoomConfig): string | null {
+  const { seatCount, ...rest } = config;
+  const players = Array.from({ length: seatCount }, (_, i) => ({
+    name: `Seat ${i + 1}`,
+    color: ROOM_COLORS[i] ?? '#888888',
+    controller: 'bot' as const,
+  }));
+  try {
+    resolveSettings(gameConfigOf({ ...rest, players }, 'config-check'));
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
 
 const VARIANT_FLAGS = [
   'eventCards',

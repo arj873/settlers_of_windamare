@@ -7,6 +7,7 @@
  */
 import { LARGEST_ARMY_MIN, LONGEST_ROAD_MIN } from '../constants';
 import { log } from '../actions/common';
+import { hookArmySize } from '../expansions/hooks';
 import type { ActionType, GameState, PlayerId } from '../types';
 import { longestRoadLengths } from './longestRoad';
 
@@ -65,8 +66,9 @@ export function updateAwards(draft: GameState, opts: { roads?: boolean } = {}): 
   }
 
   // Knights never decrease, so Largest Army only ever moves to a strictly larger army.
+  // (An expansion's armySize hook may change the count: Pirate Islands has no award.)
   const army = awardHolder(
-    draft.players.map((p) => p.knightsPlayed),
+    draft.players.map((p) => hookArmySize(draft, p.id, p.knightsPlayed)),
     draft.awards.largestArmy,
     LARGEST_ARMY_MIN,
   );

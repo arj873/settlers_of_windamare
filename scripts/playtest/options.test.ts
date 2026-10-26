@@ -60,7 +60,26 @@ describe('onlineOptions', () => {
       vp: null,
       headed: false,
       remote: null,
+      expansion: null,
     });
+  });
+
+  it('--mode / --scenario: an expansion game with the setup screen defaults', () => {
+    expect(ok({ seats: '2', bots: '2', mode: 'ck' }).expansion).toMatchObject({
+      mode: 'ck',
+      scenario: 'ck/classic',
+      vpToWin: 13,
+      options: { ck: expect.any(Object) },
+    });
+    const fog = ok({ seats: '1', bots: '4', mode: 'seafarers', scenario: 'fogIslands' });
+    expect(fog.expansion).toMatchObject({ scenario: 'seafarers/fogIslands', vpToWin: 12 });
+    expect(ok({ seats: '1', bots: '3', mode: 'ep', scenario: 'ep/landHo' }).expansion?.mode).toBe(
+      'ep',
+    );
+    expect(onlineOptions({ mode: 'atlantis' })).toHaveProperty('error');
+    expect(onlineOptions({ mode: 'ck', scenario: 'fogIslands' })).toHaveProperty('error');
+    expect(onlineOptions({ scenario: 'fogIslands' })).toHaveProperty('error');
+    expect(onlineOptions({ seats: '4', bots: '3', mode: 'ck' })).toHaveProperty('error'); // 3-6
   });
 
   it('adds bots to the seat count and picks a map that fits', () => {

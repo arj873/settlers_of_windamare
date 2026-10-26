@@ -5,16 +5,19 @@
  * one sample layout (a fixed seed), with the map's real terrain mix (e.g. two deserts on 5-6P).
  */
 import {
+  expansionById,
   generateBoard,
+  namespaceOf,
   parseHexId,
   Rng,
   topologyFor,
+  type CoreTerrain,
   type Board,
   type HexId,
+  type MapId,
   type PortKind,
   type Terrain,
 } from '../../engine';
-import type { MapId } from '../types';
 
 export interface PreviewHex {
   q: number;
@@ -63,14 +66,24 @@ export function previewHexes(map: MapId): PreviewHex[] {
   return previewBoard(map).land.map(({ q, r }) => ({ q, r }));
 }
 
-export const PREVIEW_COLORS: Record<Terrain, string> = {
+export const PREVIEW_COLORS: Record<CoreTerrain, string> = {
   brick: '#c4532d',
   lumber: '#3f8f46',
   wool: '#9bcf6a',
   grain: '#e8c547',
   ore: '#7f8fa0',
   desert: '#d9c48f',
+  gold: '#f0c419',
+  sea: '#2f7fbf',
+  fog: '#8a9099',
 };
+
+/** Preview colour of any terrain (a module's `TerrainInfo.color`; without one: grey). */
+export function previewColor(t: Terrain): string {
+  if (Object.hasOwn(PREVIEW_COLORS, t)) return PREVIEW_COLORS[t as CoreTerrain];
+  const ns = namespaceOf(t);
+  return (ns === null ? undefined : expansionById(ns)?.terrains?.[t]?.color) ?? '#9a9a9a';
+}
 
 const SQRT3 = Math.sqrt(3);
 
@@ -137,7 +150,7 @@ function previewSvg({ land, water, harbors }: PreviewBoard, tokens: boolean): SV
     svg.append(
       el('polygon', {
         points: corners(c.x, c.y, 0.93),
-        fill: PREVIEW_COLORS[hx.terrain],
+        fill: previewColor(hx.terrain),
         stroke: 'rgba(8,18,30,0.55)',
         'stroke-width': '0.08',
       }),

@@ -233,5 +233,8 @@ export function timeoutMove(
       );
     case 'gameOver':
       return null;
+    default:
+      // An expansion phase: its legal actions are the responses it waits for; pick one.
+      return mine.length > 0 ? rng.pick(mine) : null;
   }
 }

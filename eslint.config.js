@@ -29,7 +29,8 @@ export default tseslint.config(
   },
   {
     // The engine must stay pure and deterministic: no DOM, no Pixi, no ambient randomness or time.
-    files: ['src/engine/**/*.ts'],
+    // Expansion rules (src/expansions/<id>/engine) are engine code too (docs/EXPANSIONS.md §2).
+    files: ['src/engine/**/*.ts', 'src/expansions/*/engine/**/*.ts'],
     languageOptions: { globals: { ...globals.es2021 } },
     rules: {
       'no-restricted-imports': [

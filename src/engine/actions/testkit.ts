@@ -4,7 +4,7 @@
  */
 import { expect } from 'vitest';
 import { RESOURCES } from '../constants';
-import { supplyOf } from '../maps';
+import { supplyOf } from '../mapLookup';
 import { applyAction } from '../engine';
 import { freshGame } from '../fixtures';
 import { Rng } from '../rng';

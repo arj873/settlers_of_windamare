@@ -1,5 +1,13 @@
 /** Read-only derived queries over GameState. Safe for render/ui/bots to call. */
-import { AWARD_VP, PIECE_LIMITS } from './constants';
+import { AWARD_VP } from './constants';
+import {
+  expansionActors,
+  expansionVictoryPoints,
+  hookHandSize,
+  hookSetupOrder,
+  pieceLimit,
+} from './expansions/hooks';
+import type { SetupOrder } from './expansions/types';
 import { totalResources } from './resources';
 import type {
   BuildingKind,
@@ -18,6 +26,21 @@ import type {
 export function setupPlayerAt(index: number, playerCount: number, first: PlayerId = 0): PlayerId {
   const seat = index < playerCount ? index : 2 * playerCount - 1 - index;
   return (seat + first) % playerCount;
+}
+
+/**
+ * Every setup placement of the game: who places step i, and whether that settlement pays
+ * starting resources. Default: the snake order (setupPlayerAt), the second round pays; an
+ * expansion's setupOrder hook may change it (Cloth for Catan: a third round, which pays).
+ */
+export function setupOrderOf(state: GameState): SetupOrder {
+  const custom = hookSetupOrder(state);
+  if (custom) return custom;
+  const n = state.players.length;
+  const order = Array.from({ length: 2 * n }, (_, i) =>
+    setupPlayerAt(i, n, state.settings.startingPlayer),
+  );
+  return { order, pays: order.map((_, i) => i >= n) };
 }
 
 export function getPlayer(state: GameState, id: PlayerId): Player {
@@ -43,35 +66,47 @@ export function roadsOf(state: GameState, player: PlayerId): EdgeId[] {
   );
 }
 
-/** Unplaced pieces in the player's supply. */
+/** Unplaced pieces in the player's supply (limits: `pieceLimit`, i.e. 15/5/4 unless an expansion changes them). */
 export function piecesLeft(
   state: GameState,
   player: PlayerId,
 ): { road: number; settlement: number; city: number } {
   return {
-    road: PIECE_LIMITS.road - roadsOf(state, player).length,
-    settlement: PIECE_LIMITS.settlement - buildingsOf(state, player, 'settlement').length,
-    city: PIECE_LIMITS.city - buildingsOf(state, player, 'city').length,
+    road: pieceLimit(state, player, 'road') - roadsOf(state, player).length,
+    settlement:
+      pieceLimit(state, player, 'settlement') - buildingsOf(state, player, 'settlement').length,
+    city: pieceLimit(state, player, 'city') - buildingsOf(state, player, 'city').length,
   };
 }
 
-/** VP visible to everyone: buildings + Longest Road + Largest Army. */
+/** VP visible to everyone: buildings + Longest Road + Largest Army + expansions' public VP. */
 export function publicVictoryPoints(state: GameState, player: PlayerId): number {
   let vp =
     buildingsOf(state, player, 'settlement').length + 2 * buildingsOf(state, player, 'city').length;
   if (state.awards.longestRoad === player) vp += AWARD_VP;
   if (state.awards.largestArmy === player) vp += AWARD_VP;
-  return vp;
+  return vp + expansionVictoryPoints(state, player).public;
 }
 
-/** Total VP including hidden VP dev cards (also ones bought this turn). */
+/** Total VP including hidden VP dev cards (also ones bought this turn) and expansions' hidden VP. */
 export function victoryPoints(state: GameState, player: PlayerId): number {
   const p = getPlayer(state, player);
-  return publicVictoryPoints(state, player) + p.devCards.victoryPoint + p.newDevCards.victoryPoint;
+  return (
+    publicVictoryPoints(state, player) +
+    p.devCards.victoryPoint +
+    p.newDevCards.victoryPoint +
+    expansionVictoryPoints(state, player).hidden
+  );
 }
 
+/** Resource cards in a hand (base). For the 7 rule and stealing use `cardsInHand`. */
 export function handSize(player: Player): number {
   return totalResources(player.resources);
+}
+
+/** Cards in `player`'s hand as the rules count them: resources, plus expansion cards (handSize hook). */
+export function cardsInHand(state: GameState, player: PlayerId): number {
+  return hookHandSize(state, player, handSize(getPlayer(state, player)));
 }
 
 /** Port kinds the player can use (has a settlement/city on a port vertex). */
@@ -99,6 +134,6 @@ export function actingPlayers(state: GameState): PlayerId[] {
     case 'event':
       return phase.tasks.map((t) => t.player);
     default:
-      return [state.turn.current];
+      return expansionActors(state) ?? [state.turn.current];
   }
 }
