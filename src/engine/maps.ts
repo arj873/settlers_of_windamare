@@ -91,6 +91,11 @@ export interface StdMapDef extends MapDefCommon {
 /** A scenario map: its own generator (fixed or random, using the board.ts helpers). */
 export interface CustomMapDef extends MapDefCommon {
   layout: 'custom';
+  /**
+   * A combination map built on another module's map (C2, T&B + Seafarers): that module reads
+   * its own per-map data (frame cells, pirate, bonus areas) through this id.
+   */
+  basedOn?: MapId;
   /** Deterministic: draw only from `rng`. Must fill every frame hex and return the robber hex. */
   generate(rng: Rng, players: number): GeneratedBoard;
 }

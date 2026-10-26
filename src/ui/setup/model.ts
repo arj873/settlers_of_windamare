@@ -555,9 +555,14 @@ export function playerRange(draft: Pick<SetupDraft, 'mode' | 'scenario'>): Playe
   return { min, max: Math.max(min, max) };
 }
 
-/** Every option of the mode's modules, with its expansion id. */
+/** Every option of the mode's modules the mode offers (not in `hideOptions`), with its expansion id. */
 export function modeOptions(mode: ModeDef): { ext: string; def: OptionDef }[] {
-  return modeModules(mode).flatMap((m) => (m.options ?? []).map((def) => ({ ext: m.id, def })));
+  const hidden = new Set(mode.hideOptions ?? []);
+  return modeModules(mode).flatMap((m) =>
+    (m.options ?? [])
+      .filter((def) => !hidden.has(`${m.id}.${def.key}`))
+      .map((def) => ({ ext: m.id, def })),
+  );
 }
 
 function defaultOptions(mode: ModeDef): Record<string, Record<string, OptionValue>> {

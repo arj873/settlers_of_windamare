@@ -20,11 +20,13 @@ import type {
   Action,
   DevCardType,
   GameState,
+  HexId,
   PlayerId,
   Resource,
   VertexId,
 } from '../../../engine/types';
 import { handTotal, pn, stealResource, takeBank } from './common';
+import { isConqueredBuilding } from './conquest';
 import {
   FISH_CAP,
   FISH_COST,
@@ -34,6 +36,7 @@ import {
   OLD_BOOT,
   fishOf,
   fishTotal,
+  has,
   isTwo,
   tbBoard,
   type FishSlice,
@@ -50,19 +53,28 @@ export function initFish(n: number, rng: Rng): FishSlice {
   return { pool: rng.shuffle([...tokens, OLD_BOOT]), spent: [], hands, boot: null };
 }
 
-/** Fish each player is owed for `roll`: fishing grounds and lakes (the robber blocks a lake). */
-export function fishOwed(state: GameState, roll: number): number[] {
+/**
+ * Fish each player is owed for `roll`: fishing grounds and lakes (the robber blocks a lake; a
+ * ground lying on a `blocked` water hex pays nothing: the pirate, T&B + Seafarers).
+ */
+export function fishOwed(state: GameState, roll: number, blocked: readonly HexId[] = []): number[] {
   const owed = state.players.map(() => 0);
   const b = state.pieces.buildings;
+  // Fishing + Barbarian Attack: a conquered building catches nothing.
+  const ba = has(state, 'ba');
   const add = (v: VertexId) => {
     const bld = b[v];
-    if (bld) owed[bld.owner] = (owed[bld.owner] ?? 0) + (bld.kind === 'city' ? 2 : 1);
+    if (!bld || (ba && isConqueredBuilding(state, v))) return;
+    owed[bld.owner] = (owed[bld.owner] ?? 0) + (bld.kind === 'city' ? 2 : 1);
   };
   const board = tbBoard(state);
-  for (const g of board.grounds ?? []) if (g.number === roll) for (const v of g.vertices) add(v);
-  const blocked = hasRobber(state.settings) ? state.robber : null;
+  for (const g of board.grounds ?? []) {
+    if (g.number !== roll || (g.hex !== undefined && blocked.includes(g.hex))) continue;
+    for (const v of g.vertices) add(v);
+  }
+  const robber = hasRobber(state.settings) ? state.robber : null;
   for (const lake of board.lakes ?? []) {
-    if (lake.hex === blocked || !lake.numbers.includes(roll)) continue;
+    if (lake.hex === robber || !lake.numbers.includes(roll)) continue;
     for (const v of hexVertices(topologyOf(state), lake.hex)) add(v);
   }
   return owed;
@@ -97,8 +109,8 @@ function drawFish(draft: GameState, s: FishSlice, p: PlayerId, rng: Rng): void {
 }
 
 /** Pay the fish of a production roll; nobody gets fish if the pool cannot cover them all. */
-export function payFish(draft: GameState, roll: number): void {
-  const owed = fishOwed(draft, roll);
+export function payFish(draft: GameState, roll: number, blocked: readonly HexId[] = []): void {
+  const owed = fishOwed(draft, roll, blocked);
   const total = owed.reduce((a, b) => a + b, 0);
   if (total === 0) return;
   const s = fishOf(draft);

@@ -13,6 +13,8 @@ import { tbHud } from '../expansions/tb/ui';
 import { epHud } from '../expansions/ep/ui';
 import { seackHud } from '../expansions/seack/ui';
 import { tbckHud } from '../expansions/tbck/ui';
+import { tbseaHud } from '../expansions/tbsea/ui';
+import { tbpairHud } from '../expansions/tbpair/ui';
 import { epckHud } from '../expansions/epck/ui';
 import { eptbHud } from '../expansions/eptb/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
@@ -96,6 +98,8 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   epHud,
   seackHud,
   tbckHud,
+  tbseaHud,
+  tbpairHud,
   epckHud,
   eptbHud,
   // new modules go here, one per line

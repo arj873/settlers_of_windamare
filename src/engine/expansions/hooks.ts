@@ -8,22 +8,47 @@ import type {
   Action,
   BuildingKind,
   EdgeId,
+  ExpansionId,
   GainSource,
+  GameSettings,
   GameState,
   LossSink,
   Phase,
   PlayerId,
   Resource,
   ResourceCounts,
+  ScenarioId,
   Terrain,
   VertexId,
 } from '../types';
 import type { Viewer } from '../viewer';
-import { activeModules, expansionById } from './registry';
+import { activeModules, expansionById, scenarioById } from './registry';
 import { namespaceOf } from './ext';
 import type { ProductionContext, SetupOrder, Supply, VictoryPointPart } from './types';
 
 type State = Pick<GameState, 'settings'>;
+
+const PLAYS_AS = new Map<string, readonly ScenarioId[]>();
+
+/**
+ * The scenarios of module `id` this game plays (`ScenarioDef.playsAs`, C2): a combination
+ * scenario names them (T&B + Seafarers: a T&B scenario and the Seafarers one under it); any other
+ * scenario plays as itself, none as none. Cached per known scenario (hot: T&B asks per action).
+ */
+export function scenariosAs(
+  settings: Pick<GameSettings, 'scenario'>,
+  id: ExpansionId,
+): readonly ScenarioId[] {
+  const sc = settings.scenario;
+  if (sc === null) return [];
+  const key = `${sc}|${id}`;
+  const hit = PLAYS_AS.get(key);
+  if (hit) return hit;
+  const def = scenarioById(sc);
+  const out = def?.playsAs?.[id] ?? [sc];
+  if (def) PLAYS_AS.set(key, out);
+  return out;
+}
 
 export type BaseCostItem = keyof typeof COSTS;
 export type BasePieceKind = keyof typeof PIECE_LIMITS;

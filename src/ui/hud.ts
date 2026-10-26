@@ -685,7 +685,9 @@ export class Hud {
     const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log' | 'chat']);
     const sec: HTMLElement = h(
       'section',
-      { class: `side-sec sec-${key.replace(':', '-')}${closed ? ' is-collapsed' : ''}` },
+      {
+        class: `side-sec sec-${key.replace(':', '-')}${key.startsWith('ext:') ? ' sec-ext' : ''}${closed ? ' is-collapsed' : ''}`,
+      },
       h(
         'header',
         { class: 'sec-head' },

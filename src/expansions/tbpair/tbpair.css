@@ -1,0 +1,21 @@
+/* T&B scenario pairs HUD (classes are prefixed tbpair-). Colours come from the theme tokens. */
+.tbpair-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tbpair-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tbpair-fact {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.tbpair-btn {
+  align-self: flex-start;
+}

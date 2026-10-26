@@ -12,6 +12,8 @@ import { tbBots } from '../expansions/tb/bots';
 import { epBots } from '../expansions/ep/bots';
 import { seackBots } from '../expansions/seack/bots';
 import { tbckBots } from '../expansions/tbck/bots';
+import { tbseaBots } from '../expansions/tbsea/bots';
+import { tbpairBots } from '../expansions/tbpair/bots';
 import { epckBots } from '../expansions/epck/bots';
 import { eptbBots } from '../expansions/eptb/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
@@ -53,6 +55,8 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   epBots,
   seackBots,
   tbckBots,
+  tbseaBots,
+  tbpairBots,
   epckBots,
   eptbBots,
   // new modules go here, one per line

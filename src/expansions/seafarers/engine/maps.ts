@@ -39,6 +39,7 @@ import {
 import * as D from './mapdata';
 import type { MapData } from './mapdata';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
+import { isMapId, mapById } from '../../../engine/mapLookup';
 
 export const SEAFARERS = 'seafarers';
 /** The robber beside the board (until the first 7 / Knight): the framework's NO_ROBBER. */
@@ -295,9 +296,17 @@ export function specOf(key: MapKey): Spec {
   return prepared(key).spec;
 }
 
+const BASED = new Map<string, MapKey | null>();
 export function mapKeyOf(mapId: string): MapKey | null {
   const key = mapId.startsWith(`${SEAFARERS}/`) ? mapId.slice(SEAFARERS.length + 1) : '';
-  return SPECS.some((s) => s.key === key) ? (key as MapKey) : null;
+  if (SPECS.some((s) => s.key === key)) return key as MapKey;
+  // A combination map built on a Seafarers map (C2, `basedOn`).
+  if (BASED.has(mapId)) return BASED.get(mapId) ?? null;
+  if (!isMapId(mapId)) return null;
+  const def = mapById(mapId);
+  const out = def.layout === 'custom' && def.basedOn !== undefined ? mapKeyOf(def.basedOn) : null;
+  BASED.set(mapId, out);
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -312,6 +321,8 @@ export interface SeaBoard {
   region: Record<HexId, string>;
   /** Bonus area of a land hex ('S0', 'T', 'I3' ...); absent = none (main / home land). */
   area: Record<HexId, string>;
+  /** A combination map's own pirate start (C2; null = no pirate in the game). Absent = the scenario's. */
+  pirate?: HexId | null;
 }
 
 const isLandTerrain = (t: Terrain) => t !== 'sea' && t !== 'fog';

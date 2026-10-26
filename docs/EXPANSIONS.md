@@ -30,7 +30,8 @@ vertex, land and sea alike) and the ship / pirate / gold / fog / sea painters
 
 Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tbck` (mode
 `tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
-pair's rules (§11). E5b added `epck` (mode `ep+ck`) and `eptb` (mode `ep+tb`).
+pair's rules (§11). C2: `tbsea` (mode `tb+seafarers`), each T&B scenario on Heading for New
+Shores, through the `playsAs` / `basedOn` seam (§11). E5b added `epck` (mode `ep+ck`) and `eptb` (mode `ep+tb`).
 
 ---
 
@@ -152,7 +153,7 @@ interface ExpansionModule {
   wraps?: { ['<other>/<x>']?: (draft, action, next) => ActionResult }; // another module's actions
   legal?: LegalGenerator; // extra legal actions, any phase
   filterLegal?(state, actions): Action[]; // drop / replace legal actions
-  changesRoads?: ['<id>/...']; // your actions that change road lengths / occupancy
+  changesRoads?: ['<id>/...' | baseType]; // actions that change road lengths / occupancy (C2: base types too)
   actors?(state): PlayerId[] | undefined; // who acts in your phases
   hooks?: ExpansionHooks; // §5
 }
@@ -467,19 +468,24 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module  | Composes          | Scenarios (VP)                                                                  |
-| -------------- | ------- | ----------------- | ------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack` | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players      |
-| `tb+ck`        | `tbck`  | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6 |
-| `ep+ck`        | `epck`  | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4           |
-| `ep+tb`        | `eptb`  | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4         |
+| Mode           | Module   | Composes          | Scenarios (VP)                                                                                 |
+| -------------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
+| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
+| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
+| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                  |
+| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                          |
+| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                        |
 
 How a combination is built:
 
 - **A combination is a mode of a small combo module** (`src/expansions/<pair>/`) that `requires`
   both expansions and declares one mode listing exactly the suitable scenarios, with `vpBonus` or
   per-scenario `scenarioVp`. The two expansion modules run unchanged. Anything not listed as a
-  mode cannot be started; `validate` refuses other scenarios.
+  mode cannot be started; `validate` refuses other scenarios. A composed module's option that
+  does not apply in the combination goes in `ModeDef.hideOptions` (`'<ext>.<key>'`): the setup
+  screen and the online protocol (`modeOptions`) never offer it, so it keeps its default
+  (`tb+seafarers` hides `seafarers.layout`).
 - **Composition order is explicit:** the combo declares `before: [a, b]`, so its hooks, `legal` and
   `filterLegal` run first and its overrides / wraps are outermost. Where both modules define a
   first-wins hook (`afterProduction`, `onSeven`, `rollDice`), the combo's hook calls theirs in
@@ -495,36 +501,44 @@ seafarers]`).
   `isVertexOpen`, `victoryPoints`) instead of constants, never assume you are the only module
   (invariants: check your own VP hook, not `expansionVictoryPoints`), and read another module's
   state only through its exported selectors (`requires` it).
+- **A scenario of one module on another module's map (C2).** A combination scenario says what it
+  plays as: `ScenarioDef.playsAs = { tb: ['tb/traders'], seafarers: ['seafarers/newShores'] }`.
+  A module that keys rules on its scenario ids reads `scenariosAs(settings, id)` (hooks.ts,
+  cached): the listed ids, else the game's scenario (T&B's `featuresOf` takes the union, so a
+  T&B × T&B scenario can list two). A combination map built on a module's map sets
+  `CustomMapDef.basedOn` (Seafarers' `mapKeyOf` follows it) and may put data for each module in
+  `board.ext` (`tbsea` shifts T&B's whole 19-hex board onto New Shores' main island).
+- **Sea paths for road pieces.** On a map with open sea T&B's wagons, camels and barbarians also
+  use sea edges (`tb/engine/paths.ts`); the pieces that carry a wagon like a road (ships) come
+  from the `routeEdges` hook, so T&B never imports Seafarers.
 - **Seams in the composed modules** (small, generic, listed in `docs/rules/combos.md` §7-8): E&P
   `citiesInPlay` / `isHarborStep` (C&K joins: cities, the setup rounds swap), C&K `besideFog`
   (no knight next to an unexplored hex), T&B `MODE_FEATURES` (a combination mode switches a T&B
   feature on for another expansion's scenarios: `'ep+tb': ['fish']`).
-- **Known limit:** Seafarers switches its rules on by its own scenario ids, so a T&B scenario on
-  a Seafarers map (T&B + Seafarers, the 2025 sheets) needs Seafarers' side of the seam too
-  (`docs/rules/combos.md` §3).
 
 ## 12. Coverage of the rules docs' framework needs
 
-| Need (rules doc §9)                                                       | Framework feature                                                                                                           |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Explicit sea / frame / fog cells, gold, edge kinds (Seafarers, E&P)       | `HexListFrameDef`, `water[h].playable`, `seaEdges`, `isSeaEdge`, `terrainKind`, `gold`/`fog`/`sea`                          |
-| Ships on edges, closed routes, moved-this-turn (Seafarers)                | slice + `edgeBlocked` + `onStartTurn` + `afterAction`; `roadLength` for trade routes                                        |
-| Setup ship instead of road (Seafarers)                                    | own setup action + `advanceSetup`                                                                                           |
-| Robber or pirate on a 7 / knight (Seafarers, E&P)                         | extra `legal` in `moveRobber`, own steal phase; `onSeven` for E&P                                                           |
-| Gold choice after production (Seafarers)                                  | `afterProduction` → phase + `actors`                                                                                        |
-| Fog reveal, island VP (Seafarers, E&P)                                    | copy-on-write board, `afterAction`, `victoryPoints`                                                                         |
-| Event die + red/yellow dice, barbarian track, pillage (C&K)               | `rollDice`, `onRoll` interrupt + `continueRoll`, `actors`                                                                   |
-| Commodities, walls (+2 hand limit), knights on vertices (C&K)             | slice, `handSize`, `discardLimit`, `vertexBlocked`, `blocksRoute`                                                           |
-| City setup round, no dev cards, VP 13 (C&K)                               | `setupBuilding`, `supply`, scenario `vpToWin` — **done (E3, `src/expansions/ck`)**                                          |
-| Event cards instead of dice, bridges, lake, fishing grounds (T&B)         | core Event Cards (V1), `edgeBlocked`, `board.ext`, `afterProduction` — **done (E4, `tb`)**                                  |
-| Harbormaster +1 VP target, event cards vs balanced dice (T&B)             | `OptionDef.vpBonus`, `validate` — **done (E4)**                                                                             |
-| Catan for Two: 2 players + neutrals (T&B)                                 | map/mode `minPlayers: 2`, neutrals in slice + blocker hooks — **done (E4)**                                                 |
-| T&B trade-hex plazas (centre vertex + spokes)                             | frame `plazas` (F2): `v:q,r,C` vertices + `e:q,r,C<corner>` spoke edges — **done (E4)**                                     |
-| No robber, harbour settlements, missions, per-scenario VP (E&P)           | `NO_ROBBER`, slice flag on a settlement piece, `victoryPoints`, scenario `vpToWin` — **done (E5, `ep`)**                    |
-| Ships that sail a distance and carry cargo, exploring, pirate ships (E&P) | own pieces in the slice over the shared `seaGraph`, `fog`-kind terrains, copy-on-write board — **done (E5)**                |
-| E&P 5-6 paired players' turn                                              | core Second Settler step, `ScenarioDef.pairedTurns56` — **done (E5)**                                                       |
-| Combination matrix, VP increments                                         | modes only, `conflicts`, `vpBonus`, `scenarioVp` — **done for Seafarers + C&K, T&B + C&K (C1), E&P + C&K, E&P + T&B (E5b)** |
-| Combination rules on top of two modules                                   | combo module: `requires`, `before` (order), `wraps`, `routeEdges` (C1)                                                      |
+| Need (rules doc §9)                                                       | Framework feature                                                                                                                                                          |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explicit sea / frame / fog cells, gold, edge kinds (Seafarers, E&P)       | `HexListFrameDef`, `water[h].playable`, `seaEdges`, `isSeaEdge`, `terrainKind`, `gold`/`fog`/`sea`                                                                         |
+| Ships on edges, closed routes, moved-this-turn (Seafarers)                | slice + `edgeBlocked` + `onStartTurn` + `afterAction`; `roadLength` for trade routes                                                                                       |
+| Setup ship instead of road (Seafarers)                                    | own setup action + `advanceSetup`                                                                                                                                          |
+| Robber or pirate on a 7 / knight (Seafarers, E&P)                         | extra `legal` in `moveRobber`, own steal phase; `onSeven` for E&P                                                                                                          |
+| Gold choice after production (Seafarers)                                  | `afterProduction` → phase + `actors`                                                                                                                                       |
+| Fog reveal, island VP (Seafarers, E&P)                                    | copy-on-write board, `afterAction`, `victoryPoints`                                                                                                                        |
+| Event die + red/yellow dice, barbarian track, pillage (C&K)               | `rollDice`, `onRoll` interrupt + `continueRoll`, `actors`                                                                                                                  |
+| Commodities, walls (+2 hand limit), knights on vertices (C&K)             | slice, `handSize`, `discardLimit`, `vertexBlocked`, `blocksRoute`                                                                                                          |
+| City setup round, no dev cards, VP 13 (C&K)                               | `setupBuilding`, `supply`, scenario `vpToWin` — **done (E3, `src/expansions/ck`)**                                                                                         |
+| Event cards instead of dice, bridges, lake, fishing grounds (T&B)         | core Event Cards (V1), `edgeBlocked`, `board.ext`, `afterProduction` — **done (E4, `tb`)**                                                                                 |
+| Harbormaster +1 VP target, event cards vs balanced dice (T&B)             | `OptionDef.vpBonus`, `validate` — **done (E4)**                                                                                                                            |
+| Catan for Two: 2 players + neutrals (T&B)                                 | map/mode `minPlayers: 2`, neutrals in slice + blocker hooks — **done (E4)**                                                                                                |
+| T&B trade-hex plazas (centre vertex + spokes)                             | frame `plazas` (F2): `v:q,r,C` vertices + `e:q,r,C<corner>` spoke edges — **done (E4)**                                                                                    |
+| No robber, harbour settlements, missions, per-scenario VP (E&P)           | `NO_ROBBER`, slice flag on a settlement piece, `victoryPoints`, scenario `vpToWin` — **done (E5, `ep`)**                                                                   |
+| Ships that sail a distance and carry cargo, exploring, pirate ships (E&P) | own pieces in the slice over the shared `seaGraph`, `fog`-kind terrains, copy-on-write board — **done (E5)**                                                               |
+| E&P 5-6 paired players' turn                                              | core Second Settler step, `ScenarioDef.pairedTurns56` — **done (E5)**                                                                                                      |
+| Combination matrix, VP increments                                         | modes only, `conflicts`, `vpBonus`, `scenarioVp` — **done for Seafarers + C&K, T&B + C&K (C1), E&P + C&K, E&P + T&B (E5b), T&B + Seafarers, T&B × T&B Fishing pairs (C2)** |
+| Combination rules on top of two modules                                   | combo module: `requires`, `before` (order), `wraps`, `routeEdges` (C1)                                                                                                     |
+| A module's scenario on another module's map (T&B + Seafarers)             | `ScenarioDef.playsAs` + `scenariosAs`, `CustomMapDef.basedOn` — **done (C2, `tbsea`)**                                                                                     |
 
 **Known gaps (framework follow-ups, not blocking the first modes):**
 
@@ -537,9 +551,11 @@ seafarers]`).
   should check `bestRatios` in `ui/model.ts` when they need it.
 - ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
-- **Combinations (C1):** Seafarers + C&K and T&B + C&K are built (§11). Not built: T&B +
-  Seafarers (the 2025 sheets need T&B features on Seafarers scenarios: a seam in `tb` or
-  `seafarers`), Barbarian Attack + C&K, Catan for Two + C&K, the T&B × T&B sheets (T6). Details in `docs/rules/combos.md` §3.
+- **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
+  built (§11). Not built: T&B + Seafarers on the other Seafarers scenarios (per-scenario maps),
+  Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
+  Fishing pairs are mode `tb+tb`). Details in
+  `docs/rules/combos.md` §2b, §3.
 - ~~E&P combinations~~ — done (E5b): `ep+ck`, `ep+tb` (§11), player trades with gold
   (`ep/offerTrade`; in `ep+ck` one `epck/offerTrade` carries resources, commodities and gold).
 

@@ -14,6 +14,7 @@ import { buildingsOf, roadsOf } from '../../../engine/selectors';
 import { edgeVertices, topologyOf, vertexEdges } from '../../../engine/topology';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { payBank, pn } from './common';
+import { pathEnds, pathOther, pathsAt } from './paths';
 import {
   CAMELS_34,
   CAMELS_56,
@@ -35,11 +36,13 @@ export function initCaravans(state: GameState): CaravanSlice {
   };
 }
 
-/** Where the next camel may go: the start edge of an unstarted caravan, or a free edge at a head. */
+/**
+ * Where the next camel may go: the start edge of an unstarted caravan, or a free path at a head
+ * (on a Seafarers map sea paths too, ships or not: T&B + Seafarers).
+ */
 export function camelOptions(state: GameState): Camel[] {
   const s = caravansOf(state);
   if (s.left <= 0) return [];
-  const t = topologyOf(state);
   const taken = new Set(s.camels.map((c) => c.edge));
   const out: Camel[] = [];
   const seen = new Set<EdgeId>();
@@ -53,11 +56,10 @@ export function camelOptions(state: GameState): Camel[] {
       }
       return;
     }
-    for (const e of vertexEdges(t, head)) {
+    for (const e of pathsAt(state, head)) {
       if (taken.has(e) || seen.has(e)) continue;
-      const next = edgeVertices(t, e).find((v) => v !== head) as VertexId;
       seen.add(e);
-      out.push({ edge: e, head: next, caravan });
+      out.push({ edge: e, head: pathOther(state, e, head), caravan });
     }
   });
   return out;
@@ -76,10 +78,9 @@ export function placeCamel(draft: GameState, camel: Camel): void {
 
 /** Camels each vertex touches. */
 function camelDegree(state: GameState): Map<VertexId, number> {
-  const t = topologyOf(state);
   const deg = new Map<VertexId, number>();
   for (const c of caravansOf(state).camels) {
-    for (const v of edgeVertices(t, c.edge)) deg.set(v, (deg.get(v) ?? 0) + 1);
+    for (const v of pathEnds(state, c.edge)) deg.set(v, (deg.get(v) ?? 0) + 1);
   }
   return deg;
 }

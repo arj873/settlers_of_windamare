@@ -128,6 +128,13 @@ export interface ScenarioDef {
    * no special building phase), as in Explorers & Pirates 5-6. Default: the special build phase.
    */
   pairedTurns56?: boolean;
+  /**
+   * A combination scenario (C2): the scenarios of the composed modules it plays as, per module
+   * id (T&B + Seafarers: `{ tb: ['tb/traders'], seafarers: ['seafarers/newShores'] }`). A module
+   * reads its own with `scenariosAs(settings, id)` (hooks.ts); without an entry the game's
+   * scenario plays as itself.
+   */
+  playsAs?: Readonly<Record<ExpansionId, readonly ScenarioId[]>>;
 }
 
 /**
@@ -157,6 +164,11 @@ export interface ModeDef {
   vpBonus?: number;
   /** Exact VP target per scenario, overriding scenario target + vpBonus (T&B + C&K: 13 / 15). */
   scenarioVp?: Readonly<Record<ScenarioId, number>>;
+  /**
+   * Options of the mode's modules that do not apply in it, as `'<ext>.<key>'`: not offered on the
+   * setup screen or online, so the game keeps their default (T&B + Seafarers: `seafarers.layout`).
+   */
+  hideOptions?: readonly string[];
 }
 
 /**
@@ -345,8 +357,12 @@ export interface ExpansionModule {
   legal?: LegalGenerator;
   /** Drop / replace legal actions (runs after every generator, in settings order). */
   filterLegal?(state: GameState, actions: Action[]): Action[];
-  /** Your action types that add roads or occupy vertices (Longest Road is then recomputed). */
-  changesRoads?: readonly ExpansionActionType[];
+  /**
+   * Action types that add roads or occupy vertices (Longest Road is then recomputed): yours, or
+   * any whose effect your rules turn into a route change (T&B + Seafarers: a conquest cuts the
+   * trade route, so `buildCity` and `endTurn` count there).
+   */
+  changesRoads?: readonly (ExpansionActionType | BaseActionType)[];
   /** Who may act in your phases (undefined = not my phase / default turn.current). */
   actors?(state: GameState): PlayerId[] | undefined;
   hooks?: ExpansionHooks;

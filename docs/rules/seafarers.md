@@ -1594,7 +1594,8 @@ Official adjustments (catan.com Seafarers page):
   - **Traders & Barbarians (overall):** wagons may move across sea hexes (2 MP, 1 MP with your ship, 1 MP + 1
     gold with an opposing ship); the robber and the pirate are not used; a Knight may place a barbarian on a
     sea edge; players need **3 extra VP**.
-- **Not in scope for us**; listed so the engine design leaves room.
+- Built (C2) for Heading for New Shores, the one scenario all five sheets support: mode
+  `tb+seafarers`, docs/rules/combos.md §2b (rule-by-rule status and what is left).
 
 ## 9. Implementation notes for our engine
 
@@ -1831,7 +1832,15 @@ setup screen): Event Cards with the Pirate Islands (the fleet sails by the dice)
 and map balance rules (scenario maps have their own set-ups). `robberMode: 'none'` also keeps the
 pirate still (both move on the same 7 / Knight step). When the scenario's robber bans (with the
 friendly robber's limits) leave no hex and the pirate cannot move, the robber may go to any land
-hex, so a 7 never stalls the game.
+hex, so a 7 never stalls the game. With the friendly robber the pirate is friendly too (T&B FAQ
+53): it never goes next to a ship of a player with 2 or fewer points (the mover's own aside).
+
+Combinations: §8.2 is mode `seafarers+ck`; §8.3 is mode `tb+seafarers` (C2, every T&B scenario on
+Heading for New Shores, docs/rules/combos.md §2b). For them a combination scenario may name the
+Seafarers scenario it plays as (`rulesOf` reads `playsAs`), a combination map the Seafarers map it
+is built on (`mapKeyOf` follows `basedOn`) and its own pirate start (`SeaBoard.pirate`, null = no
+pirate); another module may cut a trade route at the player's own building (`blockedFor` asks
+`blocksRoute`, T&B FAQ 6), and `tradeRouteLength` takes an edge weight (camels).
 
 Statistics: gold picks count as production, discovery and fleet rewards as events, pirate
 steals as steals, the fleet's attacks as stolen cards; special VP show as "New land", "Gifts"

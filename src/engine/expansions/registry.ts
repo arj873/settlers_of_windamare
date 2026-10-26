@@ -17,6 +17,8 @@ import { tbModule } from '../../expansions/tb/engine';
 import { epModule } from '../../expansions/ep/engine';
 import { seackModule } from '../../expansions/seack/engine';
 import { tbckModule } from '../../expansions/tbck/engine';
+import { tbseaModule } from '../../expansions/tbsea/engine';
+import { tbpairModule } from '../../expansions/tbpair/engine';
 import { epckModule } from '../../expansions/epck/engine';
 import { eptbModule } from '../../expansions/eptb/engine';
 import { MAPS, type MapDef } from '../maps';
@@ -34,6 +36,8 @@ function builtinModules(): ExpansionModule[] {
     epModule,
     seackModule,
     tbckModule,
+    tbseaModule,
+    tbpairModule,
     epckModule,
     eptbModule,
     // new modules go here, one per line

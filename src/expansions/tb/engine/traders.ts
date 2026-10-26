@@ -15,10 +15,10 @@ import { isBuildPhase } from '../../../engine/actions/build';
 import { isCentreVertex } from '../../../engine/hex';
 import { hasResources } from '../../../engine/resources';
 import { Rng } from '../../../engine/rng';
-import { edgeVertices, topologyOf, vertexEdges } from '../../../engine/topology';
 import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../../../engine/types';
 import { addGold, goldOf, payBank, pn, rollDie, stealResource } from './common';
 import { TRADERS_BARBARIANS_19, TRADERS_BARBARIANS_37 } from './maps';
+import { pathEdges, pathOther, pathsAt, routeOwner } from './paths';
 import {
   BAGGAGE,
   BARBARIAN_MP,
@@ -55,7 +55,9 @@ export function initTraders(state: GameState, rng: Rng): TradersSlice {
     commodity: state.players.map(() => null),
     stacks,
     delivered: state.players.map(() => 0),
-    barbarians: [...(big ? TRADERS_BARBARIANS_37 : TRADERS_BARBARIANS_19)],
+    barbarians: [
+      ...(tbBoard(state).barbarians ?? (big ? TRADERS_BARBARIANS_37 : TRADERS_BARBARIANS_19)),
+    ],
     swift: {
       deck: SWIFT_JOURNEYS,
       held: state.players.map(() => 0),
@@ -91,7 +93,10 @@ export function plazaHex(v: VertexId): HexId | null {
 // Movement
 // ---------------------------------------------------------------------------
 
-/** Road owner on `e` for wagon purposes: a player, 'neutral', or null (none / damaged). */
+/**
+ * Road owner on `e` for wagon purposes: a player, 'neutral', or null (none / damaged). A ship
+ * counts like a road (T&B + Seafarers: 1 MP on your own, 1 MP + 1 gold to its owner otherwise).
+ */
 function roadOn(state: GameState, e: EdgeId): PlayerId | 'neutral' | null {
   const owner = state.pieces.roads[e];
   if (owner !== undefined) {
@@ -101,7 +106,7 @@ function roadOn(state: GameState, e: EdgeId): PlayerId | 'neutral' | null {
   }
   const two = tbSlice(state).two;
   if (two?.neutrals.some((nt) => nt.roads.includes(e))) return 'neutral';
-  return null;
+  return routeOwner(state, e);
 }
 
 /** MP and toll of entering edge `e` for `p`. */
@@ -121,14 +126,12 @@ export function wagonSteps(state: GameState, p: PlayerId): { vertex: VertexId; e
   const s = tradersOf(state);
   const from = s.wagons[p];
   if (!from || s.move.over) return [];
-  const t = topologyOf(state);
   const out: { vertex: VertexId; edge: EdgeId }[] = [];
-  for (const e of vertexEdges(t, from)) {
+  for (const e of pathsAt(state, from)) {
     const c = stepCost(state, p, e);
     if (c.mp > s.move.mp) continue;
     if (c.toll !== null && goldOf(state, p) < 1) continue;
-    const to = edgeVertices(t, e).find((v) => v !== from) as VertexId;
-    out.push({ vertex: to, edge: e });
+    out.push({ vertex: pathOther(state, e, from), edge: e });
   }
   return out;
 }
@@ -224,9 +227,7 @@ export function driveOffTargets(state: GameState, p: PlayerId): EdgeId[] {
   const s = tradersOf(state);
   const at = s.wagons[p];
   if (!at || s.move.over || BAGGAGE[(s.level[p] ?? 1) - 1]?.driveOff == null) return [];
-  return vertexEdges(topologyOf(state), at).filter(
-    (e) => s.barbarians.includes(e) && !s.move.tried.includes(e),
-  );
+  return pathsAt(state, at).filter((e) => s.barbarians.includes(e) && !s.move.tried.includes(e));
 }
 
 /** Roll to drive a barbarian off: in range, its new path is picked next. Returns success. */
@@ -292,16 +293,19 @@ export function upgradeWagon(draft: GameState, p: PlayerId): void {
 
 /**
  * Paths a barbarian may move to: any path without a barbarian (`noRoad`: and without a road,
- * Catan for Two's token action).
+ * Catan for Two's token action). On a Seafarers map sea paths too (T&B + Seafarers).
  */
 export function barbarianSpots(state: GameState, noRoad = false): EdgeId[] {
   const taken = new Set(tradersOf(state).barbarians);
-  return topologyOf(state).edges.filter(
+  return pathEdges(state).filter(
     (e) => !taken.has(e) && !(noRoad && state.pieces.roads[e] !== undefined),
   );
 }
 
-/** Move the barbarian on `from` to `to`; with `steal`, rob the road owner there. */
+/**
+ * Move the barbarian on `from` to `to`; with `steal`, rob the road owner there (on a sea path:
+ * the ship's owner, our reading of T&B + Seafarers).
+ */
 export function moveBarbarian(
   draft: GameState,
   p: PlayerId,
@@ -312,8 +316,8 @@ export function moveBarbarian(
   const s = tradersOf(draft);
   s.barbarians = s.barbarians.map((e) => (e === from ? to : e));
   log(draft, p, `${pn(draft, p)} moved a barbarian`);
-  const owner = draft.pieces.roads[to];
-  if (steal && owner !== undefined && owner !== p) {
+  const owner = routeOwner(draft, to);
+  if (steal && owner !== null && owner !== p) {
     const card = stealResource(draft, p, owner);
     log(draft, p, `${pn(draft, p)} stole from ${pn(draft, owner)}${card ? '' : ' (no cards)'}`);
   }
