@@ -244,6 +244,7 @@ export class GameController {
       viewer: this.viewerId,
       legal: this.legal,
       isBotTurn: turn === 'bot',
+      bots: this.seatList.map((s) => s === 'bot'),
     });
     this.updateHighlights();
     this.persist();

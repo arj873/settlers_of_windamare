@@ -35,6 +35,18 @@ export interface HudView {
   legal: Action[];
   /** The player whose turn it is is a bot. */
   isBotTurn: boolean;
+  /** Optional: which seats are bots (indexed by PlayerId), for the bot marker in the players list. */
+  bots?: readonly boolean[];
+  /** Optional turn timer (T14); the turn pill shows a countdown while set. */
+  turnTimer?: { remainingSec: number; totalSec: number } | null;
+}
+
+/** Optional bot-speed control shown in the HUD menu (see `Hud.setBotSpeed`). */
+export interface BotSpeedControl {
+  /** Current value in ms per bot move. */
+  value: number;
+  presets: readonly { label: string; ms: number }[];
+  onChange: (ms: number) => void;
 }
 
 /** Build modes the HUD can enter; the board layer shows the matching targets and calls `buildX` on click. */

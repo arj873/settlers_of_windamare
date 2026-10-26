@@ -9,21 +9,29 @@ function rectOf(root: HTMLElement, selector: string): DOMRect | null {
 }
 
 /**
- * Screen margins covered by the HUD (players left, dice/log right, hint top, hand bottom), or null
- * while a full-screen cover is up (nothing meaningful to measure).
+ * Screen margins covered by the HUD (sidebar right, turn pill top, hand / controls bottom), or
+ * null while a full-screen cover is up (nothing meaningful to measure).
  */
 export function measureHudInsets(root: HTMLElement, width: number, height: number): Insets | null {
   if (root.classList.contains('is-covered')) return null;
-  const players = rectOf(root, '.hud-players');
-  const log = rectOf(root, '.hud-log-wrap');
-  const dice = rectOf(root, '.hud-dice-wrap');
-  const hint = rectOf(root, '.hud-hint-wrap');
+  const side = rectOf(root, '.hud-side');
+  const turn = rectOf(root, '.hud-turn');
   const bottom = rectOf(root, '.hud-bottom');
-  if (!players && !bottom) return null;
+  const controls = rectOf(root, '.hud-controls');
+  // A docked trade offer card (bottom-left) pushes the board right instead of covering it.
+  const dock = rectOf(root, '.scrim.is-side .dialog');
+  if (!side && !bottom) return null;
+  // On phones the sidebar is a drawer floating over the board (CSS sets --floating: 1).
+  const sideEl = root.querySelector('.hud-side');
+  const floating =
+    sideEl !== null && getComputedStyle(sideEl).getPropertyValue('--floating').trim() === '1';
+  const sideLeft = side && !floating ? side.left : width;
   return {
-    top: Math.round(hint ? hint.bottom : 0),
-    left: Math.round(players ? players.right : 0),
-    right: Math.round(Math.max(log ? width - log.left : 0, dice ? width - dice.left : 0)),
-    bottom: Math.round(bottom ? height - bottom.top : 0),
+    top: Math.round(turn ? turn.bottom : 0),
+    left: Math.round(dock && dock.left < width / 2 ? dock.right + 8 : 0),
+    right: Math.round(Math.max(0, width - sideLeft)),
+    bottom: Math.round(
+      Math.max(bottom ? height - bottom.top : 0, controls ? height - controls.top : 0),
+    ),
   };
 }
