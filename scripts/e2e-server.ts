@@ -44,6 +44,25 @@ function freePort(): Promise<number> {
   });
 }
 
+/** The room server allows 5 new rooms per IP, then 1 a minute (SERVER_LIMITS.create). */
+const CREATE_REFILL_MS = 61_000;
+
+/**
+ * POST /api/rooms. On 429 (the per-IP create limit) wait for the bucket to refill and retry, as
+ * often as needed (every expansion game makes a room); any other non-201 fails the run.
+ */
+async function createRoom(base: string): Promise<CreateRoomResponse> {
+  for (;;) {
+    const res = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
+    if (res.status === 201) return (await res.json()) as CreateRoomResponse;
+    if (res.status !== 429) {
+      throw new Error(`POST /api/rooms -> ${res.status}: ${await res.text()}`);
+    }
+    console.log(`  ..  room create limit reached (429): waiting ${CREATE_REFILL_MS / 1000} s`);
+    await new Promise((r) => setTimeout(r, CREATE_REFILL_MS));
+  }
+}
+
 function check(ok: unknown, what: string): void {
   if (!ok) throw new Error(`check failed: ${what}`);
   console.log(`  ok  ${what}`);
@@ -300,8 +319,7 @@ const EXPANSION_GAMES: ExpansionGame[] = [
 
 async function playExpansionGame(base: string, game: ExpansionGame): Promise<void> {
   console.log(`\n${game.label} ...`);
-  const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
-  const { roomId, hostToken } = (await created.json()) as CreateRoomResponse;
+  const { roomId, hostToken } = await createRoom(base);
   const wsUrl = `${base.replace('http', 'ws')}${roomSocketPath(roomId)}`;
   const ann = new Client('Ann', wsUrl, hostToken);
   const bob = new Client('Bob', wsUrl, null);
@@ -391,9 +409,8 @@ async function main(): Promise<void> {
     });
     check(evil.status === 403, 'foreign Origin is refused (403)');
 
-    const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
-    check(created.status === 201, 'POST /api/rooms -> 201');
-    const { roomId, hostToken } = (await created.json()) as CreateRoomResponse;
+    const { roomId, hostToken } = await createRoom(base);
+    check(true, 'POST /api/rooms -> 201');
     check(/^[2-9A-HJ-NP-Z]{6}$/.test(roomId), `room code ${roomId} is 6 unambiguous chars`);
 
     const info = (await (
