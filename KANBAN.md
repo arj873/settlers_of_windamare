@@ -21,6 +21,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
+- **S1** · Sync `main` → `expansions` (24 conflicted files: V1/V2 variants, stats, online vs F1 hooks); then start E2 Seafarers + E3 C&K from the synced branch · `s3-exp-sync` 🟦
 
 ## 🏃 In Progress — Stage 2
 
