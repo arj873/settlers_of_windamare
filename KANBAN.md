@@ -8,12 +8,13 @@ Legend: 🟦 Opus · 🟩 Sonnet
 ## 🏃 In Progress
 
 - **T10** · Multi-size boards: per-map topology (Base / Base Random / 5-6P / 7-8P), generators + ports, up to 8 players, scaled bank & dev deck, new GameSettings fields · `s2-boards` 🟦 · deps: — · tab `s2-boards`
+- **T17** · HUD redesign (your reference: Colonist layout + wooden theme): right sidebar (events w/ inline icons, bank stacks, players bars up to 8), turn pill, menu button, hand + build cards w/ pieces left, dice bottom-right · `s2-hud-redesign` 🟦 · tab `s2-hud-redesign`
 - **T15** · Playwright playtest harness: session server, `pnpm pt <seat> <cmd>` CLI (wait/status/spots/click/shot/report), seat guard, PLAYBOOK.md · `s2-playtest` 🟦 · tab `s2-playtest`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
-- **T12** · Render + HUD scale: big boards fit, 8 player colours/panels, hide bank, turn-timer display, special-build UI · `s2-render-hud` 🟩 · deps: T10, T11
+- **T12** · Render scale: big boards fit, 8 player colours, map previews from engine data, special-build UI hook (HUD side moved to T17) · `s2-render-hud` 🟩 · deps: T10, T11
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10
 - **T14** · Controller: wire NewGameConfig v2, turn timer + auto-resolve on timeout, special-build flow, bots, save migration · `s2-integration` 🟦 · deps: T10–T13
 
