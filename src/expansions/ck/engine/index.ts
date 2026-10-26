@@ -521,7 +521,7 @@ export const ckModule: ExpansionModule = {
       id: CK,
       name: 'Cities & Knights',
       blurb: 'Defend Catan from the barbarians; grow cities into metropolises',
-      status: 'wip',
+      status: 'ready',
       expansions: [CK],
       scenarios: ['ck/classic', 'ck/starter'],
       players: { min: 3, max: 6 },
