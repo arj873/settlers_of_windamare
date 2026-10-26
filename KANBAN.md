@@ -22,6 +22,12 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - Stage 3 shipped: F1, E1–E5, C1, X1 squash-merged into `expansions`, then `expansions` → `main` in one squash PR. All 9 modes on the setup screen and online. 1916 tests.
 
+## 🏃 In Progress — Stage 5: extras (from `main`, PRs → `main`)
+
+- **E5b** · E&P + C&K (2025 sheet: city first, harbor second, +5 VP, knights stay on their island, Fast Gold with commodities), E&P + T&B (event cards, Fishermen), gold player trades · `s5-epcombos` (Opus) 🟦
+- **C2** · T&B + Seafarers combined mode (2025 sheets, FAQ 6/19-20/53/58/65); then T&B × T&B sheets if time · `s5-tbsea` (Opus) 🟦
+- **B1** · Smarter bots: heuristic Normal (+ Hard), Easy = current random bot; expansion strategy hook (C&K, Seafarers); benchmark vs Easy; per-seat difficulty in setup + online lobby · `s5-bots` (Opus) 🟦
+
 ## 🏃 In Progress — Stage 2
 
 
