@@ -181,11 +181,11 @@ describe('Hud', () => {
     let cfg: NewGameConfig | undefined;
     hud.on('newGame', (c) => (cfg = c));
     hud.showNewGame();
-    byText('3')!.click();
-    byText('Random')!.click();
+    root.querySelector<HTMLElement>('[data-k="players-dec"]')!.click();
+    byText('Base Random')!.click();
     byText('Start game')!.click();
     expect(cfg?.players).toHaveLength(3);
-    expect(cfg?.layout).toBe('random');
+    expect(cfg?.map).toBe('baseRandom');
   });
 
   it('escapes player names', () => {

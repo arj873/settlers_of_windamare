@@ -283,7 +283,7 @@ import { Hud } from './ui';
 const hud = new Hud(document.getElementById('ui')!);          // overlay; only its panels take pointer events
 hud.render(state, { viewer, legal, isBotTurn });              // call after every state change / viewer change
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
-hud.on('newGame', (cfg: NewGameConfig) => …);                 // { players: {name,color,controller:'human'|'bot'}[], layout, seed? }
+hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode:'base', map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[3..8], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
 hud.on('placeMode', (m: 'road'|'settlement'|'city'|null) => …); // build button toggled: board shows targets, click -> buildX
 hud.showNewGame();                                            // open the new-game screen (also the winner screen's button)
 ```

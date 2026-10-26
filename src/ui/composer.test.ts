@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { emptyResources } from '../engine';
 import {
-  buildNewGameConfig,
-  defaultNewGame,
   discardAction,
   draftToAction,
   emptyDraft,
-  pickSeatColor,
-  resizeSeats,
   stepDiscard,
   stepDraft,
   toBundle,
@@ -123,43 +119,5 @@ describe('discard validation', () => {
     });
     sel = stepDiscard(sel, 'ore', -3, h, 5);
     expect(sel.ore).toBe(0);
-  });
-});
-
-describe('new game config', () => {
-  it('defaults to a human plus three bots on the beginner board', () => {
-    const cfg = buildNewGameConfig(defaultNewGame());
-    expect(cfg.players.map((p) => p.controller)).toEqual(['human', 'bot', 'bot', 'bot']);
-    expect(cfg.layout).toBe('beginner');
-    expect(cfg.seed).toBeUndefined();
-  });
-
-  it('fills blank names, dedupes, trims and keeps the seed', () => {
-    const d = defaultNewGame();
-    d.seats[0]!.name = '  Ann ';
-    d.seats[1]!.name = 'ann';
-    d.seats[2]!.name = '';
-    d.seed = ' abc ';
-    const cfg = buildNewGameConfig(d);
-    expect(cfg.players.map((p) => p.name)).toEqual(['Ann', 'ann 2', 'Player 3', 'Orange']);
-    expect(cfg.seed).toBe('abc');
-  });
-
-  it('resizes between 3 and 4 seats with unique colors', () => {
-    const three = resizeSeats(defaultNewGame(4), 3);
-    expect(three.seats).toHaveLength(3);
-    const four = resizeSeats(three, 4);
-    expect(new Set(four.seats.map((s) => s.color)).size).toBe(4);
-  });
-
-  it('swaps colors so they stay unique', () => {
-    const d = defaultNewGame();
-    const red = d.seats[0]!.color;
-    const blue = d.seats[1]!.color;
-    const swapped = pickSeatColor(d, 0, blue);
-    expect(swapped.seats[0]!.color).toBe(blue);
-    expect(swapped.seats[1]!.color).toBe(red);
-    const green = '#3fae6a';
-    expect(pickSeatColor(d, 0, green).seats[0]!.color).toBe(green);
   });
 });
