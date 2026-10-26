@@ -10,11 +10,12 @@ import { oilHud } from '../expansions/oil/ui';
 import { ckHud } from '../expansions/ck/ui';
 import { seafarersHud } from '../expansions/seafarers/ui';
 import { tbHud } from '../expansions/tb/ui';
+import { epHud } from '../expansions/ep/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
 import type { GlyphName } from './icons';
-import type { HudView, PlaceMode } from './types';
+import type { BasePlaceMode, HudView, PlaceMode } from './types';
 
 export interface HudPanel {
   title: string;
@@ -73,6 +74,8 @@ export interface HudExtension {
   offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
   /** Action types submitted by a plain board click, without a button (like moveRobber). */
   impliedActions?: readonly string[];
+  /** Base build-bar cards this module's games do not use (E&P: no cities). */
+  hideBaseCards?: readonly BasePlaceMode[];
 }
 
 export const HUD_EXTENSIONS: readonly HudExtension[] = [
@@ -82,6 +85,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   ckHud,
   seafarersHud,
   tbHud,
+  epHud,
   // new modules go here, one per line
 ];
 
@@ -90,6 +94,11 @@ export function hudExtensionsFor(state: Pick<GameState, 'settings'>): HudExtensi
   const ids = state.settings.expansions as readonly ExpansionId[] | undefined;
   if (!ids || ids.length === 0) return [];
   return ids.flatMap((id) => HUD_EXTENSIONS.filter((x) => x.id === id));
+}
+
+/** Base build cards hidden by an active extension (`hideBaseCards`). */
+export function hiddenBaseCards(state: Pick<GameState, 'settings'>): ReadonlySet<string> {
+  return new Set(hudExtensionsFor(state).flatMap((x) => x.hideBaseCards ?? []));
 }
 
 /** First non-null hint of the active extensions. */

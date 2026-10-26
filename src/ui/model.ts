@@ -4,6 +4,7 @@
  */
 import {
   actingPlayers,
+  bankTradeRatio,
   canPlaceCity,
   canPlaceRoad,
   canPlaceSettlement,
@@ -101,6 +102,10 @@ export function bestRatios(state: GameState, player: PlayerId): Record<Resource,
   const generic = kinds.includes('generic');
   const out = {} as Record<Resource, 2 | 3 | 4>;
   for (const r of RESOURCES) out[r] = kinds.includes(r) ? 2 : generic ? 3 : 4;
+  // Expansion rates (bankTradeRatio hooks: E&P 3:1, C&K merchants): the engine has the last word.
+  if (state.settings.expansions.length > 0) {
+    for (const r of RESOURCES) out[r] = bankTradeRatio(state, player, r) as 2 | 3 | 4;
+  }
   return out;
 }
 
