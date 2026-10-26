@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '../engine';
-import { cornerVertex, TOPOLOGY } from '../engine';
+import { cornerVertex, createGame, PLAYER_COLORS, TOPOLOGY } from '../engine';
 import { discardGame, freshGame, midGame, tradeOfferGame } from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
 import {
@@ -152,6 +152,11 @@ describe('bank, build bar, players (redesigned HUD)', () => {
     ]);
     s.pieces.buildings[cornerVertex(0, 0, 'N')] = { owner: 0, kind: 'city' };
     expect(buildCards(s, 0, av)[3]!.left).toBe(3);
+  });
+
+  it('dev deck total follows the map (34 on the 5-6P board)', () => {
+    const s = createGame({ seed: 1, players: PLAYER_COLORS.slice(0, 6), map: 'base56' });
+    expect(buildCards(s, 0, availability([]))[0]).toMatchObject({ left: 34, total: 34 });
   });
 
   it('summaries carry road length and the bot flag', () => {

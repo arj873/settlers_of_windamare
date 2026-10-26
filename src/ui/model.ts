@@ -5,7 +5,6 @@
 import {
   actingPlayers,
   DEV_CARD_TYPES,
-  DEV_DECK_COMPOSITION,
   getPlayer,
   handSize,
   longestRoadLength,
@@ -13,6 +12,7 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
+  supplyOf,
   RESOURCES,
   totalDevCards,
   victoryPoints,
@@ -243,7 +243,8 @@ export interface BuildCard {
 /** The build bar: dev card, road, settlement, city with what is left of each. */
 export function buildCards(state: GameState, viewer: PlayerId, av: Availability): BuildCard[] {
   const left = piecesLeft(state, viewer);
-  const deckTotal = DEV_CARD_TYPES.reduce((n, t) => n + DEV_DECK_COMPOSITION[t], 0);
+  const deck = supplyOf(state).devDeck; // depends on the map (25 base, 34 for 5-6P, ...)
+  const deckTotal = DEV_CARD_TYPES.reduce((n, t) => n + deck[t], 0);
   return [
     { kind: 'dev', left: state.devDeck.length, total: deckTotal, enabled: av.buyDevCard },
     { kind: 'road', left: left.road, total: PIECE_LIMITS.road, enabled: av.buildRoad },
