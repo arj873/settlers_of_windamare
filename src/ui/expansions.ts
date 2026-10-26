@@ -13,6 +13,7 @@ import { tbHud } from '../expansions/tb/ui';
 import { epHud } from '../expansions/ep/ui';
 import { seackHud } from '../expansions/seack/ui';
 import { tbckHud } from '../expansions/tbck/ui';
+import { epckHud } from '../expansions/epck/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -76,8 +77,12 @@ export interface HudExtension {
   offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
   /** Action types submitted by a plain board click, without a button (like moveRobber). */
   impliedActions?: readonly string[];
-  /** Base build-bar cards this module's games do not use (E&P: no cities). */
-  hideBaseCards?: readonly BasePlaceMode[];
+  /**
+   * Base build-bar cards this module's games do not use (E&P: no cities). A function decides per
+   * game (E&P + C&K has cities).
+   */
+  hideBaseCards?:
+    readonly BasePlaceMode[] | ((state: Pick<GameState, 'settings'>) => readonly BasePlaceMode[]);
 }
 
 export const HUD_EXTENSIONS: readonly HudExtension[] = [
@@ -90,6 +95,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   epHud,
   seackHud,
   tbckHud,
+  epckHud,
   // new modules go here, one per line
 ];
 
@@ -102,7 +108,11 @@ export function hudExtensionsFor(state: Pick<GameState, 'settings'>): HudExtensi
 
 /** Base build cards hidden by an active extension (`hideBaseCards`). */
 export function hiddenBaseCards(state: Pick<GameState, 'settings'>): ReadonlySet<string> {
-  return new Set(hudExtensionsFor(state).flatMap((x) => x.hideBaseCards ?? []));
+  return new Set(
+    hudExtensionsFor(state).flatMap((x) =>
+      typeof x.hideBaseCards === 'function' ? x.hideBaseCards(state) : (x.hideBaseCards ?? []),
+    ),
+  );
 }
 
 /** First non-null hint of the active extensions. */

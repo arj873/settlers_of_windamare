@@ -5,9 +5,15 @@
  * Other modules may add edges to a player's route (`routeEdges` hook: Seafarers + C&K ships);
  * the walk then also crosses sea vertices, where a knight can stand but never be recruited.
  */
-import { extraRouteEdges } from '../../../engine/expansions/hooks';
+import { extraRouteEdges, terrainKind } from '../../../engine/expansions/hooks';
 import { touchesLand } from '../../../engine/rules/placement';
-import { edgeInfo, edgeVertices, topologyOf, vertexEdges } from '../../../engine/topology';
+import {
+  edgeInfo,
+  edgeVertices,
+  topologyOf,
+  vertexEdges,
+  vertexHexes,
+} from '../../../engine/topology';
 import type { EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { ckSlice } from './state';
 
@@ -89,11 +95,28 @@ export function touchesRoad(state: GameState, player: PlayerId, v: VertexId): bo
 }
 
 /**
+ * Is `v` a corner of an unexplored (fog-kind) hex? No knight is recruited or moved there (E&P +
+ * C&K sheet: "intersections adjacent to unexplored hexes"; no fog in C&K's other games).
+ */
+export function besideFog(state: GameState, v: VertexId): boolean {
+  return vertexHexes(topologyOf(state), v).some((h) => {
+    const t = state.board.hexes[h]?.terrain;
+    return t !== undefined && terrainKind(t) === 'fog';
+  });
+}
+
+/**
  * Can a knight of `player` be recruited on `v`: empty, touching land (never on the open sea),
- * touched by their route. The link to a building is checked separately (networkOf).
+ * not beside an unexplored hex, touched by their route. The link to a building is checked
+ * separately (networkOf).
  */
 export function isRecruitSpot(state: GameState, player: PlayerId, v: VertexId): boolean {
-  return isEmptyVertex(state, v) && touchesLand(state, v) && touchesRoad(state, player, v);
+  return (
+    isEmptyVertex(state, v) &&
+    touchesLand(state, v) &&
+    !besideFog(state, v) &&
+    touchesRoad(state, player, v)
+  );
 }
 
 /** Can `player` recruit a knight on `v`: a recruit spot linked to a building (§4.2)? */
@@ -103,7 +126,9 @@ export function canPlaceKnightAt(state: GameState, player: PlayerId, v: VertexId
 
 /** Empty vertices a knight of `player` standing on `from` can move to. */
 export function moveTargets(state: GameState, player: PlayerId, from: VertexId): VertexId[] {
-  return [...reachable(state, player, from)].filter((w) => w !== from && isEmptyVertex(state, w));
+  return [...reachable(state, player, from)].filter(
+    (w) => w !== from && isEmptyVertex(state, w) && !besideFog(state, w),
+  );
 }
 
 /**

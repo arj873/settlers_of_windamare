@@ -36,7 +36,8 @@ import type { Controller, MapId, NewGameConfig, NewGameVariants, SeatConfig } fr
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 8;
 export const VP_MIN = 3;
-export const VP_MAX = 20;
+/** The engine's VP_TO_WIN_RANGE.max (E&P full game + C&K: 22). */
+export const VP_MAX = 25;
 export const VP_DEFAULT = 10;
 export const DISCARD_MIN = 5;
 export const DISCARD_MAX = 20;

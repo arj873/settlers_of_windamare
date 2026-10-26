@@ -51,6 +51,7 @@ import {
 } from './geometry';
 import { epBoard, T } from './maps';
 import { advance, resolveLairs } from './missions';
+import { goldOfferLegal, goldTradeAllowed, offerGoldTrade, tradeOverrides } from './trade';
 import {
   canPlaceShip,
   canSail,
@@ -78,7 +79,9 @@ import {
   HOLD,
   ITEM,
   LAIR_CREWS,
+  citiesInPlay,
   epSlice,
+  isHarborStep,
   isCargo,
   load,
   rulesOf,
@@ -120,6 +123,7 @@ export const A = {
   chase: 'ep/chase',
   placePirate: 'ep/placePirate',
   pirateSteal: 'ep/pirateSteal',
+  offerTrade: 'ep/offerTrade',
 } as const;
 export type EpActionType = (typeof A)[keyof typeof A];
 
@@ -272,7 +276,7 @@ export function afterSetupSettlement(draft: GameState, v: VertexId): void {
   const ph = draft.phase;
   if (ph.kind !== 'setup') return;
   const s = epSlice(draft);
-  if (ph.index < draft.players.length) {
+  if (isHarborStep(draft, ph.index)) {
     s.harbors[v] = [];
     log(draft, null, 'It is a harbor settlement');
   }
@@ -284,11 +288,16 @@ export function afterSetupSettlement(draft: GameState, v: VertexId): void {
   draft.phase = { kind: 'ep/setupFleet', index: 0, step: 'road' };
 }
 
-/** Round 1 places harbor settlements on the marked vertices only. */
+/**
+ * The harbor round (round 1; with C&K round 2) places on the marked vertices only. With C&K the
+ * cities come first and may leave no marked corner free: then any free coastal corner (ours).
+ */
 export const setupSpotAllowed = (state: GameState, v: VertexId): boolean => {
   const ph = state.phase;
-  if (ph.kind !== 'setup' || ph.index >= state.players.length) return true;
-  return staticOf(state).spots.has(v) && isCoastal(state, v);
+  if (ph.kind !== 'setup' || !isHarborStep(state, ph.index)) return true;
+  if (!isCoastal(state, v)) return false;
+  const marks = staticOf(state).spots;
+  return marks.has(v) || ![...marks].some((m) => settlementSpot(state, state.turn.current, m));
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -312,6 +321,19 @@ function whyShip(state: GameState, p: PlayerId, e: EdgeId, replace: number | und
   const w = whyAction(state, p);
   if (w) return w;
   if (!canAfford(state, p, ITEM.ship)) return 'cannot afford a ship';
+  return whyShipSpot(state, p, e, replace);
+}
+
+/**
+ * Where a new ship of `p` may go (next to an own harbor; with none left in the supply, replacing
+ * the ship `replace`), whatever pays for it (a cost, or T&B fish in E&P + T&B).
+ */
+export function whyShipSpot(
+  state: GameState,
+  p: PlayerId,
+  e: EdgeId,
+  replace: number | undefined,
+): Why {
   const s = epSlice(state);
   if (replace !== undefined) {
     const old = shipById(s, replace);
@@ -326,6 +348,43 @@ function whyShip(state: GameState, p: PlayerId, e: EdgeId, replace: number | und
   }
   if (shipsLeft(state, p) <= 0) return 'no ships left (return one to build a new one)';
   return canPlaceShip(state, p, e) ? null : 'a ship goes next to your harbor settlement';
+}
+
+/** Put a new ship of `p` on `e` (already validated and paid): replace, place, explore. */
+export function placeShip(
+  draft: GameState,
+  p: PlayerId,
+  e: EdgeId,
+  replace: number | undefined,
+): void {
+  const s = epSlice(draft);
+  if (replace !== undefined) {
+    // Its cargo goes back to the supply too (E5): fish hauls can be caught again.
+    const old = shipById(s, replace);
+    s.haulSupply += old?.cargo.filter((c) => c === 'fish').length ?? 0;
+    if (s.turn.active === replace) s.turn.active = null;
+    if (s.turn.selected === replace) s.turn.selected = null;
+    s.ships = s.ships.filter((x) => x.id !== replace);
+    log(draft, p, `${name(draft, p)} returned a ship (and its cargo) to the supply`);
+  }
+  const id = s.nextShip++;
+  s.ships.push({ id, owner: p, edge: e, cargo: [] });
+  log(draft, p, `${name(draft, p)} built a ship`);
+  if (explore(draft, p, e).length > 0) shipTurnDraft(s, id).done = true;
+}
+
+/** Ship spots of `p` for a new ship: [edge, replace][] (replace only with none in the supply). */
+export function newShipSpots(state: GameState, p: PlayerId): [EdgeId, number | undefined][] {
+  const free = shipsLeft(state, p) > 0;
+  const replace = free ? [undefined] : shipsOf(epSlice(state), p).map((x) => x.id);
+  const edges = new Set<EdgeId>();
+  for (const v of harborsOf(state, p))
+    for (const e of graph(state).edgesAt.get(v) ?? []) edges.add(e);
+  const out: [EdgeId, number | undefined][] = [];
+  for (const e of [...edges].sort()) {
+    for (const r of replace) if (whyShipSpot(state, p, e, r) === null) out.push([e, r]);
+  }
+  return out;
 }
 
 /** Where a new settler / crew may go: an own basin or an own ship at an own harbor (§4.6). */
@@ -711,25 +770,8 @@ export const HANDLERS: Record<EpActionType, H> = {
     return guard(
       whyShip(draft, a.player, e, replace),
       () => {
-        const s = epSlice(draft);
         pay(draft, a.player, costOf(draft, ITEM.ship) as ResourceCounts);
-        if (replace !== undefined) {
-          // Its cargo goes back to the supply too (E5): fish hauls can be caught again.
-          const old = shipById(s, replace);
-          s.haulSupply += old?.cargo.filter((c) => c === 'fish').length ?? 0;
-          if (s.turn.active === replace) s.turn.active = null;
-          if (s.turn.selected === replace) s.turn.selected = null;
-          s.ships = s.ships.filter((x) => x.id !== replace);
-          log(
-            draft,
-            a.player,
-            `${name(draft, a.player)} returned a ship (and its cargo) to the supply`,
-          );
-        }
-        const id = s.nextShip++;
-        s.ships.push({ id, owner: a.player, edge: e, cargo: [] });
-        log(draft, a.player, `${name(draft, a.player)} built a ship`);
-        if (explore(draft, a.player, e).length > 0) shipTurnDraft(s, id).done = true;
+        placeShip(draft, a.player, e, replace);
       },
       draft,
     );
@@ -1091,6 +1133,8 @@ export const HANDLERS: Record<EpActionType, H> = {
     draft.phase = resumePhase(draft, ph.resume);
     return ok(draft);
   },
+
+  [A.offerTrade]: (draft, a) => offerGoldTrade(draft, a),
 };
 
 const ZERO: ResourceCounts = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
@@ -1174,17 +1218,8 @@ function actionLegal(state: GameState, p: PlayerId): Action[] {
     if (whyHarbor(state, p, b) === null) out.push(act(A.buildHarbor, p, { vertex: b }));
   }
   if (canAfford(state, p, ITEM.ship)) {
-    const free = shipsLeft(state, p) > 0;
-    const replace = free ? [undefined] : shipsOf(s, p).map((x) => x.id);
-    const edges = new Set<EdgeId>();
-    for (const v of harborsOf(state, p))
-      for (const e of graph(state).edgesAt.get(v) ?? []) edges.add(e);
-    for (const e of [...edges].sort()) {
-      for (const r of replace) {
-        if (whyShip(state, p, e, r) === null) {
-          out.push(act(A.buildShip, p, r === undefined ? { edge: e } : { edge: e, replace: r }));
-        }
-      }
+    for (const [e, r] of newShipSpots(state, p)) {
+      out.push(act(A.buildShip, p, r === undefined ? { edge: e } : { edge: e, replace: r }));
     }
   }
   for (const kind of ['settler', 'crew'] as const) {
@@ -1210,6 +1245,7 @@ function actionLegal(state: GameState, p: PlayerId): Action[] {
         out.push(act(A.dump, p, { ship: ship.id, cargo: c }));
     }
   }
+  out.push(...goldOfferLegal(state, p));
   out.push(act(A.startMovement, p));
   return out;
 }
@@ -1313,10 +1349,13 @@ const ACTION_PHASE_ONLY = new Set<string>([
 export function epFilterLegal(state: GameState, actions: Action[]): Action[] {
   const movement = inMovement(state);
   return actions.filter((a) => {
-    if (a.type === 'buildCity') return false;
+    if (a.type === 'buildCity' && !citiesInPlay(state)) return false;
     if (movement && ACTION_PHASE_ONLY.has(a.type)) return false;
+    if (!goldTradeAllowed(state, a)) return false;
     if (a.type === 'placeSetupSettlement') return setupSpotAllowed(state, a.vertex);
-    if (a.type === 'buildRoad') return !edgeSpiceClosed(state, a.player, a.edge);
+    if (a.type === 'buildRoad' || a.type === 'placeFreeRoad') {
+      return !edgeSpiceClosed(state, a.player, a.edge);
+    }
     if (a.type === 'buildSettlement') return !vertexSpiceClosed(state, a.player, a.vertex);
     return true;
   });
@@ -1332,7 +1371,12 @@ export const OVERRIDES: { readonly [K in BaseActionType]?: Override<K> } = {
     setupSpotAllowed(draft, action.vertex)
       ? next(draft, action)
       : fail('the first harbor settlement goes on a marked coastal corner of the island'),
-  buildCity: () => fail('there are no cities in Explorers & Pirates'),
+  buildCity: (draft, action, next) => {
+    if (!citiesInPlay(draft)) return fail('there are no cities in Explorers & Pirates');
+    if (inMovement(draft)) return fail('no building in the Movement phase');
+    return next(draft, action);
+  },
+  ...tradeOverrides,
   buildRoad: (draft, action, next) => {
     if (inMovement(draft)) return fail('no building in the Movement phase');
     if (edgeSpiceClosed(draft, action.player, action.edge)) {
@@ -1340,6 +1384,11 @@ export const OVERRIDES: { readonly [K in BaseActionType]?: Override<K> } = {
     }
     return next(draft, action);
   },
+  // A free road (C&K Road Building, T&B fish in the combinations) obeys the farms too.
+  placeFreeRoad: (draft, action, next) =>
+    edgeSpiceClosed(draft, action.player, action.edge)
+      ? fail('you need a crew on that spice farm first')
+      : next(draft, action),
   buildSettlement: (draft, action, next) => {
     if (inMovement(draft)) return fail('no building in the Movement phase');
     if (vertexSpiceClosed(draft, action.player, action.vertex)) {

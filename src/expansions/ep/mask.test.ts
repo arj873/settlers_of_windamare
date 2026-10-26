@@ -106,6 +106,21 @@ describe('E&P online views: no leak in bot games', () => {
     },
     60_000,
   );
+
+  it.each([['ep+ck', 'full']] as const)(
+    'combination %s (%s): the E&P mask runs',
+    (mode, key) => {
+      const states = sampleStates(
+        { seed: 77, players: 4, mode, scenario: scenarioIdOf(key) },
+        3000,
+        15,
+      );
+      const planted: Record<Kind, number> = { hidden: 0, discs: 0, lairTokens: 0, lairs: 0 };
+      expect(expectNoLeak(states, planter(planted)).planted).toBeGreaterThan(10);
+      expect(planted.hidden).toBeGreaterThan(0);
+    },
+    60_000,
+  );
 });
 
 /** A full-game state with face-down hexes, an uncaptured and a captured lair. */

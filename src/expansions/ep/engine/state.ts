@@ -71,6 +71,19 @@ export function rulesOf(state: Pick<GameState, 'settings'>): Rules {
   return (SCENARIOS.find((s) => s.key === key) as ScenarioRow).rules;
 }
 
+/**
+ * Cities & Knights is in the game (the E&P + C&K combination, module `epck`): settlements may
+ * become cities, and the setup places a city first and the harbor settlement second.
+ */
+export const citiesInPlay = (state: Pick<GameState, 'settings'>): boolean =>
+  state.settings.expansions.includes('ck');
+
+/** Setup placement `index` places the harbor settlement (round 1; with C&K round 2). */
+export function isHarborStep(state: Pick<GameState, 'settings' | 'players'>, index: number) {
+  const first = index < state.players.length;
+  return citiesInPlay(state) ? !first : first;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Pieces, costs, cargo (§1.2, §4.1)
 // ---------------------------------------------------------------------------------------------
@@ -250,6 +263,14 @@ export interface EpSlice {
   /** Counter for track arrival order. */
   clock: number;
   turn: EpTurn;
+  /** The gold in the open player trade offer (`ep/offerTrade`, §3.3); absent = none. */
+  trade?: GoldOffer | null;
+}
+
+/** Gold the offering player gives and wants in an open trade offer. */
+export interface GoldOffer {
+  give: number;
+  want: number;
 }
 
 export const epSlice = (s: Pick<GameState, 'ext'>): EpSlice => extSlice<EpSlice>(s, EP);

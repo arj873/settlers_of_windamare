@@ -1,0 +1,43 @@
+/* E&P + C&K HUD (classes are prefixed epck-). Colours come from the theme tokens. */
+.epck-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.epck-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.epck-fact {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.epck-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.epck-label {
+  margin-right: 4px;
+}
+.epck-good {
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+.epck-good:hover {
+  border-color: var(--accent);
+}
+.epck-sub {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
