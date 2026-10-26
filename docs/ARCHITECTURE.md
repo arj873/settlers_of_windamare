@@ -13,6 +13,7 @@ src/render/  PixiJS board view        imports engine (read-only)
 src/ui/      HTML/CSS overlay         imports engine (read-only)
 src/game/    controller               owns the current GameState; wires everything
 src/net/     online multiplayer       protocol + GameSession (server room core); no DOM, no Date (lint)
+src/server/  Cloudflare room server   Worker + Durable Object around GameSession (MULTIPLAYER.md §18)
 ```
 
 Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
