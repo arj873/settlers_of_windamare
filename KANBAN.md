@@ -10,7 +10,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M4a** · Online playtest harness (`pt:serve --online`, one browser per seat vs wrangler dev, drop/reconnect) → then 3 Haiku agents play a remote game · `s4-mp-e2e` 🟩
+- **M4b** · 3 Haiku agents play one ONLINE game (room on wrangler dev, headed windows, seat 2 tests drop/reconnect) · `s4-haiku-1..3` (Haiku)
+- **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
 - **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
 ## 📋 Backlog — Stage 4
@@ -119,6 +120,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **M4a** · Online playtest harness (`pt:serve --online`, per-seat browser contexts vs wrangler dev, drop/reconnect/reload/chat) + GitHub Actions CI · `s4-mp-e2e` 🟩 · PR #8 → `main` · 917 tests
 - **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
 - **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
 - **E1** · Oil Springs + Crop Trust (official rulebooks; docs/rules/oil-springs.md, crop-trust.md) · `s3-oil-crop` 🟩 · PR #5 → `expansions` · 948 tests on expansions
