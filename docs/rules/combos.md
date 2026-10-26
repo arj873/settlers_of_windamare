@@ -247,6 +247,25 @@ VP (defend with knights when the barbarians are close and Catan is weaker). Sim 
 | `tb+ck` Traders & Barbarians      | 300 / 0                    | 50 / 0  | 50 / 0  | 50 / 0  |
 | `tb+ck` variants                  | 298 / 2                    | 50 / 0  | 50 / 0  | 50 / 0  |
 
+C2 (`--max-steps 20000`, `--bias 0.5`; both modes are 3-4 players). Every run: 0 invariant
+failures, 0 errors, 0 stalls, 0 capped; average turns of a finished game in brackets (random bots).
+
+| Mode / scenario                        | 4p (300) finished | 3p (50) finished |
+| -------------------------------------- | ----------------- | ---------------- |
+| `tb+seafarers` Traders & Barbarians    | 300 (343)         | 50 (283)         |
+| `tb+seafarers` Fishermen               | 300 (321)         | 50 (347)         |
+| `tb+seafarers` Rivers                  | 300 (391)         | 50 (386)         |
+| `tb+seafarers` Caravans                | 300 (391)         | 50 (385)         |
+| `tb+seafarers` Barbarian Attack        | 300 (403)         | 50 (412)         |
+| `tb+tb` Fishing + Rivers               | 300 (237)         | 50 (247)         |
+| `tb+tb` Fishing + Traders & Barbarians | 300 (198)         | 50 (165)         |
+| `tb+tb` Fishing + Barbarian Attack     | 300 (360)         | 50 (365)         |
+| `tb+tb` Fishing + Caravans             | 300 (276)         | 50 (274)         |
+
+The first C2 runs found Rivers stalls (Road Building with only bridge-site ship spots) and a
+Barbarian Attack award lag (a Treason conquest cut the trade route without a recompute); both fixed
+with regression tests (`tbsea.test.ts`, sim seed 55).
+
 Variant runs (20 games each, 0 violations): `seafarers+ck` with Event Cards, the friendly
 robber, the variable layout; `tb+ck` Fishermen and Traders & Barbarians with Event Cards,
 variants with Harbormaster + friendly robber, Caravans at 5 players.
