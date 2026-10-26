@@ -195,3 +195,18 @@ export function gameOverGame(): GameState {
   s.log.push({ turn: 12, player: 0, text: 'Red wins!' });
   return s;
 }
+
+/** Render fixture: every road-junction case around h:0,0 (3-way mixed, 2-way same/mixed, dead ends, road at a settlement). */
+export function roadJointsGame(): GameState {
+  const s = freshGame();
+  road(s, 0, [0, 0, 'NW']);
+  road(s, 1, [0, 0, 'NE']);
+  road(s, 2, [0, -1, 'E']);
+  road(s, 1, [0, 0, 'W']);
+  road(s, 3, [0, 0, 'SW']);
+  road(s, 3, [0, 0, 'SE']);
+  settle(s, 2, [0, 0, 'SE'], 'settlement');
+  s.turn = { number: 12, current: 0, devCardPlayed: false, tradeOffers: 0 };
+  s.phase = { kind: 'main' };
+  return s;
+}
