@@ -183,6 +183,14 @@ describe('the wagon', () => {
     expect(tradersOf(next).commodity[0]).not.toBeNull();
   });
 
+  it('an empty stack: the next commodity comes from another trade hex', () => {
+    const s = tbMain('traders');
+    tradersOf(s).stacks['h:2,-2'] = [];
+    at(s, 0, 'v:2,-2,S');
+    const next = ok(s, { type: 'tb/startWagon', player: 0, vertex: 'v:2,-2,C' });
+    expect(tradersOf(next).commodity[0]).not.toBeNull();
+  });
+
   it('a commodity the plaza does not want stays loaded', () => {
     const s = tbMain('traders');
     tradersOf(s).commodity[0] = 'sand';

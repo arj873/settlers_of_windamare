@@ -216,6 +216,13 @@ function finishTurn(draft: GameState, p: PlayerId): ActionResult {
   return turnHandlers.endTurn(draft, { type: 'endTurn', player: p });
 }
 
+/** The vote is over: end the turn, or start the next one (vote after a special build phase). */
+function endVote(draft: GameState, phase: Extract<TbPhase, { kind: 'tb/vote' }>): ActionResult {
+  if (phase.then === 'endTurn') return finishTurn(draft, phase.ender);
+  draft.phase = { kind: 'preRoll' };
+  return ok(draft);
+}
+
 function endTurnBlocker(state: GameState, p: PlayerId): string | null {
   if (has(state, 'ba') && castleKnightsToMove(state, p).length > 0) {
     return 'move your knights off the castle first';
@@ -318,8 +325,7 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
     if (err) return fail(err);
     bid(draft, a.player, a.wool, a.grain);
     const phase = phaseOf(draft) as Extract<TbPhase, { kind: 'tb/vote' }>;
-    if (phase.placer !== null && camelOptions(draft).length === 0)
-      return finishTurn(draft, phase.ender);
+    if (phase.placer !== null && camelOptions(draft).length === 0) return endVote(draft, phase);
     return ok(draft);
   },
 
@@ -335,7 +341,7 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
     log(draft, a.player, `${pn(draft, a.player)} placed a camel`);
     phase.camels -= 1;
     if (phase.camels > 0 && camelOptions(draft).length > 0) return ok(draft);
-    return finishTurn(draft, phase.ender);
+    return endVote(draft, phase);
   },
 
   'tb/buyCard': (draft, action) => {
@@ -472,7 +478,9 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
       phase.from = a.edge;
       return ok(draft);
     }
-    if (!barbarianSpots(draft).includes(a.edge)) return fail('a barbarian cannot go there');
+    if (!barbarianSpots(draft, phase.noRoad === true).includes(a.edge)) {
+      return fail('a barbarian cannot go there');
+    }
     moveBarbarian(draft, a.player, phase.from, a.edge, phase.steal);
     leaveBarbarian(draft, phase.resume);
     return ok(draft);
@@ -526,7 +534,13 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
     payTokens(draft, action.player);
     // T&B: the token moves a barbarian instead (no theft).
     if (has(draft, 'traders')) {
-      draft.phase = asPhase({ kind: 'tb/barbarian', from: null, steal: false, resume });
+      draft.phase = asPhase({
+        kind: 'tb/barbarian',
+        from: null,
+        steal: false,
+        noRoad: true,
+        resume,
+      });
       log(
         draft,
         action.player,
@@ -1105,7 +1119,18 @@ export const tbModule: ExpansionModule = {
       }
       if (s.traders) s.traders.move = freshMove(s.traders.level[p] ?? 1);
       if (s.ba) s.ba.moved = [];
-      if (s.caravans) s.caravans.built = false;
+      if (s.caravans) {
+        s.caravans.built = false;
+        // 5-6: a settlement / city built in the special build phase calls one more camel; the
+        // player whose turn it was starts the vote and breaks ties. (Not with Rush mode, which
+        // rolls right away.)
+        if (s.caravans.sbpBuilt && !draft.settings.rushMode) {
+          s.caravans.sbpBuilt = false;
+          const owner = (p - 1 + draft.players.length) % draft.players.length;
+          const vote = startVote(draft, owner, 'preRoll');
+          if (vote) draft.phase = asPhase(vote);
+        }
+      }
     },
 
     onEndTurn(draft, p) {
@@ -1117,6 +1142,8 @@ export const tbModule: ExpansionModule = {
     },
 
     afterAction(draft) {
+      // No robber in BA / T&B: Robber Flees (Event Cards) must not bring one to the desert.
+      if (robberless(draft) && draft.robber !== NO_ROBBER) draft.robber = NO_ROBBER;
       if (harbormasterOn(draft)) updateHarbormaster(draft);
       if (isTwo(draft)) secondRoll(draft);
     },

@@ -189,7 +189,12 @@ export function visitPlaza(draft: GameState, p: PlayerId, hex: HexId): void {
     log(draft, p, `${pn(draft, p)} delivered ${held} to the ${kind} (+1 VP, ${gold} gold)`);
   }
   if ((s.commodity[p] ?? null) === null) {
-    const next = s.stacks[hex]?.pop() ?? null;
+    // An empty stack: draw from another trade hex's stack (T5-56; never happens with 3-4).
+    const stack =
+      (s.stacks[hex]?.length ?? 0) > 0
+        ? s.stacks[hex]
+        : Object.values(s.stacks).find((x) => x.length > 0);
+    const next = stack?.pop() ?? null;
     s.commodity[p] = next;
     if (next !== null) log(draft, p, `${pn(draft, p)} loaded ${next} at the ${kind}`);
   }
@@ -285,10 +290,15 @@ export function upgradeWagon(draft: GameState, p: PlayerId): void {
   );
 }
 
-/** Paths a barbarian may move to (any path without a barbarian). */
-export function barbarianSpots(state: GameState): EdgeId[] {
+/**
+ * Paths a barbarian may move to: any path without a barbarian (`noRoad`: and without a road,
+ * Catan for Two's token action).
+ */
+export function barbarianSpots(state: GameState, noRoad = false): EdgeId[] {
   const taken = new Set(tradersOf(state).barbarians);
-  return topologyOf(state).edges.filter((e) => !taken.has(e));
+  return topologyOf(state).edges.filter(
+    (e) => !taken.has(e) && !(noRoad && state.pieces.roads[e] !== undefined),
+  );
 }
 
 /** Move the barbarian on `from` to `to`; with `steal`, rob the road owner there. */
@@ -356,8 +366,9 @@ export function tradersLegal(state: GameState): Action[] {
       if (swiftBlocker(state, p) === null) act({ type: 'tb/swiftJourney' });
       break;
     case 'tb/barbarian': {
-      const from = (phase as { from?: EdgeId | null }).from ?? null;
-      const edges = from === null ? s.barbarians : barbarianSpots(state);
+      const ph = phase as { from?: EdgeId | null; noRoad?: boolean };
+      const from = ph.from ?? null;
+      const edges = from === null ? s.barbarians : barbarianSpots(state, ph.noRoad === true);
       for (const e of edges) act({ type: 'tb/placeBarbarian', edge: e });
       break;
     }

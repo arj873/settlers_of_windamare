@@ -121,6 +121,28 @@ describe('the voting round', () => {
   });
 });
 
+describe('5-6 players', () => {
+  it('a settlement built in the special build phase calls another camel after the phase', () => {
+    let s = tbMain('caravans', 5);
+    s.phase = { kind: 'specialBuild', builder: 4, owner: 3 };
+    s.turn.current = 4;
+    const v: VertexId = 'v:2,-1,N';
+    roads(s, 4, (topologyOf(s).vertex[v]?.edges ?? [])[0] as EdgeId);
+    setHand(s, 4, { brick: 1, lumber: 1, wool: 1, grain: 1 });
+    s = ok(s, { type: 'buildSettlement', player: 4, vertex: v });
+    expect(caravansOf(s).sbpBuilt).toBe(true);
+    s = ok(s, { type: 'passSpecialBuild', player: 4 });
+    // Player 4 was the last builder before the owner: player 4's own turn starts with the vote.
+    expect(s.turn.current).toBe(4);
+    expect(vote(s)).toMatchObject({ kind: 'tb/vote', ender: 3, then: 'preRoll' });
+    expect(vote(s).order[0]).toBe(3);
+    for (const p of [3, 4, 0, 1, 2]) s = ok(s, { type: 'tb/bid', player: p, wool: 0, grain: 0 });
+    s = ok(s, { type: 'tb/placeCamel', player: 3, edge: camelOptions(s)[0]?.edge as EdgeId });
+    expect(s.phase.kind).toBe('preRoll');
+    expect(s.turn.current).toBe(4);
+  });
+});
+
 describe('scoring', () => {
   it('+1 VP for a building between two camels', () => {
     const s = tbMain('caravans');

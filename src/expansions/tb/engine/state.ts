@@ -262,6 +262,8 @@ export interface CaravanSlice {
   heads: (VertexId | null)[];
   /** The current player built a settlement / city this turn: a camel follows the turn. */
   built: boolean;
+  /** Someone built one in the special build phase (5-6): another camel after it. */
+  sbpBuilt: boolean;
 }
 
 export interface BaSlice {
@@ -388,6 +390,8 @@ export type TbPhase =
       camels: number;
       /** Set once bidding is over: who places the camel(s). */
       placer: PlayerId | null;
+      /** After the vote: end `ender`'s turn, or (after a special build phase) start the turn. */
+      then: 'endTurn' | 'preRoll';
     }
   /** BA: Knighthood / Swift Knight: place a knight. */
   | { kind: 'tb/placeKnight'; card: 'knighthood' | 'swiftKnight'; resume: ResumeTo }
@@ -412,6 +416,8 @@ export type TbPhase =
       /** The barbarian being moved (null = pick one first). */
       from: EdgeId | null;
       steal: boolean;
+      /** Catan for Two's token action: only onto a path without a road. */
+      noRoad?: true;
       resume: ResumeTo | 'wagon';
     }
   /** Catan for Two: build the neutral piece that follows a road / settlement. */

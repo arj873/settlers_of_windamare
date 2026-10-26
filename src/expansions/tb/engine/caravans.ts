@@ -31,6 +31,7 @@ export function initCaravans(state: GameState): CaravanSlice {
     left: state.players.length > 4 ? CAMELS_56 : CAMELS_34,
     heads: (tbBoard(state).caravanStarts ?? []).map(() => null),
     built: false,
+    sbpBuilt: false,
   };
 }
 
@@ -128,7 +129,11 @@ export function camelRoadLength(state: GameState, p: PlayerId): number {
 // ---------------------------------------------------------------------------
 
 /** Start the voting round after `ender`'s turn, if a camel can be placed. */
-export function startVote(draft: GameState, ender: PlayerId): TbPhase | null {
+export function startVote(
+  draft: GameState,
+  ender: PlayerId,
+  then: 'endTurn' | 'preRoll' = 'endTurn',
+): TbPhase | null {
   if (camelOptions(draft).length === 0) return null;
   const n = draft.players.length;
   return {
@@ -138,6 +143,7 @@ export function startVote(draft: GameState, ender: PlayerId): TbPhase | null {
     bids: draft.players.map(() => 0),
     camels: isTwo(draft) ? 2 : 1,
     placer: null,
+    then,
   };
 }
 
@@ -210,8 +216,15 @@ export function voteActors(state: GameState): PlayerId[] | undefined {
   return phase.order.length > 0 ? [phase.order[0] as PlayerId] : [];
 }
 
-/** Mark that the current player built (only their own turn's builds call a camel). */
+/**
+ * Mark that the current player built (only their own turn's builds call a camel); a build in
+ * the special build phase calls one more camel after the phase (T5-56 p.4).
+ */
 export function noteBuilt(draft: GameState, p: PlayerId): void {
+  if (draft.phase.kind === 'specialBuild') {
+    caravansOf(draft).sbpBuilt = true;
+    return;
+  }
   if (
     draft.phase.kind === 'main' &&
     isCurrent(draft, p) &&

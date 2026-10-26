@@ -155,6 +155,19 @@ describe('trade tokens', () => {
     bad(next, { type: 'tb/knightForTokens', player: 0 }, /once per turn/);
   });
 
+  it('in Traders & Barbarians the token moves a barbarian to a path without a road (no theft)', () => {
+    const s = tbMain('traders', 2);
+    roads(s, 1, 'e:0,0,E');
+    let next = ok(
+      s,
+      { type: 'tb/tokenRobber', player: 0 },
+      { type: 'tb/placeBarbarian', player: 0, edge: 'e:0,1,E' },
+    );
+    bad(next, { type: 'tb/placeBarbarian', player: 0, edge: 'e:0,0,E' }, /cannot go/);
+    next = ok(next, { type: 'tb/placeBarbarian', player: 0, edge: 'e:1,0,E' });
+    expect(next.phase.kind).toBe('main');
+  });
+
   it('no trade tokens in the Fishermen scenario', () => {
     const s = tbMain('fishermen', 2);
     setHand(s, 1, { ore: 2 });
