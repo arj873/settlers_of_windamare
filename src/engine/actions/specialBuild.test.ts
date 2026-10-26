@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { COSTS, DEV_CARD_TYPES } from '../constants';
 import { applyAction, legalActions } from '../engine';
 import { createGame } from '../createGame';
-import { supplyOf } from '../maps';
+import { supplyOf } from '../mapLookup';
 import { emptyDevCards } from '../resources';
 import { piecesLeft, victoryPoints } from '../selectors';
 import { edgeVertices, TOPOLOGY, vertexEdges } from '../topology';

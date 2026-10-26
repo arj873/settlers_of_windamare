@@ -5,6 +5,12 @@
  * road: a trail may end there but not pass through. The player's own buildings never break it.
  * Brute-force DFS over edges: a player has at most 15 roads, so this is cheap.
  */
+import {
+  blocksRoute,
+  hasRoadLengthHook,
+  hasRouteBlockers,
+  hookRoadLength,
+} from '../expansions/hooks';
 import { edgeVertices, topologyOf, vertexEdges } from '../topology';
 import { roadsOf } from '../selectors';
 import type { EdgeId, GameState, PlayerId, VertexId } from '../types';
@@ -13,9 +19,11 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   const t = topologyOf(state);
   const roads = state.pieces.roads;
   const buildings = state.pieces.buildings;
+  const hooked = hasRouteBlockers(state);
   const blocked = (v: VertexId) => {
     const b = buildings[v];
-    return b !== undefined && b.owner !== player;
+    if (b !== undefined) return b.owner !== player;
+    return hooked && blocksRoute(state, v, player);
   };
 
   const used = new Set<EdgeId>();
@@ -43,7 +51,14 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   return best;
 }
 
-/** Longest Road length of every player, indexed by PlayerId. */
+/**
+ * Longest Road length of every player, indexed by PlayerId, as the award counts it: the road
+ * trail, changed by expansions' roadLength hooks (Seafarers: trade routes).
+ */
 export function longestRoadLengths(state: GameState): number[] {
-  return state.players.map((p) => longestRoadLength(state, p.id));
+  const hooked = hasRoadLengthHook(state);
+  return state.players.map((p) => {
+    const base = longestRoadLength(state, p.id);
+    return hooked ? hookRoadLength(state, p.id, base) : base;
+  });
 }

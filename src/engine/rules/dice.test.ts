@@ -164,7 +164,7 @@ describe('balanced dice: save / load', () => {
     const { diceDeck: _drop, ...rest } = s;
     const v2 = { ...rest, schemaVersion: 2 };
     const up = upgradeState(JSON.parse(JSON.stringify(v2)))!;
-    expect(up.schemaVersion).toBe(4);
+    expect(up.schemaVersion).toBe(5);
     expect(up.diceDeck).toEqual([]);
     const draft = structuredClone(up);
     expect(rollTwoDice(draft).reshuffled).toBe(true);

@@ -10,11 +10,13 @@ import {
   DICE_DECK_SIZE,
   LARGEST_ARMY_MIN,
   LONGEST_ROAD_MIN,
-  MAPS,
-  PIECE_LIMITS,
   RESOURCES,
   actingPlayers,
   edgeVertices,
+  expansionVictoryPoints,
+  isExpansionId,
+  mapOf,
+  pieceLimit,
   isBoardEdge,
   isBoardVertex,
   isLandHex,
@@ -30,6 +32,7 @@ import {
   type PlayerId,
   type VertexId,
 } from '../engine';
+import { botExtensionsFor } from './expansions';
 
 export type ViolationCode =
   | 'structure'
@@ -45,7 +48,9 @@ export type ViolationCode =
   | 'award-mismatch'
   | 'winner'
   | 'phase-actor'
-  | 'dice-deck';
+  | 'dice-deck'
+  /** Reported by an expansion's own invariants (src/bots/expansions.ts). */
+  | 'expansion';
 
 export interface Violation {
   code: ViolationCode;
@@ -96,7 +101,28 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   return best;
 }
 
+/**
+ * Every invariant of a game: the base checks (minus the codes its expansions `relax`), then each
+ * active expansion's own checks (src/bots/expansions.ts).
+ */
 export function checkInvariants(state: GameState): Violation[] {
+  const base = checkBaseInvariants(state);
+  const exts = botExtensionsFor(state);
+  if (exts.length === 0) return base;
+  const relaxed = new Set(exts.flatMap((x) => x.relax ?? []));
+  const out = relaxed.size > 0 ? base.filter((v) => !relaxed.has(v.code)) : base;
+  for (const x of exts) {
+    try {
+      out.push(...(x.invariants?.(state) ?? []));
+    } catch (e) {
+      out.push({ code: 'structure', message: `${x.id} invariants threw: ${String(e)}` });
+    }
+  }
+  return out;
+}
+
+/** The base-game invariants only. */
+export function checkBaseInvariants(state: GameState): Violation[] {
   const out: Violation[] = [];
   const add = (code: ViolationCode, message: string, player?: PlayerId) =>
     out.push(player === undefined ? { code, message } : { code, message, player });
@@ -108,7 +134,12 @@ export function checkInvariants(state: GameState): Violation[] {
     add('structure', `unknown map ${String(state.settings.map)}`);
     return out; // every board check below needs the map's topology
   }
-  const map = MAPS[state.settings.map];
+  const unknown = (state.settings.expansions ?? []).filter((id) => !isExpansionId(id));
+  if (unknown.length > 0) {
+    add('structure', `unknown expansions ${unknown.join(', ')}`);
+    return out;
+  }
+  const map = mapOf(state);
   const t = topologyOf(state);
   const supply = supplyOf(state);
   if (n < map.minPlayers || n > map.maxPlayers) {
@@ -193,12 +224,9 @@ export function checkInvariants(state: GameState): Violation[] {
       city: mine.filter(([v]) => state.pieces.buildings[v]?.kind === 'city').length,
     };
     for (const kind of ['road', 'settlement', 'city'] as const) {
-      if (counts[kind] > PIECE_LIMITS[kind]) {
-        add(
-          'piece-limit',
-          `player ${p.id} has ${counts[kind]} ${kind}s (max ${PIECE_LIMITS[kind]})`,
-          p.id,
-        );
+      const limit = pieceLimit(state, p.id, kind);
+      if (counts[kind] > limit) {
+        add('piece-limit', `player ${p.id} has ${counts[kind]} ${kind}s (max ${limit})`, p.id);
       }
     }
   }
@@ -281,7 +309,9 @@ export function checkInvariants(state: GameState): Violation[] {
       (longestRoad === p.id ? AWARD_VP : 0) +
       (largestArmy === p.id ? AWARD_VP : 0) +
       p.devCards.victoryPoint +
-      p.newDevCards.victoryPoint;
+      p.newDevCards.victoryPoint +
+      // Expansion VP are trusted here; each module checks its own sources (BotExtension).
+      ((x) => x.public + x.hidden)(expansionVictoryPoints(state, p.id));
     const reported = victoryPoints(state, p.id);
     if (vp !== reported)
       add(

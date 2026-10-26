@@ -11,7 +11,7 @@ import { RESOURCES } from '../constants';
 import { describeBundle, playerName } from '../rules/text';
 import { Rng } from '../rng';
 import { hasResources, isValidBundle, totalResources } from '../resources';
-import { handSize } from '../selectors';
+import { cardsInHand } from '../selectors';
 import { hexVertices, isLandHex, topologyOf } from '../topology';
 import type {
   Action,
@@ -32,10 +32,7 @@ export function stealCandidates(state: GameState, player: PlayerId, hex: HexId):
     if (b && b.owner !== player) owners.add(b.owner);
   }
   return [...owners]
-    .filter((p) => {
-      const pl = state.players[p];
-      return pl !== undefined && handSize(pl) > 0;
-    })
+    .filter((p) => state.players[p] !== undefined && cardsInHand(state, p) > 0)
     .sort((a, b) => a - b);
 }
 

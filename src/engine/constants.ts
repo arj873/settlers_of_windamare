@@ -1,10 +1,10 @@
 import type {
+  BaseTerrain,
   DevCardCounts,
   DevCardType,
   ProgressCardType,
   Resource,
   ResourceCounts,
-  Terrain,
 } from './types';
 
 export const RESOURCES: readonly Resource[] = ['brick', 'lumber', 'wool', 'grain', 'ore'];
@@ -90,7 +90,7 @@ export const LARGEST_ARMY_MIN = 3;
 export const AWARD_VP = 2;
 
 /** 19 land hexes: 4 forest, 4 pasture, 4 fields, 3 hills, 3 mountains, 1 desert. */
-export const TERRAIN_COUNTS: Record<Terrain, number> = {
+export const TERRAIN_COUNTS: Record<BaseTerrain, number> = {
   lumber: 4,
   wool: 4,
   grain: 4,

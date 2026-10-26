@@ -6,7 +6,17 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MAP_IDS, defaultMapFor, isMapId, layoutToMap, type Action, type MapId } from '../engine';
+import {
+  MAP_IDS,
+  defaultMapFor,
+  isMapId,
+  layoutToMap,
+  listModes,
+  modeById,
+  type Action,
+  type MapId,
+  type OptionValue,
+} from '../engine';
 import { createRandomBot, type PickMode } from './index';
 import {
   botSeedFor,
@@ -33,8 +43,15 @@ export interface SimArgs {
   trace: boolean;
   bias: number;
   pick: PickMode;
-  /** null = the default map for the player count (baseRandom / base56 / base78). */
+  /** null = the default map for the player count (baseRandom / base56 / base78), or the scenario's. */
   map: MapId | null;
+  /** Expansion mode; null = base. */
+  mode: string | null;
+  /** Variant modules on top of the mode. */
+  expansions: string[];
+  scenario: string | null;
+  /** `expansion.key` -> value. */
+  options: Record<string, Record<string, OptionValue>>;
   outDir: string;
   maxDumps: number;
   replay: string | null;
@@ -53,6 +70,12 @@ export const USAGE = `pnpm sim -- [options]
   --map M         ${MAP_IDS.join(' | ')}
                   (default: baseRandom for 3-4 players, base56 for 5-6, base78 for 7-8)
   --layout L      random | beginner (old alias for --map baseRandom | base)
+  --mode M        expansion mode: ${listModes()
+    .map((m) => m.id)
+    .join(' | ')} (default base; docs/EXPANSIONS.md)
+  --scenario S    one of the mode's scenarios (default: its first)
+  --expansion X   variant module(s) on top of the mode, comma-separated
+  --option X.K=V  expansion option (true/false, a number or a choice), repeatable
   --verbose       one line per game
   --trace         print every action (use with few games)
   --out-dir DIR   where failure dumps go (default sim-failures)
@@ -73,6 +96,10 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     bias: 0,
     pick: 'byType',
     map: null,
+    mode: null,
+    expansions: [],
+    scenario: null,
+    options: {},
     outDir: 'sim-failures',
     maxDumps: 5,
     replay: null,
@@ -132,6 +159,25 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         if (!isMapId(value)) throw new Error(`--map: "${String(value)}"`);
         args.map = value;
         break;
+      case '--mode':
+        if (!modeById(value as string)) throw new Error(`--mode: "${String(value)}"`);
+        args.mode = value as string;
+        break;
+      case '--scenario':
+        args.scenario = value as string;
+        break;
+      case '--expansion':
+        args.expansions.push(...(value as string).split(',').filter(Boolean));
+        break;
+      case '--option': {
+        const m = /^([^.=]+)\.([^=]+)=(.*)$/.exec(value as string);
+        if (!m) throw new Error(`--option: "${String(value)}" (want expansion.key=value)`);
+        const [, ext, k, raw] = m as unknown as [string, string, string, string];
+        const v: OptionValue =
+          raw === 'true' ? true : raw === 'false' ? false : raw !== '' && !isNaN(+raw) ? +raw : raw;
+        args.options[ext] = { ...args.options[ext], [k]: v };
+        break;
+      }
       case '--out-dir':
         args.outDir = value as string;
         break;
@@ -258,19 +304,26 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const maxSteps = args.maxSteps ?? defaultMaxSteps(args.players);
   let dumps = 0;
   let sbp = false;
+  let mapName = '';
+  let mode = 'base';
+  let scenario: string | null = null;
   const started = performance.now();
   for (let i = 0; i < args.games; i++) {
     const seed = args.seed + i;
-    const setup: GameSetup = {
-      seed,
-      players: args.players,
-      map: args.map ?? defaultMapFor(args.players),
-      ...(args.sbp === null ? {} : { specialBuildPhase: args.sbp }),
-      ...(args.balancedDice ? { balancedDice: true } : {}),
-    };
+    const setup = simSetup(args, seed);
     const t0 = performance.now();
-    const initial = newGame(setup);
+    let initial;
+    try {
+      initial = newGame(setup);
+    } catch (e) {
+      console.error(`bad setup: ${e instanceof Error ? e.message : String(e)}\n\n${USAGE}`);
+      return 2;
+    }
     sbp = initial.settings.specialBuildPhase;
+    mode = initial.settings.mode;
+    scenario = initial.settings.scenario;
+    // Base games keep the old summary line; expansion games name mode, scenario and map.
+    if (mode !== 'base') mapName = initial.settings.map;
     const result = runGame({
       initial,
       maxSteps,
@@ -299,8 +352,9 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const ms = performance.now() - started;
   const violations = stats.stalls + stats.errors + stats.invariantFailures;
   const avgTurns = stats.finished ? (stats.totalTurnsFinished / stats.finished).toFixed(1) : 'n/a';
+  const modeText = mapName ? `mode ${mode}${scenario ? `/${scenario}` : ''}, ` : '';
   out(
-    `\n=== sim: ${stats.games} games, map ${args.map ?? defaultMapFor(args.players)}, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
+    `\n=== sim: ${stats.games} games, ${modeText}map ${mapName || args.map || defaultMapFor(args.players)}, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
   );
   out(
     `rules: SBP ${sbp ? 'on' : 'off'}, balanced dice ${args.balancedDice ? 'on' : 'off'}, max steps ${maxSteps}`,
@@ -325,6 +379,22 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   }
   out('\nOK: no violations');
   return 0;
+}
+
+/** The game setup of game `seed` of a run (base runs: exactly the pre-F1 setup). */
+export function simSetup(args: SimArgs, seed: number): GameSetup {
+  const expansion = args.mode !== null || args.expansions.length > 0 || args.scenario !== null;
+  return {
+    seed,
+    players: args.players,
+    ...(args.map !== null || !expansion ? { map: args.map ?? defaultMapFor(args.players) } : {}),
+    ...(args.sbp === null ? {} : { specialBuildPhase: args.sbp }),
+    ...(args.balancedDice ? { balancedDice: true } : {}),
+    ...(args.mode === null ? {} : { mode: args.mode }),
+    ...(args.expansions.length === 0 ? {} : { expansions: args.expansions }),
+    ...(args.scenario === null ? {} : { scenario: args.scenario }),
+    ...(Object.keys(args.options).length === 0 ? {} : { options: args.options }),
+  };
 }
 
 function replay(args: SimArgs, out: (line: string) => void): number {

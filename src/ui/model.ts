@@ -30,7 +30,8 @@ import {
   type PlayerId,
   type Resource,
 } from '../engine';
-import type { HudView, PlaceMode } from './types';
+import { extensionHint, placeModeAction } from './expansions';
+import type { BasePlaceMode, HudView, PlaceMode } from './types';
 
 /** Legal actions the viewer may submit. */
 export function viewerLegal(view: HudView): Action[] {
@@ -78,8 +79,17 @@ export function availability(legal: readonly Action[]): Availability {
   };
 }
 
-export function placeModeAvailable(av: Availability, mode: PlaceMode): boolean {
-  return mode === 'road' ? av.buildRoad : mode === 'settlement' ? av.buildSettlement : av.buildCity;
+/** Is the build mode usable now? Expansion modes need `legal` (their action type must be in it). */
+export function placeModeAvailable(
+  av: Availability,
+  mode: PlaceMode,
+  legal: readonly Action[] = [],
+): boolean {
+  if (mode === 'road') return av.buildRoad;
+  if (mode === 'settlement') return av.buildSettlement;
+  if (mode === 'city') return av.buildCity;
+  const type = placeModeAction(mode);
+  return type !== null && legal.some((a) => a.type === type);
 }
 
 /** Bank ratio per resource for `player`: 2 (matching port), 3 (generic port) or 4. */
@@ -238,7 +248,7 @@ export function bankView(state: GameState): BankView {
   };
 }
 
-export type BuildKind = 'dev' | PlaceMode;
+export type BuildKind = 'dev' | BasePlaceMode;
 
 export interface BuildCard {
   kind: BuildKind;
@@ -267,7 +277,7 @@ export function buildCards(state: GameState, viewer: PlayerId, av: Availability)
   ];
 }
 
-const PIECE_PLURAL: Record<PlaceMode, string> = {
+const PIECE_PLURAL: Record<BasePlaceMode, string> = {
   road: 'roads',
   settlement: 'settlements',
   city: 'cities',
@@ -280,7 +290,7 @@ export interface BlockReason {
 }
 
 /** Is there any spot for `kind`, ignoring cost and phase? (geometry + own network only) */
-function anySpot(state: GameState, viewer: PlayerId, kind: PlaceMode): boolean {
+function anySpot(state: GameState, viewer: PlayerId, kind: BasePlaceMode): boolean {
   const t = topologyOf(state);
   if (kind === 'road') return t.edges.some((e) => canPlaceRoad(state, viewer, e));
   if (kind === 'city') return t.vertices.some((v) => canPlaceCity(state, viewer, v));
@@ -448,6 +458,9 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
       return placeMode
         ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
         : { text: 'Build or buy a card, then pass', tone: 'action' };
+    default:
+      // An expansion phase: its HudExtension.hint, or a generic prompt.
+      return { text: extensionHint(state, view) ?? 'Your move', tone: 'action' };
   }
 }
 

@@ -18,12 +18,16 @@ import {
   hexCenter,
   hexId,
   neighbor,
+  parseHexId,
   sideEdge,
   vertexPoint,
   type Axial,
   type Point,
 } from './hex';
-import { MAPS, type FrameDef, type FrameId } from './maps';
+// maps.ts first: it has no dependencies, and module-load code below (TOPOLOGY) needs it while the
+// expansion registry's import cycle is still being evaluated (see expansions/registry.ts).
+import { FRAME_STD19, type FrameDef, type FrameId, type HarborSpots } from './maps';
+import { mapById } from './mapLookup';
 import type { EdgeId, HexId, MapId, VertexId } from './types';
 
 export interface HexInfo {
@@ -47,15 +51,23 @@ export interface WaterHexInfo {
   r: number;
   x: number;
   y: number;
+  /** 6 corners, clockwise from N (land-touching ones are in `vertex`, the rest in `seaVertex`). */
+  vertices: VertexId[];
+  /** 6 sides, clockwise from NE (land-touching ones are in `edge`, the rest in `seaEdge`). */
+  edges: EdgeId[];
+  /** Adjacent hexes of the frame, land and water. */
+  neighbors: HexId[];
 }
 
 export interface VertexInfo {
   id: VertexId;
   x: number;
   y: number;
-  /** Adjacent land hexes (1–3). */
+  /** Adjacent land hexes (1–3; 0 for sea-only vertices). */
   hexes: HexId[];
-  /** Incident edges (2–3). */
+  /** Adjacent water hexes of the frame (EXPANSIONS.md §6). */
+  seas: HexId[];
+  /** Incident edges (2–3). Land vertices: land-touching edges only, as in the base game. */
   edges: EdgeId[];
   /** Vertices one edge away (2–3). Used for the distance rule. */
   vertices: VertexId[];
@@ -70,8 +82,10 @@ export interface EdgeInfo {
   vertices: [VertexId, VertexId];
   /** Edges sharing a vertex with this one (2–4). */
   edges: EdgeId[];
-  /** Adjacent land hexes (1–2). */
+  /** Adjacent land hexes (1–2; 0 for sea-only edges). */
   hexes: HexId[];
+  /** Adjacent water hexes of the frame. A ship may use an edge with seas.length > 0. */
+  seas: HexId[];
   coastal: boolean;
 }
 
@@ -100,6 +114,13 @@ export interface Topology {
   water: Readonly<Record<HexId, WaterHexInfo>>;
   vertex: Readonly<Record<VertexId, VertexInfo>>;
   edge: Readonly<Record<EdgeId, EdgeInfo>>;
+  /** Vertices touching only water hexes (ship routes over open sea). Not settleable. */
+  seaVertices: readonly VertexId[];
+  /** Edges touching only water hexes (ships only). */
+  seaEdges: readonly EdgeId[];
+  /** Sea-only vertex infos: `hexes` is [], `edges`/`vertices` include land-touching neighbours. */
+  seaVertex: Readonly<Record<VertexId, VertexInfo>>;
+  seaEdge: Readonly<Record<EdgeId, EdgeInfo>>;
 }
 
 /**
@@ -120,8 +141,21 @@ function landCoordsOf(rows: readonly number[]): Axial[] {
   return out;
 }
 
+function newVertexInfo(v: VertexId): VertexInfo {
+  const p = vertexPoint(v);
+  return { id: v, x: p.x, y: p.y, hexes: [], seas: [], edges: [], vertices: [], coastal: false };
+}
+
+function newEdgeInfo(e: EdgeId): EdgeInfo {
+  const p = edgeMidpoint(e);
+  const ends = edgeEndpoints(e);
+  return { id: e, x: p.x, y: p.y, vertices: ends, edges: [], hexes: [], seas: [], coastal: false };
+}
+
 function buildTopology(frame: FrameDef): Topology {
-  const landCoords = landCoordsOf(frame.rows);
+  const landCoords =
+    'rows' in frame ? landCoordsOf(frame.rows) : frame.hexes.map((id) => parseHexId(id));
+  if (landCoords.length === 0) throw new Error(`frame ${frame.id} has no hexes`);
   const landSet = new Set(landCoords.map((c) => hexId(c.q, c.r)));
   const isLand = (q: number, r: number) => landSet.has(hexId(q, r));
 
@@ -143,17 +177,14 @@ function buildTopology(frame: FrameDef): Topology {
 
     for (const v of vertices) {
       if (!vertex[v]) {
-        const p = vertexPoint(v);
-        vertex[v] = { id: v, x: p.x, y: p.y, hexes: [], edges: [], vertices: [], coastal: false };
+        vertex[v] = newVertexInfo(v);
         vertexOrder.push(v);
       }
       vertex[v].hexes.push(id);
     }
     for (const e of edges) {
       if (!edge[e]) {
-        const p = edgeMidpoint(e);
-        const ends = edgeEndpoints(e);
-        edge[e] = { id: e, x: p.x, y: p.y, vertices: ends, edges: [], hexes: [], coastal: false };
+        edge[e] = newEdgeInfo(e);
         edgeOrder.push(e);
       }
       edge[e].hexes.push(id);
@@ -209,17 +240,85 @@ function buildTopology(frame: FrameDef): Topology {
   const topLeft = [...ring].sort((a, b) => a.r - b.r || a.q - b.q)[0];
   const startAt = ring.findIndex((c) => c === topLeft);
   const waterCoords = [...ring.slice(startAt), ...ring.slice(0, startAt)];
+  // Explicit extra sea of a hex-list frame (interior seas, open ocean), row-major after the ring.
+  const extraSea = ('rows' in frame ? [] : (frame.sea ?? []))
+    .map((id) => parseHexId(id))
+    .filter((c) => !isLand(c.q, c.r) && !waterMap.has(hexId(c.q, c.r)))
+    .sort((a, b) => a.r - b.r || a.q - b.q);
+  for (const c of extraSea) waterMap.set(hexId(c.q, c.r), c);
+  const allWater = [...waterCoords, ...extraSea];
+  const inFrame = (q: number, r: number) => isLand(q, r) || waterMap.has(hexId(q, r));
+
+  // Sea geometry: water hex corners/sides; land-touching ones get `seas`, the rest are sea-only.
   const water: Record<HexId, WaterHexInfo> = {};
-  for (const { q, r } of waterCoords) {
+  const seaVertex: Record<VertexId, VertexInfo> = {};
+  const seaEdge: Record<EdgeId, EdgeInfo> = {};
+  const seaVertexOrder: VertexId[] = [];
+  const seaEdgeOrder: EdgeId[] = [];
+  for (const { q, r } of allWater) {
+    const id = hexId(q, r);
     const c = hexCenter(q, r);
-    water[hexId(q, r)] = { id: hexId(q, r), q, r, x: c.x, y: c.y };
+    const vertices = CORNERS.map((corner) => cornerVertex(q, r, corner));
+    const edges = SIDES.map((side) => sideEdge(q, r, side));
+    const neighbors = SIDES.map((s) => neighbor(q, r, s))
+      .filter((n) => inFrame(n.q, n.r))
+      .map((n) => hexId(n.q, n.r));
+    water[id] = { id, q, r, x: c.x, y: c.y, vertices, edges, neighbors };
+    for (const v of vertices) {
+      let info = vertex[v] ?? seaVertex[v];
+      if (!info) {
+        info = seaVertex[v] = newVertexInfo(v);
+        seaVertexOrder.push(v);
+      }
+      info.seas.push(id);
+    }
+    for (const e of edges) {
+      let info = edge[e] ?? seaEdge[e];
+      if (!info) {
+        info = seaEdge[e] = newEdgeInfo(e);
+        seaEdgeOrder.push(e);
+      }
+      info.seas.push(id);
+    }
+  }
+  // Sea-only adjacency (land infos keep their land-only lists, as in the base game).
+  const anyVertex = (v: VertexId) => vertex[v] ?? seaVertex[v];
+  for (const e of seaEdgeOrder) {
+    const [a, b] = (seaEdge[e] as EdgeInfo).vertices;
+    for (const [v, other] of [
+      [a, b],
+      [b, a],
+    ] as const) {
+      const sv = seaVertex[v];
+      if (sv) {
+        sv.edges.push(e);
+        sv.vertices.push(other);
+      }
+    }
+  }
+  for (const e of seaEdgeOrder) {
+    const info = seaEdge[e] as EdgeInfo;
+    const adj = new Set<EdgeId>();
+    for (const v of info.vertices) {
+      const vi = anyVertex(v);
+      if (!vi) continue;
+      for (const other of vi.edges) if (other !== e) adj.add(other);
+      if (vi.hexes.length > 0) {
+        // A land vertex: its sea-only edges are not in its land list; add them from the sea side.
+        for (const se of seaEdgeOrder) {
+          if (se !== e && (seaEdge[se] as EdgeInfo).vertices.includes(v)) adj.add(se);
+        }
+      }
+    }
+    info.edges = [...adj];
   }
 
   // Harbor slots (see FrameDef.harbors). Corner land hexes have exactly 3 land neighbors.
   const landNeighbors = (w: Axial) =>
     SIDES.map((s) => ({ s, n: neighbor(w.q, w.r, s) })).filter(({ n }) => isLand(n.q, n.r));
+  const spots: HarborSpots | 'alternate' = frame.harbors;
   const facing: [Axial, Axial][] =
-    frame.harbors === 'alternate'
+    spots === 'alternate'
       ? waterCoords
           .filter((_, i) => i % 2 === 0)
           .map((w) => {
@@ -237,7 +336,7 @@ function buildTopology(frame: FrameDef): Topology {
             if (!pick) throw new Error('harbor slot without land');
             return [w, pick];
           })
-      : frame.harbors.map(([wId, lId]) => {
+      : spots.map(([wId, lId]) => {
           const w = waterMap.get(wId);
           const l = hex[lId];
           if (!w || !l) throw new Error(`bad harbor slot ${wId} -> ${lId}`);
@@ -253,14 +352,14 @@ function buildTopology(frame: FrameDef): Topology {
   // Coastal edges clockwise, rotated to start at port slot 0.
   const coastal = edgeOrder.filter((e) => (edge[e] as EdgeInfo).coastal);
   coastal.sort((a, b) => angle(edge[a] as EdgeInfo) - angle(edge[b] as EdgeInfo));
-  const start = coastal.indexOf((portSlots[0] as PortSlot).edge);
+  const start = portSlots[0] ? Math.max(0, coastal.indexOf(portSlots[0].edge)) : 0;
   const coastalEdges = [...coastal.slice(start), ...coastal.slice(0, start)];
 
   return {
     frame: frame.id,
     center,
     landHexes: landCoords.map((c) => hexId(c.q, c.r)),
-    waterHexes: waterCoords.map((c) => hexId(c.q, c.r)),
+    waterHexes: allWater.map((c) => hexId(c.q, c.r)),
     vertices: vertexOrder,
     edges: edgeOrder,
     coastalEdges,
@@ -269,6 +368,10 @@ function buildTopology(frame: FrameDef): Topology {
     water,
     vertex,
     edge,
+    seaVertices: seaVertexOrder,
+    seaEdges: seaEdgeOrder,
+    seaVertex,
+    seaEdge,
   };
 }
 
@@ -285,9 +388,7 @@ export function topologyOfFrame(frame: FrameDef): Topology {
 
 /** Topology of a map (built on first use, then cached; maps sharing a frame share it). */
 export function topologyFor(map: MapId): Topology {
-  const def = MAPS[map];
-  if (!def) throw new Error(`unknown map ${String(map)}`);
-  return topologyOfFrame(def.frame);
+  return topologyOfFrame(mapById(map).frame);
 }
 
 /** Topology of the board a game is played on. */
@@ -300,7 +401,7 @@ export function topologyOf(state: { settings: { map: MapId } }): Topology {
  * @deprecated Only valid for base-map games; use `topologyOf(state)`. Kept for fixtures, tests
  * and UI code that only deals with the base board.
  */
-export const TOPOLOGY: Topology = topologyFor('base');
+export const TOPOLOGY: Topology = topologyOfFrame(FRAME_STD19); // = topologyFor('base')
 
 // ---------------------------------------------------------------------------
 // Convenience accessors. Unknown IDs return [] / false instead of throwing.
@@ -316,6 +417,22 @@ export function isBoardVertex(t: Topology, id: string): id is VertexId {
 }
 export function isBoardEdge(t: Topology, id: string): id is EdgeId {
   return Object.hasOwn(t.edge, id);
+}
+/** A water hex of the frame (the ring and any explicit sea). */
+export function isWaterHex(t: Topology, id: string): id is HexId {
+  return Object.hasOwn(t.water, id);
+}
+/** Any vertex of the frame: land-touching (`vertex`) or sea-only (`seaVertex`). */
+export function vertexInfo(t: Topology, id: VertexId): VertexInfo | undefined {
+  return t.vertex[id] ?? t.seaVertex[id];
+}
+/** Any edge of the frame: land-touching (`edge`, road edges) or sea-only (`seaEdge`). */
+export function edgeInfo(t: Topology, id: EdgeId): EdgeInfo | undefined {
+  return t.edge[id] ?? t.seaEdge[id];
+}
+/** An edge next to at least one water hex of the frame (a ship edge; coastal edges included). */
+export function isSeaEdge(t: Topology, id: string): id is EdgeId {
+  return (edgeInfo(t, id as EdgeId)?.seas.length ?? 0) > 0;
 }
 
 export function hexVertices(t: Topology, h: HexId): readonly VertexId[] {

@@ -1,4 +1,19 @@
 /** Pure setup-screen logic: defaults, map/player coupling, colours, persistence. No DOM. */
+import {
+  BASE_MODE,
+  defaultVpToWin,
+  expansionById,
+  listModes,
+  modeById,
+  optionVpBonus,
+  scenarioById,
+  type ExpansionModule,
+  type ModeDef,
+  type OptionDef,
+  type OptionValue,
+  type PlayerRange,
+  type ScenarioDef,
+} from '../../engine';
 import type { Controller, MapId, NewGameConfig, SeatConfig } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +88,13 @@ export interface SeatDraft {
 }
 
 export interface SetupDraft {
+  /** 'base' or an expansion mode (docs/EXPANSIONS.md §8). */
+  mode: string;
+  /** Scenario of an expansion mode; null in the base mode. */
+  scenario: string | null;
+  /** Expansion options of the mode's modules (defaults filled in). */
+  options: Record<string, Record<string, OptionValue>>;
+  /** Base mode only: the board. */
   map: MapId;
   seats: SeatDraft[];
   balancedDice: boolean;
@@ -100,6 +122,9 @@ export function defaultSetup(playerCount = 4): SetupDraft {
     seats.push(newSeat(i, new Set(seats.map((s) => s.color))));
   }
   return {
+    mode: 'base',
+    scenario: null,
+    options: {},
     map: 'base',
     seats,
     balancedDice: false,
@@ -131,14 +156,125 @@ export function mapDisabledReason(id: MapId, players: number): string | null {
 /**
  * Change the player count. Seats are kept/grown/trimmed (new seats take unused colours). If the
  * current map is too small, the smallest map that fits is selected; a bigger map than needed stays.
+ * Expansion modes clamp to their player range (playerRange).
  */
 export function setPlayerCount(draft: SetupDraft, count: number): SetupDraft {
-  const n = clamp(Math.round(count), MIN_PLAYERS, MAX_PLAYERS);
+  const range = playerRange(draft);
+  const n = clamp(Math.round(count), range.min, range.max);
   const seats = draft.seats.slice(0, n);
   while (seats.length < n) seats.push(newSeat(seats.length, new Set(seats.map((s) => s.color))));
   let map = draft.map;
   if (!mapFits(map, n)) map = MAPS.find((m) => m.max >= n)?.id ?? 'base78';
   return { ...draft, seats, map };
+}
+
+// ---------------------------------------------------------------------------
+// Modes, scenarios, expansion options (from the engine registry)
+// ---------------------------------------------------------------------------
+
+/**
+ * Modes offered on the setup screen: 'ready' ones, plus 'wip' / 'demo' ones when `showAll`
+ * (URL ?modes=all). The base mode is always first.
+ */
+export function visibleModes(showAll = false): ModeDef[] {
+  return listModes().filter((m) => m.status === 'ready' || showAll);
+}
+
+export function modeOf(draft: Pick<SetupDraft, 'mode'>): ModeDef {
+  return modeById(draft.mode) ?? BASE_MODE;
+}
+
+export function scenarioOf(draft: Pick<SetupDraft, 'scenario'>): ScenarioDef | null {
+  return draft.scenario === null ? null : (scenarioById(draft.scenario) ?? null);
+}
+
+/** The modules a mode activates (with their requires), in registry order of the mode list. */
+export function modeModules(mode: ModeDef): ExpansionModule[] {
+  const out: ExpansionModule[] = [];
+  const add = (id: string) => {
+    const m = expansionById(id);
+    if (!m || out.includes(m)) return;
+    out.push(m);
+    for (const r of m.requires ?? []) add(r);
+  };
+  for (const id of mode.expansions) add(id);
+  return out;
+}
+
+/** Seats the draft's mode + scenario allow (base: 3-8 with the map coupling). */
+export function playerRange(draft: Pick<SetupDraft, 'mode' | 'scenario'>): PlayerRange {
+  const mode = modeOf(draft);
+  if (mode.id === 'base') return { min: MIN_PLAYERS, max: MAX_PLAYERS };
+  const ranges = [
+    mode.players,
+    scenarioOf(draft)?.players,
+    ...modeModules(mode).map((m) => m.players),
+  ];
+  let min = 2;
+  let max = MAX_PLAYERS;
+  for (const r of ranges) {
+    if (!r) continue;
+    min = Math.max(min, r.min);
+    max = Math.min(max, r.max);
+  }
+  return { min, max: Math.max(min, max) };
+}
+
+/** Every option of the mode's modules, with its expansion id. */
+export function modeOptions(mode: ModeDef): { ext: string; def: OptionDef }[] {
+  return modeModules(mode).flatMap((m) => (m.options ?? []).map((def) => ({ ext: m.id, def })));
+}
+
+function defaultOptions(mode: ModeDef): Record<string, Record<string, OptionValue>> {
+  const out: Record<string, Record<string, OptionValue>> = {};
+  for (const { ext, def } of modeOptions(mode)) out[ext] = { ...out[ext], [def.key]: def.default };
+  return out;
+}
+
+/** The VP target the screen starts from for the draft's mode, scenario and options. */
+export function draftVpDefault(draft: SetupDraft): number {
+  const mode = modeOf(draft);
+  if (mode.id === 'base') return VP_DEFAULT;
+  return defaultVpToWin(mode, scenarioOf(draft)) + optionVpBonus(modeModules(mode), draft.options);
+}
+
+/** Pick a mode: its first scenario, default options and VP target, seats clamped to its range. */
+export function setMode(draft: SetupDraft, id: string): SetupDraft {
+  const mode = modeById(id) ?? BASE_MODE;
+  const next: SetupDraft = {
+    ...draft,
+    mode: mode.id,
+    scenario: mode.scenarios[0] ?? null,
+    options: defaultOptions(mode),
+  };
+  next.vpToWin = clamp(draftVpDefault(next), VP_MIN, VP_MAX);
+  return setPlayerCount(next, next.seats.length);
+}
+
+export function setScenario(draft: SetupDraft, id: string): SetupDraft {
+  if (!modeOf(draft).scenarios.includes(id)) return draft;
+  const next = { ...draft, scenario: id };
+  next.vpToWin = clamp(draftVpDefault(next), VP_MIN, VP_MAX);
+  return setPlayerCount(next, next.seats.length);
+}
+
+/** Set one expansion option (unknown keys / bad values are ignored). VP follows a vpBonus option. */
+export function setOption(
+  draft: SetupDraft,
+  ext: string,
+  key: string,
+  value: OptionValue,
+): SetupDraft {
+  const opt = modeOptions(modeOf(draft)).find((o) => o.ext === ext && o.def.key === key);
+  if (!opt || typeof value !== typeof opt.def.default) return draft;
+  const before = draftVpDefault(draft);
+  const next = {
+    ...draft,
+    options: { ...draft.options, [ext]: { ...draft.options[ext], [key]: value } },
+  };
+  // Keep a VP target the user changed; follow the default otherwise.
+  if (draft.vpToWin === before) next.vpToWin = clamp(draftVpDefault(next), VP_MIN, VP_MAX);
+  return next;
 }
 
 /** Pick a map and clamp the player count into its range. */
@@ -179,7 +315,13 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
     return { name, color: s.color, controller: s.controller };
   });
   const cfg: NewGameConfig = {
-    mode: 'base',
+    mode: draft.mode,
+    ...(draft.mode === 'base'
+      ? {}
+      : {
+          ...(draft.scenario === null ? {} : { scenario: draft.scenario }),
+          options: draft.options,
+        }),
     map: draft.map,
     players,
     rules: { balancedDice: draft.balancedDice, hideBankCards: draft.hideBankCards },
@@ -263,9 +405,26 @@ export function sanitizeSetup(raw: unknown): SetupDraft {
 
   const mapRaw = raw['map'];
   const map: MapId = MAPS.some((m) => m.id === mapRaw) ? (mapRaw as MapId) : 'base';
+  const mode = modeById(typeof raw['mode'] === 'string' ? raw['mode'] : 'base') ?? BASE_MODE;
+  const scenarioRaw = raw['scenario'];
+  const scenario =
+    typeof scenarioRaw === 'string' && mode.scenarios.includes(scenarioRaw)
+      ? scenarioRaw
+      : (mode.scenarios[0] ?? null);
+  const options = defaultOptions(mode);
+  const rawOpts = isRecord(raw['options']) ? raw['options'] : {};
+  for (const { ext, def } of modeOptions(mode)) {
+    const group = rawOpts[ext];
+    const v = isRecord(group) ? group[def.key] : undefined;
+    if (typeof v === typeof def.default)
+      options[ext] = { ...options[ext], [def.key]: v as OptionValue };
+  }
   // Re-run the coupling so a stored map that no longer fits is corrected.
   return setPlayerCount(
     {
+      mode: mode.id,
+      scenario,
+      options,
       map,
       seats,
       balancedDice: raw['balancedDice'] === true,

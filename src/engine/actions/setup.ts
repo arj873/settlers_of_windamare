@@ -11,13 +11,20 @@ import { canPlaceRoad, canPlaceSettlement } from '../rules/placement';
 import { describeBundle, playerName } from '../rules/text';
 import { piecesLeft, setupPlayerAt } from '../selectors';
 import { isBoardEdge, isBoardVertex, topologyOf, vertexEdges, vertexHexes } from '../topology';
-import { emptyResources } from '../resources';
+import { setupBuildingKind } from '../expansions/hooks';
+import { emptyResources, isResource } from '../resources';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../types';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 
-function canSetupSettlement(state: GameState, player: PlayerId, v: VertexId): boolean {
+/** `index` = setup step; its building kind comes from the setupBuilding hook (C&K: a city). */
+function canSetupSettlement(
+  state: GameState,
+  player: PlayerId,
+  v: VertexId,
+  index: number,
+): boolean {
   return (
-    piecesLeft(state, player).settlement > 0 &&
+    piecesLeft(state, player)[setupBuildingKind(state, index)] > 0 &&
     canPlaceSettlement(state, player, v, { requireRoad: false })
   );
 }
@@ -34,17 +41,18 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     }
     if (!isCurrent(draft, action.player)) return fail('not your turn');
     if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
-    if (!canSetupSettlement(draft, action.player, action.vertex)) {
+    if (!canSetupSettlement(draft, action.player, action.vertex, phase.index)) {
       return fail('vertex is taken or too close to another building');
     }
 
-    draft.pieces.buildings[action.vertex] = { owner: action.player, kind: 'settlement' };
-    let text = `${playerName(draft, action.player)} placed a settlement`;
+    const kind = setupBuildingKind(draft, phase.index);
+    draft.pieces.buildings[action.vertex] = { owner: action.player, kind };
+    let text = `${playerName(draft, action.player)} placed a ${kind}`;
     if (phase.index >= draft.players.length) {
       const gain = emptyResources();
       for (const h of vertexHexes(topologyOf(draft), action.vertex)) {
         const terrain = draft.board.hexes[h]?.terrain;
-        if (terrain && terrain !== 'desert' && draft.bank[terrain] > gain[terrain]) {
+        if (isResource(terrain) && draft.bank[terrain] > gain[terrain]) {
           gain[terrain] += 1;
         }
       }
@@ -97,7 +105,7 @@ export const setupLegal: LegalGenerator = (state: GameState): Action[] => {
   const player = state.turn.current;
   if (phase.step === 'settlement') {
     return topologyOf(state)
-      .vertices.filter((v) => canSetupSettlement(state, player, v))
+      .vertices.filter((v) => canSetupSettlement(state, player, v, phase.index))
       .map((vertex) => ({ type: 'placeSetupSettlement', player, vertex }));
   }
   const from = phase.lastSettlement;

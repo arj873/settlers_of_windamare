@@ -5,6 +5,7 @@
 import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
 import type { Controller, PlaceMode } from '../ui';
+import { impliedExtActions, placeModeAction } from '../ui/expansions';
 
 /** Seat controllers, indexed by PlayerId. */
 export type Seats = readonly Controller[];
@@ -64,12 +65,14 @@ export function boardActions(
   placeMode: PlaceMode | null,
 ): Action[] {
   const mine = legal.filter((a) => a.player === viewer);
+  const extImplied = impliedExtActions();
   const implied = mine.filter(
     (a) =>
       a.type === 'placeSetupSettlement' ||
       a.type === 'placeSetupRoad' ||
       a.type === 'moveRobber' ||
-      a.type === 'placeFreeRoad',
+      a.type === 'placeFreeRoad' ||
+      extImplied.has(a.type),
   );
   if (implied.length > 0) return implied;
   const buildType =
@@ -79,7 +82,9 @@ export function boardActions(
         ? 'buildSettlement'
         : placeMode === 'city'
           ? 'buildCity'
-          : null;
+          : placeMode
+            ? placeModeAction(placeMode) // expansion build card (ui/expansions.ts)
+            : null;
   return buildType ? mine.filter((a) => a.type === buildType) : [];
 }
 
@@ -89,9 +94,10 @@ export function highlightsFor(actions: readonly Action[], color?: string): Highl
   const edges: EdgeId[] = [];
   const hexes: HexId[] = [];
   for (const a of actions) {
-    if ('vertex' in a) vertices.push(a.vertex);
-    else if ('edge' in a) edges.push(a.edge);
-    else if ('hex' in a) hexes.push(a.hex);
+    const at = locationOf(a);
+    if (at?.kind === 'vertex') vertices.push(at.id);
+    else if (at?.kind === 'edge') edges.push(at.id);
+    else if (at?.kind === 'hex') hexes.push(at.id);
   }
   if (vertices.length + edges.length + hexes.length === 0) return {};
   return { vertices, edges, hexes, ...(color ? { color } : {}) };
@@ -100,15 +106,20 @@ export function highlightsFor(actions: readonly Action[], color?: string): Highl
 export type BoardClick =
   { kind: 'vertex'; id: VertexId } | { kind: 'edge'; id: EdgeId } | { kind: 'hex'; id: HexId };
 
+/** The board location an action targets (its `vertex`, `edge` or `hex` field), or null. */
+export function locationOf(a: Action): BoardClick | null {
+  if ('vertex' in a && typeof a.vertex === 'string') return { kind: 'vertex', id: a.vertex };
+  if ('edge' in a && typeof a.edge === 'string') return { kind: 'edge', id: a.edge };
+  if ('hex' in a && typeof a.hex === 'string') return { kind: 'hex', id: a.hex };
+  return null;
+}
+
 /** The board action matching a click, or undefined when the click means nothing right now. */
 export function actionForClick(actions: readonly Action[], click: BoardClick): Action | undefined {
-  return actions.find((a) =>
-    click.kind === 'vertex'
-      ? 'vertex' in a && a.vertex === click.id
-      : click.kind === 'edge'
-        ? 'edge' in a && a.edge === click.id
-        : 'hex' in a && a.hex === click.id,
-  );
+  return actions.find((a) => {
+    const at = locationOf(a);
+    return at !== null && at.kind === click.kind && at.id === click.id;
+  });
 }
 
 export interface BotTurn {

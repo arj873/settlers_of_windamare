@@ -4,18 +4,52 @@ export * from './constants';
 export * from './hex';
 export * from './topology';
 export * from './maps';
+export * from './mapLookup';
+export * from './expansions/types';
+export * from './expansions/ext';
+export {
+  BASE_MODE,
+  activeModules,
+  allModules,
+  allScenarios,
+  expansionById,
+  isActive,
+  isExpansionId,
+  listModes,
+  mapDef,
+  modeById,
+  scenarioById,
+} from './expansions/registry';
+export {
+  costOf,
+  expansionVictoryPoints,
+  pieceLimit,
+  terrainKind,
+  type BaseCostItem,
+} from './expansions/hooks';
 export { upgradeState, SCHEMA_VERSION } from './migrate';
 export * from './rng';
 export * from './resources';
 export * from './selectors';
 export * from './rules/placement';
-export { generateBoard, beginnerBoard, randomBoard, redNumbersSeparated } from './board';
+export {
+  assembleBoard,
+  beginnerBoard,
+  dealTokens,
+  generateBoard,
+  randomBoard,
+  redNumbersSeparated,
+} from './board';
 export {
   createGame,
+  defaultVpToWin,
   layoutToMap,
+  optionVpBonus,
+  resolveMode,
   resolveSettings,
   type GameConfig,
   type PlayerConfig,
+  type ResolvedMode,
 } from './createGame';
 export { applyAction, legalActions } from './engine';
 export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';

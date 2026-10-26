@@ -3,6 +3,7 @@
  * Everything clickable is enabled from `view.legal` only; clicks emit Actions (or 'placeMode').
  */
 import {
+  costOf,
   emptyResources,
   getPlayer,
   RESOURCES,
@@ -24,6 +25,7 @@ import {
   validateDraft,
   type TradeDraft,
 } from './composer';
+import { hudExtensionsFor } from './expansions';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
@@ -52,7 +54,8 @@ import './hud.css';
 
 type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
-type Section = 'log' | 'bank' | 'players';
+/** Base sections, or `ext:<expansionId>` for an expansion panel. */
+type Section = 'log' | 'bank' | 'players' | `ext:${string}`;
 type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
 
 const BUILD_LABEL: Record<BuildKind, string> = {
@@ -74,7 +77,12 @@ const costText = (k: BuildKind) =>
     .map(([r, n]) => `${n} ${r}`)
     .join(', ');
 
-const SECTION_TITLE: Record<Section, string> = {
+const describeCost = (cost: ResourceCounts) =>
+  RESOURCES.filter((r) => cost[r] > 0)
+    .map((r) => `${cost[r]} ${r}`)
+    .join(', ');
+
+const SECTION_TITLE: Record<'log' | 'bank' | 'players', string> = {
   log: 'Game Events',
   bank: 'Bank',
   players: 'Players',
@@ -221,10 +229,12 @@ export class Hud {
     if (this.unlockedViewer === null) this.unlockedViewer = view.viewer;
 
     // Leave build mode after anything was placed, or when it stops being legal.
-    const sig = `${Object.keys(state.pieces.buildings).length}/${Object.keys(state.pieces.roads).length}/${state.turn.number}/${state.phase.kind}`;
+    // (Expansion pieces live in state.ext: its size stands in for "a module piece was placed".)
+    const extSig = state.settings.expansions.length > 0 ? JSON.stringify(state.ext).length : 0;
+    const sig = `${Object.keys(state.pieces.buildings).length}/${Object.keys(state.pieces.roads).length}/${state.turn.number}/${state.phase.kind}/${extSig}`;
     const sigChanged = sig !== this.pieceSig;
     this.pieceSig = sig;
-    if (this.placeMode && (sigChanged || !placeModeAvailable(av, this.placeMode))) {
+    if (this.placeMode && (sigChanged || !placeModeAvailable(av, this.placeMode, legal))) {
       this.setPlaceMode(null);
     }
 
@@ -471,9 +481,14 @@ export class Hud {
 
     const list = logList(state);
     side.classList.toggle('is-open', this.drawerOpen);
+    const extPanels = hudExtensionsFor(state).flatMap((x) => {
+      const p = x.panel?.(state, view);
+      return p ? [this.section(`ext:${x.id}`, p.body, p.title)] : [];
+    });
     side.replaceChildren(
       this.section('log', list),
       this.section('bank', bankPanel(state)),
+      ...extPanels,
       this.section('players', playersList(state, view)),
     );
     const grew = state.log.length !== this.lastLogLength;
@@ -499,22 +514,23 @@ export class Hud {
     );
   }
 
-  private section(key: Section, body: HTMLElement): HTMLElement {
+  private section(key: Section, body: HTMLElement, title?: string): HTMLElement {
     const closed = this.collapsed.has(key);
+    const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log']);
     return h(
       'section',
-      { class: `side-sec sec-${key}${closed ? ' is-collapsed' : ''}` },
+      { class: `side-sec sec-${key.replace(':', '-')}${closed ? ' is-collapsed' : ''}` },
       h(
         'header',
         { class: 'sec-head' },
-        h('h2', { class: 'plaque' }, SECTION_TITLE[key]),
+        h('h2', { class: 'plaque' }, heading),
         h(
           'button',
           {
             class: 'sec-toggle',
             title: closed ? 'Expand' : 'Collapse',
             attrs: {
-              'aria-label': `${closed ? 'Expand' : 'Collapse'} ${SECTION_TITLE[key]}`,
+              'aria-label': `${closed ? 'Expand' : 'Collapse'} ${heading}`,
               'aria-expanded': String(!closed),
             },
             on: {
@@ -677,6 +693,43 @@ export class Hud {
       }),
     );
 
+    // Expansion build cards (docs/EXPANSIONS.md §8): same look, enabled from legal actions only.
+    for (const x of hudExtensionsFor(state)) {
+      for (const c of x.buildCards ?? []) {
+        const enabled = !over && legal.some((a) => a.type === c.actionType);
+        const cost = costOf(state, c.costItem ?? c.mode);
+        const left = c.left?.(state, view.viewer);
+        const total = c.total?.(state, view.viewer);
+        build.append(
+          h(
+            'span',
+            { class: 'bslot' },
+            h(
+              'button',
+              {
+                class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
+                disabled: !enabled,
+                title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
+                attrs: enabled ? {} : { 'data-why': 'Not possible right now' },
+                on: { click: toggleMode(c.mode) },
+              },
+              h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),
+              h('span', { class: 'bcard-label' }, c.label),
+              left !== undefined && h('span', { class: 'bcard-left' }, `${left}/${total ?? left}`),
+              cost &&
+                h(
+                  'span',
+                  { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+                  ...RESOURCES.flatMap((r) =>
+                    Array.from({ length: cost[r] }, () => resCardFace(r, 16)),
+                  ),
+                ),
+            ),
+          ),
+        );
+      }
+    }
+
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
     return [build, trade, hand];
@@ -821,6 +874,10 @@ export class Hud {
       if (offer.responses[view.viewer] === 'pending')
         return this.responderDialog(state, view, legal);
       return null;
+    }
+    for (const x of hudExtensionsFor(state)) {
+      const d = x.dialog?.(state, view, legal, (a) => this.send(a));
+      if (d) return d;
     }
 
     switch (this.dialog) {
