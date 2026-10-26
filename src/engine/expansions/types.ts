@@ -117,6 +117,11 @@ export interface ScenarioDef {
   maps: readonly MapId[];
   /** Default VP target (the setup screen and createGame start from it). Default 10. */
   vpToWin?: number;
+  /**
+   * With 5+ players the turn is the paired players' turn (settings.secondSettler on by default,
+   * no special building phase), as in Explorers & Pirates 5-6. Default: the special build phase.
+   */
+  pairedTurns56?: boolean;
 }
 
 /**
