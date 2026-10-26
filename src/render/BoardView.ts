@@ -237,7 +237,9 @@ export class BoardView {
    */
   screenPos(id: string): Point | null {
     const info =
-      TOPOLOGY.vertex[id as VertexId] ?? TOPOLOGY.edge[id as EdgeId] ?? TOPOLOGY.hex[id as HexId];
+      this.topo.vertex[id as VertexId] ??
+      this.topo.edge[id as EdgeId] ??
+      this.topo.hex[id as HexId];
     if (!info) return null;
     const p = unitToScreen(this.viewport.view, info);
     const r = this.app.canvas.getBoundingClientRect();
