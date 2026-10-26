@@ -3,8 +3,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createGame, legalActions, type Action, type GameState } from '../../engine';
 import { Hud } from '../../ui/hud';
+import { modeById } from '../../engine/expansions/registry';
+import { DEFAULT_ROOM_CONFIG, parseClientMessage, PROTOCOL_VERSION } from '../../net/protocol';
 import { SetupScreen } from '../../ui/setup/screen';
-import { playerRange } from '../../ui/setup/model';
+import { modeOptions, playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { fishOf } from '../tb/engine/state';
 import { PAIRS, TBSEA_MODE } from './engine';
@@ -26,6 +28,34 @@ describe('T&B + Seafarers setup screen', () => {
     q(screen, 'scenario-tbsea/traders')?.click();
     q(screen, 'start')?.click();
     expect(started[0]).toMatchObject({ mode: TBSEA_MODE, scenario: 'tbsea/traders', vpToWin: 17 });
+  });
+});
+
+describe('options the mode hides (ModeDef.hideOptions)', () => {
+  it('no variable set-up: hidden on the setup screen and refused online; Seafarers keeps it', () => {
+    const screen = new SetupScreen({ onStart: () => {}, storage: null });
+    document.body.replaceChildren(screen.element);
+    q(screen, 'mode-seafarers')?.click();
+    expect(screen.element.querySelector('[data-k="opt-seafarers-layout"]')).not.toBeNull();
+    expect(modeOptions(modeById('seafarers')!).map((o) => `${o.ext}.${o.def.key}`)).toContain(
+      'seafarers.layout',
+    );
+    q(screen, `mode-${TBSEA_MODE}`)?.click();
+    expect(screen.element.querySelector('[data-k="opt-seafarers-layout"]')).toBeNull();
+    const offered = modeOptions(modeById(TBSEA_MODE)!).map((o) => `${o.ext}.${o.def.key}`);
+    expect(offered).toEqual(['tb.harbormaster']);
+    expect(screen.state.options['seafarers']).toBeUndefined();
+    const config = {
+      ...DEFAULT_ROOM_CONFIG,
+      mode: TBSEA_MODE,
+      scenario: 'tbsea/traders',
+      options: { seafarers: { layout: 'variable' } },
+    };
+    expect(parseClientMessage({ v: PROTOCOL_VERSION, type: 'configure', config }).ok).toBe(false);
+    const plain = { ...config, options: { tb: { harbormaster: true } } };
+    expect(parseClientMessage({ v: PROTOCOL_VERSION, type: 'configure', config: plain }).ok).toBe(
+      true,
+    );
   });
 });
 

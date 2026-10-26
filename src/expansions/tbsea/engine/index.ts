@@ -342,6 +342,8 @@ export const tbseaModule: ExpansionModule = {
       expansions: [TBSEA],
       scenarios: TBSEA_SCENARIOS,
       players: { min: 3, max: 4 },
+      // The T&B island sits on the printed New Shores map: no variable set-up.
+      hideOptions: [`${SEAFARERS}.layout`],
     },
   ],
 

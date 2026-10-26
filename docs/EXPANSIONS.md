@@ -462,7 +462,10 @@ How a combination is built:
 - **A combination is a mode of a small combo module** (`src/expansions/<pair>/`) that `requires`
   both expansions and declares one mode listing exactly the suitable scenarios, with `vpBonus` or
   per-scenario `scenarioVp`. The two expansion modules run unchanged. Anything not listed as a
-  mode cannot be started; `validate` refuses other scenarios.
+  mode cannot be started; `validate` refuses other scenarios. A composed module's option that
+  does not apply in the combination goes in `ModeDef.hideOptions` (`'<ext>.<key>'`): the setup
+  screen and the online protocol (`modeOptions`) never offer it, so it keeps its default
+  (`tb+seafarers` hides `seafarers.layout`).
 - **Composition order is explicit:** the combo declares `before: [a, b]`, so its hooks, `legal` and
   `filterLegal` run first and its overrides / wraps are outermost. Where both modules define a
   first-wins hook (`afterProduction`, `onSeven`, `rollDice`), the combo's hook calls theirs in

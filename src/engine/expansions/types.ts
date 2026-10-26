@@ -164,6 +164,11 @@ export interface ModeDef {
   vpBonus?: number;
   /** Exact VP target per scenario, overriding scenario target + vpBonus (T&B + C&K: 13 / 15). */
   scenarioVp?: Readonly<Record<ScenarioId, number>>;
+  /**
+   * Options of the mode's modules that do not apply in it, as `'<ext>.<key>'`: not offered on the
+   * setup screen or online, so the game keeps their default (T&B + Seafarers: `seafarers.layout`).
+   */
+  hideOptions?: readonly string[];
 }
 
 /**
