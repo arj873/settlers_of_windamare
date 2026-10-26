@@ -650,7 +650,8 @@ harbor settlement or vice versa). Aqueduct (Science 3): if no cards on a 7, take
 Knights move only on their island, don't take part in missions, may not be built/moved next to
 unexplored hexes. Missions: Fast Gold = once in the action phase, trade 1 resource/commodity for 1
 gold (twice if crew on both Fast Gold hexes). **Win at 5 VP more than the E&P scenario requires**
-(e.g. Spices for Catan -> 19). Progress cards: Medicine (1 wheat + 2 ore for a city, or 1 wheat + 1 ore
+(the sheet's example: Spices for Catan -> 19; but Spices is 15 VP in the Mission Guide, so the
+rule gives 20: we follow the rule, combos.md §7). Progress cards: Medicine (1 wheat + 2 ore for a city, or 1 wheat + 1 ore
 for a harbor settlement), Taxation (activate the pirate ship instead of the robber), Treason (knights
 only), Road Building (roads only, no ships).
 

@@ -57,6 +57,8 @@ describe('GameSession: expansion modes online', () => {
     { mode: 'ep', scenario: 'ep/landHo' },
     { mode: 'tb', scenario: 'tb/fishermen' },
     { mode: 'seafarers+ck', scenario: 'seafarers/newShores' },
+    { mode: 'ep+ck', scenario: 'ep/pirateLairs', vpToWin: 17 },
+    { mode: 'ep+tb', scenario: 'ep/fish' },
   ])('$mode $scenario: humans and bots play; each seat gets its own view', (patch) => {
     const { net, session } = started(patch);
     expect(session.state!.settings.mode).toBe(patch.mode);

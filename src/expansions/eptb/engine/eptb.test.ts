@@ -1,5 +1,5 @@
 /**
- * Explorers & Pirates + Traders & Barbarians (2025 sheet, docs/rules/combos.md §6): the
+ * Explorers & Pirates + Traders & Barbarians (2025 sheet, docs/rules/combos.md §8): the
  * Fishermen of Catan on the E&P island. One test per rule, the composition, soundness.
  */
 import { describe, expect, it } from 'vitest';

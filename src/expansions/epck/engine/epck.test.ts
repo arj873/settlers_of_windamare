@@ -1,5 +1,5 @@
 /**
- * Explorers & Pirates + Cities & Knights (2025 sheet, docs/rules/combos.md §5): one test per
+ * Explorers & Pirates + Cities & Knights (2025 sheet, docs/rules/combos.md §7): one test per
  * combined rule, the composition order, and soundness. Board: the full game, 4 players; doubled
  * coordinates as in ep/engine/testkit.ts.
  */

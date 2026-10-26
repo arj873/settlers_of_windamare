@@ -25,6 +25,8 @@ describe('E&P + T&B setup screen', () => {
       expect(q(screen, `scenario-ep/${sc}`), sc).not.toBeNull();
     }
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 4 });
+    // Tiles show the seats this mode allows, not the scenario's own 3-6.
+    expect(q(screen, 'scenario-ep/full')?.textContent).toContain('3–4 players');
     q(screen, 'scenario-ep/full')?.click();
     q(screen, 'start')?.click();
     expect(started[0]).toMatchObject({ mode: EPTB_MODE, scenario: 'ep/full', vpToWin: 17 });

@@ -1,7 +1,7 @@
 /**
  * Explorers & Pirates + Traders & Barbarians (the 2025 combination sheet, docs/rules/combos.md
- * §6): the Fishermen of Catan on the E&P starting island. The only T&B scenario the sheet
- * combines; the others are refused (§6: Rivers, Merchant Trains, Barbarian Attack, Traders &
+ * §8): the Fishermen of Catan on the E&P starting island. The only T&B scenario the sheet
+ * combines; the others are refused (§8: Rivers, Merchant Trains, Barbarian Attack, Traders &
  * Barbarians "only balanced with CATAN"; Friendly Robber and Harbors of Catan impossible). Event
  * Cards may be used for the numbers only (the `ep` module drops their events).
  *

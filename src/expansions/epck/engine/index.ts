@@ -1,5 +1,5 @@
 /**
- * Explorers & Pirates + Cities & Knights (the 2025 combination sheet, docs/rules/combos.md §5):
+ * Explorers & Pirates + Cities & Knights (the 2025 combination sheet, docs/rules/combos.md §7):
  * the official combination, composed from the two modules plus the rules only the pair has.
  *
  * Composition order (`before`): epck, ck, ep. Where both modules hook the same first-wins point
