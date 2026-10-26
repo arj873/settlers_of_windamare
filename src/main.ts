@@ -242,7 +242,8 @@ function startOffline(o: {
   if (params.debug) installDebugHook(controller, board);
 
   if (dev) {
-    controller.start(dev.state, dev.seats);
+    const levels = params.levels?.length === dev.seats.length ? params.levels : undefined;
+    controller.start(dev.state, dev.seats, levels ? { botLevels: levels } : {});
     const hl = params.hl;
     const s = dev.state;
     const topo = topologyOf(s);

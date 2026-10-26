@@ -47,6 +47,7 @@ import {
   type TimerSettings,
   type VertexId,
 } from '../engine';
+import { BOT_LEVELS, type BotLevel } from '../bots/levels';
 import { gameConfigOf } from '../game/logic';
 import type { SlotKind } from '../game/turnTimer';
 import type { NewGameConfig, NewGameVariants } from '../ui/types';
@@ -163,6 +164,8 @@ export interface SeatInfo {
   /** Member who owns the seat (also while a bot plays it for them). */
   occupant: MemberId | null;
   status: SeatStatus;
+  /** B1: the bot that plays the seat whenever no human does (absent = DEFAULT_BOT_LEVEL). */
+  botLevel?: BotLevel;
 }
 
 export interface MemberInfo {
@@ -264,6 +267,8 @@ export type ClientMessage = V &
     | { type: 'takeSeat'; seat: PlayerId }
     | { type: 'leaveSeat' }
     | { type: 'setColor'; color: string }
+    /** Host, lobby (B1): the difficulty of the bot playing `seat` when no human does. */
+    | { type: 'setBotLevel'; seat: PlayerId; level: BotLevel }
     /** Host, lobby. */
     | { type: 'configure'; config: RoomConfig }
     /** Host. Removes a member; their token stops working. */
@@ -750,6 +755,12 @@ const CLIENT: ClientParsers = {
   takeSeat: (o, p) => ({ v, type: 'takeSeat', seat: field(o, 'seat', PLAYER_ID, p) }),
   leaveSeat: () => ({ v, type: 'leaveSeat' }),
   setColor: (o, p) => ({ v, type: 'setColor', color: field(o, 'color', oneOf(ROOM_COLORS), p) }),
+  setBotLevel: (o, p) => ({
+    v,
+    type: 'setBotLevel',
+    seat: field(o, 'seat', PLAYER_ID, p),
+    level: field(o, 'level', oneOf(BOT_LEVELS), p),
+  }),
   configure: (o, p) => ({ v, type: 'configure', config: field(o, 'config', parseRoomConfig, p) }),
   kick: (o, p) => ({ v, type: 'kick', member: field(o, 'member', str(16), p) }),
   start: () => ({ v, type: 'start' }),

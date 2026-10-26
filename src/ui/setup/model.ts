@@ -28,6 +28,7 @@ import {
   type TimerPreset,
 } from '../../engine';
 import type { Controller, MapId, NewGameConfig, NewGameVariants, SeatConfig } from '../types';
+import { isBotLevel, type BotLevel } from '../../bots/levels';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -99,6 +100,8 @@ export interface SeatDraft {
   name: string;
   color: string;
   controller: Controller;
+  /** B1: difficulty when the seat is a bot (absent = DEFAULT_BOT_LEVEL). */
+  botLevel?: BotLevel;
 }
 
 export interface SetupDraft {
@@ -677,7 +680,12 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
     let name = base;
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`;
     taken.add(name.toLowerCase());
-    return { name, color: s.color, controller: s.controller };
+    return {
+      name,
+      color: s.color,
+      controller: s.controller,
+      ...(s.controller === 'bot' && s.botLevel !== undefined ? { botLevel: s.botLevel } : {}),
+    };
   });
   const cfg: NewGameConfig = {
     mode: draft.mode,
@@ -768,6 +776,7 @@ export function sanitizeSetup(raw: unknown): SetupDraft {
           : o['controller'] === 'human'
             ? 'human'
             : 'bot',
+      ...(isBotLevel(o['botLevel']) ? { botLevel: o['botLevel'] } : {}),
     });
   });
   while (seats.length < MIN_PLAYERS)

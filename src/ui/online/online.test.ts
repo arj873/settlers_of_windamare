@@ -184,6 +184,7 @@ function actionsLog() {
     takeSeat: (s) => log.push(`sit:${s}`),
     leaveSeat: () => log.push('stand'),
     setColor: (c) => log.push(`color:${c}`),
+    setBotLevel: (seat, level) => log.push(`level:${seat}:${level}`),
     configure: (c) => log.push(`seats:${c.seatCount}`),
     start: () => log.push('start'),
     leave: () => log.push('leave'),

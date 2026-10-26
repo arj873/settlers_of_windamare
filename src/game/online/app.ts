@@ -284,6 +284,8 @@ export class OnlineApp {
             takeSeat: (seat) => this.sendOrWarn(c.send({ type: 'takeSeat', seat })),
             leaveSeat: () => this.sendOrWarn(c.send({ type: 'leaveSeat' })),
             setColor: (color) => this.sendOrWarn(c.send({ type: 'setColor', color })),
+            setBotLevel: (seat, level) =>
+              this.sendOrWarn(c.send({ type: 'setBotLevel', seat, level })),
             configure: (config) => this.sendOrWarn(c.configure(config)),
             start: () => this.sendOrWarn(c.send({ type: 'start' })),
             leave: () => this.leave(),

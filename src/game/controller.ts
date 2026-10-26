@@ -17,7 +17,8 @@ import {
   type GameState,
   type PlayerId,
 } from '../engine';
-import { createRandomBot, type Bot } from '../bots';
+import { createRandomBot, DEFAULT_BOT_LEVEL, type Bot, type BotLevel } from '../bots';
+import { botForLevel } from '../bots/byLevel';
 import type { BoardView } from '../render';
 import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import {
@@ -58,6 +59,7 @@ export interface ControllerOptions {
   toast?: (message: string, kind: ToastKind) => void;
   /** Milliseconds per bot move (0 = instant). Quick reactions use `speed * FAST_FACTOR`. */
   speed?: number;
+  /** One bot for every bot seat (tests); absent = each seat's level (B1, `start` opts). */
   bot?: Bot;
   /** Called after every render (main.ts re-measures the HUD to keep the board clear of it). */
   onRender?: () => void;
@@ -76,7 +78,10 @@ export const BOT_OFFERS_PER_TURN = 1;
 export const TIMER_TICK_MS = 250;
 const MAX_TICK_MS = 1000;
 
-/** The default bot: random, nudged to make progress instead of ending the turn at once. */
+/**
+ * The random bot nudged to make progress instead of ending the turn at once: the Easy level,
+ * and the bot of every test that drives games. Seats play their own level (B1).
+ */
 export const defaultBot: Bot = createRandomBot({ progressBias: 0.5 });
 
 export class GameController {
@@ -84,13 +89,15 @@ export class GameController {
   private readonly hud: HudLike;
   private readonly storage: KeyValueStore | null;
   private readonly toast: (message: string, kind: ToastKind) => void;
-  private readonly bot: Bot;
+  private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
   private speedMs: number;
 
   private current: GameState | null = null;
   private seatList: Seats = [];
+  /** Bot level per seat (B1); absent entries play DEFAULT_BOT_LEVEL. */
+  private levels: BotLevel[] = [];
   private legal: Action[] = [];
   private viewerId: PlayerId | null = null;
   private placeMode: PlaceMode | null = null;
@@ -122,7 +129,7 @@ export class GameController {
     this.hud = opts.hud;
     this.storage = opts.storage ?? null;
     this.toast = opts.toast ?? ((m, k) => (k === 'error' ? console.error(m) : console.info(m)));
-    this.bot = opts.bot ?? defaultBot;
+    this.bot = opts.bot ?? null;
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
@@ -149,6 +156,10 @@ export class GameController {
   }
   get seats(): Seats {
     return this.seatList;
+  }
+  /** Each seat's bot level (B1). */
+  get botLevels(): readonly BotLevel[] {
+    return this.seatList.map((_, i) => this.levels[i] ?? DEFAULT_BOT_LEVEL);
   }
   get viewer(): PlayerId | null {
     return this.viewerId;
@@ -179,6 +190,8 @@ export class GameController {
       banks?: unknown;
       /** Time already played (a resumed save); null = unknown; absent = a game starting now. */
       playedMs?: number | null;
+      /** Bot level per seat (B1); absent = all DEFAULT_BOT_LEVEL. */
+      botLevels?: readonly BotLevel[];
     } = {},
   ) {
     if (seats.length !== state.players.length) {
@@ -188,6 +201,7 @@ export class GameController {
     this.stopClock();
     this.current = state;
     this.seatList = [...seats];
+    this.levels = seats.map((_, i) => opts.botLevels?.[i] ?? DEFAULT_BOT_LEVEL);
     this.viewerId = opts.viewer ?? null;
     this.placeMode = null;
     this.offers.clear();
@@ -213,6 +227,7 @@ export class GameController {
     this.start(
       state,
       order.map((i) => cfg.players[i]?.controller ?? 'bot'),
+      { botLevels: order.map((i) => cfg.players[i]?.botLevel ?? DEFAULT_BOT_LEVEL) },
     );
   }
 
@@ -222,6 +237,7 @@ export class GameController {
       botRng: saved.botRng,
       banks: saved.banks,
       playedMs: saved.playedMs ?? null,
+      ...(saved.botLevels ? { botLevels: saved.botLevels } : {}),
     });
   }
 
@@ -236,6 +252,7 @@ export class GameController {
       seats: [...this.seatList],
       viewer: this.viewerId,
       botRng: this.botRng.state,
+      botLevels: [...this.botLevels],
       ...(timerOf(this.current.settings).kind === 'bank'
         ? { banks: flushBank(this.clock, this.banks) }
         : {}),
@@ -470,7 +487,8 @@ export class GameController {
     if (!state) return false;
     const next = nextBot(state, this.seatList, this.legal);
     if (!next) return false;
-    const action = this.bot(state, next.player, this.botRng, this.botOptions(state, next.player));
+    const bot = this.bot ?? botForLevel(this.levels[next.player]);
+    const action = bot(state, next.player, this.botRng, this.botOptions(state, next.player));
     if (!action) {
       this.toast(`Bot ${state.players[next.player]?.name ?? next.player} found no move`, 'error');
       return false;

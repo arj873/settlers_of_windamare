@@ -388,8 +388,25 @@ interface BotExtension {
   invariants?(state): Violation[]; // code 'expansion'; checked after every sim step
   relax?: ViolationCode[]; // base checks that do not hold with your module
   steer?(state, player, options, rng): Action | null; // E4: progress pick (bias draws only)
+  score?(ctx: BotContext, action): number | null; // B1: smart bots' score of an option
+  goals?(ctx: BotContext): BotGoal[]; // B1: what a smart bot saves for in this module
 }
 ```
+
+- `score` / `goals` (B1, `src/bots/smart`, ARCHITECTURE.md §13c): the Normal / Hard bots ask
+  every active module's `score` for every option (base actions too; the first non-null wins,
+  else the base scoring). The scale: 100 ≈ one VP now, `endTurn` 0, `rollDice` 50 (`VP`, `ROLL`,
+  `PIP_VALUE` exported from `src/bots/smart`). `ctx` caches the decision's board values
+  (`vertexValue`, `settlementValue`, `cityValue`, `production`, `threat(p)`, `roadToSpotValue`),
+  the plan (`goals()`, `target()`) and `handScore(hand)` for trades / discards; helpers
+  `baseScore`, `conflict` (what spending delays the target), `trade`, `robberHex`. A goal is
+  `{ id, cost: ResourceCounts, value }`; a goal with a base id ('city', 'settlement') is the
+  same plan (no conflict penalty when building it). Read only public information and the bot's
+  own secrets (`smart.test.ts` runs the bots on views). Modules without `score` still play: their
+  actions get the module's `steer` (half the decisions) or a type-first random pick.
+  Full strategies: C&K (`ck/strategy.ts`: knights vs barbarians, improvements, walls, progress
+  cards and prompts) and Seafarers (`seafarers/strategy.ts`: ships toward new land, island VP,
+  pirate, gold, Pirate Islands warships and fortress, wonders).
 
 - The random bot needs nothing: it picks from `legalActions` (module actions included). Keep
   phases finite (no action loops that never end the turn), or sims hit `--max-steps`.

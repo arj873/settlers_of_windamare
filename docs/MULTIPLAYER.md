@@ -101,7 +101,10 @@ builds on both.
 `SeatInfo.status`: lobby `human` (taken) / `bot` (open → bot at start); game `human`
 (connected), `away` (disconnected, grace running, still the player's turn and clock), `bot`
 (open seat, or grace over: a bot plays until the owner returns). `occupant` stays set while a
-bot plays for someone, so they can reclaim.
+bot plays for someone, so they can reclaim. `SeatInfo.botLevel` (B1, optional, absent =
+`DEFAULT_BOT_LEVEL` 'normal'): the level (`src/bots/levels.ts`: easy / normal / hard) of the bot
+that plays the seat whenever no human does; the host sets it in the lobby (`setBotLevel`), it
+moves with its seat under Randomize Turn Order.
 
 - Joining after the start makes you a spectator. Taking over an open bot seat mid-game is not
   supported (the engine's player names are fixed; see §17).
@@ -137,8 +140,8 @@ session.room(), .state, .phase, .seq   // read-only (logs, tests). `.state` is S
 - `deps: SessionDeps = { token(), seed() }`: tokens must be unguessable, ≥ 128 bits, matching
   `[A-Za-z0-9_-]{16,128}` — `crypto.randomUUID()` fits. Seeds: any fresh string.
 - `opts: SessionOptions` (defaults `DEFAULT_SESSION_OPTIONS`): `graceMs` 60 000, `botDelayMs`
-  900 (reactions × `FAST_FACTOR` 0.4), `timeoutStepMs` 400, `idleExpiryMs` 24 h, `bot`
-  (`defaultBot` of the hotseat controller).
+  900 (reactions × `FAST_FACTOR` 0.4), `timeoutStepMs` 400, `idleExpiryMs` 24 h, `bot?`
+  (one bot for every seat, tests; absent = each seat's `botLevel` via `botForLevel`, B1).
 - Time only enters through `now`. Within one call the session does all due work in order
   (several bot moves if they are due) and sends **one** `game` message per member at the end.
   With `botDelayMs: 0` a whole bot sequence collapses into one call (tests).
@@ -378,21 +381,22 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 
 **Client → server**
 
-| type        | fields                           | who / when          | errors                                                              |
-| ----------- | -------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `hello`     | `token: string \| null`, `name?` | first frame         | room_full, room_expired, version_mismatch                           |
-| `setName`   | `name`                           | any member          | name_required                                                       |
-| `takeSeat`  | `seat`                           | named member, lobby | wrong_phase, name_required, bad_seat, seat_taken                    |
-| `leaveSeat` | —                                | seated, lobby       | wrong_phase, not_seated                                             |
-| `setColor`  | `color` (one of `ROOM_COLORS`)   | seated, lobby       | wrong_phase, not_seated, color_taken                                |
-| `configure` | `config: RoomConfig`             | host, lobby         | not_host, wrong_phase, bad_message                                  |
-| `kick`      | `member`                         | host                | not_host, bad_message                                               |
-| `start`     | —                                | host, lobby         | not_host, wrong_phase, not_seated, bad_config                       |
-| `rematch`   | —                                | host, over          | not_host, wrong_phase                                               |
-| `intent`    | `action: Action`, `seq?`         | seated, playing     | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
-| `chat`      | `text`                           | named member        | name_required, rate_limited                                         |
-| `react`     | `reaction`                       | any member          | rate_limited                                                        |
-| `sync`      | —                                | any member          | — (resends `room` + `game`)                                         |
+| type          | fields                           | who / when          | errors                                                              |
+| ------------- | -------------------------------- | ------------------- | ------------------------------------------------------------------- |
+| `hello`       | `token: string \| null`, `name?` | first frame         | room_full, room_expired, version_mismatch                           |
+| `setName`     | `name`                           | any member          | name_required                                                       |
+| `takeSeat`    | `seat`                           | named member, lobby | wrong_phase, name_required, bad_seat, seat_taken                    |
+| `leaveSeat`   | —                                | seated, lobby       | wrong_phase, not_seated                                             |
+| `setColor`    | `color` (one of `ROOM_COLORS`)   | seated, lobby       | wrong_phase, not_seated, color_taken                                |
+| `setBotLevel` | `seat`, `level` (`BOT_LEVELS`)   | host, lobby         | not_host, wrong_phase, bad_message (B1)                             |
+| `configure`   | `config: RoomConfig`             | host, lobby         | not_host, wrong_phase, bad_message                                  |
+| `kick`        | `member`                         | host                | not_host, bad_message                                               |
+| `start`       | —                                | host, lobby         | not_host, wrong_phase, not_seated, bad_config                       |
+| `rematch`     | —                                | host, over          | not_host, wrong_phase                                               |
+| `intent`      | `action: Action`, `seq?`         | seated, playing     | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
+| `chat`        | `text`                           | named member        | name_required, rate_limited                                         |
+| `react`       | `reaction`                       | any member          | rate_limited                                                        |
+| `sync`        | —                                | any member          | — (resends `room` + `game`)                                         |
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
 plus `seatCount` (`mode` (any registered mode, X1), `scenario?` (one of the mode's), `options?`

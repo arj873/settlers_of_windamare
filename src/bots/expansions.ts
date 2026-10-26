@@ -16,6 +16,7 @@ import { epckBots } from '../expansions/epck/bots';
 import { eptbBots } from '../expansions/eptb/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
+import type { BotContext, BotGoal } from './smart/context';
 
 export interface BotExtension {
   id: ExpansionId;
@@ -30,6 +31,16 @@ export interface BotExtension {
    * that head somewhere; Seafarers: skip its no-progress moves (`steerAway`).
    */
   steer?(state: GameState, player: PlayerId, options: readonly Action[], rng: Rng): Action | null;
+  /**
+   * Smart bots (Normal / Hard, src/bots/smart): this module's score for `action` on the shared
+   * scale (smart/context.ts: 100 ≈ a VP now, ending the turn 0, a roll 50), or null for no
+   * opinion. Asked for every option, base actions included, before the base scoring; the first
+   * module with an opinion decides. Module actions nobody scores get the `steer` pick or a
+   * random pick on some decisions. Read only public information and `ctx.player`'s own secrets.
+   */
+  score?(ctx: BotContext, action: Action): number | null;
+  /** Smart bots: what this module lets a bot save for (knights, ships…), for trades and plans. */
+  goals?(ctx: BotContext): BotGoal[];
 }
 
 export const BOT_EXTENSIONS: readonly BotExtension[] = [

@@ -3,6 +3,7 @@
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
 import { scenarioById } from '../../engine';
+import { botLevelSelect } from '../botLevel';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
@@ -894,6 +895,12 @@ export class SetupScreen {
                   c === 'human' ? 'Human' : 'Bot',
                 ),
               ),
+            ),
+            botLevelSelect(seat.botLevel, { seat: i, hidden: seat.controller !== 'bot' }, (level) =>
+              this.set({
+                ...this.draft,
+                seats: this.draft.seats.map((s, j) => (j === i ? { ...s, botLevel: level } : s)),
+              }),
             ),
             h(
               'button',
