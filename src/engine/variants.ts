@@ -10,6 +10,7 @@ import type {
   GameSettings,
   GameState,
   HexId,
+  MapRules,
   MapSelection,
   PlayerId,
   RobberMode,
@@ -45,6 +46,32 @@ export function eventCardsOn(settings: GameSettings): boolean {
   return settings.eventCards === true;
 }
 
+/** The optional 5+ player rule set (RULES.md §20). */
+export function rules56On(settings: GameSettings): boolean {
+  return settings.rules56 === true;
+}
+/** Suggested victory points for the 5+ player rule set (a default on the setup screen only). */
+export const RULES56_VP = 12;
+/** The rule set needs this many players (it is built on the 5-6 extension). */
+export const RULES56_MIN_PLAYERS = 5;
+
+export const MAP_RULE_KEYS: readonly (keyof MapRules)[] = [
+  'allowRedTouch',
+  'allowExtremeTouch',
+  'allowSameNumberTouch',
+  'allowSameResourceTouch',
+];
+
+/** Map rules in force (`true` = that adjacency is allowed); absent = all constrained. */
+export function mapRulesOf(settings: GameSettings): MapRules {
+  return settings.mapRules ?? {};
+}
+
+/** The "first" desert: the first desert hex in `landHexes` order (rows top to bottom, left to right). */
+export function firstDesert(state: GameState): HexId | undefined {
+  return topologyOf(state).landHexes.find((h) => state.board.hexes[h]?.terrain === 'desert');
+}
+
 /** Friendly robber: is `player` protected (≤ FRIENDLY_ROBBER_MAX_VP public VP)? */
 export function isRobberProtected(state: GameState, player: PlayerId): boolean {
   return (
@@ -70,13 +97,17 @@ function ownersAround(state: GameState, hex: HexId, mover: PlayerId): Set<Player
  */
 export function robberTargets(state: GameState, mover: PlayerId): HexId[] {
   const t = topologyOf(state);
-  const all = t.landHexes.filter((h) => h !== state.robber);
+  // 5+ player rule set: every desert but the first is a dead hex the robber never enters.
+  const first = rules56On(state.settings) ? firstDesert(state) : undefined;
+  const open = (h: HexId) =>
+    first === undefined || h === first || state.board.hexes[h]?.terrain !== 'desert';
+  const all = t.landHexes.filter((h) => h !== state.robber && open(h));
   if (robberModeOf(state.settings) !== 'friendly') return all;
   const ok = all.filter(
     (h) => ![...ownersAround(state, h, mover)].some((p) => isRobberProtected(state, p)),
   );
   if (ok.length > 0) return ok;
-  const deserts = t.landHexes.filter((h) => state.board.hexes[h]?.terrain === 'desert');
+  const deserts = t.landHexes.filter((h) => state.board.hexes[h]?.terrain === 'desert' && open(h));
   return deserts.length > 0 ? deserts : all;
 }
 

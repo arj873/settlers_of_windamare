@@ -118,7 +118,7 @@ export interface Player {
 // ---------------------------------------------------------------------------
 
 /** Where to go after an interrupt (robber / road building) finishes. */
-export type ResumePhase = 'preRoll' | 'main';
+export type ResumePhase = 'preRoll' | 'main' | 'specialBuild';
 
 export type TradeResponse = 'pending' | 'accepted' | 'rejected';
 
@@ -200,6 +200,12 @@ export interface TurnState {
    * Absent otherwise.
    */
   secondSettlerOf?: PlayerId;
+  /**
+   * Special building phase: the player whose turn just ended, set for the whole phase so an
+   * interrupt (a Knight or Road Building played by the builder, `settings.rules56`) can resume
+   * into `specialBuild{builder, owner}`. Absent outside the phase; startTurn drops it.
+   */
+  specialOwner?: PlayerId;
 }
 
 export interface LogEntry {
@@ -231,6 +237,21 @@ export interface SetupRound {
 export interface SetupPlacement {
   first: SetupRound;
   second: SetupRound;
+}
+
+/**
+ * Map rules (random maps only): which neighbouring hexes may touch. Every flag is "allow", so
+ * absent/false = constrained. Only true flags are stored in settings (default = all constrained).
+ *  - allowRedTouch: 6 and 8 tokens on adjacent hexes (official rule: never)
+ *  - allowExtremeTouch: 2 and 12 tokens (any of them) on adjacent hexes
+ *  - allowSameNumberTouch: two identical tokens on adjacent hexes
+ *  - allowSameResourceTouch: two land hexes of the same resource side by side (deserts exempt)
+ */
+export interface MapRules {
+  allowRedTouch?: boolean;
+  allowExtremeTouch?: boolean;
+  allowSameNumberTouch?: boolean;
+  allowSameResourceTouch?: boolean;
 }
 
 /** 'fixed' = the chosen map; 'random' = a seeded pick among the maps that fit; 'veto' = vote. */
@@ -325,6 +346,13 @@ export interface GameSettings {
   secondSettler?: boolean;
   /** Chess-clock turn timer; wins over turnTimerSec (clock.ts). Client/server enforced. */
   timer?: TimerSettings;
+  /** Allowed adjacencies on random maps (only the `true` flags are present). RULES.md §19. */
+  mapRules?: MapRules;
+  /**
+   * Optional 5+ player rule set (RULES.md §20): the special build step may also play one
+   * development card, and the robber may never go to the second desert. 5+ players only.
+   */
+  rules56?: boolean;
 }
 
 export interface GameState {

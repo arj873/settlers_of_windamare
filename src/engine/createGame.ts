@@ -11,11 +11,15 @@ import { MAP_VETO_CANDIDATES, vetoOrder } from './actions/veto';
 import { isTimerPreset, timerSettings } from './clock';
 import { MAPS, MAP_IDS, defaultMapFor, isMapId } from './maps';
 import {
+  MAP_RULE_KEYS,
   MAP_SELECTIONS,
   OFFICIAL_SETUP,
+  RULES56_MIN_PLAYERS,
   ROBBER_MODES,
   SETUP_BUILDINGS,
   SETUP_RESTRICTIONS,
+  mapRulesOf,
+  rules56On,
 } from './variants';
 import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
@@ -26,6 +30,7 @@ import type {
   Layout,
   MapCandidate,
   MapId,
+  MapRules,
   MapSelection,
   Player,
   PlayerId,
@@ -87,6 +92,14 @@ export interface GameConfig {
   secondSettler?: boolean;
   /** Default none. Chess-clock timer (clock.ts); not together with turnTimerSec. */
   timer?: TimerSettings | null;
+  /**
+   * Which adjacencies random maps may have (RULES.md §19). Default: none allowed (no touching
+   * 6/8, no touching 2/12, no equal numbers or equal resources side by side). The fixed
+   * beginner map ignores it.
+   */
+  mapRules?: MapRules;
+  /** Default false. The 5+ player rule set (RULES.md §20); needs 5+ players and the special building phase. */
+  rules56?: boolean;
 }
 
 /** Seat order for Randomize Turn Order: `order[seat]` = config index. Own stream per seed. */
@@ -167,6 +180,15 @@ export function resolveSettings(config: GameConfig): GameSettings {
   }
   const placement = config.setupPlacement;
   if (placement !== undefined) validateSetupPlacement(placement);
+  const allowed = config.mapRules === undefined ? {} : validateMapRules(config.mapRules);
+  if (config.rules56) {
+    if (n < RULES56_MIN_PLAYERS) throw new Error(`rules56 needs ${RULES56_MIN_PLAYERS}+ players`);
+    if (secondSettler)
+      throw new Error('rules56 uses the special building phase, not second settler');
+    if (config.specialBuildPhase === false) {
+      throw new Error('rules56 needs the special building phase');
+    }
+  }
   return {
     seed: config.seed,
     map,
@@ -194,7 +216,20 @@ export function resolveSettings(config: GameConfig): GameSettings {
     ...(config.turboMode ? { turboMode: true } : {}),
     ...(secondSettler ? { secondSettler: true } : {}),
     ...(clock ? { timer: { ...clock } } : {}),
+    ...(Object.keys(allowed).length > 0 ? { mapRules: allowed } : {}),
+    ...(config.rules56 ? { rules56: true } : {}),
   };
+}
+
+/** Only the `true` flags are kept, so default settings stay free of the field. */
+function validateMapRules(rules: MapRules): MapRules {
+  const out: MapRules = {};
+  for (const [k, v] of Object.entries(rules)) {
+    if (!(MAP_RULE_KEYS as readonly string[]).includes(k)) throw new Error(`unknown map rule ${k}`);
+    if (typeof v !== 'boolean') throw new Error(`map rule ${k} must be true or false`);
+    if (v) out[k as keyof MapRules] = true;
+  }
+  return out;
 }
 
 /** Map selection 'random': a seeded pick (own stream) among the maps that fit `playerCount`. */
@@ -236,7 +271,9 @@ export function createGame(config: GameConfig): GameState {
   const def = MAPS[settings.map];
 
   const rng = Rng.fromSeed(config.seed);
-  const { board, robber } = generateBoard(settings.map, rng);
+  const mapRules = mapRulesOf(settings);
+  const firstDesertOnly = rules56On(settings);
+  const { board, robber } = generateBoard(settings.map, rng, mapRules, firstDesertOnly);
   // Map veto: more candidate boards from the same stream (only then, so other games keep
   // their boards, decks and rolls per seed).
   const candidates: MapCandidate[] =
@@ -244,7 +281,7 @@ export function createGame(config: GameConfig): GameState {
       ? [
           { board, robber },
           ...Array.from({ length: MAP_VETO_CANDIDATES - 1 }, () =>
-            generateBoard(settings.map, rng),
+            generateBoard(settings.map, rng, mapRules, firstDesertOnly),
           ),
         ]
       : [];
