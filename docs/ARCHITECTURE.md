@@ -12,7 +12,11 @@ src/bots/    bots + headless sim      imports engine only
 src/render/  PixiJS board view        imports engine (read-only)
 src/ui/      HTML/CSS overlay         imports engine (read-only)
 src/game/    controller               owns the current GameState; wires everything
+src/net/     online multiplayer       protocol + GameSession (server room core); no DOM, no Date (lint)
 ```
+
+Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
+clients get `viewFor(state, seat)` (§8) and their legal actions.
 
 Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, action) -> new state -> render/ui`.
 Nobody but `applyAction` produces a new GameState (fixtures excepted).
@@ -147,7 +151,9 @@ Bump `schemaVersion` and add a step there whenever GameState changes shape.
 - Played cards: knights in `knightsPlayed`, Road Building / Year of Plenty / Monopoly in `progressCardsPlayed` (`ProgressCardCounts`). So per type, deck + hands + played = `supplyOf(state).devDeck` exactly (checked by the sim's invariants). `BANK_PER_RESOURCE` / `DEV_DECK_COMPOSITION` are the 19-hex values only.
 - `turn.tradeOffers`: player trade offers made this turn; `offerTrade` is rejected once it reaches `MAX_TRADE_OFFERS_PER_TURN` (3). Reset on `endTurn`. House rule, see §12.
 - `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
-- Hidden info (hands, deck order) lives in state. Fine for hotseat; an online server would redact.
+- Hidden info (hands, dev cards, deck orders, rng, seed) lives in state. Fine for hotseat; online,
+  `viewFor(state, seat | 'spectator')` (`view.ts`, M1) masks it and adds public counts
+  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`).
 
 ## 5. Phase state machine
 
@@ -279,6 +285,7 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 | `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                        |
 | `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                             |
 | `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill)                                                                                                                                                                                                     |
+| `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`    |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -339,6 +346,7 @@ view.setInsets(insets, avoid?);           // Insets = { top, right, bottom, left
                                           // avoid: transient overlays (docked trade card) the board slides away from, never zooms for
 view.isFitted();                          // false once the user panned/zoomed, until the next refit
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
+setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
@@ -380,15 +388,26 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   reason is also in the button's `data-why` (playtest harness).
 
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
+- The HUD renders a `GameView` (online, M1) as well as a full state: other players' card counts
+  come from `handCount` / `devCardCount`, the special-build queue from `visibleSpecialBuildQueue`.
+  Never read another player's `resources` / `devCards` directly (they are 0 in a view).
 - Build buttons emit nothing but `placeMode`. HUD leaves the mode itself when pieces/turn/phase change or the build stops being legal (it emits `placeMode(null)`); Esc cancels.
 - Implied board clicks (setup placement, robber, free roads) have no HUD button: use `boardPrompt(view)` (`'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | null`) to know what to highlight.
 - `offerTrade` is open-ended, so the composer builds its own action; the HUD enables the Trade button when any `offerTrade` is in `legal`.
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
-- Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+- Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`; `?click=Menu` opens the menu, `?theme=`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood. Every colour,
+  material, font and shadow is a CSS custom property; `wood.css` is the `:root` base and each
+  theme overrides it under `:root[data-theme='…']` on `<html>`. `initTheme(location.search)` picks
+  `?theme=` > saved pick (`localStorage['catan.theme']`, try/catch) > `DEFAULT_THEME`;
+  `setTheme(name)` applies, saves and calls `onThemeChange` listeners. `themePicker()` is in the
+  HUD menu and (compact) the setup footer. `boardFrameColors()` reads `--board-frame*` for the Pixi
+  frame (main.ts → `setFrameColors` + `board.retheme()`); the board canvas is transparent and the
+  page background is `--page-bg`. Tokens must not reference per-element vars (`--pc`, `--rc`).
 - Layout (T17, wooden theme): right sidebar `.hud-side` (Game Events / Bank / Players, collapsible;
   360px, 300px under 1280px, a drawer under 720px), menu top-left (`.hud-menu`: New game, Bot speed,
-  Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
+  Theme, Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
   text), hand + Trade/Bank + build bar bottom-left (`.hud-bottom`), dice + Roll dice / End turn
   bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets` (nothing
   while the HUD is covered or has no bottom bar; dialogs are never measured); a docked trade offer card
@@ -431,7 +450,8 @@ c.destroy();
   access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
   `?layout`, `?map`, `?autoplay`) never autosave.
-- `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`.
+- `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`
+  via `gameConfigOf(cfg, seed)` (`logic.ts`, shared with the online room).
   The starting seat is random (seeded).
 - Turn timer (T14, `settings.turnTimerSec`): pure logic in `game/turnTimer.ts` (unit-tested),
   ticked every `TIMER_TICK_MS` (250) by the controller, which passes `clockView` as

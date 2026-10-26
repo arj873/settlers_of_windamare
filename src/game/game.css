@@ -10,24 +10,22 @@
   align-items: center;
   gap: 6px;
   pointer-events: none;
-  font:
-    14px/1.35 'Segoe UI',
-    system-ui,
-    sans-serif;
+  font: 14px/1.35 var(--font-ui, system-ui, sans-serif);
 }
+/* Colours come from the theme tokens (src/ui/theme). */
 .game-toast {
   max-width: min(560px, calc(100vw - 32px));
   padding: 9px 16px;
-  border-radius: 10px;
-  color: #eef3f8;
-  background: rgba(13, 29, 46, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius, 10px);
+  color: var(--toast-ink, #eef3f8);
+  background: var(--toast-bg, rgba(13, 29, 46, 0.95));
+  border: 1px solid var(--toast-edge, rgba(255, 255, 255, 0.16));
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   animation: game-toast-in 0.2s ease;
 }
 .game-toast.is-error {
-  border-color: #ff7a6b;
-  color: #ffd0c9;
+  border-color: var(--toast-error-edge, #ff7a6b);
+  color: var(--toast-error-ink, #ffd0c9);
 }
 .game-toast.is-leaving {
   opacity: 0;
@@ -46,14 +44,9 @@
   z-index: 30;
   display: grid;
   place-items: center;
-  color: #eef3f8;
-  font:
-    14px/1.35 'Segoe UI',
-    system-ui,
-    sans-serif;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(58, 123, 213, 0.35), transparent 60%),
-    linear-gradient(180deg, #0f2a44, #08121e);
+  color: var(--resume-ink, #eef3f8);
+  font: 14px/1.35 var(--font-ui, system-ui, sans-serif);
+  background: var(--resume-bg, #0f2a44);
 }
 .game-resume-card {
   width: min(420px, calc(100vw - 32px));
@@ -65,15 +58,12 @@
 }
 .game-resume h1 {
   margin: 0;
-  font:
-    700 34px 'Palatino Linotype',
-    Palatino,
-    Georgia,
-    serif;
+  font: var(--display-weight, 700) 34px var(--font-display, Georgia, serif);
+  text-transform: var(--display-case, none);
 }
 .game-resume p {
   margin: 0;
-  color: #9fb2c5;
+  color: var(--resume-dim, #9fb2c5);
 }
 .game-resume-actions {
   display: flex;

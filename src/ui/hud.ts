@@ -5,6 +5,7 @@
 import {
   emptyResources,
   getPlayer,
+  handCount,
   RESOURCES,
   victoryPoints,
   type Action,
@@ -46,6 +47,7 @@ import {
   type BuildKind,
 } from './model';
 import { bankPanel, logList, playersList } from './sidebar';
+import { themePicker } from './theme';
 import type { BotSpeedControl, HudEventName, HudEvents, HudView, PlaceMode } from './types';
 import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
@@ -393,6 +395,7 @@ export class Hud {
               ),
             ),
           ),
+        h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
           {
@@ -1237,7 +1240,7 @@ export class Hud {
           ...victims.map((id) => {
             const p = getPlayer(state, id);
             const act = acts.find((a) => a.victim === id);
-            const count = RESOURCES.reduce((n, r) => n + p.resources[r], 0);
+            const count = handCount(state, id);
             return h(
               'button',
               {

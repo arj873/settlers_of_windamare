@@ -1,0 +1,84 @@
+/* Theme picker (./picker.ts): preview tiles in the HUD menu and the setup footer. */
+.theme-pick {
+  display: flex;
+  gap: 4px;
+}
+.theme-opt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 1px 4px;
+  font: 600 11px/1.1 var(--font-ui);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--ink-dim);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  border-radius: var(--btn-radius);
+  background: transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.theme-opt:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.theme-opt.is-on {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.theme-opt:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+/* A mini panel: body, header band, accent dot, a line of text. */
+.theme-sw {
+  display: block;
+  width: 34px;
+  height: 24px;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 76% 66%, var(--s2) 0 3.5px, transparent 4px),
+    linear-gradient(var(--s3), var(--s3)) 5px 15px / 13px 2px no-repeat,
+    linear-gradient(var(--s1), var(--s1)) 0 0 / 100% 8px no-repeat,
+    var(--s0);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.theme-opt.is-on .theme-sw {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 0 3px var(--accent),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Setup footer: tiles only. */
+.theme-pick.is-compact {
+  flex: none;
+  gap: 6px;
+}
+.theme-pick.is-compact .theme-opt {
+  flex: none;
+  padding: 4px;
+}
+.theme-pick.is-compact .theme-sw {
+  width: 30px;
+  height: 22px;
+}
+@media (max-width: 600px) {
+  .theme-pick.is-compact {
+    gap: 2px;
+  }
+  .theme-pick.is-compact .theme-sw {
+    width: 24px;
+    height: 18px;
+  }
+}
