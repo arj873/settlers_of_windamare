@@ -165,7 +165,7 @@ discard, monopoly, event, other), `blocked` (what the robber's hex would have pa
   production did not explain is classified by action type, so **Σ gained − Σ lost = hand** holds
   by construction (sim invariant `stats`; `other` must stay 0 in base games). A new base action that moves resources
   needs a case in `gainSource` / `lossSink`. Expansion actions (`<id>/...`): their hand changes count as
-  `other`, their base parts (pieces placed, dev cards bought / played) are counted from the state diff
+  the module's `statsCategory` hook says (default `other`), their base parts (pieces placed, dev cards bought / played) are counted from the state diff
   (`recordExpansionAction`); expansion-only goods (oil, crops) are not counted. `recordRoll` /
   `recordProduction` count only resource terrains (like `computeProduction`).
 - `statsOf(state)` reads with defaults (`complete: false`, `fromTurn` = now for older saves).
@@ -232,7 +232,9 @@ current.
 
 **Variants × expansions.** The variant settings work in expansion modes too, through the same
 code paths as the hooks: dice and Event Cards both end in the production step
-(`produceAndContinue`: pay, then `afterProduction` hooks), a 7 or Robber Attacks goes through
+(`produceAndContinue`: pay, then `afterProduction` hooks with what was paid), an Event Card is
+the roll for the `onRoll` hooks too (`drawEventRoll`, then the hooks, then `resolveDrawnEvent`;
+an interrupt resumes with `continueRoll`, which resolves the card), a 7 or Robber Attacks goes through
 `resolveSeven` (`onSeven` hook, `handSize` / `discardLimit` hooks), `beginTurn` runs `onStartTurn`
 (also for the first turn, and for Catanian 2's Second Settler step), and the `production` hook gets
 `ctx = { cityYield, blocked }` (Epidemic, `robberMode 'none'`). A module's `setupBuilding` hook wins
@@ -536,9 +538,13 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   reason is also in the button's `data-why` (playtest harness).
 
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
-  build cards (namespaced place modes), dialogs for their phases and turn-pill hints. The setup
+  build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
+  hand bar (`handCards`) and items in the trade offer rows (`offerExtras`). The setup
   screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
-  modes; `wip`/`demo` too with `?modes=all`). See `docs/EXPANSIONS.md` §8.
+  modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
+  `validate`, e.g. C&K + Rush) shows the reason and disables Start. The build bar has no Buy card
+  when the game has no development deck. The stats screen's standings show expansions' named VP
+  (`victoryPoints` hook `parts`) as chips. See `docs/EXPANSIONS.md` §8.
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
 - The HUD renders a `GameView` (online, M1) as well as a full state: other players' card counts
   come from `handCount` / `devCardCount`, the special-build queue from `visibleSpecialBuildQueue`.

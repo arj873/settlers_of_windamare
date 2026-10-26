@@ -20,7 +20,7 @@ import type {
 } from '../types';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
-import type { ProductionContext, SetupOrder, Supply } from './types';
+import type { ProductionContext, SetupOrder, Supply, VictoryPointPart } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -135,9 +135,13 @@ export function runProductionHooks(
   for (const m of activeModules(state)) m.hooks?.production?.(state, roll, owed, ctx);
 }
 
-export function hookAfterProduction(draft: GameState, roll: number): Phase | undefined {
+export function hookAfterProduction(
+  draft: GameState,
+  roll: number,
+  paid: readonly ResourceCounts[] = [],
+): Phase | undefined {
   for (const m of activeModules(draft)) {
-    const p = m.hooks?.afterProduction?.(draft, roll);
+    const p = m.hooks?.afterProduction?.(draft, roll, paid);
     if (p !== undefined) return p;
   }
   return undefined;
@@ -205,28 +209,6 @@ export function hookArmySize(state: GameState, player: PlayerId, base: number): 
   return n;
 }
 
-/** Named VP of the active modules (statistics chips). */
-export function expansionVpSources(
-  state: GameState,
-  player: PlayerId,
-): { label: string; vp: number }[] {
-  return activeModules(state).flatMap((m) => m.hooks?.vpSources?.(state, player) ?? []);
-}
-
-/** A module's classification of a hand change for the statistics, or undefined. */
-export function hookStatsSource(
-  prev: GameState,
-  action: Action,
-  player: PlayerId,
-  change: 'gain' | 'loss',
-): GainSource | LossSink | undefined {
-  for (const m of activeModules(prev)) {
-    const s = m.hooks?.statsSource?.(prev, action, player, change);
-    if (s !== undefined) return s;
-  }
-  return undefined;
-}
-
 export function hookSetupOrder(state: GameState): SetupOrder | undefined {
   for (const m of activeModules(state)) {
     const o = m.hooks?.setupOrder?.(state);
@@ -252,6 +234,24 @@ export function hookWins(state: GameState, player: PlayerId): boolean | undefine
   for (const m of activeModules(state)) {
     const w = m.hooks?.wins?.(state, player);
     if (w !== undefined) return w;
+  }
+  return undefined;
+}
+
+/** The named parts of the expansions' VP (statistics screen chips), in module order. */
+export function expansionVictoryParts(state: GameState, player: PlayerId): VictoryPointPart[] {
+  return activeModules(state).flatMap((m) => m.hooks?.victoryPoints?.(state, player).parts ?? []);
+}
+
+/** Stats category of a hand change made by an action (statsCategory hook), or undefined. */
+export function hookStatsCategory(
+  state: GameState,
+  action: Action,
+  player: PlayerId,
+): { gain?: GainSource; loss?: LossSink } | undefined {
+  for (const m of activeModules(state)) {
+    const c = m.hooks?.statsCategory?.(state, action, player);
+    if (c !== undefined) return c;
   }
   return undefined;
 }

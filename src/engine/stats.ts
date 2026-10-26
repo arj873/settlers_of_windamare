@@ -21,7 +21,7 @@
  */
 import { DEV_CARD_TYPES, RESOURCES, tokenPips } from './constants';
 import { namespaceOf } from './expansions/ext';
-import { hookStatsSource } from './expansions/hooks';
+import { hookStatsCategory } from './expansions/hooks';
 import { emptyDevCards, emptyResources, isResource } from './resources';
 import { victoryPoints } from './selectors';
 import { hexVertices, topologyOf } from './topology';
@@ -244,7 +244,11 @@ export function recordProduction(
 // ---------------------------------------------------------------------------
 
 /** Where a positive hand change of `p` caused by `action` came from. */
-function gainSource(action: Action, p: PlayerId): GainSource {
+function gainSource(state: GameState, action: Action, p: PlayerId): GainSource {
+  // An expansion may classify any action's hand changes (statsCategory hook).
+  const ext = hookStatsCategory(state, action, p)?.gain;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'placeSetupSettlement':
       return 'setup';
@@ -267,7 +271,10 @@ function gainSource(action: Action, p: PlayerId): GainSource {
 }
 
 /** Where a negative hand change of `p` caused by `action` went. */
-function lossSink(action: Action, p: PlayerId): LossSink {
+function lossSink(state: GameState, action: Action, p: PlayerId): LossSink {
+  const ext = hookStatsCategory(state, action, p)?.loss;
+  if (ext !== undefined) return ext;
+  if (namespaceOf(action.type) !== null) return 'other';
   switch (action.type) {
     case 'buildRoad':
     case 'buildSettlement':
@@ -351,17 +358,8 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     if (!old) return;
     for (const r of RESOURCES) {
       const d = pl.resources[r] - old.resources[r] - (prod(during, p, r) - prod(before, p, r));
-      // An expansion may classify its own hand changes (statsSource hook).
-      if (d > 0) {
-        const src =
-          (hookStatsSource(prev, action, p, 'gain') as GainSource | undefined) ??
-          gainSource(action, p);
-        ed.player(p).gained[src][r] += d;
-      } else if (d < 0) {
-        const sink =
-          (hookStatsSource(prev, action, p, 'loss') as LossSink | undefined) ?? lossSink(action, p);
-        ed.player(p).lost[sink][r] -= d;
-      }
+      if (d > 0) ed.player(p).gained[gainSource(prev, action, p)][r] += d;
+      else if (d < 0) ed.player(p).lost[lossSink(prev, action, p)][r] -= d;
     }
   });
 

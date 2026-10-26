@@ -186,7 +186,7 @@ export function checkSeafarers(state: GameState): Violation[] {
     });
   }
 
-  // --- statistics: every hand change is classified (statsSource hook) -------------------------
+  // --- statistics: every hand change is classified (statsCategory hook) -------------------------
   if (state.stats?.complete) {
     state.stats.players.forEach((ps, p) => {
       const other = Object.values(ps.gained.other).reduce((a, b) => a + b, 0);

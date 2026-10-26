@@ -774,10 +774,14 @@ export class Hud {
       );
     });
 
+    const extCards = hudExtensionsFor(state).flatMap(
+      (x) => x.handCards?.(state, view, (a) => this.send(a)) ?? [],
+    );
     const hand = h(
       'div',
       { class: 'hand wood' },
       ...resCards,
+      ...extCards,
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
@@ -1493,14 +1497,20 @@ export class Hud {
     };
   }
 
-  private bundleRow(bundle: ResourceCounts): HTMLElement {
+  private bundleRow(bundle: ResourceCounts, extra: Child[] = []): HTMLElement {
     return h(
       'span',
       { class: 'bundle' },
       ...RESOURCES.filter((r) => bundle[r] > 0).map((r) =>
         h('span', { class: 'bundle-item' }, resCardFace(r, 24), `×${bundle[r]}`),
       ),
+      ...extra,
     );
+  }
+
+  /** Expansion items of the open offer (offerExtras hook). */
+  private offerExtras(state: GameState, side: 'give' | 'want'): Child[] {
+    return hudExtensionsFor(state).flatMap((x) => x.offerExtras?.(state, side) ?? []);
   }
 
   private offererDialog(state: GameState, legal: Action[]) {
@@ -1546,10 +1556,10 @@ export class Hud {
           'div',
           { class: 'offer-line' },
           h('span', {}, 'You give'),
-          this.bundleRow(offer.give),
+          this.bundleRow(offer.give, this.offerExtras(state, 'give')),
           h('span', { class: 'swap' }, '⇄'),
           h('span', {}, 'you get'),
-          this.bundleRow(offer.want),
+          this.bundleRow(offer.want, this.offerExtras(state, 'want')),
         ),
         h('div', { class: 'resps' }, ...rows),
         h(
@@ -1584,10 +1594,10 @@ export class Hud {
           'div',
           { class: 'offer-line', style: { '--pc': from.color } },
           h('span', {}, `${from.name} gives`),
-          this.bundleRow(offer.give),
+          this.bundleRow(offer.give, this.offerExtras(state, 'give')),
           h('span', { class: 'swap' }, '⇄'),
           h('span', {}, 'you give'),
-          this.bundleRow(offer.want),
+          this.bundleRow(offer.want, this.offerExtras(state, 'want')),
         ),
         !accept && h('p', { class: 'summary is-error' }, "You don't have the cards to accept"),
         h(

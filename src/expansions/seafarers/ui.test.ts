@@ -5,7 +5,7 @@ import { legalActions, type Action, type GameState } from '../../engine';
 import { actionForClick, boardActions } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
-import { draftError, playerRange } from '../../ui/setup/model';
+import { setupError, playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { seaSlice, type GoldPhase } from './engine';
 import { E, H, V, mainPhase, seaGame, ship } from './engine/testkit';
@@ -45,8 +45,8 @@ describe('Seafarers setup screen', () => {
     q(screen, 'mode-seafarers')?.click();
     q(screen, 'scenario-seafarers/pirateIslands')?.click();
     const draft = { ...screen.state, eventCards: true };
-    expect(draftError(draft)).toMatch(/Event Cards/);
-    expect(draftError(screen.state)).toBeNull();
+    expect(setupError(draft)).toMatch(/Event Cards/);
+    expect(setupError(screen.state)).toBeNull();
   });
 });
 

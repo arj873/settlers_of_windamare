@@ -10,7 +10,7 @@ import { mapPreviewSvg } from './mapPreviews';
 import {
   addSeat,
   buildConfig,
-  draftError,
+  setupError,
   clamp,
   clockLabel,
   CLOCK_OPTIONS,
@@ -198,17 +198,17 @@ export class SetupScreen {
       d.mode === 'base'
         ? (map?.label ?? 'Base')
         : `${modeOf(d).name}${scenarioOf(d) ? `: ${scenarioOf(d)?.name ?? ''}` : ''}`;
-    const err = draftError(d);
+    // A combination the engine refuses (an expansion's validate): say why, no Start.
+    const error = setupError(d);
     this.summary.replaceChildren(
       h('strong', {}, title),
       ` · ${d.seats.length} players · ${d.vpToWin} VP`,
       TIMER_STEPS[d.timerIdx] ? ` · ${timerLabel(d.timerIdx)} timer` : '',
       d.clockPreset !== 'off' ? ` · ${clockLabel(d)} clock` : '',
-      err === null ? '' : h('span', { class: 'su-error', attrs: { role: 'alert' } }, err),
+      error ? h('span', { class: 'su-error', attrs: { role: 'alert' } }, error) : '',
     );
-    // A combination the engine refuses (a module's validate) cannot start.
     const start = this.element.querySelector<HTMLButtonElement>('.su-start');
-    if (start) start.disabled = err !== null;
+    if (start) start.disabled = error !== null;
   }
 
   private render(): void {

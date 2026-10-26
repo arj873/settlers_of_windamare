@@ -138,7 +138,7 @@ function overview(state: GameState, stats: GameStats): HTMLElement[] {
       b.vpCards > 0 && chip(plural(b.vpCards, 'VP card'), b.vpCards),
       b.longestRoad && chip('Longest Road', 2),
       b.largestArmy && chip('Largest Army', 2),
-      ...b.extra.map((x) => chip(x.label, x.vp)),
+      ...b.parts.map((part) => part.vp !== 0 && chip(part.label, part.vp)),
       b.other !== 0 && chip('Other', b.other),
     ];
     return h(

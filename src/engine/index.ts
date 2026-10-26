@@ -22,8 +22,8 @@ export {
 } from './expansions/registry';
 export {
   costOf,
+  expansionVictoryParts,
   expansionVictoryPoints,
-  expansionVpSources,
   pieceLimit,
   terrainKind,
   type BaseCostItem,

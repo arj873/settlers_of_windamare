@@ -523,8 +523,8 @@
 }
 .su-error {
   display: block;
-  color: var(--bad, #d9433a);
-  font-weight: 600;
+  color: var(--bad);
+  font-weight: 700;
 }
 .su-start {
   min-width: 160px;

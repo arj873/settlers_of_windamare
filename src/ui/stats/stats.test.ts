@@ -57,7 +57,7 @@ describe('stats model', () => {
       vpCards: 3,
       longestRoad: true,
       largestArmy: false,
-      extra: [],
+      parts: [],
       other: 0,
     });
     for (const r of standings(GAME)) {

@@ -40,6 +40,12 @@ export interface ProductionContext {
   blocked: HexId | null;
 }
 
+/** A named share of an expansion's public VP (statistics screen): "Metropolis", 4. */
+export interface VictoryPointPart {
+  label: string;
+  vp: number;
+}
+
 export interface TerrainInfo {
   kind: 'land' | 'sea' | 'fog';
   /** Display name (HUD, previews). */
@@ -174,8 +180,15 @@ export interface ExpansionHooks {
    * robber blocks (null without a robber, settings.robberMode 'none').
    */
   production?(state: GameState, roll: number, owed: ResourceCounts[], ctx: ProductionContext): void;
-  /** first-wins. Phase to enter after production instead of main. */
-  afterProduction?(draft: GameState, roll: number): Phase | undefined;
+  /**
+   * first-wins. Phase to enter after production instead of main. `paid` = the resources each
+   * player just received from the core production (after the bank-shortage rule).
+   */
+  afterProduction?(
+    draft: GameState,
+    roll: number,
+    paid: readonly ResourceCounts[],
+  ): Phase | undefined;
   /** chained. Cost of `item` ('road', 'settlement', 'city', 'devCard' or '<id>/<item>'). */
   cost?(
     state: GameState,
@@ -202,24 +215,27 @@ export interface ExpansionHooks {
    * settings only (createGame calls it before the state exists).
    */
   supply?(state: Pick<GameState, 'settings'>, base: Supply): Supply;
-  /** additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. */
-  victoryPoints?(state: GameState, player: PlayerId): { public: number; hidden?: number };
   /**
-   * additive. Named parts of this module's victoryPoints, for the statistics screen's chips
-   * (instead of "Other"). Should add up to the module's public + hidden VP.
+   * additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. `parts`
+   * (optional) names where the VP come from, for the statistics screen's chips (C&K: metropolis,
+   * defender; Seafarers: new land, gifts, cloth). Unnamed VP show as "Other".
    */
-  vpSources?(state: GameState, player: PlayerId): { label: string; vp: number }[];
+  victoryPoints?(
+    state: GameState,
+    player: PlayerId,
+  ): { public: number; hidden?: number; parts?: VictoryPointPart[] };
   /**
-   * first-wins. Statistics: where a hand change of `player` caused by `action` (from `prev`)
-   * came from (`change` 'gain': a GainSource) or went to ('loss': a LossSink). undefined = the
-   * default classification (a module action counts as 'other').
+   * first-wins. Statistics (UX2): which source / sink a hand change of `player` made by `action`
+   * counts as. `gain` for cards received, `loss` for cards given. `state` is the state the action
+   * was applied to (its phase says what was being resolved). Called for module actions (default
+   * 'other') and base actions (default: the base classification, e.g. Seafarers' fleet taking
+   * cards at a `rollDice` = 'stolen'); a missing side keeps the default.
    */
-  statsSource?(
-    prev: GameState,
+  statsCategory?(
+    state: GameState,
     action: Action,
     player: PlayerId,
-    change: 'gain' | 'loss',
-  ): GainSource | LossSink | undefined;
+  ): { gain?: GainSource; loss?: LossSink } | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /** chained. Length for Longest Road (Seafarers: trade route). */

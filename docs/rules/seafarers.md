@@ -1835,7 +1835,7 @@ hex, so a 7 never stalls the game.
 
 Statistics: gold picks count as production, discovery and fleet rewards as events, pirate
 steals as steals, the fleet's attacks as stolen cards; special VP show as "New land", "Gifts"
-and "Cloth" chips (`statsSource` / `vpSources` hooks). Online play is base-only (the protocol
+and "Cloth" chips (`statsCategory` hook, `victoryPoints().parts`). Online play is base-only (the protocol
 pins `mode: 'base'`); the fog stack and gift cards are not masked by `viewFor` yet.
 
 Open questions answered by the engine (§10): Q4 frame edges, Q5 gold with a short bank, Q6

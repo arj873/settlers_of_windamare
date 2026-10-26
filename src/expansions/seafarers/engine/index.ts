@@ -472,42 +472,41 @@ export const seafarersModule: ExpansionModule = {
       return base;
     },
 
-    victoryPoints: (state, p) => ({ public: specialVp(state, p) }),
-
-    vpSources(state, p) {
+    victoryPoints(state, p) {
       const s = seaSlice(state);
       const land = s.chits.filter((c) => c.player === p && c.area !== 'gift');
       const gifts = s.chits.filter((c) => c.player === p && c.area === 'gift');
-      return [
+      const parts = [
         { label: 'New land', vp: land.reduce((n, c) => n + c.vp, 0) },
         { label: 'Gifts', vp: gifts.reduce((n, c) => n + c.vp, 0) },
         { label: 'Cloth', vp: s.cloth ? Math.floor((s.cloth.held[p] ?? 0) / 2) : 0 },
-      ];
+      ].filter((x) => x.vp !== 0);
+      return { public: specialVp(state, p), parts };
     },
 
-    statsSource(prev, action, _p, change) {
+    statsCategory(state, action) {
       switch (action.type) {
         // Gold: production; a gold pick for beating the fleet: an event reward.
         case SEA_ACTIONS.pickGold: {
-          const ph = prev.phase as GoldPhase;
-          return 'roll' in ph.then ? 'event' : 'production';
+          const ph = state.phase as GoldPhase;
+          return { gain: 'roll' in ph.then ? 'event' : 'production' };
         }
         case SEA_ACTIONS.stealCard:
-          return change === 'gain' ? 'steal' : 'stolen';
+          return { gain: 'steal', loss: 'stolen' };
         // Discovering land pays 1 card (fog); building pays for the piece.
         case SEA_ACTIONS.buildShip:
         case SEA_ACTIONS.moveShip:
         case SEA_ACTIONS.setupShip:
         case SEA_ACTIONS.freeShip:
         case SEA_ACTIONS.buildWonder:
-          return change === 'gain' ? 'event' : 'build';
+          return { gain: 'event', loss: 'build' };
         case 'buildRoad':
         case 'placeFreeRoad':
         case 'placeSetupRoad':
-          return change === 'gain' ? 'event' : undefined;
+          return { gain: 'event' };
         // The Pirate Islands fleet takes cards at the roll.
         case 'rollDice':
-          return change === 'loss' ? 'stolen' : undefined;
+          return { loss: 'stolen' };
         default:
           return undefined;
       }
