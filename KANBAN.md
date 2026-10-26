@@ -7,7 +7,14 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-_(none — stage 1 build complete)_
+- **T10** · Multi-size boards: per-map topology (Base / Base Random / 5-6P / 7-8P), generators + ports, up to 8 players, scaled bank & dev deck, new GameSettings fields · `s2-boards` 🟦 · deps: — · tab `s2-boards`
+- **T11** · New setup screen: Game Mode (Base), Map tiles, Rules (Balanced Dice, Hide Bank Cards), Advanced (Turn Timer, Players 3–8, Points to Win 3–20, Discard Limit 5–20), up to 8 seats · `s2-setup-ui` 🟩 · deps: — · tab `s2-setup-ui`
+
+## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
+
+- **T12** · Render + HUD scale: big boards fit, 8 player colours/panels, hide bank, turn-timer display, special-build UI · `s2-render-hud` 🟩 · deps: T10, T11
+- **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10
+- **T14** · Controller: wire NewGameConfig v2, turn timer + auto-resolve on timeout, special-build flow, bots, save migration · `s2-integration` 🟦 · deps: T10–T13
 
 ## ✅ Ready
 
@@ -69,3 +76,4 @@ _(none — stage 1 build complete)_
 - **T4** · PixiJS board renderer: hexes, tokens, ports, pieces, robber, hit-testing, pan/zoom · `s1-render` 🟩 · deps: T1 · merged `1ce185a` · 365 tests on main (1 known red → T8)
 - **T8** · QA + engine hardening: games must finish (trade-offer cap, better random bot), sim speed ≥5k steps/s, rules audit, exact dev-card tracking, 10k-game sim, **docs/RULES.md comprehensive rulebook (web-sourced)** · `s1-qa` 🟦 · deps: T2–T5 · merged `f803a4e` · 10k sim: 98.4% finish, 0 errors, 28.7k steps/s
 - **T7** · Game controller: hotseat flow, bot turns, wire render ⇄ engine ⇄ UI · `s1-integration` 🟦 · deps: T2–T6 · merged `c8a8934` · 413 tests, all green · verified in browser
+- **BUG** · Steal picker never opened with a single robbery victim (reported by you) · fixed by orchestrator · `89756af` · regression test added
