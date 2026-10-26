@@ -39,7 +39,9 @@ import {
   WALLS_PER_PLAYER,
   activeStrength,
   barbarianStrength,
+  choiceOf,
   ckSlice,
+  commodityCount,
   defenderStrength,
   improvementCost,
   isCommodity,
@@ -51,6 +53,7 @@ import {
   redDieDraws,
   wallsOf,
   type Choice,
+  type CkAction,
   type Commodity,
   type Good,
   type ProgressCard,
@@ -291,7 +294,8 @@ function playerRows(state: GameState): HTMLElement {
     ...state.players.map((p) => {
       const cp = s.players[p.id];
       const knights = knightsOf(state, p.id);
-      const commodities = cp ? COMMODITIES.reduce((n, c) => n + cp.commodities[c], 0) : 0;
+      // Online views zero other seats' per-type split: the public total comes from the helper.
+      const commodities = commodityCount(state, p.id);
       return h(
         'li',
         { class: 'ck-row', style: playerStyle(p.color) },
@@ -736,11 +740,17 @@ const pickAction = (player: PlayerId, c: Choice): Action => {
 function promptDialog(state: GameState, view: HudView, send: Send): HudDialog | null {
   const prompt = promptFor(state);
   if (!prompt || prompt.actor !== view.viewer || view.spectator) return null;
-  const buttons = prompt.options.filter(
+  // The choices come from the legal actions (they are the prompt's options): online, the view
+  // lacks hidden cards some options depend on (Master Merchant victims hold "no cards" there).
+  const options = view.legal.flatMap((a) => {
+    const c = a.player === view.viewer ? choiceOf(a as unknown as CkAction) : null;
+    return c ? [c] : [];
+  });
+  const buttons = options.filter(
     (c) => c.kind !== 'vertex' && c.kind !== 'edge' && c.kind !== 'hex',
   );
   const { title, text } = promptText(state);
-  const onBoard = buttons.length < prompt.options.length;
+  const onBoard = buttons.length < options.length;
   if (buttons.length === 0) return null; // board clicks only: the turn pill says what to do
   return {
     key: `ck-prompt-${state.phase.kind}-${JSON.stringify(state.phase)}`,

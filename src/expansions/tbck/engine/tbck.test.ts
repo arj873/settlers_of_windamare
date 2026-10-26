@@ -119,13 +119,16 @@ describe('Fishermen + C&K', () => {
     expect(ckSlice(t).players[0]!.progress).toEqual(['alchemist']);
     expect(ckSlice(t).decks.science.length).toBe(ckSlice(s).decks.science.length - 1);
     expect(fishOf(t).hands[0]).toEqual([]);
-    // A VP card is laid out at once.
+    // The card joins a secret hand: the log names its stack only (online views).
+    expect(t.log.at(-1)?.text).toBe('P0 paid 7 fish for a science progress card');
+    // A VP card is laid out at once (and named).
     const u = run(fisher([3, 3, 1]), {
       type: 'tbck/fishProgress',
       player: 0,
       card: 'printer',
     } as Action);
     expect(ckSlice(u).players[0]!.vpCards).toEqual(['printer']);
+    expect(u.log.at(-1)?.text).toBe('P0 paid 7 fish for the Printer (1 victory point)');
   });
 
   it('fish are no cards: a player catching only fish still gets the Aqueduct (FAQ 43)', () => {
