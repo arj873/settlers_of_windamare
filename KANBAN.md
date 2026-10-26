@@ -20,7 +20,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **E5** · Explorers & Pirates: settler/crew ships, harbor settlements, exploration, pirate lairs, fish, spice, all missions (+5-6P) · `s3-ep` 🟦
+- **X1** · Expansions online: protocol for expansion actions/settings, `maskFor` hook in `viewFor` (fog, gifts, fish, progress cards, hidden tokens), lobby expansion picker, e2e C&K + E&P games, `pt:serve` expansion flag · `s3-online` (Opus) 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -30,8 +30,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
 
 ## 📋 Backlog — Stage 3 (after F1, in parallel)
-
-- **X1** · Expansions online: `viewFor` masking hook for expansion slices (fog, gifts, fish, progress cards, hidden tokens) + protocol for expansion actions · deps: E5, C1
 
 - **F2** · T&B trade-hex plaza IDs (centre vertex + spoke edges) · deps: F1
 - **F3** · setupRounds / setup-order hook (Cloth for Catan, E&P) · deps: F1
@@ -61,6 +59,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
 - (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
 - (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
+- (E5) **E5b** E&P + C&K / E&P + T&B official combos · player trades with gold (`ep/offerTrade`) · Land Ho! 5-6P has no official map
 - (UX1) board sea tint per theme (`--board-sea` tokens) · "1 human + N bots" quick-fill
 - (M4b triage) harness `status` should show hand deltas with their log source (2 Haiku false positives: production misread as trade effects)
 - (M3) remove-seat-N protocol message + lobby kick button · unread badge on collapsed chat · CI job on `scripts/e2e/online.ts --remote` · reconnect banner vs toast overlap
@@ -126,6 +125,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **E5** · Explorers & Pirates: settler/crew ships, harbor settlements, exploration, pirate lairs + ships, fish, spices, Council missions; Land Ho!, Pirate Lairs, Fish, Spices, full game (+5-6P paired turns); shared `seaGraph`/`seaArt` · `s3-ep` 🟦 · PR #18 (squashed) → `expansions` · 1816 tests
 - **C1** · Official combos: Seafarers + C&K (New Shores, Through the Desert, +2 VP), T&B + C&K per 2025 sheets (Fishermen, Rivers, Caravans, Traders, variants); framework `before`/`wraps`/`routeEdges`; Rivers Diplomat stall fixed · `s3-combos` 🟦 · PR #17 (squashed) → `expansions` · 1712 tests
 - **E2** · Seafarers: ships, pirate, gold, Longest Trade Route, all 9 scenarios × 3p/4p/5-6p (20 maps), F3 setupOrder hook; unified VP-chip/stats/refusal/bot-steer mechanisms with C&K + T&B · `s3-seafarers` 🟦 · PR #16 (squashed) → `expansions` · 1621 tests
 - **E4** · Traders & Barbarians: Fishermen, Rivers, Caravans, Barbarian Attack, T&B main scenario (+F2 plaza ids), Catan for Two, Harbormaster, 5-6 boards · `s3-tb` 🟦 · PR #15 (squashed) → `expansions` · 1453 tests
