@@ -653,21 +653,35 @@
 .scrim.is-modal .dialog {
   max-height: calc(100vh - 32px);
 }
-/* Side card (trade offers): docked right, board and HUD stay usable. */
+/* Side card (trade offers): docked in the right column directly under the game log (which
+   sits at top 84px with max-height min(34vh, 300px)), same width, so the two never overlap. */
 .scrim.is-side {
-  place-items: center end;
-  padding: 0 16px 120px 0;
+  display: block;
+  padding: 0;
 }
 .scrim.is-side .dialog {
-  width: min(340px, calc(100vw - 32px));
+  position: absolute;
+  top: calc(84px + min(34vh, 300px) + 10px);
+  right: 12px;
+  width: 268px;
+  max-height: calc(100vh - 84px - min(34vh, 300px) - 22px);
+  padding: 14px 14px 12px;
 }
 .scrim.is-side .dialog h2 {
-  font-size: 18px;
+  font-size: 17px;
+}
+@media (max-width: 1100px) {
+  .scrim.is-side .dialog {
+    width: 230px;
+  }
 }
 @media (max-width: 720px) {
-  .scrim.is-side {
-    place-items: end center;
-    padding: 0 16px 200px;
+  .scrim.is-side .dialog {
+    top: auto;
+    bottom: 200px;
+    left: 16px;
+    right: 16px;
+    width: auto;
   }
 }
 .dialog.wide {
