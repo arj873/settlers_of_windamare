@@ -1,0 +1,211 @@
+/* Traders & Barbarians HUD (classes are prefixed tb-). Chrome uses the theme tokens; component
+   icons keep fixed art colours like the resource faces do. */
+.side-sec.sec-ext-tb:not(.is-collapsed) {
+  flex: 1.5 1 0;
+  min-height: 170px;
+}
+.sec-ext-tb .sec-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.tb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tb-ico {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 0;
+  flex: none;
+}
+
+/* --- shared facts ------------------------------------------------------- */
+.tb-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.tb-fact {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.tb-fact b {
+  color: var(--ink);
+}
+.tb-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.tb-stat b {
+  font-weight: 700;
+  color: var(--ink);
+}
+.tb-stat.is-holder {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--award-bg);
+  box-shadow: inset 0 0 0 1px var(--badge-ring);
+}
+
+/* --- players ------------------------------------------------------------ */
+.tb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tb-row {
+  display: grid;
+  grid-template-columns: minmax(56px, 0.7fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-left: 4px solid var(--pc, #888);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.tb-row.is-current {
+  background: var(--hover);
+}
+.tb-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-cells {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px 9px;
+  font-size: 12px;
+}
+.tb-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tb-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+}
+.tb-tag.is-good {
+  box-shadow: inset 0 0 0 1px var(--good);
+  color: var(--good);
+}
+.tb-tag.is-bad {
+  box-shadow: inset 0 0 0 1px var(--bad);
+  color: var(--bad);
+}
+
+/* --- the viewer's own details --------------------------------------------- */
+.tb-owns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  box-shadow: var(--sunken-shadow);
+}
+.tb-own {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+}
+.tb-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.tb-chip {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-num);
+}
+.tb-chip-fish {
+  background: #5b9fd0;
+  color: #0e2a40;
+  box-shadow: inset 0 0 0 1.5px #1e4766;
+}
+
+/* --- actions -------------------------------------------------------------- */
+.tb-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.tb-act {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tb-act .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tb-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.tb-res {
+  display: inline-flex;
+  gap: 3px;
+}
+.tb-resbtn {
+  border: 2px solid transparent;
+  border-radius: var(--btn-radius);
+  background: transparent;
+  padding: 1px;
+  cursor: pointer;
+}
+.tb-resbtn:hover,
+.tb-resbtn:focus-visible {
+  border-color: var(--accent);
+}
+.tb-note {
+  font-size: 11px;
+  margin: 0;
+}
+
+/* --- dialogs -------------------------------------------------------------- */
+.tb-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.tb-count {
+  min-width: 18px;
+  text-align: center;
+  font-family: var(--font-num);
+}

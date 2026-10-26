@@ -98,7 +98,7 @@ export function parseSetupPlacement(value: string): SetupPlacement {
 export const USAGE = `pnpm sim -- [options]
   --games N       games to play (default 10)
   --seed S        seed of the first game; game i uses S+i (default 1)
-  --players N     3..8, must fit the map (default 4)
+  --players N     2..8, must fit the map and mode (default 4)
   --max-steps M   per-game step cap (default by players: 3-4 5000, 5-6 15000, 7-8 30000)
   --sbp on|off    special building phase (default: on with 5+ players)
   --balanced-dice draw rolls from the 36-card dice deck
@@ -200,7 +200,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         args.seed = num(-Infinity);
         break;
       case '--players':
-        args.players = num(3, 8);
+        args.players = num(2, 8);
         break;
       case '--max-steps':
         args.maxSteps = num(1);

@@ -12,10 +12,12 @@
 import {
   CORNERS,
   SIDES,
+  centreVertex,
   cornerVertex,
   edgeEndpoints,
   edgeMidpoint,
   hexCenter,
+  spokeEdge,
   hexId,
   neighbor,
   parseHexId,
@@ -196,10 +198,28 @@ function buildTopology(frame: FrameDef): Topology {
     }
   }
 
+  // F2 plazas: the hex centre is a vertex, joined to the listed corners by spoke edges. They
+  // touch only their own hex; the hex's 6 corners / sides (production, robber) stay as they are.
+  for (const plaza of frame.plazas ?? []) {
+    const info = hex[plaza.hex];
+    if (!info) throw new Error(`plaza on ${plaza.hex}, which is not a land hex of ${frame.id}`);
+    const c = centreVertex(info.q, info.r);
+    vertex[c] = newVertexInfo(c);
+    vertex[c].hexes.push(plaza.hex);
+    vertexOrder.push(c);
+    for (const corner of plaza.corners) {
+      const e = spokeEdge(info.q, info.r, corner);
+      edge[e] = newEdgeInfo(e);
+      edge[e].hexes.push(plaza.hex);
+      edgeOrder.push(e);
+    }
+  }
+  const isSpoke = (e: EdgeId) => e.includes(',C');
+
   // Vertex <-> edge, vertex <-> vertex.
   for (const e of edgeOrder) {
     const info = edge[e] as EdgeInfo;
-    info.coastal = info.hexes.length === 1;
+    info.coastal = info.hexes.length === 1 && !isSpoke(e);
     const [a, b] = info.vertices;
     const va = vertex[a] as VertexInfo;
     const vb = vertex[b] as VertexInfo;
@@ -210,7 +230,7 @@ function buildTopology(frame: FrameDef): Topology {
   }
   for (const v of vertexOrder) {
     const info = vertex[v] as VertexInfo;
-    info.coastal = info.hexes.length < 3;
+    info.coastal = info.hexes.length < 3 && !v.endsWith(',C');
   }
   // Edge <-> edge (share a vertex).
   for (const e of edgeOrder) {

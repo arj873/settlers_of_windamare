@@ -418,6 +418,12 @@ function names(state: GameState, ids: PlayerId[]): string {
   return ids.map((i) => state.players[i]?.name ?? `Player ${i + 1}`).join(', ');
 }
 
+/** "Place a city — …", or an expansion card's label for a namespaced mode ("Wagon — …"). */
+function placeText(mode: PlaceMode): string {
+  const label = mode.includes('/') ? placeModeLabel(mode) : null;
+  return `${label ?? `Place a ${mode}`} — pick a highlighted spot (Esc to cancel)`;
+}
+
 /** The banner telling the viewer what the board expects (or whom we are waiting for). */
 export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | null): Hint | null {
   const phase = state.phase;
@@ -435,7 +441,6 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
   // An expansion may word any phase its own way (Seafarers: "Place a road or a ship").
   const ext = placeMode === null ? extensionHint(state, view) : null;
   if (ext) return { text: ext, tone: 'action' };
-  const piece = placeMode === null ? null : (placeModeLabel(placeMode) ?? placeMode);
 
   switch (phase.kind) {
     case 'setup':
@@ -443,14 +448,16 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         text:
           phase.step === 'settlement'
             ? 'Place a settlement'
-            : `Place a ${piece ?? 'road'} next to your new settlement`,
+            : placeMode
+              ? placeText(placeMode) // a module's build card in setup (the Seafarers Ship)
+              : 'Place a road next to your new settlement',
         tone: 'action',
       };
     case 'preRoll':
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':
       return placeMode
-        ? { text: `Place a ${piece} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : { text: 'Your turn — build, trade or end your turn', tone: 'action' };
     case 'discard':
       return {
@@ -469,7 +476,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         : { text: 'Respond to the trade offer', tone: 'action' };
     case 'specialBuild':
       return placeMode
-        ? { text: `Place a ${piece} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: placeText(placeMode), tone: 'action' }
         : {
             text: state.settings.rules56
               ? 'Build, buy or play one card, then pass'

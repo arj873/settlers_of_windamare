@@ -10,6 +10,7 @@ import {
   PORT_KINDS,
   TERRAIN_COUNTS,
 } from './constants';
+import type { Corner } from './hex';
 import type { Rng } from './rng';
 import type { BaseMapId, BaseTerrain, Board, DevCardCounts, HexId, MapId, PortKind } from './types';
 
@@ -18,6 +19,17 @@ export type FrameId = 'std19' | 'std30' | 'hex37' | `${string}/${string}`;
 
 /** An explicit list of harbor spots: [water hex, land hex it faces], clockwise. */
 export type HarborSpots = readonly (readonly [water: HexId, land: HexId])[];
+
+/**
+ * A plaza (F2, T&B trade hexes): the centre of land hex `hex` becomes a vertex (`v:q,r,C`) joined
+ * by spoke edges (`e:q,r,C<corner>`) to the listed corners of the hex. Plazas and spokes are
+ * ordinary topology vertices / edges (roads, pieces, clicks); the hex's own 6 corners and 6
+ * sides are unchanged (production, the robber and harbours ignore plazas).
+ */
+export interface PlazaDef {
+  hex: HexId;
+  corners: readonly Corner[];
+}
 
 /**
  * Base board shape. `rows` = land hexes per row, top to bottom (odd count, rows centered;
@@ -29,6 +41,8 @@ export interface RowsFrameDef {
   id: FrameId;
   rows: readonly number[];
   harbors: 'alternate' | HarborSpots;
+  /** F2: hex-centre plazas with spokes (T&B trade hexes). */
+  plazas?: readonly PlazaDef[];
 }
 
 /**
@@ -41,6 +55,8 @@ export interface HexListFrameDef {
   hexes: readonly HexId[];
   sea?: readonly HexId[];
   harbors: HarborSpots;
+  /** F2: hex-centre plazas with spokes (T&B trade hexes). */
+  plazas?: readonly PlazaDef[];
 }
 
 export type FrameDef = RowsFrameDef | HexListFrameDef;

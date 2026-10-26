@@ -41,12 +41,14 @@ board is all hexes with distance ≤ 2 from `h:0,0`.
             S
 ```
 
-| Kind   | Format            | Example    | Canonical rule                                        |
-| ------ | ----------------- | ---------- | ----------------------------------------------------- |
-| Hex    | `h:q,r`           | `h:0,-2`   | —                                                     |
-| Vertex | `v:q,r,N` or `,S` | `v:1,-2,S` | every vertex is the N or S corner of exactly one hex  |
-| Edge   | `e:q,r,NE/E/SE`   | `e:0,0,NE` | every edge is the NE, E or SE side of exactly one hex |
-| Player | number `0..n-1`   | `2`        | index into `state.players`, also turn order           |
+| Kind   | Format            | Example     | Canonical rule                                          |
+| ------ | ----------------- | ----------- | ------------------------------------------------------- |
+| Hex    | `h:q,r`           | `h:0,-2`    | —                                                       |
+| Vertex | `v:q,r,N` or `,S` | `v:1,-2,S`  | every vertex is the N or S corner of exactly one hex    |
+| Edge   | `e:q,r,NE/E/SE`   | `e:0,0,NE`  | every edge is the NE, E or SE side of exactly one hex   |
+| Player | number `0..n-1`   | `2`         | index into `state.players`, also turn order             |
+| Plaza  | `v:q,r,C`         | `v:2,-2,C`  | F2: centre of a hex listed in the frame's `plazas`      |
+| Spoke  | `e:q,r,C<corner>` | `e:2,-2,CS` | F2: plaza → that corner of hex (q,r); plaza frames only |
 
 The owning hex of a vertex/edge may be water or off-board — IDs are pure coordinates.
 Never build ID strings by hand from a corner name; use `cornerVertex(q, r, 'NE')` and `sideEdge(q, r, 'SW')` (they canonicalize).
@@ -74,6 +76,13 @@ widths + harbor spots. Sources and design notes: `docs/RULES.md` §16. Helpers (
 7–8 → `base78`). Helpers over base **and expansion** maps (`mapLookup.ts`): `isMapId`, `mapById`,
 `mapOf(state)`, `supplyOf(state)` (bank per resource + dev deck of the game: map supply changed by
 expansion `supply` hooks).
+
+**Plazas (F2, T&B trade hexes):** a frame (rows or hex list) may list `plazas: { hex, corners }[]`;
+its topology then has the centre vertex `v:q,r,C` (`hexes: [hex]`, not coastal) and one spoke
+edge `e:q,r,C<corner>` per listed corner, as ordinary vertices / edges (adjacency, roads, pieces,
+highlights, hit-testing). `hex[h].vertices` / `.edges` stay the 6 corners / sides, so production,
+the robber and harbours never see plazas. Helpers in `hex.ts`: `centreVertex`, `spokeEdge`,
+`isCentreVertex`, `isSpokeEdge`.
 
 **Expansion maps (F1):** `MapId = BaseMapId | '<expansion>/<name>'`. A `CustomMapDef`
 (`layout: 'custom'`, `generate(rng, players)`) on a `HexListFrameDef` (any hex set + explicit sea

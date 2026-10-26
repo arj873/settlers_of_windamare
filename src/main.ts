@@ -66,13 +66,8 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
         seed,
         players: PLAYER_COLORS.slice(0, n).map((p, i) => ({ ...p, name: names?.[i] ?? p.name })),
         // An expansion mode takes its map from its scenario unless ?map= names one of its maps.
-        ...(params.mode
-          ? {
-              mode: params.mode,
-              ...(params.scenario ? { scenario: params.scenario } : {}),
-              ...(params.map ? { map } : {}),
-            }
-          : { map }),
+        ...(params.mode ? { mode: params.mode, ...(params.map ? { map } : {}) } : { map }),
+        ...(params.mode && params.scenario ? { scenario: params.scenario } : {}),
         ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
         ...(params.timer === null ? {} : { turnTimerSec: params.timer }),
         ...(params.first === null || params.first >= n ? {} : { startingPlayer: params.first }),

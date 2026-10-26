@@ -38,10 +38,11 @@ import {
 } from './coords';
 import * as D from './mapdata';
 import type { MapData } from './mapdata';
+import { NO_ROBBER } from '../../../engine/expansions/ext';
 
 export const SEAFARERS = 'seafarers';
-/** Off-board robber (beside the board until the first 7 / Knight); = NO_ROBBER of the framework. */
-export const OFF_BOARD: HexId = 'h:999,999';
+/** The robber beside the board (until the first 7 / Knight): the framework's NO_ROBBER. */
+export const OFF_BOARD: HexId = NO_ROBBER;
 
 export type MapKey =
   | 'hns3'

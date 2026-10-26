@@ -2,7 +2,7 @@
  * Seafarers invariants for the simulator (docs/rules/seafarers.md §9.7). The random bot needs
  * nothing else: ships, the pirate, gold choices, wonders and fortress attacks are all legal moves.
  */
-import type { BotExtension } from '../../bots/expansions';
+import { steerAway, type BotExtension } from '../../bots/expansions';
 import { checkSeafarers } from './invariants';
 
 export const seafarersBots: BotExtension = {
@@ -14,5 +14,5 @@ export const seafarersBots: BotExtension = {
   // them itself.
   relax: ['award-mismatch', 'robber-position', 'dev-conservation', 'winner'],
   // A random bot gains nothing from moving ships around; it still does so without the bias.
-  stalling: ['seafarers/pickShip', 'seafarers/cancelMove'],
+  steer: steerAway(['seafarers/pickShip', 'seafarers/cancelMove']),
 };
