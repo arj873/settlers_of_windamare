@@ -736,9 +736,9 @@ export class BoardView {
   }
 
   private syncRobber(state: GameState) {
-    // settings.robberMode 'none': there is no robber piece.
-    this.robber.visible = state.settings.robberMode !== 'none';
+    // settings.robberMode 'none': there is no robber piece; NO_ROBBER (off the board): hidden.
     const info = this.topo.hex[state.robber];
+    this.robber.visible = state.settings.robberMode !== 'none' && info !== undefined;
     if (!info) return;
     const hasToken = state.board.hexes[state.robber]?.token != null;
     const target = { x: info.x * S + (hasToken ? -0.47 * S : 0), y: info.y * S + 0.32 * S };
