@@ -6,6 +6,7 @@
  *   primary #D0BCFF on #381E72 · secondary #CCC2DC · tertiary #EFB8C8 · error #F2B8B5
  */
 :root[data-theme='materialdark'] {
+  color-scheme: dark;
   --page-bg: #121212;
   --board-frame: #4a4458;
   --board-frame-dark: #211f24;
@@ -257,24 +258,6 @@
   background: transparent;
   color: #d0bcff;
   border: 1px solid #938f99;
-}
-
-/* Fit board button: a small elevated tonal FAB. */
-[data-theme='materialdark'] .board-fit {
-  color: #e8def8;
-  background: #4a4458;
-  border: 0;
-  border-radius: 12px;
-  box-shadow:
-    0 3px 6px 2px rgba(0, 0, 0, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.6);
-}
-[data-theme='materialdark'] .board-fit:hover {
-  color: #fff;
-  background: #5b5469;
-}
-[data-theme='materialdark'] .board-fit:focus-visible {
-  outline-color: #d0bcff;
 }
 
 /* Glyph inks: violet card backs with a rose trim. */
