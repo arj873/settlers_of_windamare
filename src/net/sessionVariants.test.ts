@@ -43,6 +43,32 @@ function playUntil(net: LocalNet, until: () => boolean, maxSteps = 3000): void {
   }
 }
 
+describe('GameSession: 5+ rule set and map rules online', () => {
+  it('start passes rules56 and the map rules into the game settings', () => {
+    const { session } = started({
+      map: 'base56',
+      seatCount: 5,
+      vpToWin: 12,
+      variants: { rules56: true, mapRules: { allowRedTouch: true } },
+    });
+    const s = session.state!;
+    expect(s.settings).toMatchObject({
+      rules56: true,
+      specialBuildPhase: true,
+      vpToWin: 12,
+      mapRules: { allowRedTouch: true },
+    });
+    const deserts = Object.values(s.board.hexes).filter((h) => h.terrain === 'desert');
+    expect(s.robber).toBe(deserts[0]?.id);
+  });
+
+  it('defaults leave both out of the settings', () => {
+    const { session } = started({});
+    expect(session.state!.settings.rules56).toBeUndefined();
+    expect(session.state!.settings.mapRules).toBeUndefined();
+  });
+});
+
 describe('GameSession: V1 variants online', () => {
   it('the host can configure variants; invalid combinations are refused', () => {
     const { session } = started({ variants: { eventCards: true, robberMode: 'friendly' } });

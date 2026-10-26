@@ -1,0 +1,271 @@
+/*
+ * Material Dark: Material Design 3 dark scheme. #121212 surface that gets lighter with elevation
+ * (a violet primary tint over it), rounded 12-16px cards, soft elevation shadows, tonal filled
+ * buttons, Roboto.
+ *   surface 0 #121212 · +1 #1c1b1f · +2 #211f24 · +3 #262429 · +4 #28262c · +5 #2c2a31
+ *   primary #D0BCFF on #381E72 · secondary #CCC2DC · tertiary #EFB8C8 · error #F2B8B5
+ */
+:root[data-theme='materialdark'] {
+  color-scheme: dark;
+  --page-bg: #121212;
+  --board-frame: #4a4458;
+  --board-frame-dark: #211f24;
+  --board-frame-light: #7a7289;
+
+  --font-ui: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: var(--font-ui);
+  --font-log: var(--font-ui);
+  --font-num: var(--font-ui);
+  --display-weight: 500;
+  --display-case: none;
+  --display-tracking: 0;
+
+  --ink: #e6e1e5;
+  --ink-dim: #cac4d0;
+  --ink-dark: #1c1b1f;
+  --ink-strong: #ffffff;
+  --log-ink: #e6e1e5;
+  --raised-ink: #e6e1e5;
+  --text-shadow: none;
+  --good: #a8dab5;
+  --bad: #f2b8b5;
+
+  --surface: #1c1b1f;
+  --surface-raised: #2b2930;
+  --surface-sunken: #141317;
+  --surface-pop: #2c2a31;
+  --surface-flat: #211f24;
+  --edge: #49454f;
+  --line: #49454f;
+  --hover: rgba(208, 188, 255, 0.12);
+  --panel-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.6);
+  --side-shadow: -2px 0 12px rgba(0, 0, 0, 0.5);
+  --btn-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sunken-shadow: none;
+  --sec-sep: 1px solid #36343b;
+  --sec-sep-shadow: none;
+  --tint-base: #211f24;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --scrim-deep: rgba(0, 0, 0, 0.88);
+  --radius: 16px;
+  --btn-radius: 20px;
+
+  --accent: #d0bcff;
+  --accent-2: #eaddff;
+  --accent-glow: rgba(208, 188, 255, 0.5);
+  --accent-ink: #381e72;
+  --primary-bg: #d0bcff;
+  --primary-ink: #381e72;
+  --primary-text-shadow: none;
+  --ghost-bg: transparent;
+  --warn: #f2b8b5;
+  --warn-glow: rgba(242, 184, 181, 0.5);
+  --danger-bg: #8c1d18;
+
+  --plaque-bg: transparent;
+  --plaque-ink: #e6e1e5;
+  --plaque-border: 0;
+  --plaque-radius: 12px;
+  --plaque-shadow: none;
+  --plaque-text-shadow: none;
+  --plaque-stud: transparent;
+
+  --log-bg: #141317;
+  --log-shadow: none;
+  --log-dim: #aea8b5;
+  --log-rule: #36343b;
+  --scroll-thumb: #6f6a78;
+  --pname-mix: white;
+  --pname-shadow: none;
+
+  --badge-bg: #381e72;
+  --badge-ink: #eaddff;
+  --badge-ring: #d0bcff;
+  --tag-bg: #4a4458;
+  --tag-ink: #e8def8;
+  --new-bg: #386a20;
+  --award-bg: #efb8c8;
+
+  --card-edge: rgba(0, 0, 0, 0.7);
+  --card-inner: rgba(255, 255, 255, 0.4);
+  --card-stack-1: #e6e0e9;
+  --card-stack-2: #cac4d0;
+  --card-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.45);
+  --card-ico-bg: radial-gradient(circle, rgba(255, 251, 254, 0.92) 58%, rgba(255, 251, 254, 0) 70%);
+  --card-radius: 0.16;
+  --rf-brick: linear-gradient(160deg, #e2825a, #b4472a);
+  --rf-lumber: linear-gradient(160deg, #58ae5f, #2d6f34);
+  --rf-wool: linear-gradient(160deg, #c3e78c, #7fb24c);
+  --rf-grain: linear-gradient(160deg, #fbe17a, #d9a92a);
+  --rf-ore: linear-gradient(160deg, #c2ccd6, #7b8896);
+  --df-back: linear-gradient(160deg, #6750a4, #381e72);
+  --df-face: linear-gradient(170deg, #fffbfe, #e6e0e9);
+  --res-brick: #e0714a;
+  --res-lumber: #4aa35a;
+  --res-wool: #a5d86e;
+  --res-grain: #ecca4e;
+  --res-ore: #9aa7b5;
+  --slot-bg: #141317;
+  --slot-shadow: none;
+
+  --die-bg: linear-gradient(145deg, #fffbfe, #e6e0e9);
+  --die-edge: rgba(0, 0, 0, 0.5);
+  --die-pip: #381e72;
+  --die-seven: #b3261e;
+  --die-shadow: 0 2px 4px 1px rgba(0, 0, 0, 0.5);
+  --die-radius: 12px;
+
+  --pp-shade: #141317;
+  --pp-gloss: none;
+  --pp-shadow: none;
+  --avatar-ring: #cac4d0;
+  --pill-shade: #2b2930;
+  --pill-ink: #e6e1e5;
+  --pill-ring: none;
+  --timer-track: #49454f;
+  --timer-low-track: #601410;
+  --timer-low-fill: #f2b8b5;
+
+  --setup-bg: #121212;
+  --tile-bg: #211f24;
+  --tile-on-bg: #4f378b;
+  --tile-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --tile-hover-edge: #d0bcff;
+  --map-sea: radial-gradient(circle at 50% 50%, #274c72, #17304a);
+  --switch-off: #49454f;
+  --switch-on: #d0bcff;
+  --range-track: #49454f;
+  --range-thumb: #d0bcff;
+  --step-bg: #4a4458;
+  --step-hover: #5b5469;
+  --swatch-on: #e6e1e5;
+
+  --toast-bg: #322f35;
+  --toast-ink: #e6e1e5;
+  --toast-edge: #49454f;
+  --toast-error-edge: #f2b8b5;
+  --toast-error-ink: #f9dedc;
+  --resume-bg: #121212;
+  --resume-ink: #e6e1e5;
+  --resume-dim: #cac4d0;
+}
+
+/* Elevation: higher surfaces are lighter (tonal) and carry a deeper shadow. */
+[data-theme='materialdark'] .hud-side {
+  background: #211f24;
+}
+[data-theme='materialdark'] .dialog,
+[data-theme='materialdark'] .menu-panel,
+[data-theme='materialdark'] .winner-card {
+  background: #2b2930;
+  border-color: transparent;
+  box-shadow:
+    0 4px 8px 3px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+}
+[data-theme='materialdark'] .hud-controls:not(:empty),
+[data-theme='materialdark'] .turn-pill {
+  background: #2b2930;
+  border-color: transparent;
+}
+[data-theme='materialdark'] .pp {
+  border-color: transparent;
+}
+[data-theme='materialdark'] .su-footer {
+  background: #211f24;
+  border-top: 1px solid #36343b;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.4);
+}
+[data-theme='materialdark'] .su-seat {
+  background: #211f24;
+  border-color: #36343b;
+}
+/* Section titles are plain headings. */
+[data-theme='materialdark'] .plaque::before,
+[data-theme='materialdark'] .plaque::after {
+  display: none;
+}
+[data-theme='materialdark'] .plaque {
+  padding: 2px 10px 3px;
+  font-size: 15px !important;
+  letter-spacing: 0.01em !important;
+}
+[data-theme='materialdark'] .sec-toggle {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-color: transparent;
+  background: #36343b;
+}
+[data-theme='materialdark'] .pname {
+  color: color-mix(in srgb, var(--pc) 65%, #fff);
+}
+[data-theme='materialdark'] .pp {
+  border-radius: 16px;
+  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.4);
+}
+[data-theme='materialdark'] .pp.is-current {
+  box-shadow:
+    0 0 0 2px #d0bcff,
+    0 2px 10px rgba(208, 188, 255, 0.3);
+}
+[data-theme='materialdark'] .avatar,
+[data-theme='materialdark'] .bcard {
+  border-color: rgba(0, 0, 0, 0.6);
+}
+/* Buttons: filled tonal, pill-ish; the primary is the violet filled button. */
+[data-theme='materialdark'] .btn,
+[data-theme='materialdark'] .menu-btn,
+[data-theme='materialdark'] .seg-btn,
+[data-theme='materialdark'] .su-step {
+  border-color: transparent;
+  background: #4a4458;
+  color: #e8def8;
+}
+[data-theme='materialdark'] .btn:hover:not(:disabled),
+[data-theme='materialdark'] .menu-btn:hover,
+[data-theme='materialdark'] .seg-btn:hover {
+  background: #5b5469;
+}
+[data-theme='materialdark'] .btn-roll.is-ready,
+[data-theme='materialdark'] .btn-end.is-ready,
+[data-theme='materialdark'] .btn-primary,
+[data-theme='materialdark'] .seg-btn.is-on {
+  border-color: transparent;
+  background: #d0bcff;
+  color: #381e72;
+  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.4);
+}
+[data-theme='materialdark'] .btn-ghost {
+  background: transparent;
+  color: #d0bcff;
+  border: 1px solid #938f99;
+}
+[data-theme='materialdark'] :focus-visible {
+  outline: 2px solid #d0bcff;
+  outline-offset: 2px;
+}
+[data-theme='materialdark'] .cover h1,
+[data-theme='materialdark'] .winner h1,
+[data-theme='materialdark'] .su-head h1 {
+  color: #e6e1e5;
+}
+[data-theme='materialdark'] .su-seat-x:hover:not(:disabled) {
+  background: rgba(242, 184, 181, 0.16);
+  color: #f2b8b5;
+}
+[data-theme='materialdark'] .su-add-seat {
+  background: transparent;
+  color: #d0bcff;
+  border: 1px solid #938f99;
+}
+
+/* Glyph inks: violet card backs with a rose trim. */
+[data-theme='materialdark'] .g-devBack rect:first-child,
+[data-theme='materialdark'] .g-devCards rect:first-child {
+  fill: #4f378b;
+}
+[data-theme='materialdark'] .g-devBack rect:nth-child(2),
+[data-theme='materialdark'] .g-devCards rect:nth-child(2) {
+  stroke: #efb8c8;
+}

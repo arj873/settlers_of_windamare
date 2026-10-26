@@ -152,6 +152,10 @@ discard, monopoly, event, other), `blocked` (what the robber's hex would have pa
   cards bought, hidden VP history) and passes it unchanged at game over.
 
 `TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5).
+`TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5) and
+`specialOwner?: PlayerId` (V2: the owner during a special build phase, so a card played there with
+`rules56` can resume into `specialBuild{builder, owner}`; `ResumePhase` is now
+`'preRoll' | 'main' | 'specialBuild'`, resolved by `resumePhase()` in `actions/common.ts`).
 
 **GameSettings v2** (validated by `createGame`, which throws on bad values):
 
@@ -171,17 +175,19 @@ discard, monopoly, event, other), `blocked` (what the robber's hex would have pa
 only when they differ from it (so default settings and old saves are unchanged; no schema bump).
 Read them only through `variants.ts` / `clock.ts` accessors. Rules and sources: RULES.md §18.
 
-| Field            | Type                                           | Engine                                                                    |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
-| `robberMode`     | `'normal' \| 'friendly' \| 'none'`             | `robberTargets`, `isRobberProtected`, `startRobber`, production           |
-| `eventCards`     | `true`                                         | rolls draw from `eventDeck`; `event` phase; not with `balancedDice`       |
-| `setupPlacement` | `{ first, second: { building, restriction } }` | setup building kind (`settlement`/`city`), `normal`/`anyVertex`           |
-| `seatOrder`      | `number[]` (config index per seat)             | Randomize Turn Order (config `randomTurnOrder: true`); seat 0 starts      |
-| `mapSelection`   | `'random' \| 'veto'`                           | `randomMapFor` / `mapVeto` phase before setup                             |
-| `rushMode`       | `true`                                         | `beginTurn` rolls automatically (no `preRoll`)                            |
-| `turboMode`      | `true`                                         | both setup rounds pay starting resources                                  |
-| `secondSettler`  | `true`                                         | paired players' turn (4+ players, excludes `specialBuildPhase`)           |
-| `timer`          | `{ preset, bankSec, incrementSec }`            | chess clock, client/server enforced (`clock.ts`); excludes `turnTimerSec` |
+| Field            | Type                                                                                                        | Engine                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `robberMode`     | `'normal' \| 'friendly' \| 'none'`                                                                          | `robberTargets`, `isRobberProtected`, `startRobber`, production                                                                           |
+| `eventCards`     | `true`                                                                                                      | rolls draw from `eventDeck`; `event` phase; not with `balancedDice`                                                                       |
+| `setupPlacement` | `{ first, second: { building, restriction } }`                                                              | setup building kind (`settlement`/`city`), `normal`/`anyVertex`                                                                           |
+| `seatOrder`      | `number[]` (config index per seat)                                                                          | Randomize Turn Order (config `randomTurnOrder: true`); seat 0 starts                                                                      |
+| `mapSelection`   | `'random' \| 'veto'`                                                                                        | `randomMapFor` / `mapVeto` phase before setup                                                                                             |
+| `rushMode`       | `true`                                                                                                      | `beginTurn` rolls automatically (no `preRoll`)                                                                                            |
+| `turboMode`      | `true`                                                                                                      | both setup rounds pay starting resources                                                                                                  |
+| `secondSettler`  | `true`                                                                                                      | paired players' turn (4+ players, excludes `specialBuildPhase`)                                                                           |
+| `timer`          | `{ preset, bankSec, incrementSec }`                                                                         | chess clock, client/server enforced (`clock.ts`); excludes `turnTimerSec`                                                                 |
+| `mapRules`       | `{ allowRedTouch?, allowExtremeTouch?, allowSameNumberTouch?, allowSameResourceTouch? }` (only `true` kept) | `randomBoard` constraints on random maps, RULES.md §19 (V2)                                                                               |
+| `rules56`        | `true`                                                                                                      | 5+ player rule set (5+ players, no `secondSettler`): a dev card in the special build step, no robber on the 2nd desert; RULES.md §20 (V2) |
 
 `startingPlayer` in the config is `PlayerId | 'random'` (default `'random'`): `randomStartingPlayer(seed, n)`
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
@@ -441,6 +447,10 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
   manual camera: a _pressed_ drag past `TAP_SLOP` (6 px), a wheel, a two-pointer pinch. A mouse press is always a
   single pointer (a missed release is dropped, and a move with no button held is a hover, never a drag). Inset
   changes leave a manual camera alone; a real size change, double-click, `fit()` or the "Fit board" button refit.
+- The fit frames `fitBounds(topo)` (land hexes + harbor badges); the sea backdrop/frame (`boardBounds`) may run
+  under the HUD and only bounds the pan clamp. Board `Text` is re-rasterized at `textResolution(pxPerUnit, dpr)`
+  150 ms after the zoom settles (no minified/magnified glyph bitmaps); the view keeps `renderer.resolution` equal to
+  `devicePixelRatio` (browser zoom, monitor change). `view.textResolution()` reports the current text resolution.
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
@@ -480,7 +490,12 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
 - Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`; `?click=Menu` opens the menu, `?theme=`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
-- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood. Every colour,
+- Setup seats (UX1): each seat row has a × (`removeSeat(draft, index)`, removes that seat, disabled at
+  `MIN_PLAYERS`) and "+ Add player" under the list (`addSeat(draft)`, human, disabled at `MAX_PLAYERS`);
+  both keep colours unique, auto-switch the map like the Players stepper and re-render it.
+- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood, GitHub Dark
+  (`githubdark.css`, flat 6px, system font) and Material Dark (`materialdark.css`, MD3 tonal
+  surfaces, Roboto via `@fontsource/roboto`). Screenshots: `docs/design/themes/`. Every colour,
   material, font and shadow is a CSS custom property; `wood.css` is the `:root` base and each
   theme overrides it under `:root[data-theme='…']` on `<html>`. `initTheme(location.search)` picks
   `?theme=` > saved pick (`localStorage['catan.theme']`, try/catch) > `DEFAULT_THEME`;

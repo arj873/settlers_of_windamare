@@ -16,6 +16,9 @@ export function checkVictory(draft: GameState): void {
   const kind = draft.phase.kind;
   if (kind === 'gameOver' || kind === 'setup' || kind === 'specialBuild') return;
   if (draft.winner !== null) return;
+  // A Knight / Road Building played inside a special build step (5+ rule set) is still the
+  // special building phase: nobody wins until a real turn starts.
+  if (draft.turn.specialOwner !== undefined) return;
   const current = draft.turn.current;
   const vp = victoryPoints(draft, current);
   if (vp < draft.settings.vpToWin) return;

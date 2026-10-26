@@ -4,6 +4,7 @@
  * sections. Marcellus for the titles, Nunito for everything else.
  */
 :root[data-theme='sunfired'] {
+  color-scheme: light;
   --page-bg: radial-gradient(ellipse at 42% 45%, #145a7d 0%, #0c3d5a 55%, #072638 100%);
   /* Terracotta rim round the board. */
   --board-frame: #b3593a;

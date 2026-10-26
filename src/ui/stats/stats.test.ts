@@ -38,10 +38,10 @@ function finished(seed = 11, eventCards = false): GameState {
 const GAME = finished();
 
 describe('stats model', () => {
-  it('formatDuration: h:mm, unknown as a dash', () => {
-    expect(formatDuration(0)).toBe('0:00');
-    expect(formatDuration(42 * 60_000 + 59_000)).toBe('0:42');
-    expect(formatDuration(96 * 60_000)).toBe('1:36');
+  it('formatDuration: minutes / hours, unknown as a dash', () => {
+    expect(formatDuration(0)).toBe('< 1 min');
+    expect(formatDuration(42 * 60_000 + 59_000)).toBe('42 min');
+    expect(formatDuration(96 * 60_000)).toBe('1 h 36 min');
     expect(formatDuration(null)).toBe('—');
     expect(formatDuration(undefined)).toBe('—');
   });
@@ -129,7 +129,7 @@ describe('stats panel in the HUD', () => {
     expect(byText('New game')).toBeDefined();
   });
 
-  it('header: title, winner with colour dot, turns, duration h:mm; five tabs', () => {
+  it('header: title, winner with colour dot, turns, duration; five tabs', () => {
     open(GAME);
     const panel = root.querySelector('.gstats')!;
     expect(root.querySelector('.winner')).toBeNull();
@@ -137,7 +137,7 @@ describe('stats panel in the HUD', () => {
     const meta = panel.querySelector('.gs-meta')!.textContent!;
     expect(meta).toContain(`Winner: ${GAME.players[GAME.winner!]!.name}`);
     expect(meta).toContain(`Turns: ${GAME.turn.number}`);
-    expect(meta).toContain('Duration: 1:36');
+    expect(meta).toContain('Duration: 1 h 36 min');
     expect(panel.querySelector('.gs-meta .gs-dot')).not.toBeNull();
     expect([...panel.querySelectorAll('.gs-tab')].map((t) => t.textContent)).toEqual(
       STATS_TABS.map((t) => t.label),

@@ -1,8 +1,11 @@
 /** Pure setup-screen logic: defaults, map/player coupling, colours, persistence. No DOM. */
 import {
   OFFICIAL_SETUP,
+  RULES56_MIN_PLAYERS,
+  RULES56_VP,
   TIMER_PRESET_VALUES,
   timerSettings,
+  type MapRules,
   type MapSelection,
   type RobberMode,
   type SetupBuilding,
@@ -102,6 +105,13 @@ export interface SetupDraft {
   randomTurnOrder: boolean;
   mapSelection: MapSelection;
   setupPlacement: SetupPlacement;
+  /** The 5+ player rule set (only with 5+ seats). */
+  rules56: boolean;
+  /** Map rules, "allow" polarity: off (the default) = the adjacency is forbidden. */
+  allowRedTouch: boolean;
+  allowExtremeTouch: boolean;
+  allowSameNumberTouch: boolean;
+  allowSameResourceTouch: boolean;
   /** Chess clock preset ('off' = none; the per-turn timer may be used instead). */
   clockPreset: TimerPreset;
   /** Custom clock: bank in minutes and increment in seconds. */
@@ -120,6 +130,11 @@ export const VARIANT_DEFAULTS: Pick<
   | 'randomTurnOrder'
   | 'mapSelection'
   | 'setupPlacement'
+  | 'rules56'
+  | 'allowRedTouch'
+  | 'allowExtremeTouch'
+  | 'allowSameNumberTouch'
+  | 'allowSameResourceTouch'
   | 'clockPreset'
   | 'customBankMin'
   | 'customIncrementSec'
@@ -132,6 +147,11 @@ export const VARIANT_DEFAULTS: Pick<
   randomTurnOrder: false,
   mapSelection: 'fixed',
   setupPlacement: OFFICIAL_SETUP,
+  rules56: false,
+  allowRedTouch: false,
+  allowExtremeTouch: false,
+  allowSameNumberTouch: false,
+  allowSameResourceTouch: false,
   clockPreset: 'off',
   customBankMin: 15,
   customIncrementSec: 20,
@@ -143,6 +163,54 @@ export const CUSTOM_INCREMENT_SEC = { min: 0, max: 600 } as const;
 export const SECOND_SETTLER_MIN_PLAYERS = 4;
 /** Colonist Rush defaults: discard limit 9 and the friendly robber (colonist.io/catan-rules/colonist-rush). */
 export const RUSH_DISCARD_LIMIT = 9;
+
+/** The 5+ player rule set needs 5+ seats (the tile is hidden below that). */
+export const RULES56_SEATS = RULES56_MIN_PLAYERS;
+export { RULES56_VP };
+
+/** Balance rules (random maps), in screen order. Wording from the design mockup. */
+export const MAP_RULE_OPTIONS: readonly {
+  key: keyof Pick<
+    SetupDraft,
+    'allowRedTouch' | 'allowExtremeTouch' | 'allowSameNumberTouch' | 'allowSameResourceTouch'
+  >;
+  rule: keyof MapRules;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    key: 'allowRedTouch',
+    rule: 'allowRedTouch',
+    title: 'Allow 6 & 8 touching',
+    desc: 'Disabled by default — official red-number rule.',
+  },
+  {
+    key: 'allowExtremeTouch',
+    rule: 'allowExtremeTouch',
+    title: 'Allow 2 & 12 touching',
+    desc: 'Adjacent dead corners.',
+  },
+  {
+    key: 'allowSameNumberTouch',
+    rule: 'allowSameNumberTouch',
+    title: 'Same numbers may touch',
+    desc: 'Two 5s side-by-side, etc.',
+  },
+  {
+    key: 'allowSameResourceTouch',
+    rule: 'allowSameResourceTouch',
+    title: 'Same resources may touch',
+    desc: 'Resource clusters, more theme.',
+  },
+];
+
+/**
+ * The balance rules apply to every randomly generated map. Only the fixed beginner layout is
+ * official and untouched (a veto or random map pick always lands on a random layout).
+ */
+export function mapRulesApply(draft: SetupDraft): boolean {
+  return draft.map !== 'base' || draft.mapSelection !== 'fixed';
+}
 
 export const ROBBER_OPTIONS: readonly { id: RobberMode; label: string; desc: string }[] = [
   { id: 'normal', label: 'Normal', desc: 'Official rules' },
@@ -246,7 +314,11 @@ export function setPlayerCount(draft: SetupDraft, count: number): SetupDraft {
   let map = draft.map;
   if (!mapFits(map, n)) map = MAPS.find((m) => m.max >= n)?.id ?? 'base78';
   const secondSettler = draft.secondSettler && n >= SECOND_SETTLER_MIN_PLAYERS;
-  return { ...draft, seats, map, secondSettler };
+  // Dropping below 5 seats turns the 5+ rule set off (and gives back its 12 VP preset).
+  const dropped = draft.rules56 && n < RULES56_SEATS;
+  const rules56 = draft.rules56 && !dropped;
+  const vpToWin = dropped && draft.vpToWin === RULES56_VP ? VP_DEFAULT : draft.vpToWin;
+  return { ...draft, seats, map, secondSettler, rules56, vpToWin };
 }
 
 // ---------------------------------------------------------------------------
@@ -260,18 +332,36 @@ export type ToggleKey =
   | 'rushMode'
   | 'turboMode'
   | 'secondSettler'
-  | 'randomTurnOrder';
+  | 'randomTurnOrder'
+  | 'rules56'
+  | 'allowRedTouch'
+  | 'allowExtremeTouch'
+  | 'allowSameNumberTouch'
+  | 'allowSameResourceTouch';
 
 /**
  * Flip a switch. Event Cards and Balanced Dice exclude each other (both replace the dice);
  * turning Rush on applies the Colonist Rush defaults (discard limit 9, friendly robber);
- * Second Settler needs 4+ players.
+ * Second Settler needs 4+ players. The 5+ rule set needs 5+ players, excludes Second Settler
+ * (it is built on the special building phase) and suggests 12 VP: it moves the slider from
+ * the default 10 to 12 (any other value the player chose stays; turning it off undoes only that).
  */
 export function toggle(draft: SetupDraft, key: ToggleKey): SetupDraft {
   const on = !draft[key];
   if (key === 'secondSettler' && on && draft.seats.length < SECOND_SETTLER_MIN_PLAYERS)
     return draft;
+  if (key === 'rules56' && on && draft.seats.length < RULES56_SEATS) return draft;
   const next: SetupDraft = { ...draft, [key]: on };
+  if (key === 'rules56') {
+    if (on) {
+      next.secondSettler = false;
+      if (next.vpToWin === VP_DEFAULT) next.vpToWin = RULES56_VP;
+    } else if (next.vpToWin === RULES56_VP) next.vpToWin = VP_DEFAULT;
+  }
+  if (on && key === 'secondSettler' && draft.rules56) {
+    next.rules56 = false;
+    if (next.vpToWin === RULES56_VP) next.vpToWin = VP_DEFAULT;
+  }
   if (on && key === 'eventCards') next.balancedDice = false;
   if (on && key === 'balancedDice') next.eventCards = false;
   if (on && key === 'rushMode') {
@@ -315,6 +405,10 @@ export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
     v.secondSettler = true;
   }
   if (draft.randomTurnOrder) v.randomTurnOrder = true;
+  if (draft.rules56 && draft.seats.length >= RULES56_SEATS) v.rules56 = true;
+  const mapRules: MapRules = {};
+  for (const o of MAP_RULE_OPTIONS) if (draft[o.key]) mapRules[o.rule] = true;
+  if (Object.keys(mapRules).length > 0) v.mapRules = mapRules;
   if (draft.mapSelection !== 'fixed') v.mapSelection = draft.mapSelection;
   const p = draft.setupPlacement;
   const o = OFFICIAL_SETUP;
@@ -332,6 +426,24 @@ export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
   });
   if (timer) v.timer = timer;
   return Object.keys(v).length > 0 ? v : undefined;
+}
+
+/** Append one seat (human by default, first unused colour). No-op at MAX_PLAYERS; the map auto-switches. */
+export function addSeat(draft: SetupDraft, controller: Controller = 'human'): SetupDraft {
+  if (draft.seats.length >= MAX_PLAYERS) return draft;
+  const grown = setPlayerCount(draft, draft.seats.length + 1);
+  const last = grown.seats.length - 1;
+  return { ...grown, seats: grown.seats.map((s, i) => (i === last ? { ...s, controller } : s)) };
+}
+
+/**
+ * Remove exactly seat `index` (not the last one). No-op at MIN_PLAYERS or for a bad index. Remaining
+ * seats keep their names, colours and controllers, so colours stay unique; the map is kept (it still fits).
+ */
+export function removeSeat(draft: SetupDraft, index: number): SetupDraft {
+  if (draft.seats.length <= MIN_PLAYERS || !Number.isInteger(index)) return draft;
+  if (index < 0 || index >= draft.seats.length) return draft;
+  return { ...draft, seats: draft.seats.filter((_, i) => i !== index) };
 }
 
 /** Pick a map and clamp the player count into its range. */
@@ -502,6 +614,12 @@ function sanitizeVariants(raw: Record<string, unknown>): typeof VARIANT_DEFAULTS
     turboMode: raw['turboMode'] === true,
     secondSettler: raw['secondSettler'] === true,
     randomTurnOrder: raw['randomTurnOrder'] === true,
+    // Seat count is re-checked by setPlayerCount (rules56 off below 5 seats).
+    rules56: raw['rules56'] === true && raw['secondSettler'] !== true,
+    allowRedTouch: raw['allowRedTouch'] === true,
+    allowExtremeTouch: raw['allowExtremeTouch'] === true,
+    allowSameNumberTouch: raw['allowSameNumberTouch'] === true,
+    allowSameResourceTouch: raw['allowSameResourceTouch'] === true,
     mapSelection: oneOf(raw['mapSelection'], MAP_SELECTION_OPTIONS, d.mapSelection),
     setupPlacement: {
       first: sanitizeRound(sp['first'], d.setupPlacement.first),

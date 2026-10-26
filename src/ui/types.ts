@@ -1,5 +1,6 @@
 import type {
   Action,
+  MapRules,
   MapSelection,
   PlayerId,
   RobberMode,
@@ -46,6 +47,10 @@ export interface NewGameVariants {
   randomTurnOrder?: boolean;
   mapSelection?: MapSelection;
   setupPlacement?: SetupPlacement;
+  /** Adjacencies random maps may have (only `true` flags are set). */
+  mapRules?: MapRules;
+  /** The optional 5+ player rule set (5+ seats only). */
+  rules56?: boolean;
   /** Chess clock (replaces `turnTimerSec`, which is then null). */
   timer?: TimerSettings;
 }

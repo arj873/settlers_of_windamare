@@ -389,7 +389,8 @@ Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` withou
 plus `seatCount` (`mode: 'base'`, `map`, `rules{balancedDice, hideBankCards}`, `turnTimerSec`,
 `vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range), plus optional
 `variants` (V1, RULES.md §18: `robberMode, eventCards, rushMode, turboMode, secondSettler,
-randomTurnOrder, mapSelection, setupPlacement, timer`). `parseVariants` is strict (unknown keys
+randomTurnOrder, mapSelection, setupPlacement, timer`; V2, §19/§20: `rules56` (5+ seats, not with
+second settler) and `mapRules`, strict keys, only `true` flags kept). `parseVariants` is strict (unknown keys
 rejected, a named clock preset must carry its own values) and normalises defaults away (off flags,
 `'normal'`, `'fixed'`). Combinations `createGame` would refuse are refused at `configure`
 (`bad_message`): event cards + balanced dice, chess clock + `turnTimerSec`, second settler with

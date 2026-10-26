@@ -54,11 +54,13 @@ export const LOSS_LABEL: Partial<Record<LossSink, string>> = {
 
 export const total = (c: ResourceCounts): number => RESOURCES.reduce((n, r) => n + c[r], 0);
 
-/** "1:36:05" → "1:36" (h:mm); under an hour "0:42". null → "—". */
+/** "< 1 min", "42 min", "1 h 36 min". null → "—". */
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return '—';
   const min = Math.floor(ms / 60_000);
-  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+  if (min < 1) return '< 1 min';
+  const h = Math.floor(min / 60);
+  return h > 0 ? `${h} h ${min % 60} min` : `${min} min`;
 }
 
 export interface VpBreakdown {
