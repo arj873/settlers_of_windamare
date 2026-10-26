@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { bankTradeRatio } from '../../../engine/actions/trade';
 import { createGame } from '../../../engine/createGame';
+import { pieceLimit } from '../../../engine/expansions/hooks';
+import { piecesLeft } from '../../../engine/selectors';
 import { RESOURCES } from '../../../engine/constants';
 import { Rng } from '../../../engine/rng';
 import type { Action, GameState, HexId, PlayerId } from '../../../engine/types';
@@ -170,6 +172,21 @@ describe('cities and harbor settlements', () => {
     expect(s.pieces.buildings[COAST]?.kind).toBe('city');
     expect(legalOf(s, 'ep/buildHarbor')).toHaveLength(0);
     fails(s, a('ep/buildHarbor', 0, { vertex: COAST }));
+  });
+
+  it('pieces: harbors are no settlement pieces; a pillaged city on its side costs a city piece', () => {
+    const s = main();
+    const spots = [V(3, 0, 'S'), V(1, 2, 'S'), V(2, 5, 'S'), V(4, 5, 'S'), V(3, 4, 'N')];
+    s.pieces.buildings[COAST] = { owner: 0, kind: 'settlement' };
+    epSlice(s).harbors[COAST] = [];
+    for (const v of spots) s.pieces.buildings[v] = { owner: 0, kind: 'settlement' };
+    // 5 plain settlements + 1 harbor: no settlement piece left, all 4 cities.
+    expect(piecesLeft(s, 0).settlement).toBe(0);
+    expect(pieceLimit(s, 0, 'city')).toBe(4);
+    // A 6th plain settlement (a pillaged city lying on its side) takes a city piece.
+    s.pieces.buildings[V(1, 4, 'S')] = { owner: 0, kind: 'settlement' };
+    expect(piecesLeft(s, 0).settlement).toBe(0);
+    expect(pieceLimit(s, 0, 'city')).toBe(3);
   });
 
   it('barbarians count cities (metropolis included), not harbor settlements', () => {

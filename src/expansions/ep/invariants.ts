@@ -132,7 +132,9 @@ function check(state: GameState, s: EpSlice, bad: (m: string, p?: PlayerId) => v
       ([v, b]) =>
         b.owner === p && b.kind === 'settlement' && s.harbors[v as VertexId] === undefined,
     ).length;
-    if (plain > 5) bad(`${plain} settlements`, p);
+    // 5, or more with C&K's pillaged cities on their side (the limit already includes harbors).
+    const pieces = pieceLimit(state, p, 'settlement') - harborsOf(state, p).length;
+    if (plain > pieces) bad(`${plain} settlements`, p);
   }
 
   // --- face-down hexes ------------------------------------------------------------------------
