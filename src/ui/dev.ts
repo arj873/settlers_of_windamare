@@ -10,7 +10,9 @@ import {
 } from '../engine/fixtures';
 import type { GameState } from '../engine';
 import { fakeLegal } from './devLegal';
-import { Hud, type PlaceMode } from './index';
+import { applyTheme, Hud, themeFromSearch, type PlaceMode } from './index';
+
+applyTheme(themeFromSearch(location.search));
 
 const FIXTURES: Record<string, () => GameState> = {
   'fresh (setup)': () => freshGame(4),

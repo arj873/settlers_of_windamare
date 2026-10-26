@@ -1,0 +1,338 @@
+/*
+ * Sunfired: a Mediterranean terrace. Speckled terracotta panels, cobalt-glazed title tiles and
+ * dice pips, cream glazed wells for reading, saffron for highlights, and azulejo bands between
+ * sections. Marcellus for the titles, Nunito for everything else.
+ */
+:root[data-theme='sunfired'] {
+  --page-bg: radial-gradient(ellipse at 42% 45%, #145a7d 0%, #0c3d5a 55%, #072638 100%);
+
+  --font-ui: 'Nunito Variable', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Marcellus', 'Trajan Pro', 'Palatino Linotype', Georgia, serif;
+  --font-log: 'Nunito Variable', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'Nunito Variable', 'Nunito', system-ui, sans-serif;
+  --display-weight: 400;
+  --display-tracking: 0.05em;
+
+  --ink: #fff4e4;
+  --ink-dim: #f7dac2;
+  --ink-dark: #3a1a0c;
+  --ink-strong: #1e0c04;
+  --log-ink: #3a1a0c;
+  --raised-ink: #1d3f86;
+  --text-shadow: 0 1px 1px rgba(60, 20, 5, 0.45);
+  --good: #b8f0a8;
+  --bad: #ffcdb8;
+
+  /* Terracotta: speckles and a warm sunlit corner over fired clay. */
+  --surface:
+    radial-gradient(circle at 30% 40%, rgba(255, 235, 210, 0.13) 0 0.8px, transparent 1.4px) 0 0 /
+      7px 7px,
+    radial-gradient(circle at 70% 60%, rgba(60, 18, 4, 0.2) 0 0.9px, transparent 1.5px) 0 0 / 11px
+      11px,
+    radial-gradient(ellipse at 20% 0%, rgba(255, 196, 140, 0.16), transparent 60%),
+    linear-gradient(180deg, #96452a, #853b22);
+  --glaze: linear-gradient(180deg, #fffbf3, #f6ead4);
+  --surface-raised:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, #fbf3e2, #ecdcc0);
+  --surface-sunken: rgba(60, 18, 4, 0.3);
+  --surface-pop: #fff8ec;
+  --surface-flat: #94422a;
+  --edge: #5e2914;
+  --line: rgba(255, 230, 200, 0.22);
+  --hover: rgba(143, 65, 39, 0.1);
+  --panel-shadow:
+    inset 0 1px 0 rgba(255, 210, 170, 0.35), inset 0 -2px 0 rgba(60, 18, 4, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.4);
+  --side-shadow: inset 2px 0 0 rgba(255, 210, 170, 0.25), -6px 0 18px rgba(0, 0, 0, 0.35);
+  --btn-shadow:
+    inset 0 -2px 0 rgba(120, 70, 30, 0.18), 0 2px 0 #5e2914, 0 3px 6px rgba(0, 0, 0, 0.3);
+  --sunken-shadow: inset 0 1px 4px rgba(40, 10, 0, 0.35);
+  --sec-sep: 8px solid transparent;
+  --sec-sep-shadow: none;
+  --tint-base: #fbf3e4;
+  --scrim: rgba(6, 30, 45, 0.5);
+  --scrim-deep: rgba(4, 22, 34, 0.88);
+  --radius: 14px;
+  --btn-radius: 10px;
+
+  --accent: #f5b82e;
+  --accent-2: #ffd77a;
+  --accent-glow: rgba(245, 184, 46, 0.55);
+  --accent-ink: #3a1a05;
+  --primary-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 48%),
+    linear-gradient(180deg, #3f73c9, #1f4fa0 60%, #173d80);
+  --primary-ink: #fff;
+  --primary-text-shadow: 0 -1px 0 rgba(0, 20, 60, 0.4);
+  --ghost-bg: transparent;
+  --warn: #ff6b55;
+  --warn-glow: rgba(255, 107, 85, 0.6);
+  --danger-bg: #a5321c;
+
+  /* Cobalt glazed title tiles, cream grout, saffron studs. */
+  --plaque-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, #3a6cc4, #1f4fa0 60%, #183f85);
+  --plaque-ink: #fffaf0;
+  --plaque-border: 2px solid #f3e9d6;
+  --plaque-radius: 8px;
+  --plaque-shadow:
+    0 0 0 1.5px #5e2914, inset 0 -3px 6px rgba(0, 10, 40, 0.25), 0 3px 4px rgba(0, 0, 0, 0.35);
+  --plaque-text-shadow: 0 1px 1px rgba(0, 10, 40, 0.5);
+  --plaque-stud: radial-gradient(circle at 40% 35%, #ffe7a3, #f5b82e 60%, #b9810f);
+
+  --log-bg: linear-gradient(180deg, #fffbf3, #f6ead4);
+  --log-shadow: inset 0 2px 5px rgba(120, 60, 20, 0.2), 0 0 0 2px #f3e9d6, 0 0 0 3.5px #5e2914;
+  --log-dim: #8a5a3e;
+  --log-rule: rgba(143, 65, 39, 0.25);
+  --scroll-thumb: rgba(143, 65, 39, 0.4);
+  --pname-mix: #1a0a04;
+  --pname-shadow: none;
+
+  --badge-bg: #1d3f86;
+  --badge-ink: #fffaf0;
+  --badge-ring: #fbf3e4;
+  --tag-bg: rgba(40, 10, 0, 0.45);
+  --tag-ink: #fff;
+  --new-bg: #2b8f86;
+  --award-bg: #ffd77a;
+
+  --card-edge: #5e2914;
+  --card-inner: rgba(255, 255, 255, 0.6);
+  --card-stack-1: #fbf3e4;
+  --card-stack-2: #eddcc0;
+  --card-shadow: 0 3px 0 rgba(60, 18, 4, 0.45);
+  --card-ico-bg: radial-gradient(circle, rgba(255, 251, 243, 0.95) 58%, rgba(255, 251, 243, 0) 70%);
+  --card-radius: 0.17;
+  --rf-brick:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 42%),
+    linear-gradient(160deg, #ea8a5e, #c24f2c);
+  --rf-lumber:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 42%),
+    linear-gradient(160deg, #56b06a, #237a43);
+  --rf-wool:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 42%),
+    linear-gradient(160deg, #c9ea8c, #84bf4a);
+  --rf-grain:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 42%),
+    linear-gradient(160deg, #ffdc6a, #eaa925);
+  --rf-ore:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 42%),
+    linear-gradient(160deg, #c8d4e0, #7a8ca0);
+  --df-back:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.3), transparent 42%),
+    linear-gradient(160deg, #2f62b8, #183f85);
+  --df-face:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.6), transparent 42%),
+    linear-gradient(170deg, #fffaf0, #f0e1c4);
+  --res-brick: #c24f2c;
+  --res-lumber: #2f8a4c;
+  --res-wool: #84bf4a;
+  --res-grain: #eaa925;
+  --res-ore: #7a8ca0;
+  --slot-bg: rgba(60, 18, 4, 0.32);
+  --slot-shadow: inset 0 2px 5px rgba(40, 10, 0, 0.4), 0 1px 0 rgba(255, 210, 170, 0.2);
+
+  --die-bg: radial-gradient(circle at 30% 22%, #ffffff, #f6f1e7 55%, #e3d8c4);
+  --die-edge: #5e2914;
+  --die-pip: #1f4fa0;
+  --die-seven: #c2401f;
+  --die-shadow: 0 3px 0 #b9a789, 0 5px 9px rgba(0, 0, 0, 0.35);
+  --die-radius: 13px;
+
+  --pp-shade: #3a1608;
+  --pp-gloss: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.1) 46%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.1)
+  );
+  --pp-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 2px 0 rgba(60, 18, 4, 0.5);
+  --avatar-ring: #fbf3e4;
+  --pill-shade: #3a1608;
+  --pill-ring: inset 0 0 0 1.5px rgba(255, 245, 225, 0.55);
+  --timer-track: #f6ead4;
+  --timer-low-track: #f6d0c4;
+  --timer-low-fill: #ff8f7a;
+
+  --setup-bg:
+    radial-gradient(ellipse at 25% 0%, rgba(255, 238, 200, 0.75), transparent 60%),
+    radial-gradient(ellipse at 90% 100%, rgba(194, 100, 60, 0.14), transparent 55%),
+    linear-gradient(180deg, #f5ecdc, #ebdcc2);
+  --tile-bg: linear-gradient(180deg, #fffcf6, #fbf3e4);
+  --tile-on-bg: linear-gradient(180deg, rgba(245, 184, 46, 0.22), rgba(245, 184, 46, 0.08));
+  --tile-shadow: 0 2px 0 rgba(143, 65, 39, 0.25);
+  --tile-hover-edge: #c2643f;
+  --map-sea: radial-gradient(circle at 50% 50%, #1b6f96, #0e4562);
+  --switch-off: rgba(143, 65, 39, 0.2);
+  --switch-on: rgba(245, 184, 46, 0.4);
+  --range-track: rgba(143, 65, 39, 0.2);
+  --range-thumb: #fffaf0;
+  --step-bg: var(--surface-raised);
+  --step-hover: #fffbf3;
+  --swatch-on: #1d3f86;
+
+  --toast-bg: #fffaf0;
+  --toast-ink: #3a1a0c;
+  --toast-edge: #c2643f;
+  --toast-error-edge: #a5321c;
+  --toast-error-ink: #8a2a14;
+  --resume-bg: var(--setup-bg);
+  --resume-ink: #3a1a0c;
+  --resume-dim: #7a4a30;
+}
+
+/*
+ * Cream-glazed surfaces for anything with running text: dialogs, menu, tooltips, setup screen.
+ * They swap the ink to dark locally.
+ */
+[data-theme='sunfired'] .dialog,
+[data-theme='sunfired'] .menu-panel,
+[data-theme='sunfired'] .why,
+[data-theme='sunfired'] .cost,
+[data-theme='sunfired'] .setup,
+[data-theme='sunfired'] .game-resume {
+  --ink: #3a1a0c;
+  --ink-dim: #7a4a30;
+  --log-ink: #3a1a0c;
+  --surface-sunken: rgba(143, 65, 39, 0.09);
+  --sunken-shadow: inset 0 1px 3px rgba(90, 40, 20, 0.2);
+  --line: rgba(143, 65, 39, 0.25);
+  --good: #2e6b2a;
+  --bad: #a5321c;
+  --accent-2: #1d3f86;
+  --text-shadow: none;
+  /* `color` was resolved on .catan-hud with the cream ink: resolve it again here. */
+  color: var(--ink);
+}
+[data-theme='sunfired'] .log-list {
+  --ink-dim: #7a4a30;
+}
+[data-theme='sunfired'] .dialog,
+[data-theme='sunfired'] .menu-panel,
+[data-theme='sunfired'] .why,
+[data-theme='sunfired'] .cost {
+  background: var(--glaze);
+  border-color: #c2643f;
+  box-shadow:
+    inset 0 0 0 3px #fffbf3,
+    inset 0 0 0 4.5px rgba(194, 100, 60, 0.35),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+}
+[data-theme='sunfired'] .su-footer {
+  --ink: #fff4e4;
+  --ink-dim: #f7dac2;
+  color: var(--ink);
+}
+
+/* Azulejo band between sidebar sections. */
+[data-theme='sunfired'] .side-sec {
+  border-image: repeating-linear-gradient(
+      90deg,
+      #1f4fa0 0 7px,
+      #f3e9d6 7px 9px,
+      #2b9a9a 9px 16px,
+      #f3e9d6 16px 18px
+    )
+    8;
+}
+[data-theme='sunfired'] .side-sec:first-child {
+  border-image: none;
+}
+[data-theme='sunfired'] .plaque {
+  padding: 3px 28px 4px;
+  font-size: 17px !important;
+}
+[data-theme='sunfired'] .sec-toggle {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+}
+[data-theme='sunfired'] .log-list {
+  margin: 0 2px;
+}
+/* Names in running text on cream: ink, keyed by a glazed dot in the player's colour. */
+[data-theme='sunfired'] .pname {
+  color: var(--ink-strong);
+}
+[data-theme='sunfired'] .pname::before {
+  content: '';
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin: 0 0.28em 0.06em 0.05em;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.7), transparent 45%), var(--pc);
+  box-shadow: 0 0 0 1.5px rgba(60, 20, 5, 0.65);
+}
+[data-theme='sunfired'] .log-roll {
+  color: #1f4fa0;
+}
+
+/* Glazed tiles for players and the turn pill: cream grout, clay outline. */
+[data-theme='sunfired'] .pp {
+  border: 2px solid #fbf3e4;
+  border-radius: 26px 10px 10px 26px;
+  box-shadow:
+    var(--pp-shadow),
+    0 0 0 1.5px #5e2914;
+}
+[data-theme='sunfired'] .pp.is-current {
+  box-shadow:
+    var(--pp-shadow),
+    0 0 0 1.5px #5e2914,
+    0 0 0 4px var(--accent),
+    0 0 14px var(--accent-glow);
+}
+[data-theme='sunfired'] .turn-pill {
+  border-color: #fbf3e4;
+}
+[data-theme='sunfired'] .avatar {
+  border-color: #5e2914;
+}
+[data-theme='sunfired'] .bcard {
+  border-color: rgba(40, 10, 0, 0.55);
+}
+[data-theme='sunfired'] .btn-roll.is-ready,
+[data-theme='sunfired'] .btn-end.is-ready,
+[data-theme='sunfired'] .btn-primary,
+[data-theme='sunfired'] .seg-btn.is-on {
+  border-color: #102e66;
+}
+[data-theme='sunfired'] .btn-roll.is-ready,
+[data-theme='sunfired'] .btn-end.is-ready {
+  animation-name: glow-cobalt;
+}
+[data-theme='sunfired'] .btn-ghost {
+  border-color: rgba(143, 65, 39, 0.5);
+}
+[data-theme='sunfired'] .cover h1,
+[data-theme='sunfired'] .winner h1 {
+  color: #fff4e4;
+}
+[data-theme='sunfired'] .su-head h1 {
+  color: #8c3f25;
+}
+[data-theme='sunfired'] .su-seat {
+  background: var(--tile-bg);
+}
+@keyframes glow-cobalt {
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      0 0 18px rgba(80, 140, 255, 0.6);
+  }
+}
+
+/* Glyph glazes: cobalt card backs with saffron trim. */
+[data-theme='sunfired'] .g-devBack rect:first-child,
+[data-theme='sunfired'] .g-devCards rect:first-child {
+  fill: #1f4fa0;
+}
+[data-theme='sunfired'] .g-devBack rect:nth-child(2),
+[data-theme='sunfired'] .g-devCards rect:nth-child(2) {
+  stroke: #f5b82e;
+}

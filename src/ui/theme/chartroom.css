@@ -1,0 +1,310 @@
+/*
+ * Chartroom: a cartographer's table. Parchment panels framed by inked neatlines, IM Fell small
+ * caps for titles, oxblood wax for the important things (seals for players, the primary button),
+ * and a graticule-ruled chart sea around the board.
+ */
+:root[data-theme='chartroom'] {
+  color-scheme: light;
+  --page-bg:
+    repeating-linear-gradient(90deg, rgba(214, 228, 236, 0.05) 0 1px, transparent 1px 120px),
+    repeating-linear-gradient(0deg, rgba(214, 228, 236, 0.05) 0 1px, transparent 1px 120px),
+    radial-gradient(ellipse at 42% 50%, #1f4767 0%, #112b43 58%, #0a1b2b 100%);
+
+  --font-ui: 'Alegreya Sans', 'Gill Sans', 'Segoe UI', sans-serif;
+  --font-display: 'IM Fell English SC', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-log: 'Alegreya', 'Palatino Linotype', Georgia, serif;
+  --font-num: 'Alegreya Sans', 'Segoe UI', sans-serif;
+  --display-weight: 400;
+  --display-tracking: 0.04em;
+
+  --ink: #2c1d10;
+  --ink-dim: #664c31;
+  --ink-dark: #2c1d10;
+  --ink-strong: #140b03;
+  --log-ink: #3a2816;
+  --raised-ink: #2c1d10;
+  --text-shadow: none;
+  --good: #2f6b2a;
+  --bad: #9e2a1f;
+
+  --surface:
+    radial-gradient(ellipse at 18% 12%, rgba(255, 251, 238, 0.6), transparent 45%),
+    radial-gradient(ellipse at 88% 82%, rgba(150, 100, 45, 0.16), transparent 50%),
+    radial-gradient(circle at 65% 35%, rgba(150, 100, 45, 0.07), transparent 28%),
+    linear-gradient(180deg, #f3e7cb, #e9d8b3);
+  --surface-raised: linear-gradient(180deg, #fcf5e3, #ecdcb7);
+  --surface-sunken: rgba(120, 85, 40, 0.1);
+  --surface-pop: #f8efd9;
+  --surface-flat: #efe2c4;
+  --edge: #3b2a1a;
+  --line: rgba(59, 42, 26, 0.28);
+  --hover: rgba(59, 42, 26, 0.08);
+  /* Double neatline just inside the ink border, and a burnt-edge vignette. */
+  --panel-shadow:
+    inset 0 0 0 3px #f1e4c6, inset 0 0 0 4px rgba(59, 42, 26, 0.55),
+    inset 0 0 26px rgba(140, 90, 40, 0.22), 0 6px 18px rgba(0, 0, 0, 0.42);
+  --side-shadow:
+    inset 4px 0 0 #f1e4c6, inset 5px 0 0 rgba(59, 42, 26, 0.5),
+    inset 0 0 40px rgba(140, 90, 40, 0.2), -6px 0 18px rgba(0, 0, 0, 0.35);
+  --btn-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 0 rgba(59, 42, 26, 0.35);
+  --sunken-shadow: inset 0 1px 3px rgba(59, 42, 26, 0.22);
+  --sec-sep: 1px solid rgba(59, 42, 26, 0.5);
+  --sec-sep-shadow: inset 0 3px 0 #efe2c4, inset 0 4px 0 rgba(59, 42, 26, 0.28);
+  --tint-base: #f6ecd4;
+  --scrim: rgba(10, 24, 38, 0.55);
+  --scrim-deep: rgba(8, 18, 30, 0.9);
+  --radius: 4px;
+  --btn-radius: 3px;
+
+  --accent: #9e2a1f;
+  --accent-2: #8a2418;
+  --accent-glow: rgba(158, 42, 31, 0.35);
+  --accent-ink: #fbf0dc;
+  --primary-bg: radial-gradient(circle at 30% 20%, #c95443, #9b2d20 60%, #7d2017);
+  --primary-ink: #fff4e2;
+  --primary-text-shadow: 0 -1px 0 rgba(60, 10, 5, 0.45);
+  --ghost-bg: transparent;
+  --warn: #c0392b;
+  --warn-glow: rgba(192, 57, 43, 0.5);
+  --danger-bg: #9e2a1f;
+
+  --plaque-bg: transparent;
+  --plaque-ink: #2c1d10;
+  --plaque-border: 0;
+  --plaque-radius: 0;
+  --plaque-shadow: none;
+  --plaque-text-shadow: none;
+  --plaque-stud: #3b2a1a;
+
+  --log-bg: linear-gradient(180deg, rgba(255, 251, 240, 0.55), rgba(255, 251, 240, 0.3));
+  --log-shadow: inset 0 0 0 1px rgba(59, 42, 26, 0.28), inset 0 2px 8px rgba(120, 85, 40, 0.14);
+  --log-dim: #6f5536;
+  --log-rule: rgba(59, 42, 26, 0.25);
+  --scroll-thumb: rgba(59, 42, 26, 0.35);
+  --pname-mix: #1d1208;
+  --pname-shadow: none;
+
+  --badge-bg: #2c1d10;
+  --badge-ink: #f8eedb;
+  --badge-ring: #f1e4c6;
+  --tag-bg: #2c1d10;
+  --tag-ink: #f8eedb;
+  --new-bg: #3d6b35;
+  --award-bg: #9e2a1f;
+
+  --card-edge: #3b2a1a;
+  --card-inner: rgba(251, 244, 227, 0.75);
+  --card-stack-1: #efe2c4;
+  --card-stack-2: #e0cea6;
+  --card-shadow: 0 2px 0 rgba(59, 42, 26, 0.3);
+  --card-ico-bg: radial-gradient(circle, rgba(251, 244, 227, 0.95) 58%, rgba(251, 244, 227, 0) 70%);
+  --card-radius: 0.07;
+  --rf-brick: linear-gradient(160deg, #d27a57, #a5472c);
+  --rf-lumber: linear-gradient(160deg, #6f9f5f, #3b6b38);
+  --rf-wool: linear-gradient(160deg, #c5dc95, #8db35e);
+  --rf-grain: linear-gradient(160deg, #f1d482, #cfa23b);
+  --rf-ore: linear-gradient(160deg, #c3c8cb, #848e96);
+  --df-back: linear-gradient(160deg, #2c4560, #1a2b40);
+  --df-face: linear-gradient(170deg, #fbf3df, #ead8b0);
+  --res-brick: #b5512f;
+  --res-lumber: #4c7f45;
+  --res-wool: #8db35e;
+  --res-grain: #d5a83c;
+  --res-ore: #848e96;
+  --slot-bg: rgba(120, 85, 40, 0.07);
+  --slot-shadow: none;
+
+  --die-bg: linear-gradient(145deg, #fffaf0, #eadfc8);
+  --die-edge: #3b2a1a;
+  --die-pip: #2c1d10;
+  --die-seven: #9e2a1f;
+  --die-shadow: 0 2px 0 rgba(59, 42, 26, 0.45), 0 4px 8px rgba(0, 0, 0, 0.25);
+  --die-radius: 6px;
+
+  --pp-shade: #f6ecd4;
+  --pp-gloss: none;
+  --pp-shadow: 0 1px 0 rgba(59, 42, 26, 0.3);
+  --avatar-ring: rgba(59, 42, 26, 0.4);
+  --timer-track: #efe2c4;
+  --timer-low-track: #f3d6cc;
+  --timer-low-fill: #e0806f;
+
+  --setup-bg:
+    radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(120, 75, 30, 0.32)),
+    radial-gradient(ellipse at 15% 10%, rgba(255, 251, 238, 0.7), transparent 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(150, 100, 45, 0.14), transparent 50%),
+    linear-gradient(180deg, #f3e7cb, #e6d3aa);
+  --tile-bg: rgba(255, 251, 240, 0.55);
+  --tile-on-bg: linear-gradient(180deg, rgba(158, 42, 31, 0.1), rgba(158, 42, 31, 0.03));
+  --tile-shadow: 0 1px 0 rgba(59, 42, 26, 0.2);
+  --tile-hover-edge: rgba(59, 42, 26, 0.6);
+  --map-sea: radial-gradient(circle at 50% 50%, #2a5a80, #15324d);
+  --switch-off: rgba(59, 42, 26, 0.18);
+  --switch-on: rgba(158, 42, 31, 0.25);
+  --range-track: rgba(59, 42, 26, 0.18);
+  --range-thumb: #fcf5e3;
+  --step-bg: linear-gradient(180deg, #fcf5e3, #ecdcb7);
+  --step-hover: #fffaf0;
+  --swatch-on: #2c1d10;
+
+  --toast-bg: #f6ecd4;
+  --toast-ink: #2c1d10;
+  --toast-edge: #3b2a1a;
+  --toast-error-edge: #9e2a1f;
+  --toast-error-ink: #8a2418;
+  --resume-bg: var(--page-bg);
+  --resume-ink: #f6ecd4;
+  --resume-dim: #c9d3da;
+}
+
+/* Section titles: small caps on a ruled line, between two ink diamonds. */
+[data-theme='chartroom'] .sec-head::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 46px;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-top: 1px solid rgba(59, 42, 26, 0.6);
+  border-bottom: 1px solid rgba(59, 42, 26, 0.3);
+}
+[data-theme='chartroom'] .plaque {
+  padding: 0 22px 1px;
+  font-size: 20px !important;
+  background: #efe1c2;
+}
+[data-theme='chartroom'] .plaque::before,
+[data-theme='chartroom'] .plaque::after {
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  transform: rotate(45deg);
+  box-shadow: none;
+}
+[data-theme='chartroom'] .sec-toggle {
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+}
+[data-theme='chartroom'] .dialog > h2 {
+  font-size: 22px;
+  padding: 2px 10px 4px;
+  border-bottom: 3px double rgba(59, 42, 26, 0.6);
+}
+
+/* Players: wax seals on ledger slips washed with the player's colour. */
+[data-theme='chartroom'] .avatar {
+  color: color-mix(in srgb, var(--pc-ink) 75%, transparent);
+  background: radial-gradient(
+    circle at 38% 30%,
+    color-mix(in srgb, var(--pc) 55%, white),
+    var(--pc) 48%,
+    color-mix(in srgb, var(--pc) 62%, black)
+  );
+  border: 0;
+  border-radius: 47% 53% 50% 50% / 53% 47% 53% 47%;
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--pc) 78%, black),
+    inset 0 0 0 4.5px color-mix(in srgb, var(--pc) 70%, white),
+    0 0 0 1.5px rgba(59, 42, 26, 0.55),
+    0 2px 3px rgba(40, 20, 5, 0.4);
+}
+[data-theme='chartroom'] .pp {
+  color: var(--ink);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--pc) 34%, #f6ecd4) 0,
+    color-mix(in srgb, var(--pc) 10%, #f6ecd4) 75%
+  );
+  border-radius: 24px 3px 3px 24px;
+}
+[data-theme='chartroom'] .pp.is-current {
+  box-shadow:
+    var(--pp-shadow),
+    0 0 0 2px var(--accent),
+    0 0 10px var(--accent-glow);
+}
+[data-theme='chartroom'] .pp .tag {
+  border-radius: 2px;
+}
+/* Names in running text: ink, keyed by a small seal in the player's colour. */
+[data-theme='chartroom'] .pname {
+  color: var(--ink-strong);
+}
+[data-theme='chartroom'] .pname::before {
+  content: '';
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin: 0 0.28em 0.08em 0.05em;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow:
+    0 0 0 1.5px rgba(44, 29, 16, 0.75),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.25);
+}
+[data-theme='chartroom'] .log-row.is-system {
+  font-style: italic;
+}
+
+/* Turn banner: a paper label with neatlines; the seal carries the colour. */
+[data-theme='chartroom'] .turn-pill {
+  color: var(--ink);
+  text-shadow: none;
+  background: var(--surface);
+  border: 1.5px solid var(--edge);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 3px #f1e4c6,
+    inset 0 0 0 4px rgba(59, 42, 26, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+}
+[data-theme='chartroom'] .turn-pill.is-action {
+  box-shadow:
+    inset 0 0 0 3px #f1e4c6,
+    inset 0 0 0 4px rgba(59, 42, 26, 0.45),
+    0 0 0 2px var(--accent),
+    0 0 16px var(--accent-glow);
+}
+[data-theme='chartroom'] .turn-title {
+  font-size: 18px;
+}
+[data-theme='chartroom'] .turn-timer {
+  color: var(--ink);
+  background:
+    linear-gradient(90deg, #d9b979 calc(var(--frac) * 100%), #f6ecd4 0) padding-box,
+    var(--edge) border-box;
+}
+
+/* Build slots are pencilled outlines, not wells. */
+[data-theme='chartroom'] .bcard {
+  border: 1.5px dashed rgba(59, 42, 26, 0.55);
+}
+[data-theme='chartroom'] .bcard.is-active {
+  border-style: solid;
+}
+[data-theme='chartroom'] .btn-roll.is-ready,
+[data-theme='chartroom'] .btn-end.is-ready,
+[data-theme='chartroom'] .btn-primary {
+  border-color: #5e140d;
+}
+[data-theme='chartroom'] .btn-ghost {
+  border-style: dashed;
+}
+[data-theme='chartroom'] .cover h1,
+[data-theme='chartroom'] .winner h1 {
+  text-shadow: none;
+}
+[data-theme='chartroom'] .winner-card .score-vp {
+  color: var(--accent);
+}
+
+/* Glyph inks: navy card backs, sepia outlines. */
+[data-theme='chartroom'] .g-devBack rect:first-child,
+[data-theme='chartroom'] .g-devCards rect:first-child {
+  fill: #23384f;
+}
+[data-theme='chartroom'] .glyph [stroke='#2a1708'] {
+  stroke: #3b2a1a;
+}

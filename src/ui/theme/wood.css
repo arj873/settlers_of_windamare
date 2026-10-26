@@ -1,0 +1,202 @@
+/*
+ * Theme tokens. Every HUD / setup / toast colour, material, font and shadow comes from these
+ * custom properties; `:root` holds the default (wood) set and each `:root[data-theme='…']` file
+ * overrides it (see ./index.ts). Tokens never reference per-element vars (--pc, --rc): those are
+ * resolved where declared, so rules that mix in a player or resource colour live in the CSS files
+ * and only take their base colours from here.
+ */
+:root {
+  /* page (behind the transparent board canvas) */
+  --page-bg: #0f2a44;
+
+  /* type */
+  --font-ui: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-display: 'Palatino Linotype', 'Book Antiqua', Palatino, 'URW Palladio L', Georgia, serif;
+  --font-log: var(--font-display);
+  --font-num: system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --display-weight: 700;
+  --display-case: none;
+  --display-tracking: 0.03em;
+
+  /* ink */
+  --ink: #fff3dc;
+  --ink-dim: #d9bf98;
+  --ink-dark: #2b170b;
+  --ink-strong: #fff;
+  --log-ink: #f4e4c1;
+  --text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  --good: #8fe08a;
+  --bad: #ff8f7a;
+
+  /* materials: wood grain over a warm plank gradient */
+  --surface:
+    repeating-linear-gradient(
+      178deg,
+      rgba(255, 226, 184, 0.035) 0 1px,
+      transparent 1px 5px,
+      rgba(40, 18, 4, 0.08) 5px 7px,
+      transparent 7px 13px
+    ),
+    repeating-linear-gradient(
+      183deg,
+      transparent 0 19px,
+      rgba(40, 18, 4, 0.1) 19px 21px,
+      transparent 21px 47px
+    ),
+    linear-gradient(180deg, #7d4b27 0%, #6e411f 38%, #7a4824 62%, #683d1d 100%);
+  --surface-raised:
+    repeating-linear-gradient(
+      178deg,
+      rgba(255, 236, 200, 0.06) 0 1px,
+      transparent 1px 6px,
+      rgba(60, 28, 8, 0.08) 6px 8px,
+      transparent 8px 14px
+    ),
+    linear-gradient(180deg, #b47a49, #93603a);
+  --raised-ink: var(--ink);
+  --surface-sunken: rgba(28, 13, 3, 0.34);
+  --surface-pop: #4a2a14;
+  --surface-flat: #6e411f;
+  --edge: #2b170b;
+  --line: rgba(255, 226, 184, 0.16);
+  --hover: rgba(255, 226, 184, 0.12);
+  --panel-shadow:
+    inset 0 1px 0 rgba(255, 222, 176, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.28),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+  --side-shadow: inset 2px 0 0 rgba(255, 222, 176, 0.18), -6px 0 18px rgba(0, 0, 0, 0.35);
+  --btn-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.35), 0 2px 3px rgba(0, 0, 0, 0.35);
+  --sunken-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+  --sec-sep: 5px solid #4a2a14;
+  --sec-sep-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.18);
+  --tint-base: #3a2010;
+  --scrim: rgba(20, 9, 2, 0.5);
+  --scrim-deep: rgba(20, 9, 2, 0.88);
+  --radius: 10px;
+  --btn-radius: 8px;
+
+  /* accent */
+  --accent: #f2c35a;
+  --accent-2: #ffe29a;
+  --accent-glow: rgba(242, 195, 90, 0.6);
+  --accent-ink: #2b170b;
+  --primary-bg: linear-gradient(180deg, #ffe7a6, #f2c35a 55%, #d99e2b);
+  --primary-ink: #2b170b;
+  --primary-text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  --ghost-bg: rgba(30, 14, 4, 0.25);
+  --warn: #ff6b55;
+  --warn-glow: rgba(255, 107, 85, 0.65);
+  --danger-bg: rgba(176, 36, 24, 0.75);
+
+  /* section headers ("plaques") */
+  --plaque-bg: var(--surface-raised);
+  --plaque-ink: #fff0d2;
+  --plaque-border: 2px solid #2b170b;
+  --plaque-radius: 4px;
+  --plaque-shadow:
+    inset 0 0 0 2px rgba(255, 222, 176, 0.25), inset 0 -4px 7px rgba(0, 0, 0, 0.22),
+    0 2px 3px rgba(0, 0, 0, 0.45);
+  --plaque-text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 226, 184, 0.3);
+  --plaque-stud: radial-gradient(circle at 35% 35%, #e9c48f, #6b3f20 70%);
+
+  /* game events */
+  --log-bg: var(--surface-sunken);
+  --log-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 222, 176, 0.12);
+  --log-dim: rgba(255, 226, 184, 0.45);
+  --log-rule: rgba(255, 226, 184, 0.18);
+  --scroll-thumb: rgba(255, 226, 184, 0.35);
+  --pname-mix: white;
+  --pname-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+
+  /* badges and tags */
+  --badge-bg: #2b170b;
+  --badge-ink: #fff3dc;
+  --badge-ring: #f2c35a;
+  --tag-bg: rgba(30, 14, 4, 0.55);
+  --tag-ink: #fff;
+  --new-bg: #3f8f46;
+  --award-bg: rgba(255, 226, 154, 0.9);
+
+  /* cards */
+  --card-edge: rgba(30, 14, 4, 0.8);
+  --card-inner: rgba(255, 248, 230, 0.45);
+  --card-stack-1: #e8d6b0;
+  --card-stack-2: #dcc79c;
+  --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --card-ico-bg: radial-gradient(circle, rgba(255, 250, 236, 0.9) 58%, rgba(255, 250, 236, 0) 70%);
+  --card-radius: 0.13;
+  --rf-brick: linear-gradient(160deg, #e2825a, #b4472a);
+  --rf-lumber: linear-gradient(160deg, #58ae5f, #2d6f34);
+  --rf-wool: linear-gradient(160deg, #c3e78c, #7fb24c);
+  --rf-grain: linear-gradient(160deg, #fbe17a, #d9a92a);
+  --rf-ore: linear-gradient(160deg, #c2ccd6, #7b8896);
+  --df-back: linear-gradient(160deg, #8a63c6, #4f3184);
+  --df-face: linear-gradient(170deg, #fbf0d6, #e2c897);
+  --res-brick: #c4532d;
+  --res-lumber: #3f8f46;
+  --res-wool: #9bcf6a;
+  --res-grain: #e8c547;
+  --res-ore: #8b99a8;
+  --slot-bg:
+    linear-gradient(180deg, rgba(255, 236, 200, 0.14), transparent 40%), var(--surface-sunken);
+  --slot-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 222, 176, 0.15);
+
+  /* dice */
+  --die-bg: linear-gradient(145deg, #fffdf6, #e2dac6);
+  --die-edge: rgba(30, 14, 4, 0.7);
+  --die-pip: #2b170b;
+  --die-seven: #b3412f;
+  --die-shadow: 0 3px 6px rgba(0, 0, 0, 0.45), inset 0 -3px 4px rgba(0, 0, 0, 0.12);
+  --die-radius: 10px;
+
+  /* players */
+  --pp-shade: #2b170b;
+  --pp-gloss: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22),
+    transparent 50%,
+    rgba(0, 0, 0, 0.12)
+  );
+  --pp-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --avatar-ring: rgba(255, 236, 205, 0.65);
+  --pill-shade: #2b170b;
+  --pill-ink: #fff;
+  --pill-ring: inset 0 0 0 1.5px rgba(255, 226, 184, 0.35);
+  --timer-track: #d8c39a;
+  --timer-low-track: #e9c9bd;
+  --timer-low-fill: #ff8f7a;
+
+  /* setup screen */
+  --setup-bg:
+    radial-gradient(circle at 50% 0%, rgba(255, 214, 150, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(20, 9, 2, 0.35), rgba(20, 9, 2, 0.6)), var(--surface);
+  --tile-bg: rgba(58, 32, 14, 0.82);
+  --tile-on-bg: linear-gradient(180deg, rgba(242, 184, 75, 0.2), rgba(242, 184, 75, 0.08));
+  --tile-shadow: none;
+  --tile-hover-edge: rgba(255, 255, 255, 0.3);
+  --map-sea: radial-gradient(circle at 50% 50%, #1d5a86, #12395a);
+  --switch-off: rgba(0, 0, 0, 0.4);
+  --switch-on: rgba(242, 184, 75, 0.35);
+  --range-track: rgba(255, 255, 255, 0.14);
+  --range-thumb: #ffe6ae;
+  --step-bg: #8a5630;
+  --step-hover: #ad7445;
+
+  /* toasts and the resume prompt (src/game) */
+  --toast-bg: rgba(13, 29, 46, 0.95);
+  --toast-ink: #eef3f8;
+  --toast-edge: rgba(255, 255, 255, 0.16);
+  --toast-error-edge: #ff7a6b;
+  --toast-error-ink: #ffd0c9;
+  --resume-bg:
+    radial-gradient(circle at 50% 0%, rgba(58, 123, 213, 0.35), transparent 60%),
+    linear-gradient(180deg, #0f2a44, #08121e);
+  --resume-ink: #eef3f8;
+  --resume-dim: #9fb2c5;
+}
+
+/* Beats the inline `html, body { background }` of index.html. */
+:root,
+:root body {
+  background: var(--page-bg);
+}

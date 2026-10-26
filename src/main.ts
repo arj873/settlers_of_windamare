@@ -9,7 +9,7 @@ import {
 } from './engine';
 import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
-import { Hud, type Controller } from './ui';
+import { applyTheme, Hud, themeFromSearch, type Controller } from './ui';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
 import { measureHudInsets } from './game/layout';
@@ -72,6 +72,8 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
 }
 
 async function boot() {
+  // `?theme=wood|chartroom|parlour|sunfired` (src/ui/theme): HUD look and page background.
+  applyTheme(themeFromSearch(location.search));
   const params = parseParams(location.search);
   const dev = devGame(params);
   // Dev sessions never overwrite the real autosave.
@@ -80,7 +82,8 @@ async function boot() {
 
   const app = new Application();
   await app.init({
-    background: 0x0f2a44,
+    // Transparent: the page background (a theme token) shows around the board.
+    backgroundAlpha: 0,
     resizeTo: window,
     antialias: true,
     resolution: window.devicePixelRatio || 1,

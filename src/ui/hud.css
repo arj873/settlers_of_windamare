@@ -1,80 +1,22 @@
 /*
- * HUD overlay, wooden theme. Layout: right sidebar (Game Events / Bank / Players), menu top-left,
- * turn pill top-centre, hand + trade + build bar bottom-left, dice + Roll / End turn bottom-right.
+ * HUD overlay. Layout: right sidebar (Game Events / Bank / Players), menu top-left, turn pill
+ * top-centre, hand + trade + build bar bottom-left, dice + Roll / End turn bottom-right.
  * Only the panels capture the pointer; the board shows through everywhere else.
+ * Colours, materials and fonts are theme tokens (src/ui/theme); only layout sizes live here.
  */
 .catan-hud {
-  --ink: #fff3dc;
-  --ink-dim: #d9bf98;
-  --ink-dark: #2b170b;
-  --wood-0: #2b170b;
-  --wood-1: #4a2a14;
-  --wood-2: #6b3f20;
-  --wood-3: #8a5630;
-  --wood-4: #ad7445;
-  --wood-hi: #e2b27a;
-  --parch: #f4e4c1;
-  --recess: rgba(28, 13, 3, 0.34);
-  --line: rgba(255, 226, 184, 0.16);
-  --gold: #f2c35a;
-  --gold-2: #ffe29a;
-  --good: #8fe08a;
-  --bad: #ff8f7a;
-  --res-brick: #c4532d;
-  --res-lumber: #3f8f46;
-  --res-wool: #9bcf6a;
-  --res-grain: #e8c547;
-  --res-ore: #8b99a8;
-  /* Also used by the setup screen (src/ui/setup/setup.css). */
-  --panel: rgba(58, 32, 14, 0.82);
-  --panel-2: #8a5630;
-  --radius: 10px;
   --side-w: 360px;
   --hand-h: 104px;
   --hand-card: 46px;
   /* Width kept free for the dice + Roll / End turn block. */
   --controls-w: 280px;
-  --serif: 'Palatino Linotype', 'Book Antiqua', Palatino, 'URW Palladio L', Georgia, serif;
-  /* Wood: fine grain lines over a warm plank gradient. */
-  --wood-bg:
-    repeating-linear-gradient(
-      178deg,
-      rgba(255, 226, 184, 0.035) 0 1px,
-      transparent 1px 5px,
-      rgba(40, 18, 4, 0.08) 5px 7px,
-      transparent 7px 13px
-    ),
-    repeating-linear-gradient(
-      183deg,
-      transparent 0 19px,
-      rgba(40, 18, 4, 0.1) 19px 21px,
-      transparent 21px 47px
-    ),
-    linear-gradient(180deg, #7d4b27 0%, #6e411f 38%, #7a4824 62%, #683d1d 100%);
-  --wood-light-bg:
-    repeating-linear-gradient(
-      178deg,
-      rgba(255, 236, 200, 0.06) 0 1px,
-      transparent 1px 6px,
-      rgba(60, 28, 8, 0.08) 6px 8px,
-      transparent 8px 14px
-    ),
-    linear-gradient(180deg, #b47a49, #93603a);
-  --bevel:
-    inset 0 1px 0 rgba(255, 222, 176, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.28),
-    0 6px 18px rgba(0, 0, 0, 0.45);
 
   position: fixed;
   inset: 0;
   z-index: 10;
   pointer-events: none;
   color: var(--ink);
-  font:
-    14px/1.35 'Segoe UI',
-    system-ui,
-    -apple-system,
-    Roboto,
-    sans-serif;
+  font: 14px/1.35 var(--font-ui);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -85,7 +27,8 @@
 }
 .catan-hud h1,
 .catan-hud h2 {
-  font-family: var(--serif);
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
   margin: 0;
   letter-spacing: 0.01em;
 }
@@ -99,13 +42,13 @@
   font: inherit;
 }
 
-/* A wooden panel. */
+/* A panel in the theme's main material (`.wood` is the historical class name). */
 .wood,
 .hud-side,
 .dialog {
-  background: var(--wood-bg);
-  border: 2px solid var(--wood-0);
-  box-shadow: var(--bevel);
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  box-shadow: var(--panel-shadow);
 }
 
 /* ---- regions ---------------------------------------------------------- */
@@ -138,9 +81,7 @@
   flex-direction: column;
   border-width: 0 0 0 3px;
   pointer-events: auto;
-  box-shadow:
-    inset 2px 0 0 rgba(255, 222, 176, 0.18),
-    -6px 0 18px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--side-shadow);
 }
 .hud-drawer {
   display: none;
@@ -167,10 +108,10 @@
 .hud-controls:not(:empty) {
   pointer-events: auto;
   padding: 8px 10px 8px 12px;
-  border-radius: 12px;
-  background: var(--wood-bg);
-  border: 2px solid var(--wood-0);
-  box-shadow: var(--bevel);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  box-shadow: var(--panel-shadow);
 }
 .hud-dialog-layer,
 .hud-overlay-layer {
@@ -193,18 +134,18 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   cursor: pointer;
-  color: var(--ink);
-  background: var(--wood-light-bg);
-  border: 2px solid var(--wood-0);
-  box-shadow: var(--bevel);
+  color: var(--raised-ink);
+  background: var(--surface-raised);
+  border: 2px solid var(--edge);
+  box-shadow: var(--panel-shadow);
   transition: transform 0.12s ease;
 }
 .menu-btn:hover,
 .menu-btn.is-open {
   transform: translateY(-1px);
-  color: var(--gold-2);
+  color: var(--accent-2);
 }
 .menu-panel {
   pointer-events: auto;
@@ -213,7 +154,7 @@
   left: 0;
   min-width: 230px;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -233,7 +174,7 @@
   cursor: pointer;
 }
 .menu-item:hover {
-  background: rgba(255, 226, 184, 0.12);
+  background: var(--hover);
 }
 .menu-sec {
   padding: 8px 10px;
@@ -263,26 +204,26 @@
   max-width: 100%;
   padding: 4px 16px 4px 4px;
   border-radius: 999px;
-  color: #fff;
+  color: var(--pill-ink);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 55%),
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--pc) 70%, #2b170b),
-      color-mix(in srgb, var(--pc) 38%, #2b170b)
+      color-mix(in srgb, var(--pc) 70%, var(--pill-shade)),
+      color-mix(in srgb, var(--pc) 38%, var(--pill-shade))
     );
-  border: 2px solid var(--wood-0);
+  border: 2px solid var(--edge);
   box-shadow:
-    inset 0 0 0 1.5px rgba(255, 226, 184, 0.35),
+    var(--pill-ring),
     0 4px 14px rgba(0, 0, 0, 0.45);
   animation: drop 0.25s ease;
 }
 .turn-pill.is-action {
   box-shadow:
-    inset 0 0 0 1.5px rgba(255, 226, 184, 0.35),
-    0 0 0 2px var(--gold),
-    0 0 18px rgba(242, 195, 90, 0.55);
+    var(--pill-ring),
+    0 0 0 2px var(--accent),
+    0 0 18px var(--accent-glow);
 }
 .turn-text {
   display: flex;
@@ -291,23 +232,21 @@
   line-height: 1.15;
 }
 .turn-title {
-  font: 700 16px/1.15 var(--serif);
+  font: var(--display-weight) 16px/1.15 var(--font-display);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .turn-next {
   margin-left: 8px;
-  font:
-    600 12px/1.15 system-ui,
-    sans-serif;
+  font: 600 12px/1.15 var(--font-ui);
   opacity: 0.85;
 }
 .turn-pill.is-timer-low {
   box-shadow:
-    inset 0 0 0 1.5px rgba(255, 226, 184, 0.35),
-    0 0 0 2px #ff6b55,
-    0 0 18px rgba(255, 107, 85, 0.65);
+    var(--pill-ring),
+    0 0 0 2px var(--warn),
+    0 0 18px var(--warn-glow);
 }
 .turn-pill .hint {
   font-size: 13px;
@@ -334,22 +273,19 @@
   padding: 3px 8px;
   border-radius: 999px;
   text-align: center;
-  font:
-    700 13px/1.2 ui-monospace,
-    'SF Mono',
-    Menlo,
-    monospace;
-  color: var(--ink-dark);
+  font: 700 13px/1.2 var(--font-mono);
+  color: var(--accent-ink);
   text-shadow: none;
   background:
-    linear-gradient(90deg, var(--gold) calc(var(--frac) * 100%), #d8c39a 0) padding-box,
-    var(--wood-0) border-box;
+    linear-gradient(90deg, var(--accent) calc(var(--frac) * 100%), var(--timer-track) 0) padding-box,
+    var(--edge) border-box;
   border: 1.5px solid transparent;
 }
 .turn-timer.is-low {
   background:
-    linear-gradient(90deg, #ff8f7a calc(var(--frac) * 100%), #e9c9bd 0) padding-box,
-    var(--wood-0) border-box;
+    linear-gradient(90deg, var(--timer-low-fill) calc(var(--frac) * 100%), var(--timer-low-track) 0)
+      padding-box,
+    var(--edge) border-box;
   animation: pulse-soft 1s ease-in-out infinite;
 }
 
@@ -370,9 +306,9 @@
     var(--pc) 55%,
     color-mix(in srgb, var(--pc) 70%, black)
   );
-  border: 2px solid var(--wood-0);
+  border: 2px solid var(--edge);
   box-shadow:
-    0 0 0 2px rgba(255, 236, 205, 0.65),
+    0 0 0 2px var(--avatar-ring),
     0 2px 4px rgba(0, 0, 0, 0.5);
 }
 .avatar > .glyph {
@@ -398,13 +334,11 @@
   border-radius: 10px;
   display: grid;
   place-items: center;
-  font:
-    800 11px/1 system-ui,
-    sans-serif;
-  color: var(--ink);
+  font: 800 11px/1 var(--font-num);
+  color: var(--badge-ink);
   text-shadow: none;
-  background: var(--wood-0);
-  border: 1.5px solid var(--gold);
+  background: var(--badge-bg);
+  border: 1.5px solid var(--badge-ring);
 }
 
 /* ---- glyphs and card faces -------------------------------------------- */
@@ -423,39 +357,39 @@
   height: calc(var(--cw) * 1.38);
   display: inline-grid;
   place-items: center;
-  border-radius: calc(var(--cw) * 0.13);
-  border: max(1px, calc(var(--cw) * 0.035)) solid rgba(30, 14, 4, 0.8);
-  box-shadow: inset 0 0 0 max(1px, calc(var(--cw) * 0.05)) rgba(255, 248, 230, 0.45);
+  border-radius: calc(var(--cw) * var(--card-radius));
+  border: max(1px, calc(var(--cw) * 0.035)) solid var(--card-edge);
+  box-shadow: inset 0 0 0 max(1px, calc(var(--cw) * 0.05)) var(--card-inner);
   vertical-align: middle;
 }
 .card-face > .ico {
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 250, 236, 0.9) 58%, rgba(255, 250, 236, 0) 70%);
+  background: var(--card-ico-bg);
 }
 .rf-brick {
-  background: linear-gradient(160deg, #e2825a, #b4472a);
+  background: var(--rf-brick);
 }
 .rf-lumber {
-  background: linear-gradient(160deg, #58ae5f, #2d6f34);
+  background: var(--rf-lumber);
 }
 .rf-wool {
-  background: linear-gradient(160deg, #c3e78c, #7fb24c);
+  background: var(--rf-wool);
 }
 .rf-grain {
-  background: linear-gradient(160deg, #fbe17a, #d9a92a);
+  background: var(--rf-grain);
 }
 .rf-ore {
-  background: linear-gradient(160deg, #c2ccd6, #7b8896);
+  background: var(--rf-ore);
 }
 .df-back {
-  background: linear-gradient(160deg, #8a63c6, #4f3184);
+  background: var(--df-back);
 }
 .df-knight,
 .df-roadBuilding,
 .df-yearOfPlenty,
 .df-monopoly,
 .df-victoryPoint {
-  background: linear-gradient(170deg, #fbf0d6, #e2c897);
+  background: var(--df-face);
 }
 .df-back > .glyph,
 .df-back > .glyph svg {
@@ -486,12 +420,10 @@
   border-radius: 11px;
   display: grid;
   place-items: center;
-  font:
-    800 12px/1 system-ui,
-    sans-serif;
-  color: var(--ink);
-  background: var(--wood-0);
-  border: 1.5px solid var(--gold);
+  font: 800 12px/1 var(--font-num);
+  color: var(--badge-ink);
+  background: var(--badge-bg);
+  border: 1.5px solid var(--badge-ring);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
@@ -502,8 +434,8 @@
   flex-direction: column;
   min-height: 0;
   flex: none;
-  border-top: 5px solid var(--wood-1);
-  box-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.18);
+  border-top: var(--sec-sep);
+  box-shadow: var(--sec-sep-shadow);
 }
 .side-sec:first-child {
   border-top: 0;
@@ -525,21 +457,17 @@
 .plaque {
   position: relative;
   padding: 3px 26px 4px;
-  font: 700 17px/1.2 var(--serif) !important;
-  letter-spacing: 0.03em !important;
-  color: #fff0d2;
-  text-shadow:
-    0 -1px 0 rgba(0, 0, 0, 0.65),
-    0 1px 0 rgba(255, 226, 184, 0.3);
-  background: var(--wood-light-bg);
-  border: 2px solid var(--wood-0);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 222, 176, 0.25),
-    inset 0 -4px 7px rgba(0, 0, 0, 0.22),
-    0 2px 3px rgba(0, 0, 0, 0.45);
+  font: var(--display-weight) 17px/1.2 var(--font-display) !important;
+  letter-spacing: var(--display-tracking) !important;
+  text-transform: var(--display-case);
+  color: var(--plaque-ink);
+  text-shadow: var(--plaque-text-shadow);
+  background: var(--plaque-bg);
+  border: var(--plaque-border);
+  border-radius: var(--plaque-radius);
+  box-shadow: var(--plaque-shadow);
 }
-/* Carved screw heads on the plaque. */
+/* Studs on the plaque (screw heads, rivets, seals: the theme decides). */
 .plaque::before,
 .plaque::after {
   content: '';
@@ -549,7 +477,7 @@
   height: 6px;
   margin-top: -3px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #e9c48f, #6b3f20 70%);
+  background: var(--plaque-stud);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 .plaque::before {
@@ -570,10 +498,10 @@
   padding: 0;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--ink);
-  background: var(--wood-light-bg);
-  border: 1.5px solid var(--wood-0);
-  box-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.3);
+  color: var(--raised-ink);
+  background: var(--surface-raised);
+  border: 1.5px solid var(--edge);
+  box-shadow: var(--btn-shadow);
 }
 .sec-toggle .glyph {
   transition: transform 0.15s ease;
@@ -601,14 +529,12 @@
   overflow-y: auto;
   padding: 2px 10px 8px;
   border-radius: 6px;
-  background: var(--recess);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.45),
-    0 1px 0 rgba(255, 222, 176, 0.12);
-  font: 14.5px/1.5 var(--serif);
-  color: var(--parch);
+  background: var(--log-bg);
+  box-shadow: var(--log-shadow);
+  font: 14.5px/1.5 var(--font-log);
+  color: var(--log-ink);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 226, 184, 0.35) transparent;
+  scrollbar-color: var(--scroll-thumb) transparent;
   user-select: text;
 }
 .log-sep {
@@ -616,19 +542,17 @@
   align-items: center;
   gap: 8px;
   margin: 6px 0 2px;
-  font:
-    700 10px/1 system-ui,
-    sans-serif;
+  font: 700 10px/1 var(--font-ui);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 226, 184, 0.45);
+  color: var(--log-dim);
 }
 .log-sep::before,
 .log-sep::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 226, 184, 0.18);
+  background: var(--log-rule);
 }
 .log-row {
   padding: 1px 0;
@@ -646,12 +570,12 @@
   vertical-align: -5px;
 }
 .log-group:last-child .log-row:last-child {
-  color: #fff;
+  color: var(--ink-strong);
 }
 .pname {
   font-weight: 700;
-  color: color-mix(in srgb, var(--pc) 78%, white);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+  color: color-mix(in srgb, var(--pc) 78%, var(--pname-mix));
+  text-shadow: var(--pname-shadow);
 }
 .log-prod-title {
   color: var(--ink-dim);
@@ -669,11 +593,9 @@
   padding: 0 3px;
   border-radius: 5px;
   vertical-align: 0;
-  font:
-    800 12px/1 system-ui,
-    sans-serif;
-  color: var(--ink-dark);
-  background: linear-gradient(145deg, #fffdf6, #e2dac6);
+  font: 800 12px/1 var(--font-num);
+  color: var(--die-pip);
+  background: var(--die-bg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .log-dice {
@@ -709,18 +631,18 @@
 .bank-stack .card-face,
 .hcard.stack-2 .card-face {
   box-shadow:
-    inset 0 0 0 2px rgba(255, 248, 230, 0.45),
-    3px -3px 0 -1px #e8d6b0,
-    3px -3px 0 0 rgba(30, 14, 4, 0.8);
+    inset 0 0 0 2px var(--card-inner),
+    3px -3px 0 -1px var(--card-stack-1),
+    3px -3px 0 0 var(--card-edge);
 }
 .bank-stack .card-face,
 .hcard.stack-3 .card-face {
   box-shadow:
-    inset 0 0 0 2px rgba(255, 248, 230, 0.45),
-    3px -3px 0 -1px #e8d6b0,
-    3px -3px 0 0 rgba(30, 14, 4, 0.8),
-    6px -6px 0 -1px #dcc79c,
-    6px -6px 0 0 rgba(30, 14, 4, 0.8);
+    inset 0 0 0 2px var(--card-inner),
+    3px -3px 0 -1px var(--card-stack-1),
+    3px -3px 0 0 var(--card-edge),
+    6px -6px 0 -1px var(--card-stack-2),
+    6px -6px 0 0 var(--card-edge);
 }
 .bank-stack.is-empty {
   opacity: 0.4;
@@ -751,12 +673,10 @@
   border-radius: 24px 6px 6px 24px;
   color: var(--pc-ink);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 50%, rgba(0, 0, 0, 0.12)),
-    linear-gradient(90deg, var(--pc) 30%, color-mix(in srgb, var(--pc) 72%, #2b170b));
-  border: 1.5px solid var(--wood-0);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.4);
+    var(--pp-gloss),
+    linear-gradient(90deg, var(--pc) 30%, color-mix(in srgb, var(--pc) 72%, var(--pp-shade)));
+  border: 1.5px solid var(--edge);
+  box-shadow: var(--pp-shadow);
   transition: transform 0.2s ease;
 }
 .pp > .avatar {
@@ -766,9 +686,9 @@
 .pp.is-current {
   transform: translateX(-5px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 0 0 2px var(--gold),
-    0 0 14px rgba(242, 195, 90, 0.7);
+    var(--pp-shadow),
+    0 0 0 2px var(--accent),
+    0 0 14px var(--accent-glow);
 }
 .pp.is-current::after {
   content: '';
@@ -777,12 +697,12 @@
   top: 50%;
   margin-top: -7px;
   border: 7px solid transparent;
-  border-right-color: var(--gold);
+  border-right-color: var(--accent);
 }
 .pp.is-acting:not(.is-current) {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 0 0 2px rgba(255, 226, 184, 0.7);
+    var(--pp-shadow),
+    0 0 0 2px var(--avatar-ring);
 }
 .pp-main {
   flex: 1;
@@ -813,12 +733,12 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #fff;
-  background: rgba(30, 14, 4, 0.55);
+  color: var(--tag-ink);
+  background: var(--tag-bg);
 }
 .hidden-vp {
-  color: var(--ink-dark);
-  background: var(--gold);
+  color: var(--accent-ink);
+  background: var(--accent);
 }
 .pp-stats {
   display: flex;
@@ -834,12 +754,12 @@
   padding: 0 2px;
 }
 .pstat.is-award {
-  color: var(--ink-dark);
-  background: rgba(255, 226, 154, 0.9);
+  color: var(--accent-ink);
+  background: var(--award-bg);
 }
 .pstat.is-warn {
   color: #fff;
-  background: rgba(176, 36, 24, 0.75);
+  background: var(--danger-bg);
 }
 .pp-awards {
   display: flex;
@@ -882,7 +802,7 @@
   pointer-events: auto;
   height: var(--hand-h);
   border-bottom: 0;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 .hand {
   order: 1;
@@ -933,8 +853,8 @@
 }
 .hcard .card-face {
   box-shadow:
-    inset 0 0 0 2px rgba(255, 248, 230, 0.45),
-    0 2px 4px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 2px var(--card-inner),
+    var(--card-shadow);
 }
 .ratio-tag {
   position: absolute;
@@ -943,12 +863,10 @@
   transform: translateX(-50%);
   padding: 0 4px;
   border-radius: 5px;
-  font:
-    800 10px/14px system-ui,
-    sans-serif;
-  color: var(--ink-dark);
-  background: var(--gold);
-  border: 1px solid var(--wood-0);
+  font: 800 10px/14px var(--font-num);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid var(--edge);
   white-space: nowrap;
 }
 .hand-sep {
@@ -956,8 +874,7 @@
   width: 2px;
   align-self: stretch;
   margin: 12px 2px;
-  background: rgba(30, 14, 4, 0.45);
-  box-shadow: 1px 0 0 rgba(255, 222, 176, 0.15);
+  background: var(--line);
 }
 .dcard {
   cursor: default;
@@ -973,9 +890,9 @@
 }
 .dcard.can-play .card-face {
   box-shadow:
-    inset 0 0 0 2px rgba(255, 248, 230, 0.45),
-    0 0 0 2px var(--gold),
-    0 0 12px rgba(242, 195, 90, 0.7);
+    inset 0 0 0 2px var(--card-inner),
+    0 0 0 2px var(--accent),
+    0 0 12px var(--accent-glow);
 }
 .dcard.can-play:hover {
   transform: translateY(-5px);
@@ -987,13 +904,11 @@
   transform: translateX(-50%);
   padding: 0 4px;
   border-radius: 5px;
-  font:
-    800 9px/13px system-ui,
-    sans-serif;
+  font: 800 9px/13px var(--font-num);
   text-transform: uppercase;
   color: #fff;
-  background: #3f8f46;
-  border: 1px solid var(--wood-0);
+  background: var(--new-bg);
+  border: 1px solid var(--edge);
 }
 
 .trade-col {
@@ -1023,13 +938,12 @@
   padding: 0 10px 0 8px;
   font-weight: 750;
   font-size: 14px;
-  border-radius: 7px;
-  background: var(--wood-light-bg);
-  border: 1.5px solid var(--wood-0);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 222, 176, 0.35),
-    0 2px 3px rgba(0, 0, 0, 0.35);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  color: var(--raised-ink);
+  border-radius: var(--btn-radius);
+  background: var(--surface-raised);
+  border: 1.5px solid var(--edge);
+  box-shadow: var(--btn-shadow);
+  text-shadow: var(--text-shadow);
 }
 .tbtn:disabled,
 .bcard:disabled,
@@ -1045,8 +959,8 @@
 .tbtn.is-active,
 .bcard.is-active {
   box-shadow:
-    0 0 0 2px var(--gold),
-    0 0 14px rgba(242, 195, 90, 0.6);
+    0 0 0 2px var(--accent),
+    0 0 14px var(--accent-glow);
 }
 
 .build-bar {
@@ -1065,12 +979,10 @@
   justify-content: flex-end;
   gap: 1px;
   padding: 0 2px 5px;
-  border-radius: 7px;
-  background: linear-gradient(180deg, rgba(255, 236, 200, 0.14), transparent 40%), var(--recess);
-  border: 1.5px solid var(--wood-0);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.35),
-    0 1px 0 rgba(255, 222, 176, 0.15);
+  border-radius: var(--btn-radius);
+  background: var(--slot-bg);
+  border: 1.5px solid var(--edge);
+  box-shadow: var(--slot-shadow);
 }
 .bcard-art {
   flex: 1;
@@ -1082,12 +994,10 @@
   font-size: 11px;
   font-weight: 750;
   line-height: 1.1;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+  text-shadow: var(--text-shadow);
 }
 .bcard-left {
-  font:
-    700 11px/1.1 system-ui,
-    sans-serif;
+  font: 700 11px/1.1 var(--font-num);
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -1102,9 +1012,9 @@
   display: none;
   gap: 3px;
   padding: 5px 7px;
-  border-radius: 7px;
-  background: var(--wood-1);
-  border: 1.5px solid var(--wood-0);
+  border-radius: var(--btn-radius);
+  background: var(--surface-pop);
+  border: 1.5px solid var(--edge);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
   pointer-events: none;
 }
@@ -1140,14 +1050,15 @@
   font-size: 12.5px;
   line-height: 1.25;
   text-align: left;
-  background: var(--wood-1);
-  border: 1.5px solid var(--wood-0);
+  color: var(--ink);
+  background: var(--surface-pop);
+  border: 1.5px solid var(--edge);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--text-shadow);
   pointer-events: none;
 }
 .why b {
-  font: 700 13px/1.2 var(--serif);
+  font: var(--display-weight) 13px/1.2 var(--font-display);
 }
 .why-cards {
   display: flex;
@@ -1177,24 +1088,22 @@
   display: grid;
   grid-template: repeat(3, 1fr) / repeat(3, 1fr);
   place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #fffdf6, #e2dac6);
-  border: 1.5px solid rgba(30, 14, 4, 0.7);
-  box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.45),
-    inset 0 -3px 4px rgba(0, 0, 0, 0.12);
+  border-radius: var(--die-radius);
+  background: var(--die-bg);
+  border: 1.5px solid var(--die-edge);
+  box-shadow: var(--die-shadow);
 }
 .die i {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2b170b;
+  background: var(--die-pip);
 }
 .die-blank {
   opacity: 0.35;
 }
 .dice.is-seven .die i {
-  background: #b3412f;
+  background: var(--die-seven);
 }
 .dice-total {
   position: absolute;
@@ -1205,16 +1114,14 @@
   padding: 0 6px;
   border-radius: 9px;
   text-align: center;
-  font:
-    800 13px/18px system-ui,
-    sans-serif;
-  color: var(--ink-dark);
-  background: var(--gold);
-  border: 1.5px solid var(--wood-0);
+  font: 800 13px/18px var(--font-num);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1.5px solid var(--edge);
 }
 .dice.is-seven .dice-total {
   color: #fff;
-  background: #b3412f;
+  background: var(--die-seven);
 }
 .dice.rolling .die {
   animation: tumble 0.55s cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -1238,21 +1145,20 @@
   min-width: 140px;
   height: 40px;
   padding: 0 14px 0 10px;
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   font-weight: 800;
   font-size: 15px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
-  background: var(--wood-light-bg);
-  border: 1.5px solid var(--wood-0);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 222, 176, 0.35),
-    0 2px 3px rgba(0, 0, 0, 0.35);
+  color: var(--raised-ink);
+  text-shadow: var(--text-shadow);
+  background: var(--surface-raised);
+  border: 1.5px solid var(--edge);
+  box-shadow: var(--btn-shadow);
 }
 .btn-roll.is-ready,
 .btn-end.is-ready {
-  color: var(--ink-dark);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, #ffe7a6, #f2c35a 55%, #d99e2b);
+  color: var(--primary-ink);
+  text-shadow: var(--primary-text-shadow);
+  background: var(--primary-bg);
   animation: glow 2s ease-in-out infinite;
 }
 .btn-roll:hover:not(:disabled),
@@ -1269,16 +1175,14 @@
 /* ---- generic buttons (dialogs, setup screen) --------------------------- */
 .btn {
   font-weight: 700;
-  color: var(--ink);
+  color: var(--raised-ink);
   cursor: pointer;
   padding: 8px 16px;
-  border-radius: 8px;
-  border: 1.5px solid var(--wood-0);
-  background: var(--wood-light-bg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 222, 176, 0.35),
-    0 2px 3px rgba(0, 0, 0, 0.3);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+  border-radius: var(--btn-radius);
+  border: 1.5px solid var(--edge);
+  background: var(--surface-raised);
+  box-shadow: var(--btn-shadow);
+  text-shadow: var(--text-shadow);
   transition:
     transform 0.12s ease,
     filter 0.18s ease,
@@ -1305,7 +1209,7 @@
 .dcard:focus-visible,
 .victim:focus-visible,
 .input:focus-visible {
-  outline: 2px solid var(--gold-2);
+  outline: 2px solid var(--accent-2);
   outline-offset: 2px;
 }
 .btn:disabled {
@@ -1313,12 +1217,12 @@
   cursor: not-allowed;
 }
 .btn-primary {
-  color: var(--ink-dark);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, #ffe7a6, #f2c35a 55%, #d99e2b);
+  color: var(--primary-ink);
+  text-shadow: var(--primary-text-shadow);
+  background: var(--primary-bg);
 }
 .btn-ghost {
-  background: rgba(30, 14, 4, 0.25);
+  background: var(--ghost-bg);
   box-shadow: none;
 }
 .btn-sm {
@@ -1329,7 +1233,7 @@
 .btn-lg {
   padding: 12px 26px;
   font-size: 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 /* ---- dialogs ---------------------------------------------------------- */
@@ -1343,7 +1247,7 @@
 }
 .scrim.is-modal {
   pointer-events: auto;
-  background: rgba(20, 9, 2, 0.5);
+  background: var(--scrim);
   backdrop-filter: blur(1.5px);
 }
 .dialog {
@@ -1353,9 +1257,9 @@
   max-height: 100%;
   overflow-y: auto;
   padding: 0 18px 16px;
-  border-radius: 12px;
+  border-radius: calc(var(--radius) + 2px);
   box-shadow:
-    var(--bevel),
+    var(--panel-shadow),
     0 24px 60px rgba(0, 0, 0, 0.55);
 }
 .dialog.wide {
@@ -1370,18 +1274,15 @@
   margin: 10px auto 12px;
   padding: 4px 24px 5px;
   font-size: 19px;
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-case);
   text-align: center;
-  color: #fff0d2;
-  text-shadow:
-    0 -1px 0 rgba(0, 0, 0, 0.65),
-    0 1px 0 rgba(255, 226, 184, 0.3);
-  background: var(--wood-light-bg);
-  border: 2px solid var(--wood-0);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 222, 176, 0.25),
-    inset 0 -4px 7px rgba(0, 0, 0, 0.22),
-    0 2px 3px rgba(0, 0, 0, 0.45);
+  color: var(--plaque-ink);
+  text-shadow: var(--plaque-text-shadow);
+  background: var(--plaque-bg);
+  border: var(--plaque-border);
+  border-radius: var(--plaque-radius);
+  box-shadow: var(--plaque-shadow);
 }
 .sub {
   color: var(--ink-dim);
@@ -1395,19 +1296,19 @@
   margin-top: 0;
 }
 .note {
-  color: var(--parch);
+  color: var(--log-ink);
   font-size: 13.5px;
   text-align: center;
 }
 .summary {
   margin: 12px 0 2px;
   padding: 7px 10px;
-  border-radius: 7px;
-  background: var(--recess);
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  box-shadow: var(--sunken-shadow);
   font-size: 13.5px;
   text-align: center;
-  color: var(--parch);
+  color: var(--log-ink);
 }
 .summary.is-error {
   color: var(--bad);
@@ -1436,11 +1337,11 @@
   align-items: center;
   gap: 3px;
   padding: 8px 2px 6px;
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   cursor: pointer;
-  border: 1.5px solid var(--wood-0);
-  background: color-mix(in srgb, var(--rc) 30%, #3a2010);
-  box-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.2);
+  border: 1.5px solid var(--edge);
+  background: color-mix(in srgb, var(--rc) 30%, var(--tint-base));
+  box-shadow: var(--btn-shadow);
   transition:
     transform 0.12s ease,
     box-shadow 0.15s ease;
@@ -1450,16 +1351,16 @@
 }
 .rpick-btn.is-selected {
   box-shadow:
-    0 0 0 2px var(--gold),
-    0 0 12px rgba(242, 195, 90, 0.5);
-  background: color-mix(in srgb, var(--rc) 55%, #3a2010);
+    0 0 0 2px var(--accent),
+    0 0 12px var(--accent-glow);
+  background: color-mix(in srgb, var(--rc) 55%, var(--tint-base));
 }
 .rpick-btn:disabled {
   opacity: 0.32;
   cursor: not-allowed;
 }
 .rpick-btn small {
-  color: var(--gold-2);
+  color: var(--accent-2);
 }
 
 .cols {
@@ -1482,23 +1383,23 @@
 .swap {
   align-self: center;
   font-size: 22px;
-  color: var(--gold-2);
+  color: var(--accent-2);
 }
 .step {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 6px 4px 8px;
-  border-radius: 8px;
-  background: var(--recess);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
   border: 1.5px solid transparent;
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
 }
 .step.has-value {
-  background: color-mix(in srgb, var(--rc) 35%, #3a2010);
-  border-color: color-mix(in srgb, var(--rc) 75%, #fff);
+  background: color-mix(in srgb, var(--rc) 35%, var(--tint-base));
+  border-color: color-mix(in srgb, var(--rc) 75%, var(--pname-mix));
 }
 .step-name {
   flex: 1;
@@ -1520,9 +1421,10 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1.5px solid var(--wood-0);
-  background: var(--wood-light-bg);
-  color: var(--ink);
+  border: 1.5px solid var(--edge);
+  background: var(--surface-raised);
+  box-shadow: var(--btn-shadow);
+  color: var(--raised-ink);
   font-size: 16px;
   font-weight: 700;
   line-height: 1;
@@ -1554,7 +1456,7 @@
   flex: none;
   border-radius: 50%;
   background: var(--pc);
-  box-shadow: 0 0 0 1.5px var(--wood-0);
+  box-shadow: 0 0 0 1.5px var(--edge);
 }
 .pp-dot.big {
   width: 26px;
@@ -1569,8 +1471,8 @@
   padding: 5px 12px 5px 9px;
   border-radius: 99px;
   cursor: pointer;
-  border: 1.5px solid var(--wood-0);
-  background: var(--recess);
+  border: 1.5px solid var(--edge);
+  background: var(--surface-sunken);
   opacity: 0.6;
   transition:
     opacity 0.15s ease,
@@ -1578,7 +1480,7 @@
 }
 .chip.is-on {
   opacity: 1;
-  background: color-mix(in srgb, var(--pc) 35%, #3a2010);
+  background: color-mix(in srgb, var(--pc) 35%, var(--tint-base));
   box-shadow: 0 0 0 1.5px var(--pc);
 }
 
@@ -1588,9 +1490,9 @@
   align-items: center;
   gap: 8px 10px;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--recess);
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  box-shadow: var(--sunken-shadow);
 }
 .bundle {
   display: inline-flex;
@@ -1613,8 +1515,8 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--recess);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
   border-left: 4px solid var(--pc);
 }
 .resp-name {
@@ -1649,11 +1551,11 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   cursor: pointer;
-  border: 1.5px solid var(--wood-0);
-  background: color-mix(in srgb, var(--pc) 28%, #3a2010);
-  box-shadow: inset 0 1px 0 rgba(255, 222, 176, 0.2);
+  border: 1.5px solid var(--edge);
+  background: color-mix(in srgb, var(--pc) 28%, var(--tint-base));
+  box-shadow: var(--btn-shadow);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -1702,7 +1604,7 @@
       color-mix(in srgb, var(--pc) 28%, transparent),
       transparent 60%
     ),
-    var(--wood-bg);
+    var(--surface);
 }
 .cover-card,
 .winner-card {
@@ -1712,27 +1614,27 @@
   align-items: center;
   gap: 14px;
   padding: 28px 34px;
-  border-radius: 14px;
-  background: rgba(28, 13, 3, 0.35);
-  border: 2px solid var(--wood-0);
-  box-shadow:
-    inset 0 2px 8px rgba(0, 0, 0, 0.4),
-    0 1px 0 rgba(255, 222, 176, 0.15);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--surface-sunken);
+  border: 2px solid var(--edge);
+  box-shadow: var(--log-shadow);
 }
 .cover-dot {
   width: 64px;
   height: 64px;
   border-radius: 50%;
   background: var(--pc);
-  border: 3px solid var(--wood-0);
+  border: 3px solid var(--edge);
   box-shadow:
-    0 0 0 3px rgba(255, 236, 205, 0.7),
+    0 0 0 3px var(--avatar-ring),
     0 0 40px var(--pc);
 }
 .cover h1,
 .winner h1 {
   font-size: 40px;
-  color: #fff0d2;
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-case);
+  color: var(--plaque-ink);
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .winner {
@@ -1740,21 +1642,21 @@
     radial-gradient(
       circle at 50% 35%,
       color-mix(in srgb, var(--pc) 30%, transparent),
-      rgba(20, 9, 2, 0.88) 75%
+      var(--scrim-deep) 75%
     ),
-    rgba(20, 9, 2, 0.5);
+    var(--scrim);
 }
 .winner-card {
   min-width: min(440px, calc(100vw - 32px));
-  background: var(--wood-bg);
+  background: var(--surface);
   box-shadow:
-    var(--bevel),
+    var(--panel-shadow),
     0 24px 60px rgba(0, 0, 0, 0.6);
 }
 .trophy {
   font-size: 64px;
   animation: pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
-  filter: drop-shadow(0 6px 18px rgba(242, 195, 90, 0.5));
+  filter: drop-shadow(0 6px 18px var(--accent-glow));
 }
 .scores {
   width: 100%;
@@ -1768,13 +1670,13 @@
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
-  border-radius: 8px;
-  background: var(--recess);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
   border-left: 5px solid var(--pc);
 }
 .score.is-winner {
-  background: rgba(242, 195, 90, 0.22);
-  box-shadow: 0 0 0 1.5px var(--gold);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 1.5px var(--accent);
 }
 .rank {
   width: 18px;
@@ -1787,7 +1689,7 @@
 .score-vp {
   margin-left: auto;
   font-weight: 800;
-  color: var(--gold-2);
+  color: var(--accent-2);
 }
 
 /* Shared with the setup screen (src/ui/setup/setup.css). */
@@ -1797,10 +1699,10 @@
   min-width: 0;
   width: 130px;
   padding: 7px 10px;
-  border-radius: 7px;
-  border: 1.5px solid var(--wood-0);
-  background: var(--recess);
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-radius: var(--btn-radius);
+  border: 1.5px solid var(--edge);
+  background: var(--surface-sunken);
+  box-shadow: var(--sunken-shadow);
 }
 .swatches {
   display: flex;
@@ -1814,22 +1716,22 @@
   cursor: pointer;
   background: var(--sw);
   border: 2px solid transparent;
-  box-shadow: 0 0 0 1.5px var(--wood-0);
+  box-shadow: 0 0 0 1.5px var(--edge);
   transition: transform 0.12s ease;
 }
 .swatch:hover {
   transform: scale(1.18);
 }
 .swatch.is-on {
-  border-color: #fff;
+  border-color: var(--swatch-on, #fff);
 }
 .seg {
   display: inline-flex;
   padding: 3px;
   gap: 2px;
-  border-radius: 8px;
-  background: var(--recess);
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  box-shadow: var(--sunken-shadow);
   margin-left: auto;
 }
 .seg-btn {
@@ -1846,8 +1748,8 @@
     color 0.15s ease;
 }
 .seg-btn.is-on {
-  color: var(--ink-dark);
-  background: linear-gradient(180deg, #ffe7a6, #f2c35a);
+  color: var(--primary-ink);
+  background: var(--primary-bg);
 }
 
 /* ---- motion ----------------------------------------------------------- */
@@ -1866,7 +1768,7 @@
   50% {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.4),
-      0 0 18px rgba(242, 195, 90, 0.75);
+      0 0 18px var(--accent-glow);
   }
 }
 @keyframes drop {
@@ -2010,12 +1912,12 @@
     display: grid;
     place-items: center;
     padding: 0;
-    border-radius: 10px;
+    border-radius: var(--radius);
     cursor: pointer;
-    color: var(--ink);
-    background: var(--wood-light-bg);
-    border: 2px solid var(--wood-0);
-    box-shadow: var(--bevel);
+    color: var(--raised-ink);
+    background: var(--surface-raised);
+    border: 2px solid var(--edge);
+    box-shadow: var(--panel-shadow);
   }
   .hud-turn {
     left: 62px;
