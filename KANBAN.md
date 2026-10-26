@@ -20,7 +20,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **S1** · Sync `main` → `expansions` (24 conflicted files: V1/V2 variants, stats, online vs F1 hooks); then start E2 Seafarers + E3 C&K from the synced branch · `s3-exp-sync` 🟦
+- **E2** · Seafarers: ships, pirate, gold, islands, fog, all official scenarios (+5-6P) · `s3-seafarers` 🟦
+- **E3** · Cities & Knights: commodities, improvements, knights, barbarians, progress cards, walls, 13 VP (+5-6P) · `s3-ck` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -34,8 +35,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **F2** · T&B trade-hex plaza IDs (centre vertex + spoke edges) · deps: F1
 - **F3** · setupRounds / setup-order hook (Cloth for Catan, E&P) · deps: F1
 - **F4** · HUD bank ratios from engine hooks; reusable "pick N resources" dialog; hide demo mode in prod
-- **E2** · Seafarers engine + all scenarios (+5-6P) · 🟦
-- **E3** · Cities & Knights engine (+5-6P) · 🟦
 - **E4** · Traders & Barbarians engine, all scenarios + Catan for Two (+5-6P) · 🟦
 - **E5** · Explorers & Pirates engine, all missions (+5-6P) · 🟦
 - **U1–U5** · Render + HUD per expansion · 🟩
@@ -124,6 +123,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **S1** · `main` synced into `expansions`: 24 conflicts resolved; variants run through F1 hooks (event cards ⇄ production hooks, setup hook precedence, stats for expansion actions), worker-safe expansion UI split · `s3-exp-sync` 🟦 · `expansions` 1223 tests
 - **BUG-B3** · Online trade flow: bots now confirm accepted offers; offerer `wait` blocks until answers; end-of-offer toasts; flaky e2e-server fixed · `s4-online-trade` 🟦 · PR #13 → `main` · 1042 tests
 - **UX2** · Game Statistics at game over: Overview (VP breakdown + 8 awards), Dice (histogram vs expected), Resources (by type/source/loss), Activity (VP-over-turns chart), Dev Cards; engine `stats` slice, online-safe · `s4-game-stats` 🟦 · PR #12 → `main` · 1027 tests
 - **BUG-B2** · Board crisp at every zoom (text re-rasterised to zoom, renderer follows DPR) + fit the island not the sea (+18% on base78) · `s4-board-crisp` 🟦 · PR #11 → `main` · 987 tests
