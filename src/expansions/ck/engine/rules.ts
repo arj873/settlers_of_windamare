@@ -47,6 +47,8 @@ import {
   isVpCard,
   metropolisVertices,
   redDieDraws,
+  MAX_KNIGHT_CANCELS,
+  phaseOf,
   type CkPhase,
   type Commodity,
   type CommodityBundle,
@@ -275,8 +277,21 @@ function ownKnight(state: GameState, p: PlayerId, v: VertexId): Knight | null {
   return k && k.owner === p ? k : null;
 }
 
+/**
+ * Activating / promoting the knight on `v`: in a build phase, or with that knight selected
+ * (phase ck/knight, the knight command dialog).
+ */
+function knightTurn(state: GameState, p: PlayerId, v: VertexId): string | null {
+  const phase = phaseOf(state);
+  if (phase.kind === 'ck/knight') {
+    if (state.turn.current !== p) return 'not your turn';
+    return phase.vertex === v ? null : 'another knight is selected';
+  }
+  return buildTurn(state, p);
+}
+
 export function activateBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
-  const t = buildTurn(state, p);
+  const t = knightTurn(state, p, v);
   if (t) return t;
   const k = ownKnight(state, p, v);
   if (!k) return 'not your knight';
@@ -307,7 +322,7 @@ export function promoteBlocker(
 }
 
 export function promoteBuildBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
-  return buildTurn(state, p) ?? promoteBlocker(state, p, v);
+  return knightTurn(state, p, v) ?? promoteBlocker(state, p, v);
 }
 
 export function promote(draft: GameState, v: VertexId): void {
@@ -341,8 +356,12 @@ export function canChase(state: GameState, p: PlayerId, v: VertexId): boolean {
 
 /** Why the knight on `v` cannot act now (or null). */
 export function knightActionBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
-  const m = mainTurn(state, p);
-  if (m) return m;
+  const phase = phaseOf(state);
+  const selected = phase.kind === 'ck/knight' && phase.vertex === v && phase.resume === 'main';
+  if (!selected) {
+    const m = mainTurn(state, p);
+    if (m) return m;
+  } else if (state.turn.current !== p) return 'not your turn';
   const k = ownKnight(state, p, v);
   if (!k) return 'not your knight';
   if (!k.active) return 'only an active knight can act';
@@ -352,6 +371,22 @@ export function knightActionBlocker(state: GameState, p: PlayerId, v: VertexId):
     displaceTargets(state, p, v).length > 0 ||
     canChase(state, p, v);
   return can ? null : 'that knight has nowhere to go';
+}
+
+/**
+ * Selecting the knight on `v` (the command dialog): something must be possible with it now,
+ * an action (main phase), activating or promoting (main or special build).
+ */
+export function selectKnightBlocker(state: GameState, p: PlayerId, v: VertexId): string | null {
+  const t = buildTurn(state, p);
+  if (t) return t;
+  if (!ownKnight(state, p, v)) return 'not your knight';
+  if (ckSlice(state).turn.cancels >= MAX_KNIGHT_CANCELS) return 'no more knight commands this turn';
+  const can =
+    (state.phase.kind === 'main' && knightActionBlocker(state, p, v) === null) ||
+    activateBlocker(state, p, v) === null ||
+    promoteBuildBlocker(state, p, v) === null;
+  return can ? null : 'nothing to do with that knight now';
 }
 
 /** Place `knight` on `v` (a fresh copy). */

@@ -17,13 +17,13 @@ import {
   goodCount,
   improveBlocker,
   knightActionBlocker,
+  selectKnightBlocker,
   promoteBuildBlocker,
   wallBlocker,
   wallSpotOk,
 } from './rules';
 import {
   GOODS,
-  MAX_KNIGHT_CANCELS,
   PROGRESS_HAND_MAX,
   TRACKS,
   ckSlice,
@@ -54,6 +54,9 @@ function builds(state: GameState, p: PlayerId, out: Action[]): void {
     if (promoteBuildBlocker(state, p, v) === null) {
       out.push(act({ type: 'ck/promoteKnight', player: p, vertex: v }));
     }
+    if (selectKnightBlocker(state, p, v) === null) {
+      out.push(act({ type: 'ck/selectKnight', player: p, vertex: v }));
+    }
   }
   if (wallBlocker(state, p, null) === null) {
     for (const v of buildingsOf(state, p, 'city')) {
@@ -71,14 +74,6 @@ function mainActions(state: GameState, p: PlayerId, out: Action[]): void {
   const s = ckSlice(state);
   const pl = s.players[p];
   if (!pl) return;
-  // Knight actions.
-  if (s.turn.cancels < MAX_KNIGHT_CANCELS) {
-    for (const [v, k] of Object.entries(s.knights) as [VertexId, (typeof s.knights)[VertexId]][]) {
-      if (k?.owner === p && knightActionBlocker(state, p, v) === null) {
-        out.push(act({ type: 'ck/selectKnight', player: p, vertex: v }));
-      }
-    }
-  }
   // Progress cards.
   for (const card of new Set(pl.progress)) {
     if (playBlocker(state, p, card) === null) out.push(act({ type: 'ck/play', player: p, card }));
@@ -160,7 +155,16 @@ export function ckLegal(state: GameState): Action[] {
       discards(state, phase.pending, true, out);
       return out;
     case 'ck/knight': {
-      if (canChase(state, p, phase.vertex)) out.push(act({ type: 'ck/chaseRobber', player: p }));
+      const v = phase.vertex;
+      if (knightActionBlocker(state, p, v) === null && canChase(state, p, v)) {
+        out.push(act({ type: 'ck/chaseRobber', player: p }));
+      }
+      if (activateBlocker(state, p, v) === null) {
+        out.push(act({ type: 'ck/activateKnight', player: p, vertex: v }));
+      }
+      if (promoteBuildBlocker(state, p, v) === null) {
+        out.push(act({ type: 'ck/promoteKnight', player: p, vertex: v }));
+      }
       out.push(act({ type: 'ck/cancel', player: p }));
       break;
     }

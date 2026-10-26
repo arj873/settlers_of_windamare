@@ -266,8 +266,13 @@ export function buildCards(state: GameState, viewer: PlayerId, av: Availability)
   const left = piecesLeft(state, viewer);
   const deck = supplyOf(state).devDeck; // depends on the map (25 base, 34 for 5-6P, ...)
   const deckTotal = DEV_CARD_TYPES.reduce((n, t) => n + deck[t], 0);
+  // No development deck in this game (an expansion's supply, e.g. C&K): no Buy card button.
+  const dev: BuildCard[] =
+    deckTotal > 0
+      ? [{ kind: 'dev', left: state.devDeck.length, total: deckTotal, enabled: av.buyDevCard }]
+      : [];
   return [
-    { kind: 'dev', left: state.devDeck.length, total: deckTotal, enabled: av.buyDevCard },
+    ...dev,
     { kind: 'road', left: left.road, total: PIECE_LIMITS.road, enabled: av.buildRoad },
     {
       kind: 'settlement',

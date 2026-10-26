@@ -390,7 +390,7 @@ describe('knights (§4.2)', () => {
     setGoods(s, 0, { grain: 1 });
     const r = ok(s, { type: 'ck/activateKnight', player: 0, vertex: V(0, 0, 'NW') });
     expect(ckSlice(r).knights[V(0, 0, 'NW')]!.active).toBe(true);
-    bad(r, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') }, /activated this turn/);
+    bad(r, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') }, /nothing to do/);
     const later = structuredClone(r);
     later.turn.number += 1;
     expect(legalOf(later, 'ck/selectKnight', 0)).toHaveLength(1);
@@ -416,7 +416,7 @@ describe('knights (§4.2)', () => {
     knight(s, 0, V(0, 0, 'N'), 1, false);
     build(s, 1, V(0, 0, 'NE'));
     // W end is the own settlement, N holds an own knight, NE is foreign: nowhere to go.
-    bad(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') }, /nowhere/);
+    bad(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') }, /nothing to do/);
     let r = structuredClone(s);
     Reflect.deleteProperty(r.pieces.buildings, V(0, 0, 'NE'));
     r = ok(r, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') });
@@ -687,7 +687,15 @@ describe('special build phase, 5-6 players (§8.1)', () => {
     const types = new Set(legalActions(s, 1).map((a) => a.type));
     expect(types.has('ck/buildKnight')).toBe(true);
     expect(types.has('ck/play')).toBe(false);
-    expect(types.has('ck/selectKnight')).toBe(false);
+    // The knight command offers promoting, but no move / displace / chase in the step.
+    const r = ok(s, { type: 'ck/selectKnight', player: 1, vertex: V(0, 0, 'N') });
+    expect(r.phase).toMatchObject({ kind: 'ck/knight', resume: 'specialBuild' });
+    const inPhase = new Set(legalActions(r, 1).map((a) => a.type));
+    expect(inPhase.has('ck/promoteKnight')).toBe(true);
+    expect(inPhase.has('ck/pickVertex')).toBe(false);
+    expect(inPhase.has('ck/chaseRobber')).toBe(false);
+    const done = ok(r, { type: 'ck/promoteKnight', player: 1, vertex: V(0, 0, 'N') });
+    expect(done.phase).toEqual({ kind: 'specialBuild', builder: 1, owner: 0 });
   });
 });
 

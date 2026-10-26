@@ -329,8 +329,11 @@ export type CkPhase =
   | { kind: 'ck/aqueduct'; queue: PlayerId[] }
   /** `player` places the metropolis of `track` on one of their cities. */
   | { kind: 'ck/metropolis'; track: Track; player: PlayerId; resume: 'main' | 'specialBuild' }
-  /** The current player chose the knight on `vertex` to act. */
-  | { kind: 'ck/knight'; vertex: VertexId }
+  /**
+   * The current player selected the knight on `vertex` (command dialog): activate, promote,
+   * or (main phase only) move / displace / chase the robber. Back to `resume` afterwards.
+   */
+  | { kind: 'ck/knight'; vertex: VertexId; resume: 'main' | 'specialBuild' }
   /** `player`'s displaced knight (`knight`, from `from`) goes to a new spot. */
   | {
       kind: 'ck/relocate';

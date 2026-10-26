@@ -7,6 +7,7 @@
  */
 import {
   RESOURCES,
+  costOf,
   type Action,
   type ExpansionAction,
   type GameState,
@@ -80,6 +81,7 @@ const ABILITY: Readonly<Record<Track, string>> = {
   science: 'Aqueduct: a free resource on an empty roll',
 };
 const goodLabel = (g: Good) => (isCommodity(g) ? COMMODITY_LABEL[g] : RESOURCE_LABEL[g]);
+const KNIGHT_TITLE = { 1: 'Basic', 2: 'Strong', 3: 'Mighty' } as const;
 
 // ---------------------------------------------------------------------------
 // Icons and card faces (static SVG; colours from the card faces / theme)
@@ -224,9 +226,15 @@ function trackRows(state: GameState, view: HudView, send: Send): HTMLElement {
       const metro = s.metropolis[t];
       const can = improve.find((a) => field(a, 'track') === t);
       const cost = level < MAX_LEVEL ? improvementCost(state, me, t) : 0;
+      const sub =
+        level >= 3
+          ? ABILITY[t]
+          : level > 0
+            ? `progress cards on a red die of ${redDieDraws(level)} or less`
+            : 'no progress cards yet';
       return h(
         'div',
-        { class: `ck-trk ck-trk-${t}` },
+        { class: `ck-trk ck-trk-${t}`, title: `${TRACK_LABEL[t]} level ${level}: ${sub}` },
         h('span', { class: 'ck-trk-ico' }, svg(TRACK_SVG[t], 18, TRACK_LABEL[t])),
         h(
           'span',
@@ -256,15 +264,6 @@ function trackRows(state: GameState, view: HudView, send: Send): HTMLElement {
                 class: `ck-pip${i < level ? ' is-on' : ''}${i >= 3 ? ' is-metro' : ''}`,
               }),
             ),
-          ),
-          h(
-            'span',
-            { class: 'muted ck-trk-sub' },
-            level >= 3
-              ? ABILITY[t]
-              : level > 0
-                ? `progress on red ≤ ${redDieDraws(level)}`
-                : 'no progress cards yet',
           ),
         ),
         level < MAX_LEVEL &&
@@ -763,30 +762,43 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
   if (phase.kind !== 'ck/knight' || state.turn.current !== view.viewer) return null;
   const chase = mine(view, 'ck/chaseRobber')[0];
   const cancel = mine(view, 'ck/cancel')[0];
+  const activate = mine(view, 'ck/activateKnight')[0];
+  const promote = mine(view, 'ck/promoteKnight')[0];
   const targets = mine(view, 'ck/pickVertex').length;
+  const k = ckSlice(state).knights[phase.vertex];
+  const costFaces = (item: string) =>
+    RESOURCES.flatMap((r) =>
+      Array.from({ length: costOf(state, item)?.[r] ?? 0 }, () => resCardFace(r, 14)),
+    );
+  const button = (a: Action | undefined, label: string, item?: string, primary = false) =>
+    a &&
+    h(
+      'button',
+      { class: `btn ${primary ? 'btn-primary' : ''} ck-choice`, on: { click: () => send(a) } },
+      label,
+      ...(item ? costFaces(item) : []),
+    );
   return {
     key: `ck-knight-${phase.vertex}`,
-    title: 'Knight action',
+    title: k ? `${KNIGHT_TITLE[k.level]} knight (${k.active ? 'active' : 'inactive'})` : 'Knight',
     modal: false,
     body: [
       h(
         'p',
         {},
         targets > 0
-          ? 'Click a highlighted spot to move there (or onto a weaker knight to displace it).'
-          : 'This knight can only chase the robber.',
+          ? 'Click a highlighted spot to move there, or onto a weaker knight to displace it.'
+          : chase
+            ? 'This knight can chase the robber away.'
+            : 'This knight cannot act now (it must be active, and not activated this turn).',
       ),
       h(
         'div',
-        { class: 'dialog-actions' },
-        chase &&
-          h(
-            'button',
-            { class: 'btn btn-primary', on: { click: () => send(chase) } },
-            'Chase the robber',
-          ),
-        cancel &&
-          h('button', { class: 'btn btn-ghost', on: { click: () => send(cancel) } }, 'Cancel'),
+        { class: 'ck-choices' },
+        button(chase, 'Chase the robber', undefined, true),
+        button(activate, 'Activate', ACTIVATE_ITEM),
+        button(promote, 'Promote', PROMOTE_ITEM),
+        button(cancel, 'Done'),
       ),
     ],
   };
@@ -835,22 +847,9 @@ export const ckHud: HudExtension = {
       total: () => KNIGHTS_PER_LEVEL,
     },
     {
-      mode: 'ck/activate',
-      label: 'Activate',
-      actionType: 'ck/activateKnight',
-      glyph: 'knight',
-      costItem: ACTIVATE_ITEM,
-    },
-    {
-      mode: 'ck/promote',
-      label: 'Promote',
-      actionType: 'ck/promoteKnight',
-      glyph: 'knight',
-      costItem: PROMOTE_ITEM,
-    },
-    {
-      mode: 'ck/act',
-      label: 'Knight action',
+      // Select a knight: activate, promote, move, displace or chase the robber (dialog).
+      mode: 'ck/command',
+      label: 'Command',
       actionType: 'ck/selectKnight',
       glyph: 'knight',
       costItem: 'ck/none',
@@ -913,27 +912,28 @@ export const ckHud: HudExtension = {
         h('span', { class: 'count-badge' }, String(n)),
       );
     });
-    const progress = [...new Set(cp.progress)].map((c) => {
-      const n = cp.progress.filter((x) => x === c).length;
-      const play = plays.find((a) => field(a, 'card') === c);
-      return h(
-        'button',
-        {
-          class: `hcard dcard ck-hp${play ? ' can-play' : ''}`,
-          disabled: !play,
-          title: `${CARD_NAMES[c]}: ${CARD_TEXT[c]}`,
-          attrs: { 'aria-label': `${CARD_NAMES[c]} ×${n}` },
-          on: { click: () => play && send(play) },
-        },
-        progressFace(c, 46),
-        h('span', { class: 'count-badge' }, String(n)),
-      );
-    });
-    return [
-      h('span', { class: 'hand-sep' }),
-      ...commodityCards,
-      ...(progress.length > 0 ? [h('span', { class: 'hand-sep' }), ...progress] : []),
-    ];
+    // Progress cards: one stack (the panel lists them with Play buttons); a click plays the
+    // first playable one when only one kind is playable.
+    const n = cp.progress.length;
+    const playable = [...new Set(plays.map((a) => field(a, 'card') as ProgressCard))];
+    const only = playable.length === 1 ? plays[0] : undefined;
+    const top = cp.progress[n - 1];
+    const stack =
+      top === undefined
+        ? null
+        : h(
+            'button',
+            {
+              class: `hcard dcard ck-hp${n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}${playable.length > 0 ? ' can-play' : ''}`,
+              disabled: !only,
+              title: `Progress cards: ${cp.progress.map((c) => CARD_NAMES[c]).join(', ')}${n > PROGRESS_HAND_MAX ? ` (keep ${PROGRESS_HAND_MAX})` : ''}`,
+              attrs: { 'aria-label': `${n} progress cards` },
+              on: { click: () => only && send(only) },
+            },
+            progressFace(top, 46),
+            h('span', { class: 'count-badge' }, String(n)),
+          );
+    return [h('span', { class: 'hand-sep' }), ...commodityCards, stack];
   },
 
   offerExtras(state, side) {

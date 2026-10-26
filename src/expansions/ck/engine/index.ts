@@ -50,6 +50,7 @@ import {
   improvementCost,
   isGoodsBundle,
   knightActionBlocker,
+  selectKnightBlocker,
   knightKind,
   moveBundle,
   moveGood,
@@ -75,7 +76,6 @@ import {
   CK,
   COMMODITIES,
   KNIGHTS_PER_LEVEL,
-  MAX_KNIGHT_CANCELS,
   PROGRESS_HAND_MAX,
   TRACKS,
   TRACK_COMMODITY,
@@ -92,6 +92,7 @@ import {
   isRobberActive,
   isTrack,
   type CkAction,
+  asPhase,
   phaseOf,
   type CkSlice,
   type ProgressCard,
@@ -115,6 +116,12 @@ const isInt = (x: unknown, lo: number, hi: number): x is number =>
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
+
+/** After activating / promoting from the knight command dialog: back to the turn. */
+function leaveCommand(draft: GameState): void {
+  const phase = phaseOf(draft);
+  if (phase.kind === 'ck/knight') draft.phase = resumePhase(draft, phase.resume);
+}
 
 /** A pick action (prompt answer). */
 const pick: ExtHandler = (draft, action) => {
@@ -187,6 +194,7 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
       k.activatedOn = draft.turn.number;
     }
     log(draft, action.player, `${pn(draft, action.player)} activated a knight`);
+    leaveCommand(draft);
     return ok(draft);
   },
 
@@ -197,24 +205,26 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     if (err) return fail(err);
     payResources(draft, action.player, PROMOTE_COST);
     promote(draft, v);
+    leaveCommand(draft);
     return ok(draft);
   },
 
   'ck/selectKnight': (draft, action) => {
     const v = action.vertex;
     if (typeof v !== 'string') return fail('invalid vertex');
-    const err = knightActionBlocker(draft, action.player, v);
+    const err = selectKnightBlocker(draft, action.player, v);
     if (err) return fail(err);
-    if (ckSlice(draft).turn.cancels >= MAX_KNIGHT_CANCELS)
-      return fail('no more knight actions this turn');
-    draft.phase = { kind: 'ck/knight', vertex: v } as Phase;
+    const resume = draft.phase.kind === 'specialBuild' ? 'specialBuild' : 'main';
+    draft.phase = asPhase({ kind: 'ck/knight', vertex: v, resume });
     return ok(draft);
   },
 
   'ck/chaseRobber': (draft, action) => {
     const phase = phaseOf(draft);
     if (phase.kind !== 'ck/knight') return fail('select a knight first');
-    if (draft.turn.current !== action.player) return fail('not your turn');
+    if (knightActionBlocker(draft, action.player, phase.vertex) !== null) {
+      return fail('that knight cannot act now');
+    }
     if (!canChase(draft, action.player, phase.vertex))
       return fail('that knight cannot chase the robber');
     const k = ckSlice(draft).knights[phase.vertex];
@@ -229,7 +239,7 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     if (phase.kind !== 'ck/knight') return fail('nothing to cancel');
     if (draft.turn.current !== action.player) return fail('not your turn');
     ckSlice(draft).turn.cancels += 1;
-    draft.phase = { kind: 'main' };
+    draft.phase = resumePhase(draft, phase.resume);
     return ok(draft);
   },
 

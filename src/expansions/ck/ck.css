@@ -1,5 +1,19 @@
 /* Cities & Knights HUD (classes are prefixed ck-). Chrome uses the theme tokens; card faces keep
    fixed art colours like the resource faces do. */
+/* The panel is tall: it shrinks and scrolls instead of squeezing Game Events away. */
+.side-sec.sec-ext-ck:not(.is-collapsed) {
+  flex: 1.4 1 0;
+  min-height: 160px;
+}
+.sec-ext-ck .sec-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.hud-side:has(.sec-ext-ck:not(.is-collapsed)) .sec-log:not(.is-collapsed) {
+  flex: 1 1 0;
+  min-height: 120px;
+}
 .ck-panel {
   display: flex;
   flex-direction: column;
@@ -95,8 +109,9 @@
 }
 .ck-trk-main {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   min-width: 0;
 }
 .ck-trk-name {
@@ -236,7 +251,7 @@
 .ck-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: 'name play drop' 'text text text';
+  grid-template-areas: 'name play drop';
   align-items: center;
   gap: 2px 6px;
   padding: 4px 6px;
@@ -259,8 +274,7 @@
   font-size: 13px;
 }
 .ck-card-text {
-  grid-area: text;
-  font-size: 11px;
+  display: none;
 }
 .ck-warn {
   margin: 0;
