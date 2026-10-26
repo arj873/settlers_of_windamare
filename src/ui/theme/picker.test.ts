@@ -29,15 +29,21 @@ describe('theme picker', () => {
       'chartroom',
       'parlour',
       'wood',
+      'githubdark',
+      'materialdark',
     ]);
-    expect(el.querySelectorAll('.theme-sw')).toHaveLength(4);
+    expect(el.querySelectorAll('.theme-sw')).toHaveLength(6);
     expect(opts(el).map((b) => b.getAttribute('aria-pressed'))).toEqual([
       'true',
       'false',
       'false',
       'false',
+      'false',
+      'false',
     ]);
     expect(el.textContent).toContain('Chartroom');
+    expect(el.textContent).toContain('GitHub Dark');
+    expect(el.textContent).toContain('Material Dark');
   });
 
   it('switches the page theme and remembers it', () => {

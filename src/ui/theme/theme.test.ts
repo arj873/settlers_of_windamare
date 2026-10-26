@@ -41,7 +41,14 @@ describe('themes', () => {
   it('lists Sunfired first and makes it the default', () => {
     expect(THEMES[0]).toBe('sunfired');
     expect(DEFAULT_THEME).toBe('sunfired');
-    expect(THEMES).toEqual(['sunfired', 'chartroom', 'parlour', 'wood']);
+    expect(THEMES).toEqual([
+      'sunfired',
+      'chartroom',
+      'parlour',
+      'wood',
+      'githubdark',
+      'materialdark',
+    ]);
   });
 
   it('reads ?theme= and ignores unknown names', () => {
