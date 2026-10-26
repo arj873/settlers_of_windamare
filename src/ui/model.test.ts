@@ -270,6 +270,14 @@ describe('special building phase pill', () => {
     s.phase = { kind: 'specialBuild', builder: 0, owner: 1 };
     s.turn.current = 0;
     expect(turnInfo(s, view(0, []), null).next).toBe("then White's turn");
+    // White builds first after Blue's turn and nobody else can: White's own turn is next.
+    s.phase = { kind: 'specialBuild', builder: 2, owner: 1 };
+    s.turn.current = 2;
+    s.players[3]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(turnInfo(s, view(2, []), null)).toMatchObject({
+      title: 'Special build: you',
+      next: 'then your turn',
+    });
   });
 
   it('has no queue outside the phase', () => {

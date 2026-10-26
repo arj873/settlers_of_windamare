@@ -36,6 +36,10 @@ export function serveOptions(
   if (vp !== null && !(Number.isInteger(vp) && vp >= 3 && vp <= 20)) {
     return { error: '--vp must be a whole number from 3 to 20' };
   }
+  const timer = flags.timer ? Number(flags.timer) : null;
+  if (timer !== null && !(Number.isInteger(timer) && timer >= 5 && timer <= 3600)) {
+    return { error: '--timer must be a whole number of seconds from 5 to 3600' };
+  }
   let map: MapName | null = null;
   if (flags.map) {
     const found = MAPS.find((m) => m.toLowerCase() === flags.map?.toLowerCase());
@@ -57,6 +61,7 @@ export function serveOptions(
     ...(map ? { map } : {}),
     debug: '1',
     ...(vp === null ? {} : { vp: String(vp) }),
+    ...(timer === null ? {} : { timer: String(timer) }),
   };
   return { seats, map, seed, vp, headed: 'headed' in flags, query };
 }

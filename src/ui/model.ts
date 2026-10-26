@@ -373,9 +373,13 @@ export function turnInfo(state: GameState, view: HudView, placeMode: PlaceMode |
   let next: string | null = null;
   if (phase.kind === 'specialBuild') {
     const queue = specialBuildQueue(state);
-    const owner = (phase.owner + 1) % state.players.length;
+    const upNext = (phase.owner + 1) % state.players.length;
     next =
-      queue.length > 0 ? `then ${names(state, queue)}` : `then ${names(state, [owner])}'s turn`;
+      queue.length > 0
+        ? `then ${names(state, queue)}`
+        : upNext === view.viewer
+          ? 'then your turn'
+          : `then ${names(state, [upNext])}'s turn`;
   }
   let hint = hintFor(state, view, placeMode);
   // "Blue's turn — Blue is thinking…" says the name twice.

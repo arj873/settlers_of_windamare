@@ -92,7 +92,7 @@ function el(tag: string, attrs: Record<string, string>): SVGElement {
 /** A small SVG of the map's board: land by terrain, the water ring, harbor dots. */
 export function mapPreviewSvg(map: MapId): SVGSVGElement {
   const { land, water, harbors } = previewBoard(map);
-  const pad = 1.05;
+  const pad = 0.9;
   const centers = water.map(hexCenter);
   const minX = Math.min(...centers.map((c) => c.x)) - pad;
   const maxX = Math.max(...centers.map((c) => c.x)) + pad;
@@ -108,7 +108,14 @@ export function mapPreviewSvg(map: MapId): SVGSVGElement {
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   for (const c of centers) {
-    svg.append(el('polygon', { points: corners(c.x, c.y, 0.97), fill: 'rgba(70,140,200,0.28)' }));
+    svg.append(
+      el('polygon', {
+        points: corners(c.x, c.y, 0.97),
+        fill: '#3d8cc4',
+        stroke: 'rgba(8,18,30,0.3)',
+        'stroke-width': '0.06',
+      }),
+    );
   }
   for (const hx of land) {
     const c = hexCenter(hx);

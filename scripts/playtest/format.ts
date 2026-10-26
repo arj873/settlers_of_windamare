@@ -87,7 +87,8 @@ export function uiMismatches(state: GameState, ui: UiScan, seat: PlayerId): stri
 /** HUD controls in a compact form: dialog first, then the action bar. */
 export function formatControls(ui: UiScan): string[] {
   const lines: string[] = [];
-  const btn = (c: UiScan['controls'][number]) => `[${c.label}${c.on ? ' (on)' : ''}]`;
+  const btn = (c: UiScan['controls'][number]) =>
+    `[${c.label}${c.on ? ' (on)' : ''}${!c.enabled && c.why ? ` — ${c.why}` : ''}]`;
   const dialog = ui.controls.filter((c) => c.inDialog);
   if (ui.dialogTitle) {
     lines.push(`Dialog "${ui.dialogTitle}"`);
@@ -155,7 +156,13 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
     `Longest Road: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
   );
 
+  if (ui.timer) {
+    lines.push(
+      `Turn timer: ${ui.timer} left${ui.timerLow ? ' (HURRY)' : ''}; at 0 the minimum moves are made for whoever is on the clock`,
+    );
+  }
   if (mine && !ui.cover) {
+    if (ui.turnTitle) lines.push(`Turn: "${ui.turnTitle}"`);
     if (ui.hint) lines.push(`Prompt: "${ui.hint}"`);
     lines.push(...formatControls(ui));
     const bad = uiMismatches(state, ui, seat);

@@ -46,6 +46,8 @@ export interface Control {
   /** Toggle chips (trade recipients): currently on. */
   on: boolean;
   inDialog: boolean;
+  /** Disabled build buttons: why ("Missing 1 brick"), from the button's `data-why`. */
+  why?: string | null;
 }
 
 /** A − value + stepper (discard / trade composer). */
@@ -65,6 +67,11 @@ export interface UiScan {
   screen: 'newGame' | 'resume' | 'winner' | null;
   winnerText: string | null;
   hint: string | null;
+  /** Turn pill title, e.g. "Your turn", "Special build: you then Seat3". */
+  turnTitle?: string | null;
+  /** Turn timer badge, e.g. "0:45" (null without a timer); `timerLow` in the last 10 s. */
+  timer?: string | null;
+  timerLow?: boolean;
   dialogTitle: string | null;
   /** Dialog text lines that are not buttons (summary / errors / notes). */
   dialogText: string[];

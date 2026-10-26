@@ -293,6 +293,8 @@
 .turn-title {
   font: 700 16px/1.15 var(--serif);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .turn-next {
   margin-left: 8px;

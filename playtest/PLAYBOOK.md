@@ -6,8 +6,8 @@ Your job: **find bugs** while playing to win. You only play through the CLI belo
 **Never edit code, configs or other files.** Only `pnpm -s pt` commands.
 
 The orchestrator has started the session (`nice -n 19 pnpm pt:serve [--seats 3..8]
-[--map base|baseRandom|base56|base78] [--seed S] [--vp N] [--headed]`; `--headed` opens a window
-a human can watch). Your seat number is given to you (below: `K`). Every command is
+[--map base|baseRandom|base56|base78] [--seed S] [--vp N] [--timer SEC] [--headed]`; `--headed`
+opens a window a human can watch). A random seat starts (the log says "SeatN starts"). Your seat number is given to you (below: `K`). Every command is
 `pnpm -s pt K <command>`. Each call prints text and exits.
 
 ## The loop
@@ -61,6 +61,11 @@ a human can watch). Your seat number is given to you (below: `K`). Every command
 - **Special build step (5+ players):** after each turn, every other player in order may build
   or buy a dev card (no trading, no playing dev cards). Build as usual, then `click Pass`
   (the button that is normally End turn). Not the same as the `pass` command for the cover.
+  `status` shows `Turn: "Special build: you then Seat3"` (who is still to go).
+- **Turn timer (`--timer`):** `status` shows `Turn timer: 0:45 left`. At 0 the game makes the
+  minimum moves for you (roll, end turn, random robber/discard, reject/cancel trades). The
+  clock is paused while the "Pass to" cover is up.
+- **Disabled build buttons** say why in `status`, e.g. `[Road 13/15 — Missing 1 brick]`.
 - **Rolled 7, too many cards:** a "Discard N cards" dialog. `set <resource> <n>` until it
   says "Discarding N of N", then `click Discard`.
 - **Robber:** `spots` -> `click-spot N` (pick a hex with an opponent, not yours). Then
