@@ -66,6 +66,26 @@ export class OnlineApp {
     return this.client;
   }
 
+  /** What `installDebugHook` (?debug=1, playtest harness) reads: the server view as the state. */
+  get debugController() {
+    const game = () => this.client?.game ?? null;
+    const net = () => this.net;
+    return {
+      get state() {
+        return game()?.view ?? null;
+      },
+      get legalActions() {
+        return game()?.legal ?? [];
+      },
+      get viewer() {
+        return game()?.view.view.viewer ?? null;
+      },
+      get boardActions() {
+        return net()?.boardActions ?? [];
+      },
+    };
+  }
+
   /** Check the room, ask for a nickname if needed, connect. */
   async run(): Promise<void> {
     this.show(noticeScreen('Joining room…', '', [], { spinner: true }));
