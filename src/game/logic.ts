@@ -3,10 +3,32 @@
  * highlights, which legal action a board click means, and which bot moves next.
  */
 import { actingPlayers } from '../engine';
-import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../engine';
+import type { Action, EdgeId, GameConfig, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
-import type { Controller, PlaceMode } from '../ui';
+import type { Controller, NewGameConfig, PlaceMode } from '../ui';
 import { impliedExtActions, placeModeAction } from '../ui/expansions';
+
+/** `createGame` config for a setup-screen config (shared with the online room, src/net). */
+export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpToWin): GameConfig {
+  const base = (cfg.mode ?? 'base') === 'base';
+  return {
+    seed,
+    players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
+    // Expansion modes take the map from their scenario (docs/EXPANSIONS.md §3).
+    ...(base
+      ? { map: cfg.map }
+      : {
+          mode: cfg.mode,
+          ...(cfg.scenario === undefined ? {} : { scenario: cfg.scenario }),
+          ...(cfg.options === undefined ? {} : { options: cfg.options }),
+        }),
+    vpToWin,
+    discardLimit: cfg.discardLimit,
+    balancedDice: cfg.rules.balancedDice,
+    hideBankCards: cfg.rules.hideBankCards,
+    turnTimerSec: cfg.turnTimerSec,
+  };
+}
 
 /** Seat controllers, indexed by PlayerId. */
 export type Seats = readonly Controller[];

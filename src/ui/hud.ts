@@ -6,6 +6,7 @@ import {
   costOf,
   emptyResources,
   getPlayer,
+  handCount,
   RESOURCES,
   victoryPoints,
   type Action,
@@ -1296,7 +1297,7 @@ export class Hud {
           ...victims.map((id) => {
             const p = getPlayer(state, id);
             const act = acts.find((a) => a.victim === id);
-            const count = RESOURCES.reduce((n, r) => n + p.resources[r], 0);
+            const count = handCount(state, id);
             return h(
               'button',
               {

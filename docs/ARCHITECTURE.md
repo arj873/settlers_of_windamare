@@ -14,7 +14,12 @@ src/ui/      HTML/CSS overlay         imports engine (read-only)
 src/game/    controller               owns the current GameState; wires everything
 src/expansions/<id>/  one folder per expansion module: engine/ (engine rules apply), render.ts,
              ui.ts, bots.ts — the framework contract is docs/EXPANSIONS.md (F1)
+src/net/     online multiplayer       protocol + GameSession (server room core); no DOM, no Date (lint)
+src/server/  Cloudflare room server   Worker + Durable Object around GameSession (MULTIPLAYER.md §18)
 ```
+
+Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
+clients get `viewFor(state, seat)` (§8) and their legal actions.
 
 Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, action) -> new state -> render/ui`.
 Nobody but `applyAction` produces a new GameState (fixtures excepted).
@@ -172,7 +177,9 @@ Bump `schemaVersion` and add a step there whenever GameState changes shape.
 - Played cards: knights in `knightsPlayed`, Road Building / Year of Plenty / Monopoly in `progressCardsPlayed` (`ProgressCardCounts`). So per type, deck + hands + played = `supplyOf(state).devDeck` exactly (checked by the sim's invariants). `BANK_PER_RESOURCE` / `DEV_DECK_COMPOSITION` are the 19-hex values only.
 - `turn.tradeOffers`: player trade offers made this turn; `offerTrade` is rejected once it reaches `MAX_TRADE_OFFERS_PER_TURN` (3). Reset on `endTurn`. House rule, see §12.
 - `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
-- Hidden info (hands, deck order) lives in state. Fine for hotseat; an online server would redact.
+- Hidden info (hands, dev cards, deck orders, rng, seed) lives in state. Fine for hotseat; online,
+  `viewFor(state, seat | 'spectator')` (`view.ts`, M1) masks it and adds public counts
+  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`).
 
 ## 5. Phase state machine
 
@@ -315,6 +322,7 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 | `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill); `continueRoll(draft)`, `discardAmounts(s)` (F1)                                                                                                                                                    |
 | `expansions/*` (F1)    | registry (`listModes, modeById, scenarioById, expansionById, activeModules, isActive, mapDef`), hook values (`costOf, pieceLimit, terrainKind, expansionVictoryPoints`), `extSlice, cloneJson, NO_ROBBER, doubledToHexId`; `createGame.ts`: `resolveMode, defaultVpToWin, optionVpBonus`. See `docs/EXPANSIONS.md`.         |
 | `selectors.ts` (F1)    | `cardsInHand(s, p)` (resources + expansion cards, for the 7 rule and stealing); `piecesLeft` uses `pieceLimit`; VP selectors add expansion VP                                                                                                                                                                               |
+| `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`    |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -372,14 +380,22 @@ view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} cle
 view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
-view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
+view.setInsets(insets, avoid?);           // Insets = { top, right, bottom, left } px. insets: permanent HUD (board fits inside);
+                                          // avoid: transient overlays (docked trade card) the board slides away from, never zooms for
+view.isFitted();                          // false once the user panned/zoomed, until the next refit
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
 - While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
-- Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit. Refits on renderer resize until the user moves it.
+- Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit.
+- Camera (`render/viewport.ts`, unit-tested): the fitted view is the pure `fitBoardView(bounds, w, h, insets, avoid)`
+  (inside the insets, or the full screen if they leave < `MIN_INSET_FIT`; negative margins count as 0; `avoid`
+  only translates). The fitted camera follows every resize and inset change. Only a real gesture switches to the
+  manual camera: a _pressed_ drag past `TAP_SLOP` (6 px), a wheel, a two-pointer pinch. A mouse press is always a
+  single pointer (a missed release is dropped, and a move with no button held is a hover, never a drag). Inset
+  changes leave a manual camera alone; a real size change, double-click, `fit()` or the "Fit board" button refit.
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
@@ -417,6 +433,9 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
   modes; `wip`/`demo` too with `?modes=all`). See `docs/EXPANSIONS.md` §8.
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
+- The HUD renders a `GameView` (online, M1) as well as a full state: other players' card counts
+  come from `handCount` / `devCardCount`, the special-build queue from `visibleSpecialBuildQueue`.
+  Never read another player's `resources` / `devCards` directly (they are 0 in a view).
 - Build buttons emit nothing but `placeMode`. HUD leaves the mode itself when pieces/turn/phase change or the build stops being legal (it emits `placeMode(null)`); Esc cancels.
 - Implied board clicks (setup placement, robber, free roads) have no HUD button: use `boardPrompt(view)` (`'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | null`) to know what to highlight.
 - `offerTrade` is open-ended, so the composer builds its own action; the HUD enables the Trade button when any `offerTrade` is in `legal`.
@@ -435,8 +454,11 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   360px, 300px under 1280px, a drawer under 720px), menu top-left (`.hud-menu`: New game, Bot speed,
   Theme, Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
   text), hand + Trade/Bank + build bar bottom-left (`.hud-bottom`), dice + Roll dice / End turn
-  bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets`; a docked
-  trade offer card (`.scrim.is-side .dialog`, above the hand) becomes a left inset.
+  bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets` (nothing
+  while the HUD is covered or has no bottom bar; dialogs are never measured); a docked trade offer card
+  (`.scrim.is-side .dialog`, above the hand) is an `avoid` margin: the board slides right without zooming.
+  `game/layout.ts` also adds the "Fit board" button (`.board-fit`, top-left under the menu, outside the HUD
+  root, hidden while covered) that calls `BoardView.fit()`.
 - Game Events parse the engine's log text (`ui/log.ts`): player names, resource counts, rolls,
   pieces, dev cards, robber and awards become icons; "X received …" lines after a roll fold into a
   "Production:" block. Unknown text stays text, so log wording changes degrade gracefully.
@@ -473,7 +495,8 @@ c.destroy();
   access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
   `?layout`, `?map`, `?autoplay`) never autosave.
-- `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`.
+- `newGame(cfg)` maps the stage-2 setup config (map, vpToWin, discardLimit, rules, turnTimerSec) into `createGame`
+  via `gameConfigOf(cfg, seed)` (`logic.ts`, shared with the online room).
   The starting seat is random (seeded).
 - Turn timer (T14, `settings.turnTimerSec`): pure logic in `game/turnTimer.ts` (unit-tested),
   ticked every `TIMER_TICK_MS` (250) by the controller, which passes `clockView` as

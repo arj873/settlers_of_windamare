@@ -10,12 +10,11 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M1** · Protocol + per-player state views (hide other hands, deck order, RNG) + docs/MULTIPLAYER.md · 🟦
+- **M3** · Client: home + lobby (invite link, nickname, seats, host config), network controller + reconnect, chat, spectator HUD, in-browser dev server · `s4-mp-client` 🟦
+- **V1** · Colonist-style game settings (your screenshot): robber modes, Event Cards deck, Rush + Turbo modes, timer presets (Bullet/Blitz/Rapid/Classic chess-clock/Custom), randomize turn order, Second Settler, map Fixed/Random/Veto, setup placement (1st/2nd building + restrictions) · `s4-variants` 🟦
 
 ## 📋 Backlog — Stage 4
 
-- **M2** · Room server: Cloudflare Durable Object per room, authoritative engine, seats, reconnect tokens, server-side bots + timer, spectators, chat, persistence, `wrangler dev` locally · 🟦 · deps: M1
-- **M3** · Client: home/lobby (create room → invite link, join with nickname, seats/colours, host config + start), network controller, reconnect, chat panel, spectator view · 🟦/🟩 · deps: M1
 - **M4** · Multi-browser e2e tests + Haiku remote playtest (each agent its own browser) · deps: M2, M3
 - **M5** · Go live on Cloudflare (needs your account) · deps: M4
 
@@ -23,8 +22,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
-- **BUG-B1** · 🔴 BLOCKER: board camera zooms in over a long game (6 Haiku reports, turns 59-75); spots off-screen/under HUD · `s3-camera-bug` 🟦
+- **E1** · Oil Springs + Crop Trust scenarios (rules research + docs/rules/*.md) · `s3-oil-crop` 🟩
 
 ## 🏃 In Progress — Stage 2
 
@@ -35,7 +33,9 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 3 (after F1, in parallel)
 
-- **E1** · Oil Springs + Crop Trust scenarios · 🟩
+- **F2** · T&B trade-hex plaza IDs (centre vertex + spoke edges) · deps: F1
+- **F3** · setupRounds / setup-order hook (Cloth for Catan, E&P) · deps: F1
+- **F4** · HUD bank ratios from engine hooks; reusable "pick N resources" dialog; hide demo mode in prod
 - **E2** · Seafarers engine + all scenarios (+5-6P) · 🟦
 - **E3** · Cities & Knights engine (+5-6P) · 🟦
 - **E4** · Traders & Barbarians engine, all scenarios + Catan for Two (+5-6P) · 🟦
@@ -56,6 +56,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Beginner start option: pre-place the rulebook starting pieces (from T8)
 
 ## 💡 Ideas from agents
+
+- (M2) global rate limiting via WAF / rate-limit binding · fewer DO storage writes · send diffs not full views · run e2e:server in GitHub Actions
+- (B1) harness auto-clicks Fit board when a spot is off-screen · headed playtests guard wheel input · highlight Fit board while camera is manual
+- (M1) HUD spectator mode → in M3 · parallel timer for simultaneous discards · board once + log deltas over the wire · heuristic bot that plays from `viewFor` · private "you stole X" notice
 - Beginner layout suggested starting positions as a setup option (from T1)
 - Per-player hidden-info view of state: hands, deck order (needed for online + fair bots) (from T1)
 - "Roll to decide who starts" option (from T1)
@@ -112,6 +116,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **M2** · Room server: Worker + Durable Object per room (hibernation, alarms, snapshots), 6-char codes, origin check + rate limits, `pnpm dev:server` / `e2e:server` / `deploy:cf` · `s4-mp-server` 🟦 · PR #4 → `main` · 777 tests, e2e passed
+- **BUG-B1** · Camera stuck zoomed (stray wheel in headed playtest never left manual mode) → fit math fixed, manual mode only on real drag/wheel/pinch, **Fit board** button · `s3-camera-bug` 🟦 · PR #3 → `main` · 747 tests
+- **M1** · Multiplayer protocol, per-player views (leak-tested), GameSession, LocalNet, docs/MULTIPLAYER.md · `s4-mp-protocol` 🟦 · PR #2 → `main` · 733 tests
+- **F1** · Expansion framework: registry, 20 hooks, schema v5, generalised board/topology, render/HUD/setup/bot extension points, Oasis demo · `s3-framework` 🟦 · PR #1 → `expansions` `7ff36aa` · 718 tests
 - **T1** · Foundation: scaffold, hex topology, board generator, RNG, core types, ARCHITECTURE.md · `s1-architect` 🟦 · deps: — · merged `b6a4937` · 67 tests
 - **T5** · Random bot + headless sim (`pnpm sim`) + invariant checks · `s1-bots-sim` 🟩 · deps: T1 · merged `71b5aba` · 119 tests total
 - **T3** · Rules trade/dev: bank 4:1, ports, player trades, dev cards, largest army, longest road · `s1-rules-trade` 🟦 · deps: T1 · merged `8875279` · 198 tests total on main
