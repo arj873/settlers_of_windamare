@@ -309,6 +309,13 @@ the turn timer on, an away player can still time out during the grace period (mi
 `TIMER_STEPS`). The session reuses `src/game/turnTimer.ts` unchanged:
 `timerSlot(state, controllers, legal, null)` → `syncClock` → `tickClock(now − clockAt)` →
 `timeoutMove`. `away` seats count as human (they are on the clock); bots are never timed.
+Chess clock (`settings.timer`, V1): the same slots, but `syncBankClock` puts the player on the
+clock with their own bank (`GameRec.banks`, part of the snapshot) and `bankAfterAction` banks the
+time used and credits the increment after each action (`begin()` has advanced the clock to `now`).
+`TimerInfo.remainingMs` is then the bank and `totalMs` the starting bank. Map veto and event-card
+choices need nothing special: `actingPlayers` / `obligated` cover them, so legal actions, bots and
+the timer work unchanged. With Randomize Turn Order, `start` reorders the lobby seats by
+`settings.seatOrder` so that seat index = PlayerId.
 Differences from hotseat: there is no viewer (`null`), so when several humans owe a discard or
 a trade reply they are timed one after another in table order; there is no "covered" pause; the
 clock only freezes while nobody is connected. Clients get `timer: { player, kind, remainingMs,
@@ -377,7 +384,14 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
 plus `seatCount` (`mode: 'base'`, `map`, `rules{balancedDice, hideBankCards}`, `turnTimerSec`,
-`vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range).
+`vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range), plus optional
+`variants` (V1, RULES.md §18: `robberMode, eventCards, rushMode, turboMode, secondSettler,
+randomTurnOrder, mapSelection, setupPlacement, timer`). `parseVariants` is strict (unknown keys
+rejected, a named clock preset must carry its own values) and normalises defaults away (off flags,
+`'normal'`, `'fixed'`). Combinations `createGame` would refuse are refused at `configure`
+(`bad_message`): event cards + balanced dice, chess clock + `turnTimerSec`, second settler with
+fewer than 4 seats. The V1 game actions (`vetoMap`, `eventGain`, `eventGive`, `eventSteal` with an
+explicit `victim: null` to pass, `eventDamageRoad`, `repairRoad`) have strict parsers like the rest.
 
 **Server → client**
 

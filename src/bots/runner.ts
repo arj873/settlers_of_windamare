@@ -10,6 +10,7 @@ import {
   Rng,
   type Action,
   type ActionResult,
+  type GameConfig,
   type GameState,
   type Layout,
   type MapId,
@@ -40,7 +41,21 @@ export interface GameSetup {
   specialBuildPhase?: boolean;
   /** Default false. */
   balancedDice?: boolean;
+  /** V1 variant settings, passed to createGame as they are (absent = official rules). */
+  variants?: VariantConfig;
 }
+
+export type VariantConfig = Pick<
+  GameConfig,
+  | 'robberMode'
+  | 'eventCards'
+  | 'setupPlacement'
+  | 'randomTurnOrder'
+  | 'mapSelection'
+  | 'rushMode'
+  | 'turboMode'
+  | 'secondSettler'
+>;
 
 export function newGame(setup: GameSetup): GameState {
   return createGame({
@@ -53,6 +68,7 @@ export function newGame(setup: GameSetup): GameState {
       ? {}
       : { specialBuildPhase: setup.specialBuildPhase }),
     ...(setup.balancedDice === undefined ? {} : { balancedDice: setup.balancedDice }),
+    ...setup.variants,
   });
 }
 

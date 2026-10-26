@@ -1,5 +1,16 @@
 /** Pure setup-screen logic: defaults, map/player coupling, colours, persistence. No DOM. */
-import type { Controller, MapId, NewGameConfig, SeatConfig } from '../types';
+import {
+  OFFICIAL_SETUP,
+  TIMER_PRESET_VALUES,
+  timerSettings,
+  type MapSelection,
+  type RobberMode,
+  type SetupBuilding,
+  type SetupPlacement,
+  type SetupRestriction,
+  type TimerPreset,
+} from '../../engine';
+import type { Controller, MapId, NewGameConfig, NewGameVariants, SeatConfig } from '../types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -77,12 +88,107 @@ export interface SetupDraft {
   seats: SeatDraft[];
   balancedDice: boolean;
   hideBankCards: boolean;
-  /** Index into TIMER_STEPS. */
+  /** Index into TIMER_STEPS (legacy per-turn timer; 0 while a chess clock is picked). */
   timerIdx: number;
   vpToWin: number;
   discardLimit: number;
   seed: string;
+  // --- V1 variants (defaults = official rules) ---------------------------------------------
+  robberMode: RobberMode;
+  eventCards: boolean;
+  rushMode: boolean;
+  turboMode: boolean;
+  secondSettler: boolean;
+  randomTurnOrder: boolean;
+  mapSelection: MapSelection;
+  setupPlacement: SetupPlacement;
+  /** Chess clock preset ('off' = none; the per-turn timer may be used instead). */
+  clockPreset: TimerPreset;
+  /** Custom clock: bank in minutes and increment in seconds. */
+  customBankMin: number;
+  customIncrementSec: number;
 }
+
+/** The variant fields of a draft with their defaults. */
+export const VARIANT_DEFAULTS: Pick<
+  SetupDraft,
+  | 'robberMode'
+  | 'eventCards'
+  | 'rushMode'
+  | 'turboMode'
+  | 'secondSettler'
+  | 'randomTurnOrder'
+  | 'mapSelection'
+  | 'setupPlacement'
+  | 'clockPreset'
+  | 'customBankMin'
+  | 'customIncrementSec'
+> = {
+  robberMode: 'normal',
+  eventCards: false,
+  rushMode: false,
+  turboMode: false,
+  secondSettler: false,
+  randomTurnOrder: false,
+  mapSelection: 'fixed',
+  setupPlacement: OFFICIAL_SETUP,
+  clockPreset: 'off',
+  customBankMin: 15,
+  customIncrementSec: 20,
+};
+
+export const CUSTOM_BANK_MIN = { min: 1, max: 180 } as const;
+export const CUSTOM_INCREMENT_SEC = { min: 0, max: 600 } as const;
+/** Second Settler: Catanian 2 sits third to the left, so it needs 4+ players. */
+export const SECOND_SETTLER_MIN_PLAYERS = 4;
+/** Colonist Rush defaults: discard limit 9 and the friendly robber (colonist.io/catan-rules/colonist-rush). */
+export const RUSH_DISCARD_LIMIT = 9;
+
+export const ROBBER_OPTIONS: readonly { id: RobberMode; label: string; desc: string }[] = [
+  { id: 'normal', label: 'Normal', desc: 'Official rules' },
+  {
+    id: 'friendly',
+    label: 'Friendly robber',
+    desc: "Can't block or rob players with 2 or fewer points",
+  },
+  { id: 'none', label: 'No robber', desc: 'A 7 only makes players discard' },
+];
+
+export const MAP_SELECTION_OPTIONS: readonly { id: MapSelection; label: string; desc: string }[] = [
+  { id: 'fixed', label: 'Fixed', desc: 'The map picked above' },
+  { id: 'random', label: 'Random', desc: 'Any map that fits the players' },
+  { id: 'veto', label: 'Veto', desc: '3 boards; players veto until one is left' },
+];
+
+export const CLOCK_OPTIONS: readonly { id: TimerPreset; label: string }[] = [
+  { id: 'off', label: 'Off' },
+  { id: 'bullet', label: 'Bullet' },
+  { id: 'blitz', label: 'Blitz' },
+  { id: 'rapid', label: 'Rapid' },
+  { id: 'classic', label: 'Classic' },
+  { id: 'custom', label: 'Custom' },
+];
+
+/** "20m + 30s" for a preset (custom: the draft's values). */
+export function clockLabel(d: SetupDraft): string {
+  const p = d.clockPreset;
+  if (p === 'off') return 'Off';
+  const v =
+    p === 'custom'
+      ? { bankSec: d.customBankMin * 60, incrementSec: d.customIncrementSec }
+      : TIMER_PRESET_VALUES[p];
+  const bank = v.bankSec % 60 === 0 ? `${v.bankSec / 60}m` : `${v.bankSec}s`;
+  return `${bank} + ${v.incrementSec}s`;
+}
+
+export const SETUP_BUILDING_OPTIONS: readonly { id: SetupBuilding; label: string }[] = [
+  { id: 'settlement', label: 'Settlement' },
+  { id: 'city', label: 'City' },
+];
+export const SETUP_RESTRICTION_OPTIONS: readonly { id: SetupRestriction; label: string }[] = [
+  { id: 'normal', label: 'Distance rule' },
+  { id: 'anyVertex', label: 'None (any vertex)' },
+];
 
 function newSeat(index: number, taken: Set<string>): SeatDraft {
   const c =
@@ -108,6 +214,7 @@ export function defaultSetup(playerCount = 4): SetupDraft {
     vpToWin: VP_DEFAULT,
     discardLimit: DISCARD_DEFAULT,
     seed: '',
+    ...VARIANT_DEFAULTS,
   };
 }
 
@@ -138,7 +245,93 @@ export function setPlayerCount(draft: SetupDraft, count: number): SetupDraft {
   while (seats.length < n) seats.push(newSeat(seats.length, new Set(seats.map((s) => s.color))));
   let map = draft.map;
   if (!mapFits(map, n)) map = MAPS.find((m) => m.max >= n)?.id ?? 'base78';
-  return { ...draft, seats, map };
+  const secondSettler = draft.secondSettler && n >= SECOND_SETTLER_MIN_PLAYERS;
+  return { ...draft, seats, map, secondSettler };
+}
+
+// ---------------------------------------------------------------------------
+// Variant coupling
+// ---------------------------------------------------------------------------
+
+export type ToggleKey =
+  | 'balancedDice'
+  | 'hideBankCards'
+  | 'eventCards'
+  | 'rushMode'
+  | 'turboMode'
+  | 'secondSettler'
+  | 'randomTurnOrder';
+
+/**
+ * Flip a switch. Event Cards and Balanced Dice exclude each other (both replace the dice);
+ * turning Rush on applies the Colonist Rush defaults (discard limit 9, friendly robber);
+ * Second Settler needs 4+ players.
+ */
+export function toggle(draft: SetupDraft, key: ToggleKey): SetupDraft {
+  const on = !draft[key];
+  if (key === 'secondSettler' && on && draft.seats.length < SECOND_SETTLER_MIN_PLAYERS)
+    return draft;
+  const next: SetupDraft = { ...draft, [key]: on };
+  if (on && key === 'eventCards') next.balancedDice = false;
+  if (on && key === 'balancedDice') next.eventCards = false;
+  if (on && key === 'rushMode') {
+    next.discardLimit = RUSH_DISCARD_LIMIT;
+    if (next.robberMode === 'normal') next.robberMode = 'friendly';
+  }
+  return next;
+}
+
+/** Pick a chess-clock preset; any preset turns the per-turn timer off. */
+export function setClockPreset(draft: SetupDraft, preset: TimerPreset): SetupDraft {
+  return { ...draft, clockPreset: preset, timerIdx: preset === 'off' ? draft.timerIdx : 0 };
+}
+
+/** Step the per-turn timer; turning it on turns the chess clock off. */
+export function setTimerIdx(draft: SetupDraft, idx: number): SetupDraft {
+  const timerIdx = clamp(idx, 0, TIMER_STEPS.length - 1);
+  return { ...draft, timerIdx, clockPreset: timerIdx > 0 ? 'off' : draft.clockPreset };
+}
+
+export function setSetupRound(
+  draft: SetupDraft,
+  round: 'first' | 'second',
+  change: Partial<SetupPlacement['first']>,
+): SetupDraft {
+  const setupPlacement = {
+    ...draft.setupPlacement,
+    [round]: { ...draft.setupPlacement[round], ...change },
+  };
+  return { ...draft, setupPlacement };
+}
+
+/** The variants of a draft that differ from the official rules (undefined when none do). */
+export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
+  const v: NewGameVariants = {};
+  if (draft.robberMode !== 'normal') v.robberMode = draft.robberMode;
+  if (draft.eventCards) v.eventCards = true;
+  if (draft.rushMode) v.rushMode = true;
+  if (draft.turboMode) v.turboMode = true;
+  if (draft.secondSettler && draft.seats.length >= SECOND_SETTLER_MIN_PLAYERS) {
+    v.secondSettler = true;
+  }
+  if (draft.randomTurnOrder) v.randomTurnOrder = true;
+  if (draft.mapSelection !== 'fixed') v.mapSelection = draft.mapSelection;
+  const p = draft.setupPlacement;
+  const o = OFFICIAL_SETUP;
+  if (
+    p.first.building !== o.first.building ||
+    p.first.restriction !== o.first.restriction ||
+    p.second.building !== o.second.building ||
+    p.second.restriction !== o.second.restriction
+  ) {
+    v.setupPlacement = { first: { ...p.first }, second: { ...p.second } };
+  }
+  const timer = timerSettings(draft.clockPreset, {
+    bankSec: draft.customBankMin * 60,
+    incrementSec: draft.customIncrementSec,
+  });
+  if (timer) v.timer = timer;
+  return Object.keys(v).length > 0 ? v : undefined;
 }
 
 /** Pick a map and clamp the player count into its range. */
@@ -189,6 +382,11 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
   };
   const seed = draft.seed.trim();
   if (seed) cfg.seed = seed;
+  const variants = buildVariants(draft);
+  if (variants) {
+    cfg.variants = variants;
+    if (variants.timer) cfg.turnTimerSec = null;
+  }
   return cfg;
 }
 
@@ -274,9 +472,55 @@ export function sanitizeSetup(raw: unknown): SetupDraft {
       vpToWin: int(raw['vpToWin'], VP_MIN, VP_MAX, VP_DEFAULT),
       discardLimit: int(raw['discardLimit'], DISCARD_MIN, DISCARD_MAX, DISCARD_DEFAULT),
       seed: '',
+      ...sanitizeVariants(raw),
     },
     seats.length,
   );
+}
+
+const oneOf = <T extends string>(v: unknown, options: readonly { id: T }[], fallback: T): T =>
+  options.some((o) => o.id === v) ? (v as T) : fallback;
+
+function sanitizeRound(raw: unknown, fallback: SetupPlacement['first']): SetupPlacement['first'] {
+  const o = isRecord(raw) ? raw : {};
+  return {
+    building: oneOf(o['building'], SETUP_BUILDING_OPTIONS, fallback.building),
+    restriction: oneOf(o['restriction'], SETUP_RESTRICTION_OPTIONS, fallback.restriction),
+  };
+}
+
+/** Variant fields of a stored draft (older drafts have none: defaults). */
+function sanitizeVariants(raw: Record<string, unknown>): typeof VARIANT_DEFAULTS {
+  const d = VARIANT_DEFAULTS;
+  const sp = isRecord(raw['setupPlacement']) ? raw['setupPlacement'] : {};
+  const eventCards = raw['eventCards'] === true && raw['balancedDice'] !== true;
+  const clockPreset = oneOf(raw['clockPreset'], CLOCK_OPTIONS, d.clockPreset);
+  return {
+    robberMode: oneOf(raw['robberMode'], ROBBER_OPTIONS, d.robberMode),
+    eventCards,
+    rushMode: raw['rushMode'] === true,
+    turboMode: raw['turboMode'] === true,
+    secondSettler: raw['secondSettler'] === true,
+    randomTurnOrder: raw['randomTurnOrder'] === true,
+    mapSelection: oneOf(raw['mapSelection'], MAP_SELECTION_OPTIONS, d.mapSelection),
+    setupPlacement: {
+      first: sanitizeRound(sp['first'], d.setupPlacement.first),
+      second: sanitizeRound(sp['second'], d.setupPlacement.second),
+    },
+    clockPreset,
+    customBankMin: int(
+      raw['customBankMin'],
+      CUSTOM_BANK_MIN.min,
+      CUSTOM_BANK_MIN.max,
+      d.customBankMin,
+    ),
+    customIncrementSec: int(
+      raw['customIncrementSec'],
+      CUSTOM_INCREMENT_SEC.min,
+      CUSTOM_INCREMENT_SEC.max,
+      d.customIncrementSec,
+    ),
+  };
 }
 
 export function loadSetup(storage: SetupStorage | null): SetupDraft {

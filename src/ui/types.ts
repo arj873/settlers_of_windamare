@@ -1,4 +1,11 @@
-import type { Action, PlayerId } from '../engine';
+import type {
+  Action,
+  MapSelection,
+  PlayerId,
+  RobberMode,
+  SetupPlacement,
+  TimerSettings,
+} from '../engine';
 
 export type Controller = 'human' | 'bot';
 
@@ -25,6 +32,22 @@ export interface NewGameConfig {
   discardLimit: number;
   /** Absent = the controller picks one. */
   seed?: string;
+  /** V1 variants; absent (or any field absent) = official rules. Only non-defaults are set. */
+  variants?: NewGameVariants;
+}
+
+/** Game-setting variants from the setup screen (engine GameConfig fields of the same names). */
+export interface NewGameVariants {
+  robberMode?: RobberMode;
+  eventCards?: boolean;
+  rushMode?: boolean;
+  turboMode?: boolean;
+  secondSettler?: boolean;
+  randomTurnOrder?: boolean;
+  mapSelection?: MapSelection;
+  setupPlacement?: SetupPlacement;
+  /** Chess clock (replaces `turnTimerSec`, which is then null). */
+  timer?: TimerSettings;
 }
 
 /** What the controller tells the HUD about the viewer on every render. */

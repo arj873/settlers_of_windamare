@@ -5,6 +5,8 @@
  * After the last road: turn.number = 1, current = settings.startingPlayer, phase = preRoll.
  * Helpers: canPlaceSettlement(.., { requireRoad: false }), canPlaceRoad(.., { fromVertex }),
  * setupPlayerAt().
+ * V1 variants: settings.setupPlacement picks each round's building (settlement / city) and
+ * restriction (distance rule / any empty vertex); settings.turboMode pays in round 1 too.
  */
 import { RESOURCES } from '../constants';
 import { canPlaceRoad, canPlaceSettlement } from '../rules/placement';
@@ -12,14 +14,28 @@ import { describeBundle, playerName } from '../rules/text';
 import { piecesLeft, setupPlayerAt } from '../selectors';
 import { isBoardEdge, isBoardVertex, topologyOf, vertexEdges, vertexHexes } from '../topology';
 import { emptyResources } from '../resources';
-import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../types';
+import type { Action, EdgeId, GameState, PlayerId, SetupRound, VertexId } from '../types';
+import { setupPlacementOf } from '../variants';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
+import { beginTurn } from './turn';
 
-function canSetupSettlement(state: GameState, player: PlayerId, v: VertexId): boolean {
-  return (
-    piecesLeft(state, player).settlement > 0 &&
-    canPlaceSettlement(state, player, v, { requireRoad: false })
-  );
+/** The building and restriction of setup placement `index` (round 1: index < n). */
+export function setupRoundAt(state: GameState, index: number): SetupRound {
+  const p = setupPlacementOf(state.settings);
+  return index < state.players.length ? p.first : p.second;
+}
+
+function canSetupSettlement(
+  state: GameState,
+  player: PlayerId,
+  v: VertexId,
+  round: SetupRound,
+): boolean {
+  if (piecesLeft(state, player)[round.building] <= 0) return false;
+  if (round.restriction === 'anyVertex') {
+    return isBoardVertex(topologyOf(state), v) && state.pieces.buildings[v] === undefined;
+  }
+  return canPlaceSettlement(state, player, v, { requireRoad: false });
 }
 
 function canSetupRoad(state: GameState, player: PlayerId, e: EdgeId, from: VertexId): boolean {
@@ -34,13 +50,16 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     }
     if (!isCurrent(draft, action.player)) return fail('not your turn');
     if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
-    if (!canSetupSettlement(draft, action.player, action.vertex)) {
+    const round = setupRoundAt(draft, phase.index);
+    if (!canSetupSettlement(draft, action.player, action.vertex, round)) {
       return fail('vertex is taken or too close to another building');
     }
 
-    draft.pieces.buildings[action.vertex] = { owner: action.player, kind: 'settlement' };
-    let text = `${playerName(draft, action.player)} placed a settlement`;
-    if (phase.index >= draft.players.length) {
+    draft.pieces.buildings[action.vertex] = { owner: action.player, kind: round.building };
+    let text = `${playerName(draft, action.player)} placed a ${round.building}`;
+    // Round 2 pays starting resources (Turbo Mode: both rounds). A setup city pays like a
+    // settlement, 1 per hex (C&K's second-placement city does the same).
+    if (phase.index >= draft.players.length || draft.settings.turboMode) {
       const gain = emptyResources();
       for (const h of vertexHexes(topologyOf(draft), action.vertex)) {
         const terrain = draft.board.hexes[h]?.terrain;
@@ -81,8 +100,8 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     if (next >= 2 * n) {
       draft.turn.number = 1;
       draft.turn.current = draft.settings.startingPlayer;
-      draft.phase = { kind: 'preRoll' };
       log(draft, null, 'Setup complete');
+      beginTurn(draft);
     } else {
       draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
       draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
@@ -96,8 +115,9 @@ export const setupLegal: LegalGenerator = (state: GameState): Action[] => {
   if (phase.kind !== 'setup') return [];
   const player = state.turn.current;
   if (phase.step === 'settlement') {
+    const round = setupRoundAt(state, phase.index);
     return topologyOf(state)
-      .vertices.filter((v) => canSetupSettlement(state, player, v))
+      .vertices.filter((v) => canSetupSettlement(state, player, v, round))
       .map((vertex) => ({ type: 'placeSetupSettlement', player, vertex }));
   }
   const from = phase.lastSettlement;
