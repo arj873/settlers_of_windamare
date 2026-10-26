@@ -232,7 +232,12 @@ describe('player counts and setup snake', () => {
 
   for (let n = 3; n <= 8; n++) {
     it(`setup snake works for ${n} players`, () => {
-      let s = createGame({ seed: `snake-${n}`, players: players(n), map: defaultMapFor(n) });
+      let s = createGame({
+        seed: `snake-${n}`,
+        players: players(n),
+        map: defaultMapFor(n),
+        startingPlayer: 0,
+      });
       const order: number[] = [];
       while (s.phase.kind === 'setup') {
         const phase = s.phase;
@@ -254,10 +259,60 @@ describe('player counts and setup snake', () => {
   }
 });
 
+describe('starting player (RULES.md 2.7, 2.13, 2.20)', () => {
+  it('is drawn from the seed, and every seat can start', () => {
+    const firsts = new Set<number>();
+    for (let i = 0; i < 60; i++) {
+      const s = createGame({ seed: `start-${i}`, players: players(4), map: 'baseRandom' });
+      expect(s.turn.current).toBe(s.settings.startingPlayer);
+      // Same seed, same starter.
+      const again = createGame({ seed: `start-${i}`, players: players(4), map: 'baseRandom' });
+      expect(again.settings.startingPlayer).toBe(s.settings.startingPlayer);
+      firsts.add(s.settings.startingPlayer);
+    }
+    expect([...firsts].sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it('does not change the board, deck or RNG of a seed', () => {
+    const a = createGame({ seed: 9, players: players(4), map: 'baseRandom', startingPlayer: 2 });
+    const b = createGame({ seed: 9, players: players(4), map: 'baseRandom', startingPlayer: 0 });
+    expect(a.board).toEqual(b.board);
+    expect(a.devDeck).toEqual(b.devDeck);
+    expect(a.rng).toBe(b.rng);
+  });
+
+  it('logs who starts', () => {
+    const s = createGame({ seed: 1, players: FIXTURE_PLAYERS, startingPlayer: 1 });
+    expect(s.log.map((e) => e.text)).toContain('Blue starts');
+    expect(s.log.at(-1)).toMatchObject({ player: 1, text: 'Blue starts' });
+  });
+
+  it('snakes from the starting seat and takes the first turn', () => {
+    let s = createGame({ seed: 's', players: players(4), map: 'baseRandom', startingPlayer: 2 });
+    const order: number[] = [];
+    while (s.phase.kind === 'setup') {
+      if (s.phase.step === 'settlement') order.push(s.turn.current);
+      const r = applyAction(s, legalActions(s)[0]!);
+      if (!r.ok) throw new Error(r.error);
+      s = r.state;
+    }
+    expect(order).toEqual([2, 3, 0, 1, 1, 0, 3, 2]);
+    expect(s.turn).toMatchObject({ number: 1, current: 2 });
+    expect(setupPlayerAt(0, 4, 2)).toBe(2);
+    expect(setupPlayerAt(7, 4, 2)).toBe(2);
+  });
+
+  it('rejects a seat that does not exist', () => {
+    const base = { seed: 1, players: players(4), map: 'baseRandom' as const };
+    expect(() => resolveSettings({ ...base, startingPlayer: 4 })).toThrow();
+    expect(() => resolveSettings({ ...base, startingPlayer: -1 })).toThrow();
+  });
+});
+
 describe('settings v2', () => {
   it('defaults', () => {
     const s = createGame({ seed: 1, players: players(4), map: 'baseRandom' });
-    expect(s.schemaVersion).toBe(3);
+    expect(s.schemaVersion).toBe(4);
     expect(s.settings).toEqual({
       seed: 1,
       map: 'baseRandom',
@@ -267,6 +322,7 @@ describe('settings v2', () => {
       specialBuildPhase: false,
       hideBankCards: false,
       turnTimerSec: null,
+      startingPlayer: s.settings.startingPlayer,
     });
     expect(createGame({ seed: 1, players: players(5) }).settings.specialBuildPhase).toBe(true);
   });
@@ -331,9 +387,9 @@ describe('upgradeState (saves)', () => {
     return { ...s, schemaVersion: 1, settings: { seed: 'fixture', layout, vpToWin: 8 } };
   }
 
-  it('upgrades v1 -> v3 with defaults', () => {
+  it('upgrades v1 -> v4 with defaults', () => {
     const up = upgradeState(v1Save('beginner'));
-    expect(up?.schemaVersion).toBe(3);
+    expect(up?.schemaVersion).toBe(4);
     expect(up?.diceDeck).toEqual([]);
     expect(up?.settings).toEqual({
       seed: 'fixture',
@@ -344,6 +400,7 @@ describe('upgradeState (saves)', () => {
       specialBuildPhase: false,
       hideBankCards: false,
       turnTimerSec: null,
+      startingPlayer: 0,
     });
     expect(upgradeState(v1Save('random'))?.settings.map).toBe('baseRandom');
   });
@@ -355,12 +412,20 @@ describe('upgradeState (saves)', () => {
     expect(applyAction(up, a!).ok).toBe(true);
   });
 
-  it('passes v3 through and rejects garbage', () => {
+  it('upgrades v3 -> v4: seat 0 started every earlier game', () => {
+    const s = freshGame();
+    const { startingPlayer: _, ...v3Settings } = s.settings;
+    const v3 = { ...s, schemaVersion: 3, settings: v3Settings };
+    expect(upgradeState(JSON.parse(JSON.stringify(v3)))).toEqual(s);
+  });
+
+  it('passes v4 through and rejects garbage', () => {
     const s = freshGame();
     expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(upgradeState(null)).toBeNull();
     expect(upgradeState({})).toBeNull();
-    expect(upgradeState({ ...s, schemaVersion: 4 })).toBeNull();
+    expect(upgradeState({ ...s, schemaVersion: 5 })).toBeNull();
+    expect(upgradeState({ ...s, settings: { ...s.settings, startingPlayer: 4 } })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, map: 'moon' } })).toBeNull();
     expect(
       upgradeState({ ...s, schemaVersion: 1, settings: { seed: 1, layout: 'x', vpToWin: 10 } }),

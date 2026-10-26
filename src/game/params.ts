@@ -15,6 +15,10 @@ export interface DevParams {
   speed: number | null;
   /** `?vp=5`: points to win (new games started from params). */
   vpToWin: number | null;
+  /** `?timer=20`: turn timer in seconds (games started from params; also on a `?fixture`). */
+  timer: number | null;
+  /** `?first=0`: starting seat as a PlayerId (0-based) for games started from params. Default: random. */
+  first: number | null;
   /** `?seats=hbbb`: h = human, b = bot, per seat. */
   seats: Controller[] | null;
   /** `?hl=vertices|edges|hexes`: board highlight preview (render dev aid). */
@@ -33,6 +37,7 @@ export function parseParams(search: string): DevParams {
     const n = Number(raw);
     return Number.isFinite(n) && n >= min && n <= max ? n : null;
   };
+  const integer = (n: number | null) => (n !== null && Number.isInteger(n) ? n : null);
   const layout = p.get('layout');
   const map = p.get('map');
   const auto = /^([3-8])bots?$/.exec(p.get('autoplay') ?? '');
@@ -50,6 +55,8 @@ export function parseParams(search: string): DevParams {
     autoplay: auto ? Number(auto[1]) : null,
     speed: num('speed', 0, 60000),
     vpToWin: num('vp', 3, 20),
+    timer: integer(num('timer', 1, 3600)),
+    first: integer(num('first', 0, 7)),
     seats: seats ? [...seats[0]].map((c) => (c === 'h' ? 'human' : 'bot')) : null,
     hl: hl === 'vertices' || hl === 'edges' || hl === 'hexes' ? hl : null,
     names: names.length > 0 ? names : null,

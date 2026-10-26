@@ -2,7 +2,7 @@
  * OWNER: T2 (rules-core).
  * Initial placement in snake order (see Phase 'setup' in types.ts).
  * Round-2 settlements (index >= n) produce one resource per adjacent non-desert hex.
- * After the last road: turn.number = 1, current = 0, phase = preRoll.
+ * After the last road: turn.number = 1, current = settings.startingPlayer, phase = preRoll.
  * Helpers: canPlaceSettlement(.., { requireRoad: false }), canPlaceRoad(.., { fromVertex }),
  * setupPlayerAt().
  */
@@ -80,11 +80,11 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     const next = phase.index + 1;
     if (next >= 2 * n) {
       draft.turn.number = 1;
-      draft.turn.current = 0;
+      draft.turn.current = draft.settings.startingPlayer;
       draft.phase = { kind: 'preRoll' };
       log(draft, null, 'Setup complete');
     } else {
-      draft.turn.current = setupPlayerAt(next, n);
+      draft.turn.current = setupPlayerAt(next, n, draft.settings.startingPlayer);
       draft.phase = { kind: 'setup', index: next, step: 'settlement', lastSettlement: null };
     }
     return ok(draft);

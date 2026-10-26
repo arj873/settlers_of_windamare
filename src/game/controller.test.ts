@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGame, legalActions, type Action, type GameState } from '../engine';
+import { applyAction, createGame, legalActions, type Action, type GameState } from '../engine';
 import {
   FIXTURE_PLAYERS,
   discardGame,
@@ -37,9 +37,17 @@ class FakeBoard implements BoardLike {
 
 class FakeHud implements HudLike {
   views: HudView[] = [];
+  covered = false;
+  timers: HudView['turnTimer'][] = [];
   private handlers: { [E in keyof HudEvents]?: ((p: HudEvents[E]) => void)[] } = {};
   render(_state: GameState, view: HudView): void {
     this.views.push(view);
+  }
+  isCovered(): boolean {
+    return this.covered;
+  }
+  setTurnTimer(t: HudView['turnTimer']): void {
+    this.timers.push(t);
   }
   on<E extends keyof HudEvents>(event: E, cb: (p: HudEvents[E]) => void): void {
     const list = (this.handlers[event] ?? []) as ((p: HudEvents[E]) => void)[];
@@ -347,6 +355,119 @@ describe('GameController: bots', () => {
   });
 });
 
+const timed = (s: GameState, sec: number): GameState => ({
+  ...s,
+  settings: { ...s.settings, turnTimerSec: sec },
+});
+
+describe('GameController: turn timer', () => {
+  it('shows nothing without settings.turnTimerSec', () => {
+    const c = make();
+    c.start(midGame(), humans4);
+    expect(hud.last.turnTimer ?? null).toBeNull();
+  });
+
+  it('counts down for the current human and ticks only the pill', () => {
+    const c = make();
+    c.start(timed(midGame(), 30), humans4);
+    expect(hud.last.turnTimer).toEqual({ remainingSec: 30, totalSec: 30 });
+    const renders = hud.views.length;
+    vi.advanceTimersByTime(5000);
+    expect(hud.views.length).toBe(renders);
+    expect(Math.ceil(hud.timers.at(-1)!.remainingSec)).toBe(25);
+    expect(c.state?.turn.current).toBe(1);
+  });
+
+  it('on timeout makes the minimum moves: roll, robber/steal if needed, end turn', () => {
+    const c = make();
+    const s = timed(midGame(), 20);
+    c.start({ ...s, phase: { kind: 'preRoll' } }, ['human', 'human', 'bot', 'bot']);
+    vi.advanceTimersByTime(19000);
+    expect(c.state?.phase.kind).toBe('preRoll');
+    for (let i = 0; i < 400 && c.state?.turn.current === 1; i++) vi.advanceTimersByTime(250);
+    expect(c.state?.turn.current).toBe(2);
+    expect(toasts).toContain('Blue ran out of time');
+    const types = c.state!.log.filter((e) => e.player === 1 && e.turn === 12).map((e) => e.text);
+    expect(types.some((t) => /rolled/.test(t))).toBe(true);
+    expect(types.some((t) => /built|bought/.test(t))).toBe(false);
+  });
+
+  it('pauses while the hotseat cover is up', () => {
+    const c = make();
+    c.start(timed(midGame(), 20), humans4);
+    hud.covered = true;
+    vi.advanceTimersByTime(60000);
+    expect(c.state?.turn.current).toBe(1);
+    hud.covered = false;
+    vi.advanceTimersByTime(5000);
+    expect(Math.ceil(hud.timers.at(-1)!.remainingSec)).toBe(15);
+  });
+
+  it('never times bots', () => {
+    const c = make(0);
+    c.start(timed(midGame(), 5), ['bot', 'bot', 'bot', 'bot']);
+    expect(hud.last.turnTimer ?? null).toBeNull();
+  });
+
+  it('times a human trade reply and rejects it on timeout', () => {
+    const c = make();
+    c.start(timed(tradeOfferGame(), 10), humans4);
+    expect(c.viewer).toBe(2);
+    vi.advanceTimersByTime(10250);
+    const phase = c.state?.phase;
+    expect(phase?.kind === 'trade' && phase.offer.responses[2]).toBe('rejected');
+    // Orange accepted earlier: Blue must now confirm or cancel, on Blue's own clock.
+    expect(c.viewer).toBe(1);
+    expect(hud.last.turnTimer?.remainingSec).toBe(10);
+    vi.advanceTimersByTime(10250);
+    // Timed out: offer cancelled, then the turn ended.
+    expect(c.state?.log.some((e) => e.text === 'Blue withdrew the offer')).toBe(true);
+    expect(c.state?.turn.current).toBe(2);
+  });
+});
+
+describe('GameController: special building phase (hotseat)', () => {
+  /** 5 players, SBP on, Red (0) in main. Everyone can afford a dev card. */
+  function sbpGame(): GameState {
+    let s = createGame({
+      seed: 'sbp',
+      players: [...FIXTURE_PLAYERS, { name: 'Green', color: '#2ecc71' }],
+      map: 'base56',
+      specialBuildPhase: true,
+      startingPlayer: 0,
+    });
+    for (let i = 0; i < 400 && s.phase.kind === 'setup'; i++) {
+      const a = legalActions(s)[0]!;
+      const r = applyAction(s, a);
+      if (!r.ok) throw new Error(r.error);
+      s = r.state;
+    }
+    const rich = { brick: 1, lumber: 1, wool: 1, grain: 1, ore: 1 };
+    return {
+      ...s,
+      phase: { kind: 'main' },
+      players: s.players.map((p) => ({ ...p, resources: rich })),
+    };
+  }
+
+  it('bots take their step, the next human gets the screen, then the turn moves on', () => {
+    const c = make(10);
+    c.start(sbpGame(), ['human', 'bot', 'human', 'bot', 'bot']);
+    hud.emit('action', { type: 'endTurn', player: 0 });
+    expect(c.state?.phase).toMatchObject({ kind: 'specialBuild', builder: 1, owner: 0 });
+    expect(c.viewer).toBe(0); // a bot builds: the screen stays with Red
+    for (let i = 0; i < 100 && c.state?.turn.current === 1; i++) vi.advanceTimersByTime(10);
+    expect(c.state?.phase).toMatchObject({ kind: 'specialBuild', builder: 2 });
+    expect(c.viewer).toBe(2); // White's step: the HUD shows the cover for White
+    hud.emit('action', { type: 'passSpecialBuild', player: 2 });
+    for (let i = 0; i < 300 && c.state?.phase.kind === 'specialBuild'; i++) {
+      vi.advanceTimersByTime(10);
+    }
+    expect(c.state?.phase.kind).toBe('preRoll');
+    expect(c.state?.turn.current).toBe(1);
+  });
+});
+
 describe('GameController: autosave', () => {
   it('saves after every action and restores the same session', () => {
     const c = make();
@@ -394,7 +515,7 @@ describe('GameController: autosave', () => {
     const seats = ['human', 'bot', 'bot', 'bot'];
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: v1, seats, viewer: 0, botRng: 5 }));
     const saved = loadSession(store);
-    expect(saved?.state.schemaVersion).toBe(3);
+    expect(saved?.state.schemaVersion).toBe(4);
     expect(saved?.state.settings).toMatchObject({ map: 'base', discardLimit: 7, vpToWin: 10 });
     expect(saved?.state.pieces).toEqual(midGame().pieces);
   });

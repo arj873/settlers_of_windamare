@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Action } from '../engine';
+import { legalActions, type Action } from '../engine';
 import { discardGame, midGame, moveRobberGame, tradeOfferGame } from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
 import { Hud } from './hud';
@@ -283,6 +283,68 @@ describe('Hud', () => {
     expect(roll.querySelector('.pname')!.textContent).toBe('Blue');
     const built = rows.find((r) => r.textContent?.includes('built'))!;
     expect(built.querySelector('.g-road')).not.toBeNull();
+  });
+
+  it('log shows both dice faces from the roll text, and old saves still render', () => {
+    const s = midGame();
+    s.dice = [6, 6];
+    s.log.push({ turn: 12, player: 1, text: 'Blue rolled 5 (1+4)' });
+    hud.render(s, { viewer: 1, legal: [], isBotTurn: false });
+    const rolls = [...root.querySelectorAll('.log-row')].filter((r) =>
+      r.textContent?.includes('rolled'),
+    );
+    const faces = (r: Element) =>
+      [...r.querySelectorAll('.die')].map((d) => d.getAttribute('aria-label'));
+    expect(faces(rolls.at(-1)!)).toEqual(['Die showing 1', 'Die showing 4']);
+    // The fixture's older "Blue rolled 8" has no faces and is not the latest roll: a number.
+    expect(faces(rolls[0]!)).toEqual([]);
+    expect(rolls[0]!.querySelector('.log-roll')!.textContent).toBe('8');
+  });
+
+  it('disabled build buttons explain why on tap (missing cards as card faces)', () => {
+    const s = midGame(); // Blue lacks a brick for a road
+    hud.render(s, { viewer: 1, legal: legalActions(s, 1), isBotTurn: false });
+    const road = byText('Road')!;
+    expect(road.disabled).toBe(true);
+    expect(road.getAttribute('data-why')).toBe('Missing 1 brick');
+    const slot = road.closest('.bslot')!;
+    expect(slot.classList.contains('is-blocked')).toBe(true);
+    (slot as HTMLElement).click();
+    const open = root.querySelector('.bslot.is-why .why')!;
+    expect(open.textContent).toContain('Missing 1 brick');
+    expect(open.querySelectorAll('.why-cards > .card-face[aria-label="Brick"]')).toHaveLength(1);
+    // Enabled buttons have no reason and keep the cost tooltip.
+    expect(byText('City')!.closest('.bslot')!.classList.contains('is-blocked')).toBe(false);
+    expect(byText('City')!.title).toMatch(/cost/);
+  });
+
+  it('turn timer: updates the pill in place and warns in the last 10 s', () => {
+    const s = midGame();
+    hud.render(s, {
+      viewer: 1,
+      legal: [],
+      isBotTurn: false,
+      turnTimer: { remainingSec: 30, totalSec: 30 },
+    });
+    const hand = root.querySelector('.hud-bottom')!.firstChild;
+    hud.setTurnTimer({ remainingSec: 9.2, totalSec: 30 });
+    const pill = root.querySelector('.turn-pill')!;
+    expect(pill.classList.contains('is-timer-low')).toBe(true);
+    expect(pill.querySelector('.turn-timer.is-low')!.textContent).toBe('0:10');
+    expect(root.querySelector('.hud-bottom')!.firstChild).toBe(hand); // not re-rendered
+    expect(hud.isCovered()).toBe(false);
+  });
+
+  it('special build pill names the builder and who is still to go', () => {
+    const s = midGame();
+    for (const p of s.players) p.resources = { brick: 1, lumber: 1, wool: 1, grain: 1, ore: 1 };
+    s.phase = { kind: 'specialBuild', builder: 2, owner: 1 };
+    s.turn.current = 2;
+    hud.render(s, { viewer: 2, legal: legalActions(s, 2), isBotTurn: false });
+    const title = root.querySelector('.turn-title')!;
+    expect(title.textContent).toBe('Special build: youthen Orange, Red');
+    expect(title.querySelector('.turn-next')!.textContent).toBe('then Orange, Red');
+    expect(byText('Pass')!.disabled).toBe(false);
   });
 
   it('turn pill names the current player and shows a timer when given one', () => {

@@ -20,7 +20,7 @@ const show = (tokens: LogToken[]) =>
         case 'resource':
           return `[${t.count} ${t.resource}]`;
         case 'dice':
-          return `[dice ${t.total}]`;
+          return t.faces ? `[dice ${t.total}=${t.faces.join('+')}]` : `[dice ${t.total}]`;
         case 'piece':
           return `[${t.piece}]`;
         case 'dev':
@@ -35,6 +35,8 @@ const show = (tokens: LogToken[]) =>
 
 describe('parseLogText', () => {
   it('turns names, rolls and pieces into tokens', () => {
+    expect(show(parseLogText('Red rolled 8 (3+5)', players))).toBe('<P0> rolled [dice 8=3+5]');
+    // Logs from before T14 (old saves) have no faces.
     expect(show(parseLogText('Red rolled 8', players))).toBe('<P0> rolled [dice 8]');
     expect(show(parseLogText('Red built a city', players))).toBe('<P0> built [city]');
     expect(show(parseLogText('Red placed a free road', players))).toBe('<P0> placed free [road]');

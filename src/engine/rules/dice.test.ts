@@ -132,7 +132,7 @@ describe('balanced dice', () => {
     }
   });
 
-  it('rollDice through applyAction: two dice values, unchanged roll log, shuffle logged', () => {
+  it('rollDice through applyAction: two dice values, same roll log, shuffle logged', () => {
     const s = game(true);
     s.turn = { number: 1, current: 0, devCardPlayed: false, tradeOffers: 0 };
     s.phase = { kind: 'preRoll' };
@@ -144,7 +144,8 @@ describe('balanced dice', () => {
     expect(after.diceDeck).not.toContain(card(after.dice!));
     const texts = after.log.slice(-2).map((l) => l.text);
     expect(texts[0]).toBe('The dice deck was shuffled');
-    expect(texts[1]).toBe(`Red rolled ${total(after.dice!)}`);
+    const [d1, d2] = after.dice!;
+    expect(texts[1]).toBe(`Red rolled ${total(after.dice!)} (${d1}+${d2})`);
   });
 });
 
@@ -163,7 +164,7 @@ describe('balanced dice: save / load', () => {
     const { diceDeck: _drop, ...rest } = s;
     const v2 = { ...rest, schemaVersion: 2 };
     const up = upgradeState(JSON.parse(JSON.stringify(v2)))!;
-    expect(up.schemaVersion).toBe(3);
+    expect(up.schemaVersion).toBe(4);
     expect(up.diceDeck).toEqual([]);
     const draft = structuredClone(up);
     expect(rollTwoDice(draft).reshuffled).toBe(true);

@@ -294,6 +294,19 @@
   font: 700 16px/1.15 var(--serif);
   white-space: nowrap;
 }
+.turn-next {
+  margin-left: 8px;
+  font:
+    600 12px/1.15 system-ui,
+    sans-serif;
+  opacity: 0.85;
+}
+.turn-pill.is-timer-low {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 226, 184, 0.35),
+    0 0 0 2px #ff6b55,
+    0 0 18px rgba(255, 107, 85, 0.65);
+}
 .turn-pill .hint {
   font-size: 13px;
   opacity: 0.95;
@@ -1096,6 +1109,56 @@
 .bcard:hover .cost,
 .bcard:focus-visible .cost {
   display: flex;
+}
+
+/* Disabled build buttons: the slot catches hover / tap and explains why. */
+.bslot {
+  position: relative;
+  display: flex;
+}
+.bslot.is-blocked {
+  cursor: help;
+}
+.bslot.is-blocked .bcard {
+  pointer-events: none;
+}
+.why {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.25;
+  text-align: left;
+  background: var(--wood-1);
+  border: 1.5px solid var(--wood-0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.why b {
+  font: 700 13px/1.2 var(--serif);
+}
+.why-cards {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+.bslot.is-why .why {
+  display: flex;
+}
+@media (hover: hover) {
+  .bslot.is-blocked:hover .why {
+    display: flex;
+  }
 }
 
 /* ---- bottom-right: dice and turn buttons ------------------------------ */

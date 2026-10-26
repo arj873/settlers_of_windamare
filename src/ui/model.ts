@@ -4,6 +4,10 @@
  */
 import {
   actingPlayers,
+  canPlaceCity,
+  canPlaceRoad,
+  canPlaceSettlement,
+  COSTS,
   DEV_CARD_TYPES,
   getPlayer,
   handSize,
@@ -12,7 +16,9 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
+  specialBuildQueue,
   supplyOf,
+  topologyOf,
   RESOURCES,
   totalDevCards,
   victoryPoints,
@@ -261,6 +267,74 @@ export function buildCards(state: GameState, viewer: PlayerId, av: Availability)
   ];
 }
 
+const PIECE_PLURAL: Record<PlaceMode, string> = {
+  road: 'roads',
+  settlement: 'settlements',
+  city: 'cities',
+};
+
+export interface BlockReason {
+  text: string;
+  /** Can't afford: the cards still missing (shown as card faces). */
+  missing?: Partial<Record<Resource, number>>;
+}
+
+/** Is there any spot for `kind`, ignoring cost and phase? (geometry + own network only) */
+function anySpot(state: GameState, viewer: PlayerId, kind: PlaceMode): boolean {
+  const t = topologyOf(state);
+  if (kind === 'road') return t.edges.some((e) => canPlaceRoad(state, viewer, e));
+  if (kind === 'city') return t.vertices.some((v) => canPlaceCity(state, viewer, v));
+  return t.vertices.some((v) => canPlaceSettlement(state, viewer, v, { requireRoad: true }));
+}
+
+/**
+ * Why a build-bar button is disabled (empty when it is enabled): not the viewer's moment,
+ * no pieces / cards left, the missing cards, no legal spot. Most useful reason first.
+ */
+export function blockReasons(state: GameState, viewer: PlayerId, card: BuildCard): BlockReason[] {
+  if (card.enabled) return [];
+  const phase = state.phase.kind;
+  if (phase === 'gameOver') return [{ text: 'The game is over' }];
+  if (state.turn.current !== viewer) return [{ text: 'Not your turn' }];
+  if (phase === 'preRoll') return [{ text: 'Roll the dice first' }];
+  if (phase === 'setup') return [{ text: 'Place your starting pieces first' }];
+  if (phase !== 'main' && phase !== 'specialBuild') {
+    return [{ text: 'Finish the current step first' }];
+  }
+
+  const kind = card.kind;
+  if (card.left === 0) {
+    return [
+      {
+        text:
+          kind === 'dev'
+            ? 'No development cards left'
+            : `No ${PIECE_PLURAL[kind]} left (all ${card.total} placed)`,
+      },
+    ];
+  }
+  const out: BlockReason[] = [];
+  const hand = getPlayer(state, viewer).resources;
+  const cost = COSTS[kind === 'dev' ? 'devCard' : kind];
+  const missing: Partial<Record<Resource, number>> = {};
+  for (const r of RESOURCES) if (cost[r] > hand[r]) missing[r] = cost[r] - hand[r];
+  if (Object.keys(missing).length > 0) {
+    const list = Object.entries(missing).map(([r, n]) => `${n} ${r}`);
+    out.push({ text: `Missing ${list.join(', ')}`, missing });
+  }
+  if (kind !== 'dev' && !anySpot(state, viewer, kind)) {
+    out.push({
+      text:
+        kind === 'city'
+          ? 'No settlement to upgrade'
+          : kind === 'road'
+            ? 'No free edge next to your roads or buildings'
+            : 'No legal spot (needs your road, no building next to it)',
+    });
+  }
+  return out.length > 0 ? out : [{ text: 'Not possible right now' }];
+}
+
 /** Dark or light text for a player colour (`#rgb` / `#rrggbb`; anything else gets light text). */
 export function inkFor(color: string): 'dark' | 'light' {
   const digits = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())?.[1];
@@ -271,30 +345,45 @@ export function inkFor(color: string): 'dark' | 'light' {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.62 ? 'dark' : 'light';
 }
 
+/** The turn timer warns (red, pulsing) for the last this-many seconds. */
+export const TIMER_WARN_SEC = 10;
+
 export interface TurnInfo {
   /** Whose avatar the pill shows. */
   player: PlayerId;
-  /** "Your turn" or "Blue's turn". */
+  /** "Your turn", "Blue's turn" or "Special build: Blue". */
   title: string;
   hint: Hint | null;
+  /** Special building phase: who is still to go after this step ("then Red, White"). */
+  next: string | null;
 }
 
 export function turnInfo(state: GameState, view: HudView, placeMode: PlaceMode | null): TurnInfo {
   const current = state.turn.current;
   const name = state.players[current]?.name ?? `Player ${current + 1}`;
+  const phase = state.phase;
   const title =
-    state.phase.kind === 'gameOver'
+    phase.kind === 'gameOver'
       ? 'Game over'
-      : current === view.viewer
-        ? 'Your turn'
-        : `${name}'s turn`;
+      : phase.kind === 'specialBuild'
+        ? `Special build: ${current === view.viewer ? 'you' : name}`
+        : current === view.viewer
+          ? 'Your turn'
+          : `${name}'s turn`;
+  let next: string | null = null;
+  if (phase.kind === 'specialBuild') {
+    const queue = specialBuildQueue(state);
+    const owner = (phase.owner + 1) % state.players.length;
+    next =
+      queue.length > 0 ? `then ${names(state, queue)}` : `then ${names(state, [owner])}'s turn`;
+  }
   let hint = hintFor(state, view, placeMode);
   // "Blue's turn — Blue is thinking…" says the name twice.
   if (hint?.text === `${name} is thinking…`) hint = { text: 'thinking…', tone: 'wait' };
   if (hint && title === 'Your turn' && hint.text.startsWith('Your turn — ')) {
     hint = { ...hint, text: hint.text.slice('Your turn — '.length) };
   }
-  return { player: current, title, hint };
+  return { player: current, title, hint, next };
 }
 
 export interface Hint {
@@ -354,7 +443,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
     case 'specialBuild':
       return placeMode
         ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
-        : { text: 'Special build — build or buy a card, then pass', tone: 'action' };
+        : { text: 'Build or buy a card, then pass', tone: 'action' };
   }
 }
 

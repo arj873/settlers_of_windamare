@@ -19,7 +19,8 @@ export type LogToken =
   | { kind: 'text'; text: string }
   | { kind: 'player'; id: PlayerId }
   | { kind: 'resource'; resource: Resource; count: number }
-  | { kind: 'dice'; total: number }
+  /** `faces` from "rolled 8 (3+5)" (T14+); null in older logs ("rolled 8"). */
+  | { kind: 'dice'; total: number; faces: [number, number] | null }
   | { kind: 'piece'; piece: PieceKind }
   /** `card: null` = a face-down development card (bought). */
   | { kind: 'dev'; card: DevCardType | null }
@@ -58,10 +59,14 @@ const RES = RESOURCES.join('|');
 /** Keyword patterns, tried in this order at each position (after player names). */
 const PATTERNS: [RegExp, (m: RegExpExecArray) => LogToken[]][] = [
   [
-    /rolled (\d+)/y,
+    /rolled (\d+)(?: \(([1-6])\+([1-6])\))?/y,
     (m) => [
       { kind: 'text', text: 'rolled ' },
-      { kind: 'dice', total: Number(m[1]) },
+      {
+        kind: 'dice',
+        total: Number(m[1]),
+        faces: m[2] && m[3] ? [Number(m[2]), Number(m[3])] : null,
+      },
     ],
   ],
   [

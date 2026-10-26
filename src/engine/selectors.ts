@@ -11,9 +11,13 @@ import type {
   VertexId,
 } from './types';
 
-/** Snake order: 0,1,..,n-1,n-1,..,1,0. `index` in 0..2n-1. */
-export function setupPlayerAt(index: number, playerCount: number): PlayerId {
-  return index < playerCount ? index : 2 * playerCount - 1 - index;
+/**
+ * Snake order from the starting player `first` (settings.startingPlayer): with first = 0,
+ * 0,1,..,n-1,n-1,..,1,0; with first = 2 of 4, 2,3,0,1,1,0,3,2. `index` in 0..2n-1.
+ */
+export function setupPlayerAt(index: number, playerCount: number, first: PlayerId = 0): PlayerId {
+  const seat = index < playerCount ? index : 2 * playerCount - 1 - index;
+  return (seat + first) % playerCount;
 }
 
 export function getPlayer(state: GameState, id: PlayerId): Player {

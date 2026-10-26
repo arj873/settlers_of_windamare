@@ -46,7 +46,8 @@ describe('rollDice', () => {
       expect(d).toBeGreaterThanOrEqual(1);
       expect(d).toBeLessThanOrEqual(6);
     }
-    expect(a.log.at(-1)?.text).toBe(`Red rolled ${d1 + d2}`);
+    // Both faces in the log (T14), e.g. "Red rolled 8 (3+5)".
+    expect(a.log.at(-1)?.text).toBe(`Red rolled ${d1 + d2} (${d1}+${d2})`);
   });
 
   it('non-7 goes to main', () => {

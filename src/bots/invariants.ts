@@ -346,10 +346,11 @@ function checkPhase(
         add('phase-actor', `setup index ${phase.index} out of range`);
         break;
       }
-      if (state.turn.current !== setupPlayerAt(phase.index, n)) {
+      const expected = setupPlayerAt(phase.index, n, state.settings.startingPlayer);
+      if (state.turn.current !== expected) {
         add(
           'phase-actor',
-          `setup index ${phase.index}: current ${state.turn.current}, expected ${setupPlayerAt(phase.index, n)}`,
+          `setup index ${phase.index}: current ${state.turn.current}, expected ${expected}`,
         );
       }
       const last = phase.lastSettlement;

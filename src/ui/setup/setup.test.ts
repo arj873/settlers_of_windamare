@@ -17,7 +17,8 @@ import {
   timerLabel,
   type SetupStorage,
 } from './model';
-import { previewHexes } from './mapPreviews';
+import { MAPS as ENGINE_MAPS, beginnerBoard, topologyFor } from '../../engine';
+import { mapPreviewSvg, previewBoard, previewHexes } from './mapPreviews';
 import { SetupScreen } from './screen';
 
 class MemoryStorage implements SetupStorage {
@@ -216,6 +217,29 @@ describe('map previews', () => {
       const keys = previewHexes(m.id).map((h) => `${h.q},${h.r}`);
       expect(new Set(keys).size).toBe(keys.length);
     }
+  });
+
+  it('matches the engine boards: same hexes, terrain mix and harbors', () => {
+    for (const m of MAPS) {
+      const topo = topologyFor(m.id);
+      expect(previewHexes(m.id).map((h) => `h:${h.q},${h.r}`)).toEqual(topo.landHexes);
+      const board = previewBoard(m.id);
+      expect(board.water).toHaveLength(topo.waterHexes.length);
+      expect(board.harbors).toHaveLength(ENGINE_MAPS[m.id].harbors.length);
+      const deserts = board.land.filter((h) => h.terrain === 'desert').length;
+      expect(deserts).toBe(ENGINE_MAPS[m.id].terrain.desert);
+    }
+    // The beginner map shows its real, fixed layout.
+    const beginner = beginnerBoard().board.hexes;
+    for (const h of previewBoard('base').land) {
+      expect(h.terrain).toBe(beginner[`h:${h.q},${h.r}`]?.terrain);
+    }
+  });
+
+  it('draws one polygon per land and water hex, one dot per harbor', () => {
+    const svg = mapPreviewSvg('base56');
+    expect(svg.querySelectorAll('polygon')).toHaveLength(30 + 22);
+    expect(svg.querySelectorAll('circle')).toHaveLength(11);
   });
 });
 

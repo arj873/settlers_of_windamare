@@ -36,6 +36,12 @@ describe('parseParams', () => {
       vpToWin: null,
     });
   });
+
+  it('reads the turn timer and starting seat (T14)', () => {
+    expect(parseParams('?timer=20&first=2')).toMatchObject({ timer: 20, first: 2 });
+    expect(parseParams('?timer=0&first=9')).toMatchObject({ timer: null, first: null });
+    expect(parseParams('?timer=1.5&first=x')).toMatchObject({ timer: null, first: null });
+  });
 });
 
 describe('overlays', () => {
