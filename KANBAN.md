@@ -14,7 +14,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **UX2** · End-of-game **Game Statistics** (your Colonist screenshot): winner/turns/duration + tabs Overview · Dice · Resources · Activity · Dev Cards; engine stats slice, online-safe · `s4-game-stats` 🟦
 - **V2** · Optional **5+ player rule set** (settlersboard.com 5-6 FAQ, cross-checked with official rules): build phase may play 1 dev card, no robber on 2nd desert, 12 VP preset; + general **Map rules → Balance rules** (your mockup): Allow 6&8 touching / Allow 2&12 touching / Same numbers may touch / Same resources may touch, all off by default, all random maps, component-count audit · `s4-rules-56` 🟩
 - **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
-- **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
 ## 📋 Backlog — Stage 4
 
@@ -59,6 +58,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (UX1) board sea tint per theme (`--board-sea` tokens) · "1 human + N bots" quick-fill
+- (M4b triage) harness `status` should show hand deltas with their log source (2 Haiku false positives: production misread as trade effects)
 - (M3) remove-seat-N protocol message + lobby kick button · unread badge on collapsed chat · CI job on `scripts/e2e/online.ts --remote` · reconnect banner vs toast overlap
 - (E1) Oil Springs "Wide Open" variant · pick which hex a Crop Trust loss hits · shared wins (`winner` array) · core counts metropolis-only special builds
 - (V1) real-time Rush (simultaneous actors, server dice clock) · all players' chess-clock banks in the players panel · C&K notes on event cards · smarter bot event choices
@@ -122,6 +123,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **UX1** · Seat × remove / + Add player; **GitHub Dark** + **Material Dark** themes (all screens incl. online + V1); 6P name-truncation fix · `s4-themes-seats` 🟩 · PR #9 → `main` · 921 tests
 - **M4a** · Online playtest harness (`pt:serve --online`, per-seat browser contexts vs wrangler dev, drop/reconnect/reload/chat) + GitHub Actions CI · `s4-mp-e2e` 🟩 · PR #8 → `main` · 917 tests
 - **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s
 - **M3** · Online client: home (online/join/offline), invite links + Watch, lobby (seats, bots, host config via setup screen), network controller + reconnect, chat + reactions, spectator HUD, in-browser dev server · `s4-mp-client` 🟦 · PR #6 → `main` · 812 tests, e2e:online passed (dev + real wrangler)
