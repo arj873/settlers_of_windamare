@@ -9,7 +9,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - **T18** · AI playtest, 6 players (LIVE, headed window): 6 Haiku agents on Base 5-6P, seed pt6a, to 10 VP · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · tab `s2-rules`
-- **T17** · HUD redesign (your reference: Colonist layout + wooden theme): right sidebar (events w/ inline icons, bank stacks, players bars up to 8), turn pill, menu button, hand + build cards w/ pieces left, dice bottom-right · `s2-hud-redesign` 🟦 · tab `s2-hud-redesign`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
@@ -62,6 +61,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Per-seat bot name/difficulty option (from T11)
 - Arrow-key focus in setup tile groups (from T11)
 
+- Engine roll log with dice faces ("rolled 8 (3+5)") so every roll shows real dice in Game Events (from T17)
+- Delete dead speed-picker code in src/game (from T17)
+- Build cost on tap for touch screens (from T17)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -87,3 +90,5 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **T10** · Multi-size boards: per-map topology (Base / Base Random / 5-6P / 7-8P), generators + ports, up to 8 players, scaled bank & dev deck, new GameSettings fields · `s2-boards` 🟦 · deps: — · merged `7cae6f4` · 493 tests · sims clean on all 4 maps · setup screen config wired into createGame (orchestrator)
 - **T15** · Playwright playtest harness: session server, `pnpm pt <seat> <cmd>` CLI (wait/status/spots/click/shot/report), seat guard, PLAYBOOK.md · `s2-playtest` 🟦 · merged `f07a7f1` · 535 tests
 - **BUG** · Haiku playtest (3 reports, Seat1+Seat4): 5-6P-only spots refused as 'not a board id' — BoardView.screenPos used base topology · orchestrator · `056254c` · game restarted on the fix
+- **T17** · HUD redesign (your reference: Colonist layout + wooden theme): right sidebar (events w/ inline icons, bank stacks, players bars up to 8), turn pill, menu button, hand + build cards w/ pieces left, dice bottom-right · `s2-hud-redesign` 🟦 · merged · 555 tests
+- **FIX** · Favicon 404 in console (Haiku playtest, 2 reports) · orchestrator · `b9a2eb4`
