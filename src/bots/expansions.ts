@@ -6,6 +6,7 @@
 import { cropBots } from '../expansions/crop/bots';
 import { demoBots } from '../expansions/demo/bots';
 import { oilBots } from '../expansions/oil/bots';
+import { ckBots } from '../expansions/ck/bots';
 import type { ExpansionId, GameState } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 
@@ -21,6 +22,7 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   demoBots,
   oilBots,
   cropBots,
+  ckBots,
   // new modules go here, one per line
 ];
 

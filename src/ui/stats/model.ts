@@ -7,6 +7,7 @@ import {
   buildingsOf,
   DEV_CARD_TYPES,
   DICE_TOTALS,
+  expansionVictoryParts,
   RESOURCES,
   statsOf,
   sumCounts,
@@ -19,6 +20,7 @@ import {
   type PlayerId,
   type PlayerStats,
   type ResourceCounts,
+  type VictoryPointPart,
 } from '../../engine';
 
 export type StatsTab = 'overview' | 'dice' | 'resources' | 'activity' | 'dev';
@@ -72,7 +74,9 @@ export interface VpBreakdown {
   vpCards: number;
   longestRoad: boolean;
   largestArmy: boolean;
-  /** VP from anything else (expansions / variants); 0 in the base game. */
+  /** Named expansion VP (victoryPoints hook `parts`), e.g. "Metropolis". */
+  parts: VictoryPointPart[];
+  /** VP from anything else (unnamed expansion / variant VP); 0 in the base game. */
   other: number;
 }
 
@@ -86,12 +90,14 @@ export function standings(state: GameState): VpBreakdown[] {
       const longestRoad = state.awards.longestRoad === p.id;
       const largestArmy = state.awards.largestArmy === p.id;
       const total = victoryPoints(state, p.id);
+      const parts = expansionVictoryParts(state, p.id);
       const known =
         settlements +
         2 * cities +
         vpCards +
         (longestRoad ? AWARD_VP : 0) +
-        (largestArmy ? AWARD_VP : 0);
+        (largestArmy ? AWARD_VP : 0) +
+        parts.reduce((s, x) => s + x.vp, 0);
       return {
         player: p.id,
         total,
@@ -100,6 +106,7 @@ export function standings(state: GameState): VpBreakdown[] {
         vpCards,
         longestRoad,
         largestArmy,
+        parts,
         other: total - known,
       };
     })

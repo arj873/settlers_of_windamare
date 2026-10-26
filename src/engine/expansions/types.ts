@@ -17,7 +17,9 @@ import type {
   ExpansionAction,
   ExpansionActionType,
   ExpansionId,
+  GainSource,
   GameSettings,
+  LossSink,
   GameState,
   HexId,
   MapId,
@@ -36,6 +38,12 @@ export interface ProductionContext {
   cityYield: number;
   /** The hex that does not produce (the robber's), or null without a robber. */
   blocked: HexId | null;
+}
+
+/** A named share of an expansion's public VP (statistics screen): "Metropolis", 4. */
+export interface VictoryPointPart {
+  label: string;
+  vp: number;
 }
 
 export interface TerrainInfo {
@@ -160,8 +168,15 @@ export interface ExpansionHooks {
    * robber blocks (null without a robber, settings.robberMode 'none').
    */
   production?(state: GameState, roll: number, owed: ResourceCounts[], ctx: ProductionContext): void;
-  /** first-wins. Phase to enter after production instead of main. */
-  afterProduction?(draft: GameState, roll: number): Phase | undefined;
+  /**
+   * first-wins. Phase to enter after production instead of main. `paid` = the resources each
+   * player just received from the core production (after the bank-shortage rule).
+   */
+  afterProduction?(
+    draft: GameState,
+    roll: number,
+    paid: readonly ResourceCounts[],
+  ): Phase | undefined;
   /** chained. Cost of `item` ('road', 'settlement', 'city', 'devCard' or '<id>/<item>'). */
   cost?(
     state: GameState,
@@ -188,8 +203,24 @@ export interface ExpansionHooks {
    * settings only (createGame calls it before the state exists).
    */
   supply?(state: Pick<GameState, 'settings'>, base: Supply): Supply;
-  /** additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. */
-  victoryPoints?(state: GameState, player: PlayerId): { public: number; hidden?: number };
+  /**
+   * additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. `parts`
+   * (optional) names where the public VP come from, for the statistics screen.
+   */
+  victoryPoints?(
+    state: GameState,
+    player: PlayerId,
+  ): { public: number; hidden?: number; parts?: VictoryPointPart[] };
+  /**
+   * first-wins. Statistics (UX2): which source / sink a hand change of `player` made by one of
+   * your actions counts as (default 'other'). `gain` for cards received, `loss` for cards given.
+   * `state` is the state the action was applied to (its phase says what was being resolved).
+   */
+  statsCategory?(
+    state: GameState,
+    action: ExpansionAction,
+    player: PlayerId,
+  ): { gain?: GainSource; loss?: LossSink } | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /** chained. Length for Longest Road (Seafarers: trade route). */
