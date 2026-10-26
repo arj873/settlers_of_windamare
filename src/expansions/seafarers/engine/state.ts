@@ -2,6 +2,7 @@
  * The Seafarers state slice (state.ext.seafarers) and the scenario rule table.
  */
 import { extSlice } from '../../../engine/expansions/ext';
+import { scenariosAs } from '../../../engine/expansions/hooks';
 import type {
   DevCardCounts,
   DevCardType,
@@ -139,10 +140,16 @@ export const SCENARIOS: readonly ScenarioRules[] = [
 
 export const scenarioIdOf = (key: ScenarioKey) => `${SEAFARERS}/${key}` as const;
 
-/** The scenario rules of a Seafarers game (by settings.scenario). */
+/**
+ * The scenario rules of a Seafarers game (by settings.scenario; a combination scenario names
+ * the Seafarers one it is built on in `playsAs`, C2).
+ */
 export function rulesOf(state: Pick<GameState, 'settings'>): ScenarioRules {
   const id = state.settings.scenario;
-  const r = SCENARIOS.find((s) => scenarioIdOf(s.key) === id);
+  const own = SCENARIOS.find((s) => scenarioIdOf(s.key) === id);
+  if (own) return own;
+  const as = scenariosAs(state.settings, SEAFARERS)[0];
+  const r = SCENARIOS.find((s) => scenarioIdOf(s.key) === as);
   if (!r) throw new Error(`not a Seafarers scenario: ${String(id)}`);
   return r;
 }

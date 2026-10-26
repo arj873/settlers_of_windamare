@@ -21,10 +21,13 @@ export function shipsLeft(state: GameState, player: PlayerId): number {
   return pieceLimit(state, player, SHIP) - shipsOf(state, player).length;
 }
 
-/** An opponent's building (or a module piece that cuts routes) stands on `v`. */
+/**
+ * An opponent's building (or a module piece that cuts routes) stands on `v`. A module may cut
+ * the route at the player's own building too (T&B + Seafarers: a conquered settlement, FAQ 6).
+ */
 export function blockedFor(state: GameState, v: VertexId, player: PlayerId): boolean {
   const b = state.pieces.buildings[v];
-  if (b !== undefined) return b.owner !== player;
+  if (b !== undefined && b.owner !== player) return true;
   return hasRouteBlockers(state) && blocksRoute(state, v, player);
 }
 
@@ -157,9 +160,14 @@ export function markClosedRoutes(draft: GameState): void {
 /**
  * Longest Trade Route of `player` (§3.5): the longest trail over their roads and ships (no edge
  * twice). Roads join roads and ships join ships anywhere, a road and a ship only at the player's
- * own settlement or city. An opponent's building ends the trail there.
+ * own settlement or city. An opponent's building ends the trail there. `weight` counts an edge
+ * more than once (T&B + Seafarers: a camel on a road or ship counts it twice).
  */
-export function tradeRouteLength(state: GameState, player: PlayerId): number {
+export function tradeRouteLength(
+  state: GameState,
+  player: PlayerId,
+  weight: (e: EdgeId) => number = () => 1,
+): number {
   const g = graph(state);
   const ships = seaSlice(state).ships;
   const roads = state.pieces.roads;
@@ -180,12 +188,13 @@ export function tradeRouteLength(state: GameState, player: PlayerId): number {
       if (k === null || (!joint && k !== via)) continue;
       const [a, b] = g.ends.get(e) as readonly [VertexId, VertexId];
       const next = a === v ? b : a;
+      const w = weight(e);
       if (blockedFor(state, next, player)) {
-        if (len + 1 > best) best = len + 1;
+        if (len + w > best) best = len + w;
         continue;
       }
       used.add(e);
-      walk(next, k, len + 1);
+      walk(next, k, len + w);
       used.delete(e);
     }
   };

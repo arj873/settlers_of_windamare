@@ -17,6 +17,7 @@ import { tbModule } from '../../expansions/tb/engine';
 import { epModule } from '../../expansions/ep/engine';
 import { seackModule } from '../../expansions/seack/engine';
 import { tbckModule } from '../../expansions/tbck/engine';
+import { tbseaModule } from '../../expansions/tbsea/engine';
 import { MAPS, type MapDef } from '../maps';
 import type { ExpansionId, GameSettings, MapId, ModeId, ScenarioId } from '../types';
 import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
@@ -32,6 +33,7 @@ function builtinModules(): ExpansionModule[] {
     epModule,
     seackModule,
     tbckModule,
+    tbseaModule,
     // new modules go here, one per line
   ];
 }

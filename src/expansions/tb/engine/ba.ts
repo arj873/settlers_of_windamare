@@ -28,6 +28,7 @@ import type {
 } from '../../../engine/types';
 import { addGold, payBank, pn, rollDie, rollTwo } from './common';
 import { CONQUER_AT, isConqueredBuilding, isConqueredHex } from './conquest';
+import { isLandPath } from './paths';
 import {
   BA_BARBARIANS_34,
   BA_BARBARIANS_56,
@@ -125,15 +126,18 @@ export const knightsOf = (state: GameState, p: PlayerId): EdgeId[] =>
 export const knightsLeft = (state: GameState, p: PlayerId): number =>
   KNIGHTS_PER_PLAYER - knightsOf(state, p).length;
 
-/** Free edges (no knight) for a new knight: the castle's (Knighthood) or any (Swift Knight). */
+/**
+ * Free edges (no knight) for a new knight: the castle's (Knighthood) or any (Swift Knight).
+ * Knights stay on land paths (a Seafarers map has sea board hexes: T&B + Seafarers).
+ */
 export function knightSpots(state: GameState, card: 'knighthood' | 'swiftKnight'): EdgeId[] {
   const s = baOf(state);
   const t = topologyOf(state);
   const pool = card === 'knighthood' ? castleHexes(state).flatMap((h) => hexEdges(t, h)) : t.edges;
-  return [...new Set(pool)].filter((e) => s.knights[e] === undefined);
+  return [...new Set(pool)].filter((e) => s.knights[e] === undefined && isLandPath(state, e));
 }
 
-/** Edge distance (steps between edges sharing a vertex) from `from`, up to `max`. */
+/** Edge distance (steps between land edges sharing a vertex) from `from`, up to `max`. */
 function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId, number> {
   const t = topologyOf(state);
   const dist = new Map<EdgeId, number>([[from, 0]]);
@@ -142,7 +146,7 @@ function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId,
     const next: EdgeId[] = [];
     for (const e of frontier) {
       for (const n of edgeNeighbors(t, e)) {
-        if (dist.has(n)) continue;
+        if (dist.has(n) || !isLandPath(state, n)) continue;
         dist.set(n, d);
         next.push(n);
       }

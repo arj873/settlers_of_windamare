@@ -132,6 +132,7 @@ import {
   asTb,
   baOf,
   caravansOf,
+  featuresOf,
   fishOf,
   harbormasterOn,
   has,
@@ -797,12 +798,12 @@ export const tbModule: ExpansionModule = {
   ],
 
   validate(settings) {
-    const scenario = settings.scenario;
-    const noRobber = scenario === SC_BA || scenario === SC_TRADERS;
+    const f = featuresOf(settings.scenario);
+    const noRobber = f.includes('ba') || f.includes('traders');
     if (noRobber && (settings.robberMode ?? 'normal') !== 'normal') {
       return 'This scenario has no robber: the robber variants do not apply';
     }
-    const endSteps = scenario === SC_BA || scenario === SC_TRADERS || scenario === SC_CARAVANS;
+    const endSteps = noRobber || f.includes('caravans');
     if (endSteps && settings.secondSettler) {
       return 'This scenario has an end-of-turn step: use the special building phase, not the paired turn';
     }
@@ -1105,7 +1106,8 @@ export const tbModule: ExpansionModule = {
 
     roadLength(state, p, base) {
       if (has(state, 'traders')) return 0;
-      let n = has(state, 'caravans') ? camelRoadLength(state, p) : base;
+      // max: a combination's longer route (camels on ships, T&B + Seafarers) is kept.
+      let n = has(state, 'caravans') ? Math.max(base, camelRoadLength(state, p)) : base;
       if (isTwo(state)) n = lengthAgainstNeutrals(state, p, n);
       return n;
     },

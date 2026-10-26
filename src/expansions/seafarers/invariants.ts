@@ -5,6 +5,7 @@
 import {
   DEV_CARD_TYPES,
   LARGEST_ARMY_MIN,
+  longestRoadLengths,
   pieceLimit,
   supplyOf,
   terrainKind,
@@ -19,7 +20,7 @@ import { CLOTH_PER_VILLAGE, CLOTH_SUPPLY, tribeGifts } from './engine/features';
 import { graph, hexKind, isSeaHex, isShipEdge } from './engine/geometry';
 import { mapKeyOf, OFF_BOARD, type MapKey } from './engine/maps';
 import { fortressOf, lineOf } from './engine/pirates';
-import { SHIP, tradeRouteLength } from './engine/ships';
+import { SHIP } from './engine/ships';
 import { rulesOf, scenarioKey, type SeaSlice } from './engine/state';
 import { villagesWithCloth } from './engine/effects';
 
@@ -151,7 +152,8 @@ export function checkSeafarers(state: GameState): Violation[] {
     bad('Longest Trade Route held in a scenario without it');
   if (!rules.largestArmy && largestArmy !== null) bad('Largest Army held in a scenario without it');
   if (rules.longestRoute) {
-    const lengths = state.players.map((p) => tradeRouteLength(state, p.id));
+    // The hooked lengths: a combination may change the route (T&B + Seafarers: camels, none in T&B).
+    const lengths = longestRoadLengths(state);
     const max = Math.max(...lengths);
     if (longestRoad !== null && (lengths[longestRoad] ?? 0) < max) {
       bad(`Longest Trade Route holder ${longestRoad} has ${lengths[longestRoad]}, longest ${max}`);

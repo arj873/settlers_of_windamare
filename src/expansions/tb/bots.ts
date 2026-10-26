@@ -56,6 +56,7 @@ import {
   tbBoard,
   type TbSlice,
 } from './engine';
+import { pathEdges, pathEnds, pathOther, pathsAt } from './engine/paths';
 
 const isCount = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 0;
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
@@ -74,6 +75,7 @@ function check(state: GameState): Violation[] {
     return [{ code: 'expansion', message: 'tb: missing or malformed slice' }];
   }
   const t = topologyOf(state);
+  const paths = new Set(pathEdges(state));
 
   // Robber: on a land hex, or off the board (never in BA / T&B).
   if (robberless(state)) {
@@ -148,7 +150,7 @@ function check(state: GameState): Violation[] {
       bad(`${c.camels.length} camels + ${c.left} left ≠ ${total}`);
     const edges = c.camels.map((x) => x.edge);
     if (new Set(edges).size !== edges.length) bad('two camels on one edge');
-    if (!edges.every((e) => isBoardEdge(t, e))) bad('a camel off the board');
+    if (!edges.every((e) => paths.has(e))) bad('a camel off the board');
     if (state.board.hexes[state.robber]?.terrain === 'tb/oasis') bad('the robber is on the oasis');
   }
 
@@ -176,7 +178,7 @@ function check(state: GameState): Violation[] {
   if (has(state, 'traders')) {
     const tr = s.traders;
     if (!tr) return [...out, { code: 'expansion', message: 'tb: no traders slice' }];
-    if (new Set(tr.barbarians).size !== 3 || !tr.barbarians.every((e) => isBoardEdge(t, e))) {
+    if (new Set(tr.barbarians).size !== 3 || !tr.barbarians.every((e) => paths.has(e))) {
       bad(`barbarians on ${tr.barbarians.join(' ')}`);
     }
     tr.level.forEach((l, p) => {
@@ -184,7 +186,9 @@ function check(state: GameState): Violation[] {
     });
     if (state.phase.kind !== 'setup') {
       tr.wagons.forEach((w, p) => {
-        if (w === null || !isBoardVertex(t, w)) bad(`wagon at ${String(w)}`, p);
+        if (w === null || (!isBoardVertex(t, w) && pathsAt(state, w).length === 0)) {
+          bad(`wagon at ${String(w)}`, p);
+        }
       });
     }
     const swift = tr.swift.deck + sum(tr.swift.held) + sum(tr.swift.fresh);
@@ -283,7 +287,6 @@ function wagonPath(state: GameState, p: PlayerId): { first: VertexId; cost: numb
   const tr = tradersOf(state);
   const from = tr.wagons[p];
   if (!from) return null;
-  const t = topologyOf(state);
   const held = tr.commodity[p] ?? null;
   const targets = new Set(
     (tbBoard(state).tradeHexes ?? [])
@@ -300,8 +303,8 @@ function wagonPath(state: GameState, p: PlayerId): { first: VertexId; cost: numb
     if (targets.has(v)) return { first: firstOf.get(v) as VertexId, cost: dist.get(v) ?? 0 };
     // Plazas end a move: do not route through them.
     if (v !== from && plazaHex(v) !== null) continue;
-    for (const e of t.vertex[v]?.edges ?? []) {
-      const w = (t.edge[e]?.vertices ?? []).find((x) => x !== v) as VertexId;
+    for (const e of pathsAt(state, v)) {
+      const w = pathOther(state, e, v);
       const d = (dist.get(v) ?? 0) + stepCost(state, p, e).mp;
       if (d < (dist.get(w) ?? Infinity)) {
         dist.set(w, d);
@@ -400,17 +403,14 @@ function steerRivers(state: GameState, p: PlayerId, options: readonly Action[]):
 function steerCaravans(state: GameState, p: PlayerId, options: readonly Action[]): Action | null {
   const camels = options.filter((a) => a.type === 'tb/placeCamel');
   if (camels.length === 0) return null;
-  const t = topologyOf(state);
   const camelAt = new Set(
-    ((state.ext[TB] as TbSlice).caravans?.camels ?? []).flatMap(
-      (c) => t.edge[c.edge]?.vertices ?? [],
-    ),
+    ((state.ext[TB] as TbSlice).caravans?.camels ?? []).flatMap((c) => pathEnds(state, c.edge)),
   );
   let best: Action | null = null;
   let bestScore = 0;
   for (const a of camels) {
     const e = (a as { edge?: EdgeId }).edge as EdgeId;
-    const score = (t.edge[e]?.vertices ?? []).reduce(
+    const score = pathEnds(state, e).reduce(
       (n, v) => n + (state.pieces.buildings[v]?.owner === p ? (camelAt.has(v) ? 3 : 1) : 0),
       0,
     );

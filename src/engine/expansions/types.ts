@@ -128,6 +128,13 @@ export interface ScenarioDef {
    * no special building phase), as in Explorers & Pirates 5-6. Default: the special build phase.
    */
   pairedTurns56?: boolean;
+  /**
+   * A combination scenario (C2): the scenarios of the composed modules it plays as, per module
+   * id (T&B + Seafarers: `{ tb: ['tb/traders'], seafarers: ['seafarers/newShores'] }`). A module
+   * reads its own with `scenariosAs(settings, id)` (hooks.ts); without an entry the game's
+   * scenario plays as itself.
+   */
+  playsAs?: Readonly<Record<ExpansionId, readonly ScenarioId[]>>;
 }
 
 /**

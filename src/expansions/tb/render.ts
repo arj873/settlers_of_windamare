@@ -10,7 +10,16 @@
  * the light and the dark themes alike (as in ck/render.ts).
  */
 import { Container, Graphics, Text } from 'pixi.js';
-import type { EdgeId, GameState, HexId, PlayerId, Point, VertexId } from '../../engine';
+import {
+  edgeInfo,
+  vertexInfo,
+  type EdgeId,
+  type GameState,
+  type HexId,
+  type PlayerId,
+  type Point,
+  type VertexId,
+} from '../../engine';
 import { drawTerrainMotif, hexPoints, shade } from '../../render/art';
 import type { BoardDrawer, DrawContext } from '../../render/expansions';
 import { TOKEN, terrainPalette } from '../../render/theme';
@@ -708,8 +717,9 @@ export const tbDrawer: BoardDrawer = {
       draw: (state, ctx) =>
         graphicsLayer((g) => {
           for (const c of slice(state)?.caravans?.camels ?? []) {
-            const info = ctx.topo.edge[c.edge];
-            const head = ctx.topo.vertex[c.head];
+            // Sea paths too (T&B + Seafarers).
+            const info = edgeInfo(ctx.topo, c.edge);
+            const head = vertexInfo(ctx.topo, c.head);
             if (!info || !head) continue;
             const [x, y] = ctx.pt(info);
             const [hx] = ctx.pt(head);
@@ -862,7 +872,7 @@ export const tbDrawer: BoardDrawer = {
             if (v) at.set(v, [...(at.get(v) ?? []), p]);
           });
           for (const [v, ps] of at) {
-            const info = ctx.topo.vertex[v];
+            const info = vertexInfo(ctx.topo, v);
             if (!info) continue;
             const [x, y] = ctx.pt(info);
             ps.forEach((p, i) => {
@@ -888,7 +898,7 @@ export const tbDrawer: BoardDrawer = {
       draw: (state, ctx) =>
         graphicsLayer((g) => {
           for (const e of slice(state)?.traders?.barbarians ?? []) {
-            const info = ctx.topo.edge[e];
+            const info = edgeInfo(ctx.topo, e);
             if (!info) continue;
             const [x, y] = ctx.pt(info);
             barbarian(g, x, y + 0.1 * ctx.S, ctx.S);

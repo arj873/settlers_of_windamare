@@ -1,0 +1,28 @@
+/* T&B + Seafarers HUD (classes are prefixed tbsea-). Colours come from the theme tokens. */
+.tbsea-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tbsea-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tbsea-fact {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.tbsea-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tbsea-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

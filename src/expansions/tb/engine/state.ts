@@ -7,6 +7,7 @@
  * *features* (fish, rivers, caravans, ba, traders); two players switch on Catan for Two.
  */
 import { extSlice } from '../../../engine/expansions/ext';
+import { scenariosAs } from '../../../engine/expansions/hooks';
 import type {
   EdgeId,
   ExpansionAction,
@@ -45,8 +46,23 @@ const FEATURES: Readonly<Record<string, readonly Feature[]>> = {
   [SC_TRADERS]: ['traders'],
 };
 
+const COMBINED = new Map<ScenarioId, readonly Feature[]>();
+
+/**
+ * The features a scenario switches on. A combination scenario (C2, `ScenarioDef.playsAs`) plays
+ * as one or more T&B scenarios: the union of theirs (T&B + Seafarers: one; T&B × T&B: two).
+ */
 export function featuresOf(scenario: ScenarioId | null): readonly Feature[] {
-  return (scenario !== null ? FEATURES[scenario] : undefined) ?? [];
+  if (scenario === null) return [];
+  const own = FEATURES[scenario];
+  if (own) return own;
+  let out = COMBINED.get(scenario);
+  if (!out) {
+    const as = scenariosAs({ scenario }, TB).filter((s) => s !== scenario);
+    out = [...new Set(as.flatMap((s) => FEATURES[s] ?? []))];
+    COMBINED.set(scenario, out);
+  }
+  return out;
 }
 
 type S = Pick<GameState, 'settings'>;
@@ -85,6 +101,8 @@ export interface FishingGround {
   number: number;
   /** The tip vertex (between two coastal hexes) and its two coastal neighbours. */
   vertices: VertexId[];
+  /** The water hex it lies on (a pirate there blocks it: T&B + Seafarers). */
+  hex?: HexId;
 }
 
 export type TradeKind = 'castle' | 'quarry' | 'glassworks';
@@ -118,6 +136,8 @@ export interface TbBoard {
   tradeHexes?: TradeHex[];
   noBuild?: VertexId[];
   noRoad?: EdgeId[];
+  /** T&B: the barbarians' start paths when the map moves them (absent = the X marks of §2.6). */
+  barbarians?: EdgeId[];
 }
 
 export const tbBoard = (state: Pick<GameState, 'board'>): TbBoard =>

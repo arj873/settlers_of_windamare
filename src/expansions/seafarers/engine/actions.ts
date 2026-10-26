@@ -202,24 +202,38 @@ export function pirateMovable(state: GameState, p: PlayerId): boolean {
   return !cloth || Object.values(cloth.links).some((l) => l.includes(p));
 }
 
+/**
+ * Sea hexes the pirate may go to. With the friendly robber the pirate is friendly too (T&B FAQ
+ * 53): never next to a ship of a player with 2 or fewer points (the mover's own ships aside).
+ */
 export function pirateTargets(state: GameState, p: PlayerId): HexId[] {
   if (!pirateMovable(state, p)) return [];
   const t = topologyOf(state);
   const at = seaSlice(state).pirate;
   const hexes = [...t.waterHexes, ...t.landHexes];
-  return hexes.filter((h) => h !== at && isSeaHex(state, h));
+  return hexes.filter(
+    (h) =>
+      h !== at &&
+      isSeaHex(state, h) &&
+      ![...shipOwnersAround(state, h, p)].some((o) => isRobberProtected(state, o)),
+  );
+}
+
+/** Owners other than `p` of a ship on a side of `hex`. */
+function shipOwnersAround(state: GameState, hex: HexId, p: PlayerId): Set<PlayerId> {
+  const ships = seaSlice(state).ships;
+  const owners = new Set<PlayerId>();
+  for (const e of graph(state).hexEdges.get(hex) ?? []) {
+    const s = ships[e];
+    if (s && s.owner !== p) owners.add(s.owner);
+  }
+  return owners;
 }
 
 /** Players `p` may rob after moving the pirate to `hex`: a ship on one of its sides (FAQ #7). */
 export function pirateVictims(state: GameState, p: PlayerId, hex: HexId): PlayerId[] {
-  const g = graph(state);
-  const ships = seaSlice(state).ships;
   const cloth = seaSlice(state).cloth;
-  const owners = new Set<PlayerId>();
-  for (const e of g.hexEdges.get(hex) ?? []) {
-    const s = ships[e];
-    if (s && s.owner !== p) owners.add(s.owner);
-  }
+  const owners = shipOwnersAround(state, hex, p);
   return [...owners]
     .filter((o) => {
       const has = cardsInHand(state, o) > 0 || (cloth?.held[o] ?? 0) > 0;
