@@ -11,6 +11,7 @@
 import { demoModule } from '../../expansions/demo/engine';
 import { cropModule } from '../../expansions/crop/engine';
 import { oilModule } from '../../expansions/oil/engine';
+import { seafarersModule } from '../../expansions/seafarers/engine';
 import { MAPS, type MapDef } from '../maps';
 import type { ExpansionId, GameSettings, MapId, ModeId, ScenarioId } from '../types';
 import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
@@ -20,6 +21,7 @@ function builtinModules(): ExpansionModule[] {
     demoModule,
     oilModule,
     cropModule,
+    seafarersModule,
     // new modules go here, one per line
   ];
 }

@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
-import type { ProductionContext, Supply } from './types';
+import type { ProductionContext, SetupOrder, Supply } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -192,6 +192,23 @@ export function hookRoadLength(state: GameState, player: PlayerId, base: number)
 
 export function hasRoadLengthHook(state: State): boolean {
   return activeModules(state).some((m) => m.hooks?.roadLength !== undefined);
+}
+
+export function hookArmySize(state: GameState, player: PlayerId, base: number): number {
+  let n = base;
+  for (const m of activeModules(state)) {
+    const f = m.hooks?.armySize;
+    if (f) n = f(state, player, n);
+  }
+  return n;
+}
+
+export function hookSetupOrder(state: GameState): SetupOrder | undefined {
+  for (const m of activeModules(state)) {
+    const o = m.hooks?.setupOrder?.(state);
+    if (o !== undefined) return o;
+  }
+  return undefined;
 }
 
 export function runOnEndTurn(draft: GameState, player: PlayerId): void {

@@ -25,7 +25,7 @@ import {
   isBoardVertex,
   isLandHex,
   isMapId,
-  setupPlayerAt,
+  setupOrderOf,
   sumCounts,
   supplyOf,
   topologyOf,
@@ -462,11 +462,12 @@ function checkPhase(
 
   switch (phase.kind) {
     case 'setup': {
-      if (!isCount(phase.index) || phase.index >= 2 * n) {
+      const { order } = setupOrderOf(state);
+      if (!isCount(phase.index) || phase.index >= order.length) {
         add('phase-actor', `setup index ${phase.index} out of range`);
         break;
       }
-      const expected = setupPlayerAt(phase.index, n, state.settings.startingPlayer);
+      const expected = order[phase.index];
       if (state.turn.current !== expected) {
         add(
           'phase-actor',

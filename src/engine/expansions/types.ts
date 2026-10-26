@@ -140,10 +140,22 @@ export interface ModeDef {
   scenarioVp?: Readonly<Record<ScenarioId, number>>;
 }
 
+/**
+ * The setup placements of a game: `order[i]` places setup step i (a settlement, then its road);
+ * `pays[i]` = that settlement pays starting resources. Default: the snake order of 2n steps,
+ * the second round pays.
+ */
+export interface SetupOrder {
+  order: readonly PlayerId[];
+  pays: readonly boolean[];
+}
+
 /** Pure functions the core rules call (docs/EXPANSIONS.md §5). All optional. */
 export interface ExpansionHooks {
   /** first-wins. Kind of building placed at setup step `index` (default settlement). */
   setupBuilding?(state: GameState, index: number): BuildingKind | undefined;
+  /** first-wins. Setup placement order and paying steps (Cloth for Catan: a third round). */
+  setupOrder?(state: GameState): SetupOrder | undefined;
   /** first-wins. The two numbered dice of a roll (store any extra die in your slice). */
   rollDice?(draft: GameState): [number, number] | undefined;
   /**
@@ -194,6 +206,8 @@ export interface ExpansionHooks {
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /** chained. Length for Longest Road (Seafarers: trade route). */
   roadLength?(state: GameState, player: PlayerId, base: number): number;
+  /** chained. Army size for Largest Army, base = knights played (Pirate Islands: no award, 0). */
+  armySize?(state: GameState, player: PlayerId, base: number): number;
   /** additive. `player` ended their turn (before the special build phase / next turn). */
   onEndTurn?(draft: GameState, player: PlayerId): void;
   /** additive. `player`'s turn starts (preRoll). Not called for the first turn after setup. */
