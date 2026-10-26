@@ -21,6 +21,7 @@
  */
 import { DEV_CARD_TYPES, RESOURCES, tokenPips } from './constants';
 import { namespaceOf } from './expansions/ext';
+import { hookStatsSource } from './expansions/hooks';
 import { emptyDevCards, emptyResources, isResource } from './resources';
 import { victoryPoints } from './selectors';
 import { hexVertices, topologyOf } from './topology';
@@ -350,8 +351,17 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     if (!old) return;
     for (const r of RESOURCES) {
       const d = pl.resources[r] - old.resources[r] - (prod(during, p, r) - prod(before, p, r));
-      if (d > 0) ed.player(p).gained[gainSource(action, p)][r] += d;
-      else if (d < 0) ed.player(p).lost[lossSink(action, p)][r] -= d;
+      // An expansion may classify its own hand changes (statsSource hook).
+      if (d > 0) {
+        const src =
+          (hookStatsSource(prev, action, p, 'gain') as GainSource | undefined) ??
+          gainSource(action, p);
+        ed.player(p).gained[src][r] += d;
+      } else if (d < 0) {
+        const sink =
+          (hookStatsSource(prev, action, p, 'loss') as LossSink | undefined) ?? lossSink(action, p);
+        ed.player(p).lost[sink][r] -= d;
+      }
     }
   });
 

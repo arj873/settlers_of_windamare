@@ -10,6 +10,7 @@ import {
   listModes,
   modeById,
   optionVpBonus,
+  resolveSettings,
   scenarioById,
   timerSettings,
   type ExpansionModule,
@@ -455,7 +456,8 @@ export function buildVariants(draft: SetupDraft): NewGameVariants | undefined {
   if (draft.rules56 && draft.seats.length >= RULES56_SEATS) v.rules56 = true;
   const mapRules: MapRules = {};
   for (const o of MAP_RULE_OPTIONS) if (draft[o.key]) mapRules[o.rule] = true;
-  if (Object.keys(mapRules).length > 0) v.mapRules = mapRules;
+  // Expansion modes play scenario maps: the balance rules do not apply (and are not shown).
+  if (draft.mode === 'base' && Object.keys(mapRules).length > 0) v.mapRules = mapRules;
   const mapSelection = mapSelectionOf(draft);
   if (mapSelection !== 'fixed') v.mapSelection = mapSelection;
   const p = draft.setupPlacement;
@@ -666,6 +668,34 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
     if (variants.timer) cfg.turnTimerSec = null;
   }
   return cfg;
+}
+
+/**
+ * Why the engine would refuse to start this draft (a module's `validate`, e.g. Seafarers' Pirate
+ * Islands with Event Cards), or null. The screen shows it and disables Start.
+ */
+export function draftError(draft: SetupDraft): string | null {
+  const cfg = buildConfig(draft);
+  try {
+    resolveSettings({
+      seed: 'check',
+      players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
+      ...(cfg.mode === 'base' || cfg.mode === undefined
+        ? { map: cfg.map }
+        : {
+            mode: cfg.mode,
+            ...(cfg.scenario === undefined ? {} : { scenario: cfg.scenario }),
+            ...(cfg.options === undefined ? {} : { options: cfg.options }),
+          }),
+      vpToWin: cfg.vpToWin,
+      discardLimit: cfg.discardLimit,
+      balancedDice: cfg.rules.balancedDice,
+      ...cfg.variants,
+    });
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
 }
 
 export function timerLabel(idx: number): string {

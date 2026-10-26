@@ -7,6 +7,7 @@ import {
   buildingsOf,
   DEV_CARD_TYPES,
   DICE_TOTALS,
+  expansionVpSources,
   RESOURCES,
   statsOf,
   sumCounts,
@@ -72,6 +73,8 @@ export interface VpBreakdown {
   vpCards: number;
   longestRoad: boolean;
   largestArmy: boolean;
+  /** Named expansion VP (the modules' vpSources hook), e.g. "New islands". */
+  extra: { label: string; vp: number }[];
   /** VP from anything else (expansions / variants); 0 in the base game. */
   other: number;
 }
@@ -86,12 +89,14 @@ export function standings(state: GameState): VpBreakdown[] {
       const longestRoad = state.awards.longestRoad === p.id;
       const largestArmy = state.awards.largestArmy === p.id;
       const total = victoryPoints(state, p.id);
+      const extra = expansionVpSources(state, p.id).filter((x) => x.vp !== 0);
       const known =
         settlements +
         2 * cities +
         vpCards +
         (longestRoad ? AWARD_VP : 0) +
-        (largestArmy ? AWARD_VP : 0);
+        (largestArmy ? AWARD_VP : 0) +
+        extra.reduce((n, x) => n + x.vp, 0);
       return {
         player: p.id,
         total,
@@ -100,6 +105,7 @@ export function standings(state: GameState): VpBreakdown[] {
         vpCards,
         longestRoad,
         largestArmy,
+        extra,
         other: total - known,
       };
     })

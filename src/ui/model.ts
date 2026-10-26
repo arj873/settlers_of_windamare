@@ -31,7 +31,7 @@ import {
   type PlayerId,
   type Resource,
 } from '../engine';
-import { extensionHint, placeModeAction } from './expansions';
+import { extensionHint, placeModeAction, placeModeActions, placeModeLabel } from './expansions';
 import type { BasePlaceMode, HudView, PlaceMode } from './types';
 
 /** Legal actions the viewer may submit. */
@@ -89,6 +89,8 @@ export function placeModeAvailable(
   if (mode === 'road') return av.buildRoad;
   if (mode === 'settlement') return av.buildSettlement;
   if (mode === 'city') return av.buildCity;
+  const types = placeModeActions(mode);
+  if (types.length > 0) return legal.some((a) => types.includes(a.type));
   const type = placeModeAction(mode);
   return type !== null && legal.some((a) => a.type === type);
 }
@@ -425,6 +427,10 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
     }
     return { text: `Waiting for ${names(state, who)}…`, tone: 'wait' };
   }
+  // An expansion may word any phase its own way (Seafarers: "Place a road or a ship").
+  const ext = placeMode === null ? extensionHint(state, view) : null;
+  if (ext) return { text: ext, tone: 'action' };
+  const piece = placeMode === null ? null : (placeModeLabel(placeMode) ?? placeMode);
 
   switch (phase.kind) {
     case 'setup':
@@ -439,7 +445,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: `Place a ${piece} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
         : { text: 'Your turn — build, trade or end your turn', tone: 'action' };
     case 'discard':
       return {
@@ -458,7 +464,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         : { text: 'Respond to the trade offer', tone: 'action' };
     case 'specialBuild':
       return placeMode
-        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        ? { text: `Place a ${piece} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
         : {
             text: state.settings.rules56
               ? 'Build, buy or play one card, then pass'

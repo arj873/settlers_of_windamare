@@ -7,6 +7,7 @@
 import { cropHud } from '../expansions/crop/ui';
 import { demoHud } from '../expansions/demo/ui';
 import { oilHud } from '../expansions/oil/ui';
+import { seafarersHud } from '../expansions/seafarers/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -34,6 +35,12 @@ export interface ExtBuildCard {
   label: string;
   /** The action type a board click submits in this mode. */
   actionType: string;
+  /**
+   * More action types this mode places (Seafarers: a setup ship, a free ship from Road
+   * Building). The card is enabled by any of them, and in this mode a board click prefers them
+   * over the implied prompts (a coast edge could otherwise only take the road).
+   */
+  alsoActions?: readonly string[];
   glyph?: GlyphName;
   /** Cost item for costOf() (shown as card faces). Default: `mode`. */
   costItem?: string;
@@ -64,6 +71,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   demoHud,
   oilHud,
   cropHud,
+  seafarersHud,
   // new modules go here, one per line
 ];
 
@@ -97,6 +105,24 @@ export function placeModeAction(mode: string): string | null {
   return null;
 }
 
+/** Every action type a namespaced place mode submits (its actionType first), or []. */
+export function placeModeActions(mode: string): readonly string[] {
+  for (const x of HUD_EXTENSIONS) {
+    const card = x.buildCards?.find((c) => c.mode === mode);
+    if (card) return [card.actionType, ...(card.alsoActions ?? [])];
+  }
+  return [];
+}
+
+/** The (lower-case) label of a namespaced place mode's build card ('ship'), or null. */
+export function placeModeLabel(mode: string): string | null {
+  for (const x of HUD_EXTENSIONS) {
+    const card = x.buildCards?.find((c) => c.mode === mode);
+    if (card) return card.label.toLowerCase();
+  }
+  return null;
+}
+
 // boardActions (game/logic.ts) learns the extensions' board actions from here, so the headless room
 // server, which imports game/logic but no UI, never loads module stylesheets.
-setBoardExtensions({ implied: impliedExtActions(), placeModeAction });
+setBoardExtensions({ implied: impliedExtActions(), placeModeAction, placeModeActions });

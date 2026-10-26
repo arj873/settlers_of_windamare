@@ -8,7 +8,9 @@ import type {
   Action,
   BuildingKind,
   EdgeId,
+  GainSource,
   GameState,
+  LossSink,
   Phase,
   PlayerId,
   Resource,
@@ -201,6 +203,28 @@ export function hookArmySize(state: GameState, player: PlayerId, base: number): 
     if (f) n = f(state, player, n);
   }
   return n;
+}
+
+/** Named VP of the active modules (statistics chips). */
+export function expansionVpSources(
+  state: GameState,
+  player: PlayerId,
+): { label: string; vp: number }[] {
+  return activeModules(state).flatMap((m) => m.hooks?.vpSources?.(state, player) ?? []);
+}
+
+/** A module's classification of a hand change for the statistics, or undefined. */
+export function hookStatsSource(
+  prev: GameState,
+  action: Action,
+  player: PlayerId,
+  change: 'gain' | 'loss',
+): GainSource | LossSink | undefined {
+  for (const m of activeModules(prev)) {
+    const s = m.hooks?.statsSource?.(prev, action, player, change);
+    if (s !== undefined) return s;
+  }
+  return undefined;
 }
 
 export function hookSetupOrder(state: GameState): SetupOrder | undefined {

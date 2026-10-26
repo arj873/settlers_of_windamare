@@ -387,7 +387,7 @@ export const seafarersModule: ExpansionModule = {
       id: SEAFARERS,
       name: 'Seafarers',
       blurb: 'Ships, islands, gold and the pirate',
-      status: 'wip',
+      status: 'ready',
       expansions: [SEAFARERS],
       scenarios: scenarioDefs.map((s) => s.id),
       players: { min: 3, max: 6 },
@@ -478,6 +478,45 @@ export const seafarersModule: ExpansionModule = {
     },
 
     victoryPoints: (state, p) => ({ public: specialVp(state, p) }),
+
+    vpSources(state, p) {
+      const s = seaSlice(state);
+      const land = s.chits.filter((c) => c.player === p && c.area !== 'gift');
+      const gifts = s.chits.filter((c) => c.player === p && c.area === 'gift');
+      return [
+        { label: 'New land', vp: land.reduce((n, c) => n + c.vp, 0) },
+        { label: 'Gifts', vp: gifts.reduce((n, c) => n + c.vp, 0) },
+        { label: 'Cloth', vp: s.cloth ? Math.floor((s.cloth.held[p] ?? 0) / 2) : 0 },
+      ];
+    },
+
+    statsSource(prev, action, _p, change) {
+      switch (action.type) {
+        // Gold: production; a gold pick for beating the fleet: an event reward.
+        case SEA_ACTIONS.pickGold: {
+          const ph = prev.phase as GoldPhase;
+          return 'roll' in ph.then ? 'event' : 'production';
+        }
+        case SEA_ACTIONS.stealCard:
+          return change === 'gain' ? 'steal' : 'stolen';
+        // Discovering land pays 1 card (fog); building pays for the piece.
+        case SEA_ACTIONS.buildShip:
+        case SEA_ACTIONS.moveShip:
+        case SEA_ACTIONS.setupShip:
+        case SEA_ACTIONS.freeShip:
+        case SEA_ACTIONS.buildWonder:
+          return change === 'gain' ? 'event' : 'build';
+        case 'buildRoad':
+        case 'placeFreeRoad':
+        case 'placeSetupRoad':
+          return change === 'gain' ? 'event' : undefined;
+        // The Pirate Islands fleet takes cards at the roll.
+        case 'rollDice':
+          return change === 'loss' ? 'stolen' : undefined;
+        default:
+          return undefined;
+      }
+    },
 
     roadLength: (state, p, base) =>
       rulesOf(state).longestRoute ? Math.max(base, tradeRouteLength(state, p)) : 0,

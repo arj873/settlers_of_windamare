@@ -872,7 +872,8 @@ export class Hud {
     // Expansion build cards (docs/EXPANSIONS.md §8): same look, enabled from legal actions only.
     for (const x of hudExtensionsFor(state)) {
       for (const c of x.buildCards ?? []) {
-        const enabled = !over && legal.some((a) => a.type === c.actionType);
+        const enabled =
+          !over && legal.some((a) => a.type === c.actionType || c.alsoActions?.includes(a.type));
         const cost = costOf(state, c.costItem ?? c.mode);
         const left = c.left?.(state, view.viewer);
         const total = c.total?.(state, view.viewer);

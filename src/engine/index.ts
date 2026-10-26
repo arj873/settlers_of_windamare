@@ -23,6 +23,7 @@ export {
 export {
   costOf,
   expansionVictoryPoints,
+  expansionVpSources,
   pieceLimit,
   terrainKind,
   type BaseCostItem,

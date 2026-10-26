@@ -14,6 +14,12 @@ Status: framework implemented (F1). The only module is the **demo** (`src/expans
 "Oasis" toy mode). It is the worked example of every extension point: copy its shape. It is hidden
 on the setup screen unless the URL has `?modes=all`; `?mode=demo` starts it directly.
 
+Modules: `demo`, `oil` (Oil Springs), `crop` (Crop Trust), `seafarers` (Seafarers, all nine
+scenarios for 3-6 players, `docs/rules/seafarers.md` §11). Seafarers is the reference for
+board-heavy modules: scenario maps on `HexListFrameDef`s, sea-edge pieces (ships) with their own
+geometry over `seaEdges`, copy-on-write board changes (fog, placed harbours), setup interrupts,
+`setupOrder`, `armySize`, `deferVictory` with its own win rules.
+
 ---
 
 ## 1. Vocabulary
@@ -171,6 +177,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | Hook                                      | Called from                                    | Kind                        | Examples                                                       |
 | ----------------------------------------- | ---------------------------------------------- | --------------------------- | -------------------------------------------------------------- |
 | `setupBuilding(state, index)`             | `setupRoundAt` (setup placement)               | first-wins (over settings)  | C&K / E&P: a setup step places a city / harbour                |
+| `setupOrder(state)` → `{ order, pays }`   | `setupOrderOf` (setup, invariants)             | first-wins                  | Cloth for Catan: a third round, only it pays (F3)              |
 | `rollDice(draft)`                         | `rollFor` (not with `settings.eventCards`)     | first-wins                  | C&K red/yellow + event die, T&B event cards (extras in slice)  |
 | `onRoll(draft, roll)` → `Phase?`          | `rollDice`, after the log, before 7/production | additive (first phase wins) | C&K barbarians (interrupt for pillage, then `continueRoll`)    |
 | `onSeven(draft, pending)` → `Phase?`      | `resolveSeven` (a 7, Robber Attacks card)      | first-wins                  | C&K robber inert before the first attack, E&P pirate           |
@@ -187,6 +194,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `victoryPoints(state, p)`                 | `publicVictoryPoints`, `victoryPoints`         | additive                    | `{ public, hidden? }`: islands, metropolis, defender, missions |
 | `bankTradeRatio(state, p, r, base)`       | `bankTradeRatio`                               | chained                     | C&K trading house / merchant, Oil Springs                      |
 | `roadLength(state, p, base)`              | Longest Road award                             | chained                     | Seafarers longest trade route                                  |
+| `armySize(state, p, base)`                | Largest Army award (base = knights played)     | chained                     | Pirate Islands: no award (0)                                   |
 | `onEndTurn(draft, p)`                     | `endTurn`, before SBP / next turn              | additive                    | upkeep, lair resolution, disaster phase                        |
 | `onStartTurn(draft, p)`                   | `beginTurn` (turn 1, after SBP, Catanian 2)    | additive                    | reset per-turn flags (ship moved, fast gold used)              |
 | `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |
@@ -290,6 +298,10 @@ interface HudExtension {
 - A build card toggles its namespaced `PlaceMode`; the controller (`game/logic.ts`
   `boardActions`) highlights the legal actions of its `actionType` and maps clicks to them.
   Implied actions (setup ship, pirate move, knight move) are highlighted whenever legal.
+  `alsoActions` lists more action types of the same mode (Seafarers' Ship card: the setup ship
+  and Road Building's free ship); with the mode on, a click prefers them over the implied prompts
+  (a coast edge could otherwise only take the road). A module's `hint` may word any phase the
+  viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
 - **Setup screen** (generated from the registry): mode tiles from `listModes()` (`status: 'ready'`
@@ -346,8 +358,8 @@ Use `src/expansions/demo` as the template: each step has a demo counterpart.
    UI tests in your folder (`// @vitest-environment jsdom`, see `demo/ui.test.ts`).
 9. **Bots**: `src/expansions/<id>/bots.ts` → `BotExtension`; append it to
    `src/bots/expansions.ts`. Sim until clean (§9). See `demo/bots.test.ts`.
-10. **Play it**: `pnpm dev`, open `/?mode=<id>` (or `/?modes=all` → setup screen); `&autoplay=4bots&speed=20`
-    watches bots play.
+10. **Play it**: `pnpm dev`, open `/?mode=<id>` (or `/?modes=all` → setup screen); `&scenario=<id>/<s>`
+    picks a scenario, `&autoplay=4bots&speed=20` watches bots play.
 11. **Ship**: flip the mode to `'ready'`, write the engine status per rule into
     `docs/rules/<id>.md`, run `nice -n 19 pnpm typecheck && nice -n 19 pnpm lint && nice -n 19 pnpm test`,
     commit on your branch. List framework needs (new hooks, core changes) in your report.
@@ -399,8 +411,8 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
 - **T&B trade-hex plazas** (main "Traders & Barbarians" scenario): a centre vertex + spoke edges
   inside a hex need new id kinds (`v:q,r,C`, spoke edges). Ask for it when T&B reaches that
   scenario; the other T&B scenarios work without it.
-- **Setup rounds other than 2** (Cloth for Catan's third round, E&P harbour-first order): override
-  `placeSetupRoad` (`next` then adjust the phase) for now; a `setupRounds` hook can be added.
+- **Setup rounds other than 2**: done, the `setupOrder` hook (Cloth for Catan's third round; E&P's
+  harbour-first order can use it too). An expansion phase may interrupt setup (a gold pick).
 - **Bank-trade HUD ratios** still show harbour ratios only; expansions with `bankTradeRatio` hooks
   should check `bestRatios` in `ui/model.ts` when they need it.
 

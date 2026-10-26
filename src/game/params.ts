@@ -1,5 +1,5 @@
 /** Dev query parameters. */
-import { isMapId, modeById, type Layout, type MapId } from '../engine';
+import { isMapId, modeById, scenarioById, type Layout, type MapId } from '../engine';
 import type { Controller } from '../ui';
 
 export interface DevParams {
@@ -29,6 +29,8 @@ export interface DevParams {
   debug: boolean;
   /** `?mode=demo`: start an expansion mode at once (its first scenario; docs/EXPANSIONS.md). */
   mode: string | null;
+  /** `?scenario=seafarers/fogIslands`: with `?mode`, one of the mode's scenarios. */
+  scenario: string | null;
 }
 
 export function parseParams(search: string): DevParams {
@@ -64,5 +66,6 @@ export function parseParams(search: string): DevParams {
     names: names.length > 0 ? names : null,
     debug: p.get('debug') === '1',
     mode: modeById(p.get('mode') ?? '') ? p.get('mode') : null,
+    scenario: scenarioById(p.get('scenario') ?? '') ? p.get('scenario') : null,
   };
 }

@@ -17,9 +17,11 @@ import type {
   ExpansionAction,
   ExpansionActionType,
   ExpansionId,
+  GainSource,
   GameSettings,
   GameState,
   HexId,
+  LossSink,
   MapId,
   ModeId,
   Phase,
@@ -202,6 +204,22 @@ export interface ExpansionHooks {
   supply?(state: Pick<GameState, 'settings'>, base: Supply): Supply;
   /** additive. Extra VP: `public` is visible to all, `hidden` only counts for victory. */
   victoryPoints?(state: GameState, player: PlayerId): { public: number; hidden?: number };
+  /**
+   * additive. Named parts of this module's victoryPoints, for the statistics screen's chips
+   * (instead of "Other"). Should add up to the module's public + hidden VP.
+   */
+  vpSources?(state: GameState, player: PlayerId): { label: string; vp: number }[];
+  /**
+   * first-wins. Statistics: where a hand change of `player` caused by `action` (from `prev`)
+   * came from (`change` 'gain': a GainSource) or went to ('loss': a LossSink). undefined = the
+   * default classification (a module action counts as 'other').
+   */
+  statsSource?(
+    prev: GameState,
+    action: Action,
+    player: PlayerId,
+    change: 'gain' | 'loss',
+  ): GainSource | LossSink | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /** chained. Length for Longest Road (Seafarers: trade route). */

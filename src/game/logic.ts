@@ -100,6 +100,8 @@ export function pickViewer(
 export interface BoardExtensions {
   implied: ReadonlySet<string>;
   placeModeAction(mode: string): string | null;
+  /** Every action type of a namespaced place mode (ExtBuildCard.alsoActions). */
+  placeModeActions?(mode: string): readonly string[];
 }
 let boardExtensions: BoardExtensions = { implied: new Set(), placeModeAction: () => null };
 export function setBoardExtensions(x: BoardExtensions): void {
@@ -113,6 +115,16 @@ export function boardActions(
   placeMode: PlaceMode | null,
 ): Action[] {
   const mine = legal.filter((a) => a.player === viewer);
+  // An expansion build mode wins over the implied prompts when it has moves (Seafarers: the
+  // Ship card during setup / Road Building, where a coast edge would otherwise take a road).
+  const modeTypes =
+    placeMode && placeMode.includes('/')
+      ? boardExtensions.placeModeActions?.(placeMode)
+      : undefined;
+  if (modeTypes && modeTypes.length > 0) {
+    const inMode = mine.filter((a) => modeTypes.includes(a.type));
+    if (inMode.length > 0) return inMode;
+  }
   const extImplied = boardExtensions.implied;
   const implied = mine.filter(
     (a) =>
