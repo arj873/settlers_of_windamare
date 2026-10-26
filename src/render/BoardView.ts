@@ -39,8 +39,10 @@ import {
   HEX_SIZE as S,
   backdropRadius,
   boardBounds,
+  fitBounds,
   pick,
   screenToUnit,
+  textResolution,
   unitToScreen,
   type Hit,
   type PickCandidates,
@@ -77,25 +79,31 @@ interface Glow {
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = '"Trebuchet MS", "Segoe UI", Helvetica, Arial, sans-serif';
-const TEXT_RES = 4;
+/** Quiet time (ms) after the last zoom before board text is re-rasterized for the new scale. */
+const RETEXT_DELAY = 150;
 
 const pt = (p: Point): [number, number] => [p.x * S, p.y * S];
 
+/** `resolution`: texels per design px, so the glyphs match the screen (`textResolution`). */
 function label(
   text: string,
   size: number,
   fill: number,
+  resolution: number,
   font = SERIF,
   weight: 'bold' | 'normal' = 'bold',
 ) {
   const t = new Text({
     text,
     style: { fontFamily: font, fontSize: size, fontWeight: weight, fill },
-    resolution: TEXT_RES,
+    resolution,
   });
   t.anchor.set(0.5);
   return t;
 }
+
+const devicePixelRatio = () =>
+  typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
 
 const easeOutBack = (t: number) => {
   const c1 = 1.70158;
@@ -137,8 +145,17 @@ export class BoardView {
   private robberTarget: Point = { x: 0, y: 0 };
   private robberPos: Point | null = null;
 
+  /** Resolution the board text is rasterized at, and the one the current zoom wants. */
+  private textRes = 1;
+  private wantTextRes = 1;
+  private viewChangedAt = 0;
+  private unwatchDpr: (() => void) | null = null;
+
   private clock = 0;
-  private readonly onResize = () => this.resize();
+  private readonly onResize = () => {
+    this.resize();
+    this.wantTextRes = this.textResFor(this.viewport.view.scale);
+  };
   private readonly tick = (ticker: { deltaMS: number }) => this.update(ticker.deltaMS);
 
   constructor(private readonly app: Application) {
@@ -163,6 +180,7 @@ export class BoardView {
     this.viewport = new Viewport({
       canvas: app.canvas,
       bounds: boardBounds(),
+      fitBounds: fitBounds(),
       getSize: () => ({ width: app.screen.width, height: app.screen.height }),
       onChange: (v) => this.applyView(v),
       onTap: (p) => this.handleTap(p),
@@ -171,6 +189,7 @@ export class BoardView {
 
     app.renderer.on('resize', this.onResize);
     app.ticker.add(this.tick);
+    this.watchPixelRatio();
   }
 
   // -------------------------------------------------------------------------
@@ -184,7 +203,7 @@ export class BoardView {
       // A different board frame: new sea, new fit bounds. (Big boards get proper art in T12.)
       this.topo = topo;
       this.buildSea();
-      this.viewport.setBounds(boardBounds(topo));
+      this.viewport.setBounds(boardBounds(topo), fitBounds(topo));
     }
     const sig = JSON.stringify([
       Object.values(state.board.hexes).map((h) => [h.id, h.terrain, h.token]),
@@ -192,6 +211,7 @@ export class BoardView {
     ]);
     if (sig !== this.boardSig) {
       this.boardSig = sig;
+      this.textRes = this.wantTextRes;
       this.buildLand(state);
       this.buildPorts(state);
       this.buildTokens(state);
@@ -260,7 +280,13 @@ export class BoardView {
     this.buildSea();
   }
 
+  /** Resolution board text is currently rasterized at (texels per design px; tests, harness). */
+  textResolution(): number {
+    return this.textRes;
+  }
+
   destroy(): void {
+    this.unwatchDpr?.();
     this.app.renderer.off('resize', this.onResize);
     this.app.ticker.remove(this.tick);
     this.viewport.dispose();
@@ -313,6 +339,54 @@ export class BoardView {
   private applyView(v: ViewTransform) {
     this.world.position.set(v.x, v.y);
     this.world.scale.set(v.scale / S);
+    this.wantTextRes = this.textResFor(v.scale);
+    this.viewChangedAt = this.clock;
+  }
+
+  private textResFor(pxPerUnit: number): number {
+    return textResolution(pxPerUnit, this.app.renderer.resolution);
+  }
+
+  /**
+   * Board text is a bitmap drawn at design size: re-rasterize it for the current zoom (once the
+   * zoom has settled), so it is never minified many times over without mipmaps (smeared when
+   * zoomed out) nor magnified (soft when zoomed in). Graphics are vector and need nothing.
+   */
+  private retext() {
+    this.textRes = this.wantTextRes;
+    const walk = (c: Container) => {
+      for (const child of c.children) {
+        if (child instanceof Text) child.resolution = this.textRes;
+        else walk(child);
+      }
+    };
+    walk(this.portLayer);
+    walk(this.tokenLayer);
+  }
+
+  /**
+   * Keep the renderer at the device pixel ratio. `app.init` reads it once; browser zoom or a
+   * move to another monitor changes it, and a stale canvas resolution is scaled (blurred) by the
+   * browser. The media query only matches the current ratio, so it is re-armed on every change.
+   */
+  private watchPixelRatio() {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const sync = () => {
+      const dpr = devicePixelRatio();
+      const { width, height } = this.app.screen;
+      if (this.app.renderer.resolution !== dpr) this.app.renderer.resize(width, height, dpr);
+    };
+    const arm = () => {
+      const mq = window.matchMedia(`(resolution: ${devicePixelRatio()}dppx)`);
+      const onChange = () => {
+        sync();
+        arm();
+      };
+      mq.addEventListener('change', onChange, { once: true });
+      this.unwatchDpr = () => mq.removeEventListener('change', onChange);
+    };
+    sync();
+    arm();
   }
 
   // -------------------------------------------------------------------------
@@ -437,15 +511,15 @@ export class BoardView {
       g.circle(0, 0, R * 0.86).stroke({ width: 1.5, color: shade(col, -0.4), alpha: 0.7 });
       if (port.kind === 'generic') {
         b.addChild(g);
-        const t = label('3:1', 0.21 * S, TOKEN.text);
+        const t = label('3:1', 0.21 * S, TOKEN.text, this.textRes);
         t.position.set(0, -0.04 * S);
-        const any = label('ANY', 0.085 * S, 0x6b5f45, SANS);
+        const any = label('ANY', 0.085 * S, 0x6b5f45, this.textRes, SANS);
         any.position.set(0, 0.16 * S);
         b.addChild(t, any);
       } else {
         drawResourceIcon(g, port.kind, 0, -0.07 * S, 0.3 * S);
         b.addChild(g);
-        const t = label('2:1', 0.15 * S, TOKEN.text);
+        const t = label('2:1', 0.15 * S, TOKEN.text, this.textRes);
         t.position.set(0, 0.2 * S);
         b.addChild(t);
       }
@@ -477,6 +551,7 @@ export class BoardView {
         String(tile.token),
         (tile.token >= 10 ? 0.27 : 0.31) * S,
         hot ? TOKEN.red : TOKEN.text,
+        this.textRes,
       );
       t.position.set(0, -0.05 * S);
       c.addChild(g, t);
@@ -725,6 +800,9 @@ export class BoardView {
 
   private update(dtMs: number) {
     this.clock += dtMs;
+    if (this.wantTextRes !== this.textRes && this.clock - this.viewChangedAt >= RETEXT_DELAY) {
+      this.retext();
+    }
     const pulse = 0.5 + 0.5 * Math.sin(this.clock / 260);
     for (const g of this.glows) {
       g.glow.alpha = 0.55 + 0.45 * pulse;
