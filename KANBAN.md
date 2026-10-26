@@ -5,13 +5,31 @@
 
 Legend: 🟦 Opus · 🟩 Sonnet
 
-## 🏃 In Progress
+## 🏃 In Progress — Stage 3 (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
+
+- **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5
+- **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
+- **P2** · Road junctions look clean for any mix of owners (your screenshot) · `s3-road-joints` 🟩
+- **H1** · Hosting research → docs/HOSTING.md (no deploys) · `s3-hosting` 🟩
+
+## 🏃 In Progress — Stage 2
 
 - **T18** · AI playtest, 6 players (LIVE, headed window): game 2 on latest build (wood HUD + SBP), seed pt6b, fresh Haiku agents; game 1 (pt6a) ended at turn 32 on the old-build discard bug · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
+
+## 📋 Backlog — Stage 3 (after F1, in parallel)
+
+- **E1** · Oil Springs + Crop Trust scenarios · 🟩
+- **E2** · Seafarers engine + all scenarios (+5-6P) · 🟦
+- **E3** · Cities & Knights engine (+5-6P) · 🟦
+- **E4** · Traders & Barbarians engine, all scenarios + Catan for Two (+5-6P) · 🟦
+- **E5** · Explorers & Pirates engine, all missions (+5-6P) · 🟦
+- **U1–U5** · Render + HUD per expansion · 🟩
+- **Q1–Q5** · Haiku playtest per expansion
+- **C1** · Official combinations (Seafarers + C&K, T&B combos, 5-6P variants)
 
 ## ✅ Ready
 
@@ -69,7 +87,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Timer sound/vibration in the last 10s (from T14)
 - Show starting seat on setup screen + 'roll for it' animation (from T14)
 
-## 🧊 Later — Stage 2+
+## 🧊 Later
+- Catan: Starfarers (standalone space game; you chose: skip for now)
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
 - Animations + sound
