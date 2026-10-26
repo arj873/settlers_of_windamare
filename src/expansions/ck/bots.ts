@@ -84,7 +84,11 @@ function check(state: GameState): Violation[] {
 
   // Progress hand limit out of turn (a discard phase may be pending).
   const phase = phaseOf(state);
-  const discarding = phase.kind === 'ck/progressDiscard' || phase.kind === 'ck/defender';
+  // (A VP card drawn on the roll can end the game before the others discard.)
+  const discarding =
+    phase.kind === 'ck/progressDiscard' ||
+    phase.kind === 'ck/defender' ||
+    phase.kind === 'gameOver';
   s.players.forEach((p, i) => {
     if (i !== state.turn.current && !discarding && p.progress.length > PROGRESS_HAND_MAX) {
       bad(`player ${i} holds ${p.progress.length} progress cards out of turn`, i);

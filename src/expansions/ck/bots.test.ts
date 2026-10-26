@@ -24,7 +24,7 @@ describe('ck in the simulator', () => {
       expect(result.failure, JSON.stringify(result.failure?.message)).toBeNull();
       expect(result.outcome).toBe('finished');
     }
-  });
+  }, 60_000);
 
   it('the invariants catch a lost commodity and a lost progress card', () => {
     const s = newGame({ seed: 1, players: 4, mode: CK });

@@ -69,7 +69,9 @@ describe('science', () => {
     giveCards(s, 0, 'alchemist');
     ckSlice(s).attacks = 1;
     const r = ok(s, { type: 'ck/alchemist', player: 0, yellow: 3, red: 4 });
-    expect(['moveRobber', 'ck/pillage', 'ck/defender', 'ck/progressDiscard']).toContain(r.phase.kind);
+    expect(['moveRobber', 'ck/pillage', 'ck/defender', 'ck/progressDiscard']).toContain(
+      r.phase.kind,
+    );
   });
 
   it('Crane: the next improvement this turn costs 1 less; level 1 becomes free (CK-56)', () => {
@@ -99,7 +101,11 @@ describe('science', () => {
     const hexes = legalOf(r, 'ck/pickHex').map((a) => (a as { hex: string }).hex);
     expect(hexes).not.toContain('h:0,-2'); // the 6
     expect(hexes).not.toContain('h:1,-2'); // the 2
-    r = ok(r, { type: 'ck/pickHex', player: 0, hex: 'h:-1,-1' }, { type: 'ck/pickHex', player: 0, hex: 'h:0,0' });
+    r = ok(
+      r,
+      { type: 'ck/pickHex', player: 0, hex: 'h:-1,-1' },
+      { type: 'ck/pickHex', player: 0, hex: 'h:0,0' },
+    );
     expect(r.board.hexes['h:-1,-1']?.token).toBe(11);
     expect(r.board.hexes['h:0,0']?.token).toBe(3);
     expect(s.board.hexes['h:0,0']?.token).toBe(11);
@@ -148,7 +154,9 @@ describe('science', () => {
     let r = play(s, 'smith');
     r = ok(r, { type: 'ck/pickVertex', player: 0, vertex: V(0, 0, 'N') });
     expect(phase(r)).toMatchObject({ kind: 'ck/card', card: 'smith', left: 1 });
-    expect(legalOf(r, 'ck/pickVertex').map((a) => (a as { vertex: string }).vertex)).toEqual([V(0, 0, 'S')]);
+    expect(legalOf(r, 'ck/pickVertex').map((a) => (a as { vertex: string }).vertex)).toEqual([
+      V(0, 0, 'S'),
+    ]);
     r = ok(r, { type: 'ck/pickVertex', player: 0, vertex: V(0, 0, 'S') });
     expect(ckSlice(r).knights[V(0, 0, 'N')]).toMatchObject({ level: 2, active: true });
     expect(ckSlice(r).knights[V(0, 0, 'S')]).toMatchObject({ level: 3, active: false });
@@ -204,7 +212,9 @@ describe('politics', () => {
     build(s, 0, V(-1, 0, 'S'));
     roads(s, 0, E(-1, 0, 'SE'));
     giveCards(s, 0, 'diplomat', 'diplomat');
-    const open = legalOf(play(s, 'diplomat'), 'ck/pickEdge').map((a) => (a as { edge: string }).edge);
+    const open = legalOf(play(s, 'diplomat'), 'ck/pickEdge').map(
+      (a) => (a as { edge: string }).edge,
+    );
     expect(open.sort()).toEqual([E(-1, 0, 'SE'), E(0, 0, 'E')].sort());
     let r = ok(play(s, 'diplomat'), { type: 'ck/pickEdge', player: 0, edge: E(0, 0, 'E') });
     expect(r.pieces.roads[E(0, 0, 'E')]).toBeUndefined();
@@ -247,7 +257,7 @@ describe('politics', () => {
     giveCards(s, 0, 'spy');
     giveCards(s, 2, 'warlord', 'crane');
     let r = play(s, 'spy');
-    expect(legalOf(r, 'ck/pickPlayer').map((a) => (a as { target: number }).target)).toEqual([2]);
+    expect(legalOf(r, 'ck/pickPlayer').map((a) => a['target' as keyof typeof a])).toEqual([2]);
     r = ok(r, { type: 'ck/pickPlayer', player: 0, target: 2 });
     r = ok(r, { type: 'ck/pickCard', player: 0, card: 'crane' });
     expect(hand(r, 0)).toEqual(['crane']);
@@ -260,7 +270,9 @@ describe('politics', () => {
     knight(s, 0, V(0, 0, 'S'), 2);
     giveCards(s, 0, 'warlord');
     const r = play(s, 'warlord');
-    expect(Object.values(ckSlice(r).knights).every((k) => k.active && k.activatedOn === 3)).toBe(true);
+    expect(Object.values(ckSlice(r).knights).every((k) => k.active && k.activatedOn === 3)).toBe(
+      true,
+    );
   });
 
   it('Wedding: each richer player gives 2 cards of their choice', () => {
@@ -306,7 +318,11 @@ describe('trade', () => {
     setGoods(s, 1, { ore: 1, coin: 1, wool: 1 });
     giveCards(s, 0, 'masterMerchant');
     let r = ok(play(s, 'masterMerchant'), { type: 'ck/pickPlayer', player: 0, target: 1 });
-    r = ok(r, { type: 'ck/pickGood', player: 0, good: 'coin' }, { type: 'ck/pickGood', player: 0, good: 'ore' });
+    r = ok(
+      r,
+      { type: 'ck/pickGood', player: 0, good: 'coin' },
+      { type: 'ck/pickGood', player: 0, good: 'ore' },
+    );
     expect(r.phase.kind).toBe('main');
     expect(r.players[0]!.resources.ore).toBe(1);
     expect(ckPlayer(r, 0).commodities.coin).toBe(1);

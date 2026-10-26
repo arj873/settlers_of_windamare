@@ -11,14 +11,7 @@ import { piecesLeft, publicVictoryPoints, victoryPoints } from '../../../engine/
 import { statsOf } from '../../../engine/stats';
 import { supplyOf } from '../../../engine/mapLookup';
 import type { GameState } from '../../../engine/types';
-import {
-  BARBARIAN_STEPS,
-  CK,
-  ckPlayer,
-  ckSlice,
-  giveRatio,
-  type CkPhase,
-} from '.';
+import { BARBARIAN_STEPS, CK, ckPlayer, ckSlice, giveRatio, type CkPhase } from '.';
 import {
   E,
   V,
@@ -314,7 +307,9 @@ describe('progress draws (§3.2)', () => {
     const got = (p: number) => ckPlayer(r, p).progress.length + ckPlayer(r, p).vpCards.length;
     expect([got(0), got(1), got(2)]).toEqual([0, 0, 1]);
     const r2 = roll(s, 4, 2, 'politics');
-    expect([0, 1, 2].map((p) => ckPlayer(r2, p).progress.length + ckPlayer(r2, p).vpCards.length)).toEqual([0, 1, 1]);
+    expect(
+      [0, 1, 2].map((p) => ckPlayer(r2, p).progress.length + ckPlayer(r2, p).vpCards.length),
+    ).toEqual([0, 1, 1]);
   });
 
   it('level 0 never draws; a track of another colour does not count', () => {
@@ -459,7 +454,12 @@ describe('knights (§4.2)', () => {
     const s = knightBoard();
     knight(s, 0, V(0, 0, 'NE'), 1, true, 1);
     s.robber = 'h:0,0';
-    expect(legalOf(ok(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NE') }), 'ck/chaseRobber')).toEqual([]);
+    expect(
+      legalOf(
+        ok(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NE') }),
+        'ck/chaseRobber',
+      ),
+    ).toEqual([]);
     ckSlice(s).attacks = 1;
     let r = ok(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NE') });
     r = ok(r, { type: 'ck/chaseRobber', player: 0 });
@@ -478,9 +478,9 @@ describe('knights (§4.2)', () => {
     expect(longestRoadLength(s, 1)).toBe(3);
     setGoods(s, 1, { brick: 1, lumber: 1, wool: 1, grain: 1 });
     s.turn.current = 1;
-    expect(legalOf(s, 'buildSettlement', 1).map((a) => (a as { vertex: string }).vertex)).not.toContain(
-      V(-1, 0, 'N'),
-    );
+    expect(
+      legalOf(s, 'buildSettlement', 1).map((a) => (a as { vertex: string }).vertex),
+    ).not.toContain(V(-1, 0, 'N'));
     expect(legalOf(s, 'buildRoad', 1).map((a) => (a as { edge: string }).edge)).not.toContain(
       E(-1, -1, 'SE'),
     );
@@ -491,9 +491,9 @@ describe('knights (§4.2)', () => {
     roads(s, 0, E(0, -1, 'SE'));
     knight(s, 0, V(0, -1, 'S'));
     setGoods(s, 0, { brick: 1, lumber: 1, wool: 1, grain: 1 });
-    expect(legalOf(s, 'buildSettlement', 0).map((a) => (a as { vertex: string }).vertex)).not.toContain(
-      V(0, -1, 'S'),
-    );
+    expect(
+      legalOf(s, 'buildSettlement', 0).map((a) => (a as { vertex: string }).vertex),
+    ).not.toContain(V(0, -1, 'S'));
   });
 
   it('only active knights defend; every knight sleeps after an attack (CK-11)', () => {
@@ -659,7 +659,13 @@ describe('trading (§3.7)', () => {
   it('a partner without the commodities cannot accept', () => {
     const s = ckMain();
     setGoods(s, 0, { brick: 1 });
-    const r = ok(s, { type: 'ck/offerTrade', player: 0, give: { brick: 1 }, want: { coin: 1 }, to: [1] });
+    const r = ok(s, {
+      type: 'ck/offerTrade',
+      player: 0,
+      give: { brick: 1 },
+      want: { coin: 1 },
+      to: [1],
+    });
     expect(legalOf(r, 'acceptTrade')).toEqual([]);
     bad(r, { type: 'acceptTrade', player: 1 }, /commodities/);
   });
@@ -711,9 +717,9 @@ describe('victory (§5)', () => {
 
 describe('variants', () => {
   it('Rush mode is refused (the Alchemist needs a step before the roll)', () => {
-    expect(() =>
-      createGame({ seed: 1, players: players(4), mode: CK, rushMode: true }),
-    ).toThrow(/Rush/);
+    expect(() => createGame({ seed: 1, players: players(4), mode: CK, rushMode: true })).toThrow(
+      /Rush/,
+    );
   });
 
   it('Event Cards: the card is the roll, the event die is still rolled before it resolves', () => {

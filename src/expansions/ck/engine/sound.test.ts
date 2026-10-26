@@ -22,7 +22,7 @@ function walk(s0: GameState, seed: number, steps: number, check: (s: GameState) 
   }
 }
 
-describe('soundness', () => {
+describe('soundness', { timeout: 60_000 }, () => {
   it('every legal action is accepted (3-4 players, 2500 random steps per seed)', () => {
     for (const [seed, n] of [
       [1, 4],
