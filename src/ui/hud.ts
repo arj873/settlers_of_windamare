@@ -528,7 +528,8 @@ export class Hud {
     }
     if (phase.kind === 'steal') {
       const victims = ofType(legal, 'steal');
-      if (victims.length > 1)
+      // Always show the picker: the engine needs an explicit steal action even with one victim.
+      if (victims.length > 0)
         return this.stealDialog(
           state,
           view,

@@ -140,6 +140,16 @@ describe('Hud', () => {
     expect(actions).toEqual([{ type: 'steal', player: 1, victim: 3 }]);
   });
 
+  it('steal picker also shows with a single candidate', () => {
+    const s = moveRobberGame();
+    s.phase = { kind: 'steal', candidates: [3], resume: 'main' };
+    hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
+    const victims = [...root.querySelectorAll<HTMLButtonElement>('.victim')];
+    expect(victims).toHaveLength(1);
+    victims[0]!.click();
+    expect(actions).toEqual([{ type: 'steal', player: 1, victim: 3 }]);
+  });
+
   it('shows a Pass-to cover when the viewer changes and hides the hand until confirmed', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
