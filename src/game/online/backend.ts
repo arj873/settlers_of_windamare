@@ -3,6 +3,13 @@
  * GET /api/rooms/:code, WebSocket /api/rooms/:code/ws). Dev: a GameSession in the browser
  * (devServer.ts), picked by `?server=local` or by default under `pnpm dev`.
  */
+import {
+  API_ROOMS,
+  roomApiPath,
+  roomSocketPath,
+  type CreateRoomResponse,
+  type RoomSummary,
+} from '../../net/api';
 import type { Clock, Connect, KeyStore, RoomApi } from '../../net/transport';
 
 export interface Backend {
@@ -83,20 +90,21 @@ async function json(res: Response): Promise<unknown> {
 export function httpRoomApi(origin: string): RoomApi {
   return {
     async create() {
-      const res = await fetch(`${origin}/api/rooms`, { method: 'POST' });
+      const res = await fetch(`${origin}${API_ROOMS}`, { method: 'POST' });
       if (!res.ok) throw new Error(`Could not create a room (HTTP ${res.status})`);
-      const body = (await json(res)) as { roomId?: unknown; hostToken?: unknown } | null;
+      const body = (await json(res)) as Partial<CreateRoomResponse> | null;
       if (typeof body?.roomId !== 'string' || typeof body.hostToken !== 'string') {
         throw new Error('The server sent an unexpected reply');
       }
       return { roomId: body.roomId, hostToken: body.hostToken };
     },
     async check(roomId) {
-      const res = await fetch(`${origin}/api/rooms/${encodeURIComponent(roomId)}`);
+      const res = await fetch(`${origin}${roomApiPath(encodeURIComponent(roomId))}`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`Could not reach the server (HTTP ${res.status})`);
-      const body = (await json(res)) as { phase?: unknown } | null;
-      return typeof body?.phase === 'string' ? { phase: body.phase } : {};
+      const body = (await json(res)) as Partial<RoomSummary> | null;
+      // A 200 without a usable body still means the room exists; assume the lobby.
+      return { phase: body?.phase ?? 'lobby' };
     },
   };
 }
@@ -106,7 +114,8 @@ export function remoteBackend(origin: string): Backend {
   return {
     kind: 'remote',
     api: httpRoomApi(origin),
-    connect: (roomId) => webSocketConnect(`${wsOrigin}/api/rooms/${encodeURIComponent(roomId)}/ws`),
+    connect: (roomId) =>
+      webSocketConnect(`${wsOrigin}${roomSocketPath(encodeURIComponent(roomId))}`),
   };
 }
 

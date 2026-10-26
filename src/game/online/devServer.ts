@@ -3,9 +3,10 @@
  * real timers. Runs inside a SharedWorker (devWorker.ts) so several tabs share the rooms, or in
  * the page itself where SharedWorker is missing (one tab only). No backend needed.
  */
-import { GameSession, type SessionOptions } from '../../net';
+import { GameSession, type RoomPhase, type SessionOptions } from '../../net';
 import { RoomHost, type Sink } from '../../net/loopback';
-import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, type Clock } from '../../net/transport';
+import { ROOM_CODE_LENGTH, roomCodeFromBytes } from '../../net/api';
+import type { Clock } from '../../net/transport';
 
 const ROOM_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -30,7 +31,7 @@ export class DevServer {
 
   create(): { roomId: string; hostToken: string } {
     // Same code format as the Worker (6 symbols, no 0/O/1/I).
-    const code = () => randomString(ROOM_CODE_LENGTH, ROOM_CODE_ALPHABET);
+    const code = () => roomCodeFromBytes(crypto.getRandomValues(new Uint8Array(ROOM_CODE_LENGTH)));
     let roomId = code();
     while (this.rooms.has(roomId)) roomId = code();
     const { session, hostToken } = GameSession.create(
@@ -46,7 +47,7 @@ export class DevServer {
     return { roomId, hostToken };
   }
 
-  check(roomId: string): { phase: string } | null {
+  check(roomId: string): { phase: RoomPhase } | null {
     const room = this.rooms.get(roomId);
     return room ? { phase: room.session.phase } : null;
   }

@@ -3,6 +3,7 @@
  * clock. WebSocket + real timers in the browser (src/game/online), a loopback + fake clock in
  * tests (loopback.ts). Nothing here touches the DOM.
  */
+import { normalizeRoomCode, type CreateRoomResponse, type RoomSummary } from './api';
 
 /** Callbacks a transport calls. `onClose` is called exactly once per transport. */
 export interface TransportHandlers {
@@ -40,25 +41,11 @@ export interface KeyStore {
 export const tokenKey = (roomId: string): string => `catan.mp.token.${roomId}`;
 export const NAME_KEY = 'catan.mp.name';
 
-/** HTTP side of the room server: POST /api/rooms, GET /api/rooms/:code. */
+/** HTTP side of the room server (shapes in ./api): POST /api/rooms, GET /api/rooms/:code. */
 export interface RoomApi {
-  create(): Promise<{ roomId: string; hostToken: string }>;
+  create(): Promise<CreateRoomResponse>;
   /** null = no such room. */
-  check(roomId: string): Promise<{ phase?: string } | null>;
-}
-
-// Room codes as the M2 Worker makes them. TODO(M2 merge): import ROOM_CODE_ALPHABET,
-// ROOM_CODE_LENGTH and normalizeRoomCode from ./api instead of mirroring them here.
-/** 32 symbols: digits and capitals without 0, O, 1 and I. */
-export const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-export const ROOM_CODE_LENGTH = 6;
-
-/** A typed or URL code in canonical form (trimmed, upper case), or null. */
-export function normalizeRoomCode(raw: string): string | null {
-  const code = raw.trim().toUpperCase();
-  if (code.length !== ROOM_CODE_LENGTH) return null;
-  for (const ch of code) if (!ROOM_CODE_ALPHABET.includes(ch)) return null;
-  return code;
+  check(roomId: string): Promise<Pick<RoomSummary, 'phase'> | null>;
 }
 
 /**
