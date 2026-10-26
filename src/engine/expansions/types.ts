@@ -281,8 +281,10 @@ export interface ExpansionHooks {
    * `view` is the view so far (base secrets and earlier modules' secrets already masked), `state`
    * the full state. Return `view` with your secrets replaced by placeholders of the same shape,
    * keeping what is public (a face-down stack keeps its length, a hand its size). Use
-   * `hiddenFrom` (engine/viewer.ts) for per-player secrets. Never mutate either argument; share
-   * unchanged parts. Not called in base games.
+   * `hiddenFrom` (engine/viewer.ts) for per-player secrets; cards a player holds outside the
+   * base hands go into the public counts with `addPublicCounts`. Keep the view's `view` field
+   * (spread `view`). Never mutate either argument; share unchanged parts. Not called in base
+   * games.
    */
   maskFor?(view: GameState, viewer: Viewer, state: GameState): GameState;
 }

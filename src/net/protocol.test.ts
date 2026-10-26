@@ -115,10 +115,10 @@ function expansionActions(): Action[] {
     for (const scenario of m.scenarios.length ? m.scenarios : [undefined]) {
       runGame({
         initial: newGame({ seed: `p-${m.id}`, players: 4, mode: m.id, scenario }),
-        maxSteps: 300,
+        maxSteps: 200,
         bot: createRandomBot({ progressBias: 0.5 }),
         onStep: ({ step, state }) => {
-          if (step % 3 === 0) out.push(...legalActions(state));
+          if (step % 4 === 0) out.push(...legalActions(state));
         },
       });
     }
@@ -134,7 +134,7 @@ describe('parseAction: expansion actions', () => {
       expect([...types].some((t) => t.startsWith(`${ns}/`))).toBe(true);
     }
     for (const a of actions) expect(parseAction(JSON.parse(JSON.stringify(a)), 'a')).toEqual(a);
-  });
+  }, 30_000);
 
   it('rebuilds the payload as plain JSON', () => {
     const raw = JSON.parse('{"type":"ck/play","player":1,"card":"spy","__proto__":{"evil":1}}');

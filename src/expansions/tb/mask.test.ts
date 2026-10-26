@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGame,
+  devCardCount,
   HIDDEN_DEV_CARD,
   legalActions,
   viewFor,
@@ -220,6 +221,15 @@ describe('T&B online views: shape and reveals', () => {
       fresh: [0, 0, 0, 0],
     });
     expect(tbSlice(v1).traders?.swift.held).toEqual([0, 1, 0, 0]);
+    // The public dev card count includes the held Swift Journey, for every viewer.
+    for (const v of [v0, v1, viewFor(s, 'spectator')]) {
+      expect(devCardCount(v, 1)).toBe(devCardCount(s, 1) + 1);
+    }
+    // A held Swift Journey and a held base dev card look the same to the others.
+    const asDev = structuredClone(s);
+    tbSlice(asDev).traders!.swift.held = [0, 0, 0, 0];
+    asDev.players[1]!.devCards.knight += 1;
+    expect(JSON.stringify(viewFor(asDev, 0))).toBe(JSON.stringify(v0));
     expect(v0.devDeck.length).toBe(s.devDeck.length + 2);
     expect(v0.devDeck.every((c) => c === HIDDEN_DEV_CARD)).toBe(true);
     // The same number of undrawn cards with one Swift Journey fewer (a base card instead): the

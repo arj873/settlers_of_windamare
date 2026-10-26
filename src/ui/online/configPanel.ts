@@ -37,8 +37,7 @@ function variantFields(v: NewGameVariants | undefined): Partial<SetupDraft> {
 
 /** RoomConfig -> setup draft (seats are placeholders: only their count matters here). */
 export function draftOf(config: RoomConfig): SetupDraft {
-  const { seatCount, map, rules, turnTimerSec, vpToWin, discardLimit, variants, ...extra } =
-    config;
+  const { seatCount, map, rules, turnTimerSec, vpToWin, discardLimit, variants, ...extra } = config;
   const timerIdx = Math.max(0, TIMER_STEPS.indexOf(turnTimerSec));
   return sanitizeSetup({
     // Rule options added to both shapes later pass through by name (mode, scenario, options).

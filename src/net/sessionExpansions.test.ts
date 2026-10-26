@@ -42,8 +42,7 @@ function playUntil(net: LocalNet, until: () => boolean, maxSteps = 3000): void {
     const conn = ['host', 'bob'].find((c) => legalOf(net, c).length > 0);
     if (conn) {
       const legal = legalOf(net, conn).filter((a) => !/offerTrade$/.test(a.type));
-      const pick =
-        legal[i % 3 === 0 ? legal.length - 1 : 0] ?? legalOf(net, conn)[0]!;
+      const pick = legal[i % 3 === 0 ? legal.length - 1 : 0] ?? legalOf(net, conn)[0]!;
       net.send(conn, { type: 'intent', action: pick, seq: net.last(conn, 'game')!.seq });
     } else {
       net.advance(500);
@@ -101,7 +100,10 @@ describe('GameSession: expansion modes online', () => {
 
   it('intent guard: only moves legalActions offers the seat now', () => {
     const { net, session } = started({ mode: 'ck' });
-    playUntil(net, () => session.state!.phase.kind === 'preRoll' && legalOf(net, 'host').length > 0);
+    playUntil(
+      net,
+      () => session.state!.phase.kind === 'preRoll' && legalOf(net, 'host').length > 0,
+    );
     const seq = net.last('host', 'game')!.seq;
     net.clear('host');
     // A well-formed C&K action the seat may not take now (no knight there, wrong phase).

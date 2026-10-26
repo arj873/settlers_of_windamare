@@ -6,7 +6,7 @@
  *  - fish.hands[p] (Fishermen §4.5.1: "hidden hand of tokens"; the HUD shows "count only",
  *    §9.6) -> HIDDEN_FISH x length (the number of tokens a player holds is public);
  *  - traders.swift.held[p] / fresh[p] (T&B §4.7.6: Swift Journey is a development card, drawn
- *    face down from the dev deck) -> 0.
+ *    face down from the dev deck) -> 0; they are added to `view.devCardCounts` (public count).
  * Face-down stacks (hidden from every viewer, game over included):
  *  - fish.pool (§2.2: tokens "mixed face down") -> HIDDEN_FISH x length (its size is public);
  *  - ba.deck (Barbarian Attack cards, §4.8.5, a shuffled deck) -> HIDDEN_BA_CARD x length;
@@ -27,7 +27,7 @@
  * Imports no engine/view.ts (it would close an import cycle): HIDDEN_DEV_CARD is mirrored here.
  */
 import type { DevCardType, GameState, HexId } from '../../../engine/types';
-import { hiddenFrom, type Viewer } from '../../../engine/viewer';
+import { addPublicCounts, hiddenFrom, type Viewer } from '../../../engine/viewer';
 import { supplyOf } from '../../../engine/mapLookup';
 import { TB, tbSlice, type BaCard, type Commodity, type TbSlice } from './state';
 
@@ -81,5 +81,12 @@ export function tbMaskFor(view: GameState, viewer: Viewer, state: GameState): Ga
       },
     };
   }
-  return { ...view, devDeck, ext: { ...view.ext, [TB]: out } };
+  const masked: GameState = { ...view, devDeck, ext: { ...view.ext, [TB]: out } };
+  // Swift Journeys are dev cards in hand: the public dev card counts include them (else a
+  // "bought a development card" that leaves the count unchanged would name the card).
+  const swift = s.traders?.swift;
+  if (!swift) return masked;
+  return addPublicCounts(masked, {
+    devCardCounts: swift.held.map((n, p) => n + (swift.fresh[p] ?? 0)),
+  });
 }

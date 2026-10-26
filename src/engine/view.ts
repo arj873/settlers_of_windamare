@@ -28,9 +28,9 @@ import { hookMaskFor } from './expansions/hooks';
 import { emptyDevCards, emptyResources, totalDevCards, totalResources } from './resources';
 import { getPlayer } from './selectors';
 import type { DevCardType, GameState, LogEntry, Player, PlayerId } from './types';
-import { hiddenFrom, type Viewer } from './viewer';
+import { addPublicCounts, hiddenFrom, type Viewer } from './viewer';
 
-export { hiddenFrom, type Viewer };
+export { addPublicCounts, hiddenFrom, type Viewer };
 
 export const HIDDEN_SEED = 'hidden';
 /** Placeholder for every face-down dev card; only `devDeck.length` is meaningful in a view. */
@@ -87,7 +87,7 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
   const revealAll = state.phase.kind === 'gameOver';
   const masked = state.players.map((p) => hiddenFrom(state, viewer, p.id));
   const { stats, ...rest } = state;
-  const base: GameState = {
+  const base: GameView = {
     ...rest,
     ...(revealAll && stats ? { stats } : {}),
     settings: { ...state.settings, seed: HIDDEN_SEED },
@@ -106,9 +106,6 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
     ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => HIDDEN_EVENT_CARD) } : {}),
     log: state.log.map(maskLogEntry),
     rng: 0,
-  };
-  return {
-    ...hookMaskFor(base, viewer, state),
     view: {
       viewer: seat,
       handCounts: state.players.map((p) => totalResources(p.resources)),
@@ -117,6 +114,8 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
       specialBuildQueue: publicSpecialBuildQueue(state),
     },
   };
+  // Modules mask their own secrets (and may raise the public counts: addPublicCounts).
+  return hookMaskFor(base, viewer, state) as GameView;
 }
 
 export function isGameView(state: GameState): state is GameView {
