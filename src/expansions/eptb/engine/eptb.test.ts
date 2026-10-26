@@ -13,7 +13,7 @@ import { epSlice, freshTurn, shipTurn } from '../../ep/engine';
 import { E, H, players, V } from '../../ep/engine/testkit';
 import { fishOf, fishOwed, LAKE, tbBoard } from '../../tb/engine';
 import { roll } from '../../tb/engine/testkit';
-import { EPTB, EPTB_MODE, EPTB_SCENARIOS, GROUND_PLACES, LAKE_HEX, eptbSlice } from '.';
+import { EPTB, EPTB_MODE, EPTB_SCENARIOS, GROUND_PLACES, LAKE_HEX, eptbModule, eptbSlice } from '.';
 
 function game(scenario = 'ep/full', n = 4, extra: Record<string, unknown> = {}): GameState {
   return createGame({
@@ -245,6 +245,15 @@ describe('the E&P fish uses', () => {
     epSlice(s).turn.movement = true;
     setFish(s, 0, [3, 2, 2]);
     fails(s, a('eptb/fish', 0, { use: 'secondMove', ship: 4 }), /not sailed/);
+  });
+});
+
+describe('statistics', () => {
+  it('a fish ship that explores counts its card as an event (like a built ship)', () => {
+    const s = main();
+    const cat = eptbModule.hooks?.statsCategory?.(s, a('eptb/fishShip', 0), 0);
+    expect(cat).toEqual({ gain: 'event' });
+    expect(eptbModule.hooks?.statsCategory?.(s, a('eptb/fish', 0), 0)).toBeUndefined();
   });
 });
 

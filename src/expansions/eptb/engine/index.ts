@@ -331,6 +331,10 @@ export const eptbModule: ExpansionModule = {
     onStartTurn(draft) {
       eptbSlice(draft).freePassage = [];
     },
+
+    // A fish ship that explores pays a card, like E&P's built ship (exploring = event).
+    statsCategory: (_state, action) =>
+      action.type === 'eptb/fishShip' ? { gain: 'event' } : undefined,
     afterAction(draft) {
       // Ships built after the 2 fish were paid sail past the pirate too.
       const p = draft.turn.current;
