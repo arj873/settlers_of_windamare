@@ -36,6 +36,7 @@ import {
   isProgressCard,
   isVpCard,
   moveGood,
+  openRoads,
   phaseOf,
   promptFor,
   stealRandom,
@@ -209,6 +210,14 @@ export function riverDiplomatBlocker(state: GameState, p: PlayerId, e: EdgeId): 
     return `removing a road at a river costs ${RIVER_ROAD_TOLL} gold`;
   }
   return null;
+}
+
+/** Rivers: the Diplomat has no road it may take (all bridges, or river roads without gold). */
+function diplomatUseless(state: GameState, p: PlayerId): boolean {
+  return (
+    has(state, 'rivers') &&
+    openRoads(state).every((e) => riverDiplomatBlocker(state, p, e) !== null)
+  );
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -429,6 +438,11 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
     return next(draft, action);
   },
 
+  'ck/play': (draft, action, next) =>
+    action['card'] === 'diplomat' && diplomatUseless(draft, action.player)
+      ? fail('no road the Diplomat may take (bridges stay; a river road costs 1 gold)')
+      : next(draft, action),
+
   'ck/pickEdge': (draft, action, next) => {
     const ph = diplomatPhase(draft);
     const e = action['edge'];
@@ -531,6 +545,8 @@ function filterLegal(state: GameState, actions: Action[]): Action[] {
         return !plazaPick(state, x['vertex']);
       case 'ck/pickHex':
         return !bishopOnOasis(state, x['hex']);
+      case 'ck/play':
+        return x['card'] !== 'diplomat' || !diplomatUseless(state, a.player);
       case 'ck/alchemist': {
         const sum = Number(x['yellow']) + Number(x['red']);
         return !traders || (sum !== 2 && sum !== 12);

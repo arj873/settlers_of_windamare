@@ -13,7 +13,7 @@ import { ckSlice, type ProgressCard } from '../../ck/engine';
 import { giveCards, knight, rngFor, setGoods } from '../../ck/engine/testkit';
 import { TB_MAPS, bridgesOf, goldOf, tbBoard, tbSlice } from '../../tb/engine';
 import { fishOf, tradersOf } from '../../tb/engine/state';
-import { vertexOnRiver } from '../../tb/engine/rivers';
+import { edgeOnRiver, vertexOnRiver } from '../../tb/engine/rivers';
 import { TBCK, TBCK_MODE, TBCK_VP } from '.';
 
 const players = (n: number) =>
@@ -178,6 +178,17 @@ describe('Rivers + C&K', () => {
   function diplomat(edge: EdgeId, owner: PlayerId, gold: number): GameState {
     const s = main('tb/rivers');
     s.pieces.roads[edge] = owner;
+    // An ordinary open road far away, so the Diplomat has something to take.
+    const t = topologyOf(s);
+    const near = new Set(t.edge[edge]?.edges ?? []);
+    const plain = t.edges.find(
+      (e) =>
+        e !== edge &&
+        !near.has(e) &&
+        !edgeOnRiver(s, e) &&
+        !(tbBoard(s).bridgeSites ?? []).includes(e),
+    ) as EdgeId;
+    s.pieces.roads[plain] = 2;
     tbSlice(s).gold[0] = gold;
     giveCards(s, 0, 'diplomat' as ProgressCard);
     return run(s, { type: 'ck/play', player: 0, card: 'diplomat' } as Action);
@@ -201,9 +212,15 @@ describe('Rivers + C&K', () => {
     const edge = t.edges.find(
       (e) => !sites.has(e) && (t.edge[e]?.hexes ?? []).some((h) => river.has(h)),
     ) as EdgeId;
-    const broke = diplomat(edge, 1, 0);
-    expect(legalOf(broke, 'ck/pickEdge')).toHaveLength(0);
-    fails(broke, { type: 'ck/pickEdge', player: 0, edge } as Action, /gold/);
+    // Without gold and with only that road open, the Diplomat cannot even be played.
+    const poor = main('tb/rivers');
+    poor.pieces.roads[edge] = 1;
+    tbSlice(poor).gold[0] = 0;
+    giveCards(poor, 0, 'diplomat' as ProgressCard);
+    expect(legalOf(poor, 'ck/play').some((a) => (a as { card?: string }).card === 'diplomat')).toBe(
+      false,
+    );
+    fails(poor, { type: 'ck/play', player: 0, card: 'diplomat' } as Action, /Diplomat/);
     const rich = diplomat(edge, 1, 2);
     const after = run(rich, { type: 'ck/pickEdge', player: 0, edge } as Action);
     expect(after.pieces.roads[edge]).toBeUndefined();
