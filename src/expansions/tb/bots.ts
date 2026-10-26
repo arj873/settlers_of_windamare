@@ -396,7 +396,37 @@ function steerRivers(state: GameState, p: PlayerId, options: readonly Action[]):
   return poor ? (options.find((a) => a.type === 'tb/sellForGold') ?? null) : null;
 }
 
+/** Caravans: put camels where they score (next to own buildings, best beside another camel). */
+function steerCaravans(state: GameState, p: PlayerId, options: readonly Action[]): Action | null {
+  const camels = options.filter((a) => a.type === 'tb/placeCamel');
+  if (camels.length === 0) return null;
+  const t = topologyOf(state);
+  const camelAt = new Set(
+    ((state.ext[TB] as TbSlice).caravans?.camels ?? []).flatMap(
+      (c) => t.edge[c.edge]?.vertices ?? [],
+    ),
+  );
+  let best: Action | null = null;
+  let bestScore = 0;
+  for (const a of camels) {
+    const e = (a as { edge?: EdgeId }).edge as EdgeId;
+    const score = (t.edge[e]?.vertices ?? []).reduce(
+      (n, v) => n + (state.pieces.buildings[v]?.owner === p ? (camelAt.has(v) ? 3 : 1) : 0),
+      0,
+    );
+    if (score > bestScore) {
+      best = a;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function steer(state: GameState, p: PlayerId, options: readonly Action[], rng: Rng): Action | null {
+  if (has(state, 'caravans')) {
+    const a = steerCaravans(state, p, options);
+    if (a) return a;
+  }
   if (has(state, 'rivers')) {
     const a = steerRivers(state, p, options);
     if (a) return a;
