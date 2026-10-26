@@ -8,7 +8,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 ## 🏃 In Progress
 
 - **T14** · Stage-2 integration: turn timer + auto-resolve, SBP hotseat flow, engine map previews, dice faces in log, disabled-button reasons, random starting player, harness check · `s2-integration` 🟦 · tab `s2-integration`
-- **T18** · AI playtest, 6 players (LIVE, headed window): 6 Haiku agents on Base 5-6P, seed pt6a, to 10 VP · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
+- **T18** · AI playtest, 6 players (LIVE, headed window): game 2 on latest build (wood HUD + SBP), seed pt6b, fresh Haiku agents; game 1 (pt6a) ended at turn 32 on the old-build discard bug · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
