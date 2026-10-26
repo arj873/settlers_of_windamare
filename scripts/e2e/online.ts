@@ -16,9 +16,13 @@ import { build, preview } from 'vite';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const args = process.argv.slice(2);
-const OUT = args.includes('--out')
-  ? args[args.indexOf('--out') + 1]!
-  : join(REPO, 'playtest', 'shots', 'e2e-online');
+const flag = (name: string): string | null => {
+  const i = args.indexOf(name);
+  return i >= 0 ? (args[i + 1] ?? null) : null;
+};
+const OUT = flag('--out') ?? join(REPO, 'playtest', 'shots', 'e2e-online');
+/** `--remote http://localhost:8787/`: play against a running room server (M2) instead. */
+const REMOTE = flag('--remote');
 const HEADED = args.includes('--headed');
 const VIEWPORT = { width: 1440, height: 900 };
 
@@ -39,16 +43,20 @@ const clientExpr = '(window.catan && window.catan.online && window.catan.online.
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const outDir = join(REPO, 'playtest', 'dist', 'e2e');
-  console.log('Building…');
-  await build({ root: REPO, logLevel: 'warn', build: { outDir, emptyOutDir: true } });
-  const server = await preview({
-    root: REPO,
-    logLevel: 'warn',
-    build: { outDir },
-    preview: { host: '127.0.0.1', port: 4329, strictPort: false, open: false },
-  });
-  const base = server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:4329/';
+  let server: Awaited<ReturnType<typeof preview>> | null = null;
+  let base = REMOTE;
+  if (!base) {
+    const outDir = join(REPO, 'playtest', 'dist', 'e2e');
+    console.log('Building…');
+    await build({ root: REPO, logLevel: 'warn', build: { outDir, emptyOutDir: true } });
+    server = await preview({
+      root: REPO,
+      logLevel: 'warn',
+      build: { outDir },
+      preview: { host: '127.0.0.1', port: 4329, strictPort: false, open: false },
+    });
+    base = server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:4329/';
+  }
   const browser = await chromium.launch({
     headless: !HEADED,
     executablePath: '/usr/bin/google-chrome-stable',
@@ -56,8 +64,11 @@ async function main() {
   });
   const errors: string[] = [];
   try {
-    const ctx = await browser.newContext({ viewport: VIEWPORT });
+    // Dev server: one profile, so the tabs share its SharedWorker (tokens are per tab).
+    // Real server: tokens live in localStorage, so each player needs their own profile.
+    const shared = await browser.newContext({ viewport: VIEWPORT });
     const open = async (url: string) => {
+      const ctx = REMOTE ? await browser.newContext({ viewport: VIEWPORT }) : shared;
       const p = await ctx.newPage();
       p.on('pageerror', (e) => errors.push(e.message));
       p.on('console', (m) => {
@@ -67,15 +78,27 @@ async function main() {
       return p;
     };
 
+    // Hotseat still starts from the home screen.
+    const solo = await open(base);
+    await solo.click('[data-k="offline"]');
+    await solo.waitForSelector('.setup [data-k="start"]');
+    await solo.click('.setup [data-k="start"]');
+    await solo.waitForSelector('.hud-side .sec-players');
+    check(!(await solo.$('.sec-chat')), 'Play offline -> hotseat setup -> game (no chat)');
+    await solo.close();
+
     // Home -> create.
-    const ann = await open(`${base}?server=local`);
+    const ann = await open(REMOTE ? base : `${base}?server=local`);
     await ann.waitForSelector('[data-k="create"]');
     await shot(ann, '1-home');
     await ann.fill('[data-k="nickname"]', 'Ann');
     await ann.click('[data-k="create"]');
     await ann.waitForSelector('.ol-lobby');
     const invite = await ann.inputValue('[data-k="invite"]');
-    check(/\?room=[2-9A-Z]{6}&server=local$/.test(invite), `invite link ${invite}`);
+    check(
+      (REMOTE ? /\?room=[2-9A-Z]{6}$/ : /\?room=[2-9A-Z]{6}&server=local$/).test(invite),
+      `invite link ${invite}`,
+    );
     check(new URL(ann.url()).searchParams.get('room'), 'host URL carries ?room=');
 
     // Bob opens the link.
@@ -172,7 +195,7 @@ async function main() {
     console.log(`\nAll checks passed. Screenshots in ${OUT}`);
   } finally {
     await browser.close();
-    await server.close();
+    await server?.close();
   }
 }
 
