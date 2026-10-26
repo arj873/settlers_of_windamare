@@ -20,8 +20,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
-- **E2** · Seafarers: ships, pirate, gold, islands, fog, all official scenarios (+5-6P) · `s3-seafarers` 🟦
-- **E3** · Cities & Knights: commodities, improvements, knights, barbarians, progress cards, walls, 13 VP (+5-6P) · `s3-ck` 🟦
+- **E2** · Seafarers: ships, pirate, gold, islands, fog, all official scenarios (+5-6P) · `s3-seafarers` 🟦 · built (1390 tests) → final sims
+- **E4** · Traders & Barbarians: Catan for Two, Fishermen, Rivers, Caravans, Barbarian Attack, main T&B scenario (+F2 plaza IDs), Harbormaster · `s3-tb` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -54,6 +54,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (E3) `viewFor` hook to hide expansion secrets → C&K online · bot action weighting (random C&K games ~270 turns) · Nasty variant · knight Event Cards ↔ C&K knights · verify starter-board harbors
 - (B3) parallel trade-reply timers · hotseat end-of-offer toasts · "time ran out" wording · harness `wait` prints newest log lines
 - (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
 - (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
@@ -123,6 +124,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **E3** · Cities & Knights: commodities, improvements + metropolises, knights, barbarians + event die, all 54 progress cards, walls, aqueduct, 13 VP, 5-6P, starter board, Easy start / Knight-errant, works with Event Cards · `s3-ck` 🟦 · PR #14 (squashed) → `expansions` · 1321 tests
 - **S1** · `main` synced into `expansions`: 24 conflicts resolved; variants run through F1 hooks (event cards ⇄ production hooks, setup hook precedence, stats for expansion actions), worker-safe expansion UI split · `s3-exp-sync` 🟦 · `expansions` 1223 tests
 - **BUG-B3** · Online trade flow: bots now confirm accepted offers; offerer `wait` blocks until answers; end-of-offer toasts; flaky e2e-server fixed · `s4-online-trade` 🟦 · PR #13 → `main` · 1042 tests
 - **UX2** · Game Statistics at game over: Overview (VP breakdown + 8 awards), Dice (histogram vs expected), Resources (by type/source/loss), Activity (VP-over-turns chart), Dev Cards; engine `stats` slice, online-safe · `s4-game-stats` 🟦 · PR #12 → `main` · 1027 tests
