@@ -18,20 +18,30 @@ import { describeBundle, playerName } from '../rules/text';
 import { Rng } from '../rng';
 import { handSize, portsOf, publicVictoryPoints, roadsOf } from '../selectors';
 import { topologyOf } from '../topology';
-import type { Action, EventKind, EventTask, GameState, PlayerId, Resource } from '../types';
+import type {
+  Action,
+  EventKind,
+  EventTask,
+  GameState,
+  PlayerId,
+  Resource,
+  ResourceCounts,
+} from '../types';
 import { hasRobber, roadsBlocked } from '../variants';
 import { type HandlerMap, type LegalGenerator, fail, log, ok } from './common';
 import { resolveSeven } from './robber';
 
 type EventPhase = Extract<GameState['phase'], { kind: 'event' }>;
 
-/** Produce for `roll` and log what everyone received. */
-export function payProduction(draft: GameState, roll: number, cityYield = 2): void {
-  produce(draft, roll, { cityYield }).forEach((gain, p) => {
+/** Produce for `roll` and log what everyone received. Returns what each player was paid. */
+export function payProduction(draft: GameState, roll: number, cityYield = 2): ResourceCounts[] {
+  const paid = produce(draft, roll, { cityYield });
+  paid.forEach((gain, p) => {
     if (RESOURCES.some((r) => gain[r] > 0)) {
       log(draft, p, `${playerName(draft, p)} received ${describeBundle(gain)}`);
     }
   });
+  return paid;
 }
 
 /**
@@ -39,8 +49,8 @@ export function payProduction(draft: GameState, roll: number, cityYield = 2): vo
  * `main` or an expansion's afterProduction phase (docs/EXPANSIONS.md §5).
  */
 export function produceAndContinue(draft: GameState, roll: number, cityYield = 2): void {
-  payProduction(draft, roll, cityYield);
-  draft.phase = hookAfterProduction(draft, roll) ?? { kind: 'main' };
+  const paid = payProduction(draft, roll, cityYield);
+  draft.phase = hookAfterProduction(draft, roll, paid) ?? { kind: 'main' };
 }
 
 const bankTotal = (s: GameState) => RESOURCES.reduce((n, r) => n + s.bank[r], 0);
@@ -150,6 +160,12 @@ function continueEvent(draft: GameState, event: EventKind, tasks: EventTask[]): 
 
 /** rollDice with event cards: draw a card, resolve its event, then (eventually) produce. */
 export function resolveEventRoll(draft: GameState, player: PlayerId): void {
+  drawEventRoll(draft, player);
+  resolveDrawnEvent(draft);
+}
+
+/** Draw the next event card as `player`'s roll: sets the dice (its number) and lastEvent, logs. */
+export function drawEventRoll(draft: GameState, player: PlayerId): void {
   const { card, reshuffled } = drawEventCard(draft);
   if (reshuffled) log(draft, null, 'New Year: the event deck was shuffled');
   const [a, b] = facesFor(card.number);
@@ -158,18 +174,26 @@ export function resolveEventRoll(draft: GameState, player: PlayerId): void {
   log(draft, player, `${playerName(draft, player)} rolled ${card.number} (${a}+${b})`);
   const info = EVENT_INFO[card.event];
   if (card.event !== 'none') log(draft, null, `Event: ${info.name}. ${info.text}`);
+}
 
-  if (card.event === 'robberAttacks') {
+/**
+ * Resolve the event card drawn by drawEventRoll (lastEvent; null = no card, e.g. dice set by an
+ * expansion card: a plain roll), then (eventually) produce. A 7 is Robber Attacks.
+ */
+export function resolveDrawnEvent(draft: GameState): void {
+  const event = draft.lastEvent ?? 'none';
+  const roll = draft.dice ? draft.dice[0] + draft.dice[1] : 0;
+  if (event === 'robberAttacks' || roll === 7) {
     resolveSeven(draft);
     return;
   }
-  if (card.event === 'robberFlees' && hasRobber(draft.settings)) {
+  if (event === 'robberFlees' && hasRobber(draft.settings)) {
     const desert = topologyOf(draft).landHexes.find(
       (h) => draft.board.hexes[h]?.terrain === 'desert',
     );
     if (desert && draft.board.hexes[draft.robber]?.terrain !== 'desert') draft.robber = desert;
   }
-  continueEvent(draft, card.event, eventTasks(draft, card.event));
+  continueEvent(draft, event, eventTasks(draft, event));
 }
 
 /** The calling player's open task in an event phase, or an error. */

@@ -7,6 +7,7 @@
 import { cropHud } from '../expansions/crop/ui';
 import { demoHud } from '../expansions/demo/ui';
 import { oilHud } from '../expansions/oil/ui';
+import { ckHud } from '../expansions/ck/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -56,6 +57,10 @@ export interface HudExtension {
   ): HudDialog | null;
   /** Turn-pill text for this module's phases (the viewer can act). */
   hint?(state: GameState, view: HudView): string | null;
+  /** Extra cards in the viewer's hand bar, after the resource cards (C&K commodities). */
+  handCards?(state: GameState, view: HudView, send: (a: Action) => void): Child[];
+  /** Extra items shown in the open trade offer's `give` / `want` row (C&K commodities). */
+  offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
   /** Action types submitted by a plain board click, without a button (like moveRobber). */
   impliedActions?: readonly string[];
 }
@@ -64,6 +69,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   demoHud,
   oilHud,
   cropHud,
+  ckHud,
   // new modules go here, one per line
 ];
 

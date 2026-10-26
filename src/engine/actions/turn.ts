@@ -21,6 +21,7 @@
  */
 import { DEV_CARD_TYPES } from '../constants';
 import { hookRollDice, runOnEndTurn, runOnRoll, runOnStartTurn } from '../expansions/hooks';
+import { activeModules } from '../expansions/registry';
 import { rollTwoDice } from '../rules/dice';
 import { playerName } from '../rules/text';
 import { emptyDevCards } from '../resources';
@@ -30,7 +31,7 @@ import { eventCardsOn } from '../variants';
 import { buildLegal } from './build';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 import { canBuyDevCard, devLegal } from './dev';
-import { produceAndContinue, resolveEventRoll } from './events';
+import { drawEventRoll, produceAndContinue, resolveDrawnEvent } from './events';
 import { discardAmounts, resolveSeven } from './robber';
 
 export { discardAmounts };
@@ -43,7 +44,11 @@ export { discardAmounts };
  */
 export function rollFor(draft: GameState, player: PlayerId): void {
   if (eventCardsOn(draft.settings)) {
-    resolveEventRoll(draft, player);
+    // The card's number is the roll: the onRoll hooks run before its event (C&K event die).
+    drawEventRoll(draft, player);
+    const interrupt = runOnRoll(draft, draft.dice ? draft.dice[0] + draft.dice[1] : 0);
+    if (interrupt) draft.phase = interrupt;
+    else resolveDrawnEvent(draft);
     recordRoll(draft, player);
     return;
   }
@@ -84,6 +89,11 @@ export function secondSettlerFor(state: GameState, owner: PlayerId): PlayerId {
  * interrupted the roll call this when their phase is done.
  */
 export function continueRoll(draft: GameState): void {
+  // Event Cards: the drawn card's event (lastEvent), then its production.
+  if (eventCardsOn(draft.settings)) {
+    resolveDrawnEvent(draft);
+    return;
+  }
   const roll = draft.dice ? draft.dice[0] + draft.dice[1] : 0;
   if (roll === 7) {
     resolveSeven(draft);
@@ -98,7 +108,9 @@ function canSpecialBuild(state: GameState): boolean {
     canBuyDevCard(state, state.turn.current) === null ||
     buildLegal(state).length > 0 ||
     // 5+ rule set: a playable development card is also something to do in the step.
-    devLegal(state).some((a) => a.type !== 'buyDevCard')
+    devLegal(state).some((a) => a.type !== 'buyDevCard') ||
+    // An expansion's own builds (C&K knights, walls, improvements).
+    activeModules(state).some((m) => (m.legal?.(state).length ?? 0) > 0)
   );
 }
 

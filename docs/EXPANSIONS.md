@@ -10,9 +10,11 @@ Read `docs/ARCHITECTURE.md` first (the base contract). Rules research: `docs/rul
 `explorers-pirates.md`). Section 9 of each lists that expansion's framework needs; §12 below maps
 each need to a framework feature.
 
-Status: framework implemented (F1). The only module is the **demo** (`src/expansions/demo`, the
-"Oasis" toy mode). It is the worked example of every extension point: copy its shape. It is hidden
-on the setup screen unless the URL has `?modes=all`; `?mode=demo` starts it directly.
+Status: framework implemented (F1). Modules: the **demo** (`src/expansions/demo`, the "Oasis" toy
+mode, the worked example of every extension point: copy its shape; hidden on the setup screen
+unless the URL has `?modes=all`; `?mode=demo` starts it directly), **Oil Springs** and **Crop
+Trust** (E1), **Cities & Knights** (`ck`, E3: the largest module; `docs/rules/cities-knights.md`
+§11).
 
 ---
 
@@ -168,35 +170,42 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 **additive** = all results combine; **first-wins** = the first module returning a value decides;
 **chained** = each module gets the previous value. Base games call none of them.
 
-| Hook                                      | Called from                                    | Kind                        | Examples                                                       |
-| ----------------------------------------- | ---------------------------------------------- | --------------------------- | -------------------------------------------------------------- |
-| `setupBuilding(state, index)`             | `setupRoundAt` (setup placement)               | first-wins (over settings)  | C&K / E&P: a setup step places a city / harbour                |
-| `rollDice(draft)`                         | `rollFor` (not with `settings.eventCards`)     | first-wins                  | C&K red/yellow + event die, T&B event cards (extras in slice)  |
-| `onRoll(draft, roll)` → `Phase?`          | `rollDice`, after the log, before 7/production | additive (first phase wins) | C&K barbarians (interrupt for pillage, then `continueRoll`)    |
-| `onSeven(draft, pending)` → `Phase?`      | `resolveSeven` (a 7, Robber Attacks card)      | first-wins                  | C&K robber inert before the first attack, E&P pirate           |
-| `production(state, roll, owed, ctx)`      | `computeProduction`, before the shortage rule  | additive                    | wells, C&K city commodities; `ctx = { cityYield, blocked }`    |
-| `afterProduction(draft, roll)` → `Phase?` | `produceAndContinue` (dice and event cards)    | first-wins                  | Seafarers gold choice, demo bloom                              |
-| `cost(state, item, base)`                 | `costOf` (build, dev, HUD)                     | chained                     | `'seafarers/ship'`, `'ck/knight'`, changed base costs          |
-| `pieceLimit(state, p, kind, base)`        | `pieceLimit` / `piecesLeft` / invariants       | chained                     | ships 15, knights per level, E&P harbours                      |
-| `vertexBlocked(state, v)`                 | `isVertexOpen`                                 | additive OR                 | knights, neutral pieces, fortresses                            |
-| `edgeBlocked(state, e)`                   | `canPlaceRoad`                                 | additive OR                 | ships, bridge sites, camels, barbarians                        |
-| `blocksRoute(state, v, p)`                | `canPlaceRoad`, Longest Road                   | additive OR                 | C&K foreign knights cut roads                                  |
-| `handSize(state, p, base)`                | `cardsInHand` (7 rule, steal candidates)       | chained                     | C&K commodities count                                          |
-| `discardLimit(state, p, base)`            | `discardAmounts`                               | chained                     | C&K +2 per city wall                                           |
-| `supply(state, base)`                     | `supplyOf` (createGame, invariants, HUD)       | chained                     | C&K / E&P no dev deck, scenario bank sizes                     |
-| `victoryPoints(state, p)`                 | `publicVictoryPoints`, `victoryPoints`         | additive                    | `{ public, hidden? }`: islands, metropolis, defender, missions |
-| `bankTradeRatio(state, p, r, base)`       | `bankTradeRatio`                               | chained                     | C&K trading house / merchant, Oil Springs                      |
-| `roadLength(state, p, base)`              | Longest Road award                             | chained                     | Seafarers longest trade route                                  |
-| `onEndTurn(draft, p)`                     | `endTurn`, before SBP / next turn              | additive                    | upkeep, lair resolution, disaster phase                        |
-| `onStartTurn(draft, p)`                   | `beginTurn` (turn 1, after SBP, Catanian 2)    | additive                    | reset per-turn flags (ship moved, fast gold used)              |
-| `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |
-| `deferVictory(state)`                     | `checkVictory`                                 | additive OR                 | Oil Springs: the win is declared at the end of the turn        |
+| Hook                                            | Called from                                                                   | Kind                        | Examples                                                                                                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setupBuilding(state, index)`                   | `setupRoundAt` (setup placement)                                              | first-wins (over settings)  | C&K / E&P: a setup step places a city / harbour                                                                                               |
+| `rollDice(draft)`                               | `rollFor` (not with `settings.eventCards`)                                    | first-wins                  | C&K red/yellow + event die, T&B event cards (extras in slice)                                                                                 |
+| `onRoll(draft, roll)` → `Phase?`                | `rollDice`, after the log, before 7/production                                | additive (first phase wins) | C&K barbarians (interrupt for pillage, then `continueRoll`)                                                                                   |
+| `onSeven(draft, pending)` → `Phase?`            | `resolveSeven` (a 7, Robber Attacks card)                                     | first-wins                  | C&K robber inert before the first attack, E&P pirate                                                                                          |
+| `production(state, roll, owed, ctx)`            | `computeProduction`, before the shortage rule                                 | additive                    | wells, C&K city commodities; `ctx = { cityYield, blocked }`                                                                                   |
+| `afterProduction(draft, roll, paid)` → `Phase?` | `produceAndContinue` (dice and event cards); `paid` = what the core just paid | first-wins                  | Seafarers gold choice, demo bloom, C&K commodities + Aqueduct                                                                                 |
+| `cost(state, item, base)`                       | `costOf` (build, dev, HUD)                                                    | chained                     | `'seafarers/ship'`, `'ck/knight'`, changed base costs                                                                                         |
+| `pieceLimit(state, p, kind, base)`              | `pieceLimit` / `piecesLeft` / invariants                                      | chained                     | ships 15, knights per level, E&P harbours                                                                                                     |
+| `vertexBlocked(state, v)`                       | `isVertexOpen`                                                                | additive OR                 | knights, neutral pieces, fortresses                                                                                                           |
+| `edgeBlocked(state, e)`                         | `canPlaceRoad`                                                                | additive OR                 | ships, bridge sites, camels, barbarians                                                                                                       |
+| `blocksRoute(state, v, p)`                      | `canPlaceRoad`, Longest Road                                                  | additive OR                 | C&K foreign knights cut roads                                                                                                                 |
+| `handSize(state, p, base)`                      | `cardsInHand` (7 rule, steal candidates)                                      | chained                     | C&K commodities count                                                                                                                         |
+| `discardLimit(state, p, base)`                  | `discardAmounts`                                                              | chained                     | C&K +2 per city wall                                                                                                                          |
+| `supply(state, base)`                           | `supplyOf` (createGame, invariants, HUD)                                      | chained                     | C&K / E&P no dev deck, scenario bank sizes                                                                                                    |
+| `victoryPoints(state, p)`                       | `publicVictoryPoints`, `victoryPoints`                                        | additive                    | `{ public, hidden?, parts? }`: islands, metropolis, defender, missions; `parts` = named shares for the stats screen (`expansionVictoryParts`) |
+| `statsCategory(state, action, p)`               | `recordAction` (stats.ts), your actions only                                  | first-wins                  | `{ gain?, loss? }`: which GainSource / LossSink a hand change counts as (default 'other'); C&K knights = build                                |
+| `bankTradeRatio(state, p, r, base)`             | `bankTradeRatio`                                                              | chained                     | C&K trading house / merchant, Oil Springs                                                                                                     |
+| `roadLength(state, p, base)`                    | Longest Road award                                                            | chained                     | Seafarers longest trade route                                                                                                                 |
+| `onEndTurn(draft, p)`                           | `endTurn`, before SBP / next turn                                             | additive                    | upkeep, lair resolution, disaster phase                                                                                                       |
+| `onStartTurn(draft, p)`                         | `beginTurn` (turn 1, after SBP, Catanian 2)                                   | additive                    | reset per-turn flags (ship moved, fast gold used)                                                                                             |
+| `afterAction(draft, action)`                    | `applyAction`, before awards                                                  | additive                    | fog reveal, island VP, closed-route marking                                                                                                   |
+| `deferVictory(state)`                           | `checkVictory`                                                                | additive OR                 | Oil Springs: the win is declared at the end of the turn                                                                                       |
 
 **Variant settings** (V1/V2, `docs/RULES.md` §18-20) apply in expansion modes too. Read the
 blocked hex and the city yield from `ctx` (or `hasRobber(settings)`), not `state.robber` / 2, so
 `robberMode 'none'` and the Epidemic card stay right. `validate(settings)` may refuse a variant
-your module cannot support. Map veto is refused with any expansion (slices are built from the
-board); see ARCHITECTURE.md "Variants × expansions".
+your module cannot support; the setup screen shows that message and disables Start
+(`setupError` in `ui/setup/model.ts`). Map veto is refused with any expansion (slices are built
+from the board); see ARCHITECTURE.md "Variants × expansions". With Event Cards the drawn card is
+the roll: the `onRoll` hooks run after the draw and before the card's event (an interrupt resumes
+with `continueRoll`, which then resolves the card); `rollDice` hooks are not called.
+
+**Special build phase:** a builder whose only possible moves are your module's (`legal` returns
+something in `specialBuild`) still gets a step (C&K knights, walls, improvements).
 
 Terrains: `terrainKind(t)` → `'land'` (resources, desert, gold, unknown), `'sea'`, `'fog'`, or your
 module's declared kind. Settlements need a vertex touching a land hex; roads need an edge
@@ -284,8 +293,16 @@ interface HudExtension {
   dialog?(state, view, legal, send): { key; title; body; modal } | null; // after base forced dialogs
   hint?(state, view): string | null; // turn pill text in your phases
   impliedActions?: string[]; // clicked on the board, no button
+  handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
+  offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
 }
 ```
+
+- Expansion-only goods in a player trade: put your part of the offer in your slice and show it
+  with `offerExtras` (C&K: `ck/offerTrade` + overrides of acceptTrade / confirmTrade).
+- The sidebar section of your panel has the class `sec-ext-<id>`; a tall panel can make it
+  shrink and scroll (see `ck.css`).
+- The Buy card button is hidden when the game has no development deck (`supply` hook).
 
 - A build card toggles its namespaced `PlaceMode`; the controller (`game/logic.ts`
   `boardActions`) highlights the legal actions of its `actionType` and maps clicks to them.
@@ -387,7 +404,7 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
 | Fog reveal, island VP (Seafarers, E&P)                              | copy-on-write board, `afterAction`, `victoryPoints`                                                |
 | Event die + red/yellow dice, barbarian track, pillage (C&K)         | `rollDice`, `onRoll` interrupt + `continueRoll`, `actors`                                          |
 | Commodities, walls (+2 hand limit), knights on vertices (C&K)       | slice, `handSize`, `discardLimit`, `vertexBlocked`, `blocksRoute`                                  |
-| City setup round, no dev cards, VP 13 (C&K)                         | `setupBuilding`, `supply`, `ModeDef.vpToWin`                                                       |
+| City setup round, no dev cards, VP 13 (C&K)                         | `setupBuilding`, `supply`, scenario `vpToWin` — **done (E3, `src/expansions/ck`)**                 |
 | Event cards instead of dice, bridges, lake, fishing grounds (T&B)   | `rollDice`, `edgeBlocked`, `board.ext`, `production`                                               |
 | Harbormaster +1 VP target, event cards vs balanced dice (T&B)       | `OptionDef.vpBonus`, `validate`                                                                    |
 | Catan for Two: 2 players + neutrals (T&B)                           | map/mode `minPlayers: 2`, neutrals in slice + blocker hooks                                        |
@@ -403,6 +420,10 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
   `placeSetupRoad` (`next` then adjust the phase) for now; a `setupRounds` hook can be added.
 - **Bank-trade HUD ratios** still show harbour ratios only; expansions with `bankTradeRatio` hooks
   should check `bestRatios` in `ui/model.ts` when they need it.
+- **Secret expansion state online:** `viewFor` passes `state.ext` unmasked (C&K progress hands
+  and stack orders, oil is public anyway). Online play is base-only for now; a module masking
+  hook is needed before an expansion with secrets goes online.
+- **Statistics** count resources only; expansion goods (commodities, oil, crops) have none.
 
 ## 13. File ownership for parallel expansion agents
 

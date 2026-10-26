@@ -21,12 +21,14 @@
  */
 import { DEV_CARD_TYPES, RESOURCES, tokenPips } from './constants';
 import { namespaceOf } from './expansions/ext';
+import { hookStatsCategory } from './expansions/hooks';
 import { emptyDevCards, emptyResources, isResource } from './resources';
 import { victoryPoints } from './selectors';
 import { hexVertices, topologyOf } from './topology';
 import type {
   Action,
   DevCardType,
+  ExpansionAction,
   GainSource,
   GameState,
   GameStats,
@@ -243,7 +245,10 @@ export function recordProduction(
 // ---------------------------------------------------------------------------
 
 /** Where a positive hand change of `p` caused by `action` came from. */
-function gainSource(action: Action, p: PlayerId): GainSource {
+function gainSource(state: GameState, action: Action, p: PlayerId): GainSource {
+  if (namespaceOf(action.type) !== null) {
+    return hookStatsCategory(state, action as ExpansionAction, p)?.gain ?? 'other';
+  }
   switch (action.type) {
     case 'placeSetupSettlement':
       return 'setup';
@@ -266,7 +271,10 @@ function gainSource(action: Action, p: PlayerId): GainSource {
 }
 
 /** Where a negative hand change of `p` caused by `action` went. */
-function lossSink(action: Action, p: PlayerId): LossSink {
+function lossSink(state: GameState, action: Action, p: PlayerId): LossSink {
+  if (namespaceOf(action.type) !== null) {
+    return hookStatsCategory(state, action as ExpansionAction, p)?.loss ?? 'other';
+  }
   switch (action.type) {
     case 'buildRoad':
     case 'buildSettlement':
@@ -350,8 +358,8 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     if (!old) return;
     for (const r of RESOURCES) {
       const d = pl.resources[r] - old.resources[r] - (prod(during, p, r) - prod(before, p, r));
-      if (d > 0) ed.player(p).gained[gainSource(action, p)][r] += d;
-      else if (d < 0) ed.player(p).lost[lossSink(action, p)][r] -= d;
+      if (d > 0) ed.player(p).gained[gainSource(prev, action, p)][r] += d;
+      else if (d < 0) ed.player(p).lost[lossSink(prev, action, p)][r] -= d;
     }
   });
 

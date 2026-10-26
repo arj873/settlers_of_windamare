@@ -8,7 +8,10 @@ import type {
   Action,
   BuildingKind,
   EdgeId,
+  ExpansionAction,
+  GainSource,
   GameState,
+  LossSink,
   Phase,
   PlayerId,
   Resource,
@@ -18,7 +21,7 @@ import type {
 } from '../types';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
-import type { ProductionContext, Supply } from './types';
+import type { ProductionContext, Supply, VictoryPointPart } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -133,9 +136,13 @@ export function runProductionHooks(
   for (const m of activeModules(state)) m.hooks?.production?.(state, roll, owed, ctx);
 }
 
-export function hookAfterProduction(draft: GameState, roll: number): Phase | undefined {
+export function hookAfterProduction(
+  draft: GameState,
+  roll: number,
+  paid: readonly ResourceCounts[] = [],
+): Phase | undefined {
   for (const m of activeModules(draft)) {
-    const p = m.hooks?.afterProduction?.(draft, roll);
+    const p = m.hooks?.afterProduction?.(draft, roll, paid);
     if (p !== undefined) return p;
   }
   return undefined;
@@ -204,6 +211,24 @@ export function runOnStartTurn(draft: GameState, player: PlayerId): void {
 
 export function runAfterAction(draft: GameState, action: Action): void {
   for (const m of activeModules(draft)) m.hooks?.afterAction?.(draft, action);
+}
+
+/** The named parts of the expansions' public VP (statistics screen), in module order. */
+export function expansionVictoryParts(state: GameState, player: PlayerId): VictoryPointPart[] {
+  return activeModules(state).flatMap((m) => m.hooks?.victoryPoints?.(state, player).parts ?? []);
+}
+
+/** Stats category of a hand change made by an expansion action (statsCategory hook). */
+export function hookStatsCategory(
+  state: GameState,
+  action: ExpansionAction,
+  player: PlayerId,
+): { gain?: GainSource; loss?: LossSink } | undefined {
+  for (const m of activeModules(state)) {
+    const c = m.hooks?.statsCategory?.(state, action, player);
+    if (c !== undefined) return c;
+  }
+  return undefined;
 }
 
 /** Does an active module take over the victory check (`deferVictory`)? */
