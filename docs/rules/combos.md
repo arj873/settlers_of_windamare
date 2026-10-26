@@ -120,3 +120,32 @@ Each combo has a `BotExtension`: its invariants (Seafarers + C&K: knights at sea
 ship moved from under a knight, robber and pirate asleep until the first attack; T&B + C&K: no
 development cards, no knight on a plaza, the progress limit before the wagon) and a steer towards
 VP (defend with knights when the barbarians are close and Catan is weaker). Sim results: §6.
+
+## 6. Sim results (final code)
+
+`pnpm sim -- --mode <mode> --scenario <s> --players <n> --games <g> --bias 0.5` (default step caps:
+5000 at 3-4 players, 15000 at 5-6). Every run: **0 invariant failures, 0 errors, 0 stalls**.
+"Capped" = games that hit the step cap unfinished (not a violation; random bots at 16 VP).
+
+| Mode / scenario                   | 4p (300) finished / capped | 3p (50) | 5p (50) | 6p (50) |
+| --------------------------------- | -------------------------- | ------- | ------- | ------- |
+| `seafarers+ck` New Shores         | 259 / 41                   | 45 / 5  | 50 / 0  | 50 / 0  |
+| `seafarers+ck` Through the Desert | 261 / 39                   | 38 / 12 | 50 / 0  | 50 / 0  |
+| `tb+ck` Fishermen                 | 291 / 9                    | 48 / 2  | 50 / 0  | 50 / 0  |
+| `tb+ck` Rivers                    | 296 / 4                    | 50 / 0  | 50 / 0  | 50 / 0  |
+| `tb+ck` Caravans                  | 284 / 16                   | 46 / 4  | 50 / 0  | 50 / 0  |
+| `tb+ck` Traders & Barbarians      | 300 / 0                    | 50 / 0  | 50 / 0  | 50 / 0  |
+| `tb+ck` variants                  | 298 / 2                    | 50 / 0  | 50 / 0  | 50 / 0  |
+
+Variant runs (20 games each, 0 violations): `seafarers+ck` with Event Cards, the friendly
+robber, the variable layout; `tb+ck` Fishermen and Traders & Barbarians with Event Cards,
+variants with Harbormaster + friendly robber, Caravans at 5 players.
+
+A Rivers run found 7 stalls (the Diplomat played when every open road was a bridge or a river
+road the player could not pay for); fixed in the rules (the card is unplayable then) with a
+regression test from the dump (`tbck/bots.test.ts`, `fixtures/rivers-diplomat-stall.json`).
+
+Browser check (`node scripts/shots-combos.mjs <preview url> <dir>`, headless Chrome with
+SwiftShader): the setup screen lists both combined modes with their scenario tiles; bot games of
+`seafarers+ck` New Shores and `tb+ck` Traders & Barbarians run to game over with no page errors;
+the pair panels read correctly in all six themes.
