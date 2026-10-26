@@ -98,9 +98,12 @@ export function intrigueTargets(state: GameState, p: PlayerId): VertexId[] {
     .map(([v]) => v);
 }
 
-/** Every open road (Diplomat), any owner. */
+/** Every open road (Diplomat), any owner; an Earthquake-damaged road never (T&B FAQ 13). */
 export function openRoads(state: GameState): EdgeId[] {
-  return (Object.keys(state.pieces.roads) as EdgeId[]).filter((e) => isOpenRoad(state, e));
+  const damaged = new Set(state.damagedRoads ?? []);
+  return (Object.keys(state.pieces.roads) as EdgeId[]).filter(
+    (e) => !damaged.has(e) && isOpenRoad(state, e),
+  );
 }
 
 /** `state` without the road on `e` (the Diplomat re-placing own road). */

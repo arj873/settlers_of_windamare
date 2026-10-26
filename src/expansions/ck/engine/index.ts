@@ -18,7 +18,9 @@ import { runOnRoll } from '../../../engine/expansions/hooks';
 import type { ExpansionModule, ExtHandler } from '../../../engine/expansions/types';
 import { emptyDevCards } from '../../../engine/resources';
 import { playerName } from '../../../engine/rules/text';
-import type { Rng } from '../../../engine/rng';
+import { Rng } from '../../../engine/rng';
+import { DICE_CARDS } from '../../../engine/rules/dice';
+import { DICE_DECK_RESHUFFLE_AT } from '../../../engine/constants';
 import { buildingsOf } from '../../../engine/selectors';
 import { recordRoll } from '../../../engine/stats';
 import type { Action, GameState, Phase, PlayerId, VertexId } from '../../../engine/types';
@@ -116,6 +118,17 @@ const isInt = (x: unknown, lo: number, hi: number): x is number =>
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
+
+/** Remove the card of the outcome yellow + red from the balanced dice deck (refill as a draw). */
+function takeDiceCard(draft: GameState, yellow: number, red: number): void {
+  if (draft.diceDeck.length <= DICE_DECK_RESHUFFLE_AT) {
+    const rng = new Rng(draft.rng);
+    draft.diceDeck = rng.shuffle(DICE_CARDS);
+    draft.rng = rng.state;
+  }
+  const i = draft.diceDeck.indexOf((yellow - 1) * 6 + (red - 1));
+  if (i >= 0) draft.diceDeck.splice(i, 1);
+}
 
 /** After activating / promoting from the knight command dialog: back to the turn. */
 function leaveCommand(draft: GameState): void {
@@ -295,6 +308,8 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     hand.splice(i, 1);
     ckSlice(draft).decks.science.unshift('alchemist');
     draft.dice = [yellow, red];
+    // Balanced dice (ours): the chosen outcome is used up like a drawn card.
+    if (draft.settings.balancedDice) takeDiceCard(draft, yellow, red);
     // Event Cards: the Alchemist replaces revealing a card (T&B FAQ 15/16).
     if (draft.settings.eventCards) draft.lastEvent = null;
     log(
@@ -484,7 +499,7 @@ export const ckModule: ExpansionModule = {
   scenarios: [
     {
       id: 'ck/classic',
-      name: 'Cities & Knights',
+      name: 'Variable board',
       blurb: 'Variable board: commodities, knights, barbarians, progress cards',
       players: { min: 3, max: 6 },
       maps: ['baseRandom', 'base56'],

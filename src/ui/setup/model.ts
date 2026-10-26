@@ -661,7 +661,10 @@ export function setupError(draft: SetupDraft): string | null {
     });
     return null;
   } catch (e) {
-    return e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    // createGame prefixes a module's validate message with its id ("ck: ...").
+    const ns = /^([^:\s]+): /.exec(msg)?.[1];
+    return ns !== undefined && expansionById(ns) ? msg.slice(ns.length + 2) : msg;
   }
 }
 
