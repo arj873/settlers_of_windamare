@@ -2,13 +2,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { NewGameConfig } from '../types';
 import {
+  addSeat,
   buildConfig,
   defaultSetup,
   loadSetup,
   mapDisabledReason,
   mapRulesApply,
   MAPS,
+  MAX_PLAYERS,
   pickSeatColor,
+  removeSeat,
   saveSetup,
   SEAT_COLORS,
   setMap,
@@ -91,6 +94,41 @@ describe('player / map coupling', () => {
     expect(setPlayerCount(d, 7).map).toBe('base78');
     expect(setPlayerCount(d, 8).map).toBe('base78');
     expect(setPlayerCount({ ...d, map: 'baseRandom' }, 5).map).toBe('base56');
+  });
+
+  it('addSeat appends a human with an unused colour, switches map, stops at the maximum', () => {
+    let d = defaultSetup();
+    d = addSeat(d);
+    expect(d.seats).toHaveLength(5);
+    expect(d.seats[4]?.controller).toBe('human');
+    expect(d.map).toBe('base56');
+    expect(new Set(d.seats.map((s) => s.color)).size).toBe(5);
+    while (d.seats.length < MAX_PLAYERS) d = addSeat(d);
+    expect(d.map).toBe('base78');
+    expect(addSeat(d)).toBe(d);
+  });
+
+  it('removeSeat removes that seat, keeps the others intact, stops at the minimum', () => {
+    const d = setPlayerCount(defaultSetup(), 6);
+    const r = removeSeat(d, 1);
+    expect(r.seats).toHaveLength(5);
+    expect(r.seats.map((s) => s.name)).toEqual(
+      d.seats.filter((_, i) => i !== 1).map((s) => s.name),
+    );
+    expect(r.seats.map((s) => s.color)).toEqual(
+      d.seats.filter((_, i) => i !== 1).map((s) => s.color),
+    );
+    expect(new Set(r.seats.map((s) => s.color)).size).toBe(5);
+    expect(r.map).toBe('base56');
+    expect(removeSeat(d, -1)).toBe(d);
+    expect(removeSeat(d, 6)).toBe(d);
+    expect(removeSeat(defaultSetup(3), 0)).toEqual(defaultSetup(3));
+  });
+
+  it('removing then re-adding reuses the freed colour', () => {
+    const d = defaultSetup(4);
+    const freed = d.seats[1]?.color;
+    expect(addSeat(removeSeat(d, 1)).seats[3]?.color).toBe(freed);
   });
 
   it('keeps a bigger map when shrinking', () => {
@@ -382,6 +420,28 @@ describe('SetupScreen', () => {
     expect(new SetupScreen({ onStart: () => undefined, storage: throwing }).state).toEqual(
       defaultSetup(),
     );
+  });
+
+  it('adds and removes seats from the Seats list and keeps the stepper in sync', () => {
+    const seats = () => screen.element.querySelectorAll('.su-seat').length;
+    click('add-seat');
+    expect(seats()).toBe(5);
+    expect(out('players')).toBe('5');
+    expect(screen.state.map).toBe('base56');
+    q<HTMLInputElement>('[data-k="name-1"]').value = 'Keep';
+    q<HTMLInputElement>('[data-k="name-1"]').dispatchEvent(new Event('input', { bubbles: true }));
+    click('remove-0');
+    expect(seats()).toBe(4);
+    expect(out('players')).toBe('4');
+    expect(q<HTMLInputElement>('[data-k="name-0"]').value).toBe('Keep');
+    expect(q<HTMLButtonElement>('[data-k="remove-0"]').disabled).toBe(false);
+    click('remove-0');
+    click('remove-0');
+    expect(seats()).toBe(3);
+    expect(q<HTMLButtonElement>('[data-k="remove-0"]').disabled).toBe(true);
+    for (let i = 0; i < 5; i++) click('add-seat');
+    expect(seats()).toBe(8);
+    expect(q<HTMLButtonElement>('[data-k="add-seat"]').disabled).toBe(true);
   });
 
   it('shows Back only when there is a game to return to', () => {

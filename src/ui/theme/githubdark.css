@@ -1,0 +1,242 @@
+/*
+ * GitHub Dark: a flat, crisp developer-tool look. Near-black canvas, two grey surface steps,
+ * hairline borders, 6px radii, system sans. Blue for focus and highlights, green for the primary
+ * action. Palette and style only; no logos or marks.
+ */
+:root[data-theme='githubdark'] {
+  color-scheme: dark;
+  --page-bg: #0d1117;
+  --board-frame: #30363d;
+  --board-frame-dark: #161b22;
+  --board-frame-light: #484f58;
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  --font-display: var(--font-ui);
+  --font-log: var(--font-ui);
+  --font-num: var(--font-ui);
+  --display-weight: 600;
+  --display-case: none;
+  --display-tracking: 0;
+
+  --ink: #e6edf3;
+  --ink-dim: #9198a1;
+  --ink-dark: #0d1117;
+  --ink-strong: #ffffff;
+  --log-ink: #e6edf3;
+  --raised-ink: #e6edf3;
+  --text-shadow: none;
+  --good: #3fb950;
+  --bad: #ff7b72;
+
+  --surface: #161b22;
+  --surface-raised: #21262d;
+  --surface-sunken: #0d1117;
+  --surface-pop: #1c2128;
+  --surface-flat: #161b22;
+  --edge: #30363d;
+  --line: #30363d;
+  --hover: rgba(177, 186, 196, 0.12);
+  --panel-shadow: 0 0 0 1px #30363d, 0 8px 24px rgba(1, 4, 9, 0.85);
+  --side-shadow: -1px 0 0 #30363d, -8px 0 24px rgba(1, 4, 9, 0.5);
+  --btn-shadow: 0 1px 0 rgba(1, 4, 9, 0.35);
+  --sunken-shadow: none;
+  --sec-sep: 1px solid #30363d;
+  --sec-sep-shadow: none;
+  --tint-base: #161b22;
+  --scrim: rgba(1, 4, 9, 0.6);
+  --scrim-deep: rgba(1, 4, 9, 0.9);
+  --radius: 6px;
+  --btn-radius: 6px;
+
+  --accent: #2f81f7;
+  --accent-2: #58a6ff;
+  --accent-glow: rgba(47, 129, 247, 0.5);
+  --accent-ink: #ffffff;
+  --primary-bg: #238636;
+  --primary-ink: #ffffff;
+  --primary-text-shadow: none;
+  --ghost-bg: transparent;
+  --warn: #f85149;
+  --warn-glow: rgba(248, 81, 73, 0.55);
+  --danger-bg: #da3633;
+
+  --plaque-bg: transparent;
+  --plaque-ink: #e6edf3;
+  --plaque-border: 0;
+  --plaque-radius: 6px;
+  --plaque-shadow: none;
+  --plaque-text-shadow: none;
+  --plaque-stud: transparent;
+
+  --log-bg: #0d1117;
+  --log-shadow: inset 0 0 0 1px #30363d;
+  --log-dim: #9198a1;
+  --log-rule: #21262d;
+  --scroll-thumb: #484f58;
+  --pname-mix: white;
+  --pname-shadow: none;
+
+  --badge-bg: #0d1117;
+  --badge-ink: #e6edf3;
+  --badge-ring: #30363d;
+  --tag-bg: rgba(110, 118, 129, 0.4);
+  --tag-ink: #ffffff;
+  --new-bg: #238636;
+  --award-bg: #d29922;
+
+  --card-edge: rgba(1, 4, 9, 0.85);
+  --card-inner: rgba(255, 255, 255, 0.4);
+  --card-stack-1: #c9d1d9;
+  --card-stack-2: #8b949e;
+  --card-shadow: 0 1px 3px rgba(1, 4, 9, 0.7);
+  --card-ico-bg: radial-gradient(circle, rgba(246, 248, 250, 0.92) 58%, rgba(246, 248, 250, 0) 70%);
+  --card-radius: 0.1;
+  --rf-brick: linear-gradient(160deg, #e2825a, #b4472a);
+  --rf-lumber: linear-gradient(160deg, #58ae5f, #2d6f34);
+  --rf-wool: linear-gradient(160deg, #c3e78c, #7fb24c);
+  --rf-grain: linear-gradient(160deg, #fbe17a, #d9a92a);
+  --rf-ore: linear-gradient(160deg, #c2ccd6, #7b8896);
+  --df-back: linear-gradient(160deg, #6e7681, #30363d);
+  --df-face: linear-gradient(170deg, #f6f8fa, #d0d7de);
+  --res-brick: #e0714a;
+  --res-lumber: #4aa35a;
+  --res-wool: #a5d86e;
+  --res-grain: #ecca4e;
+  --res-ore: #9aa7b5;
+  --slot-bg: #0d1117;
+  --slot-shadow: inset 0 0 0 1px #30363d;
+
+  --die-bg: linear-gradient(145deg, #f6f8fa, #d0d7de);
+  --die-edge: #30363d;
+  --die-pip: #0d1117;
+  --die-seven: #cf222e;
+  --die-shadow: 0 2px 6px rgba(1, 4, 9, 0.7);
+  --die-radius: 8px;
+
+  --pp-shade: #0d1117;
+  --pp-gloss: none;
+  --pp-shadow: none;
+  --avatar-ring: #30363d;
+  --pill-shade: #161b22;
+  --pill-ink: #e6edf3;
+  --pill-ring: inset 0 0 0 1px #30363d;
+  --timer-track: #30363d;
+  --timer-low-track: #5a1e1b;
+  --timer-low-fill: #ff7b72;
+
+  --setup-bg: #0d1117;
+  --tile-bg: #161b22;
+  --tile-on-bg: rgba(47, 129, 247, 0.15);
+  --tile-shadow: none;
+  --tile-hover-edge: #8b949e;
+  --map-sea: radial-gradient(circle at 50% 50%, #1d4a73, #12304d);
+  --switch-off: #30363d;
+  --switch-on: #238636;
+  --range-track: #30363d;
+  --range-thumb: #e6edf3;
+  --step-bg: #21262d;
+  --step-hover: #30363d;
+  --swatch-on: #e6edf3;
+
+  --toast-bg: #161b22;
+  --toast-ink: #e6edf3;
+  --toast-edge: #30363d;
+  --toast-error-edge: #f85149;
+  --toast-error-ink: #ffa198;
+  --resume-bg: #0d1117;
+  --resume-ink: #e6edf3;
+  --resume-dim: #9198a1;
+}
+
+/* Panels: hairline border instead of bevels, no grain. */
+[data-theme='githubdark'] .hud-side,
+[data-theme='githubdark'] .dialog,
+[data-theme='githubdark'] .menu-panel,
+[data-theme='githubdark'] .winner-card,
+[data-theme='githubdark'] .hud-controls:not(:empty),
+[data-theme='githubdark'] .su-footer {
+  border-color: #30363d;
+}
+[data-theme='githubdark'] .su-footer {
+  box-shadow: none;
+}
+/* Section titles are plain headings, not nameplates. */
+[data-theme='githubdark'] .plaque::before,
+[data-theme='githubdark'] .plaque::after {
+  display: none;
+}
+[data-theme='githubdark'] .plaque {
+  padding: 2px 10px 3px;
+  font-size: 14px !important;
+}
+[data-theme='githubdark'] .sec-toggle {
+  border-radius: 6px;
+  border-width: 1px;
+  border-color: #30363d;
+}
+[data-theme='githubdark'] .pname {
+  color: color-mix(in srgb, var(--pc) 70%, #fff);
+}
+[data-theme='githubdark'] .pp,
+[data-theme='githubdark'] .turn-pill {
+  border: 1px solid #30363d;
+}
+[data-theme='githubdark'] .pp {
+  border-radius: 6px;
+}
+[data-theme='githubdark'] .pp.is-current {
+  border-color: #2f81f7;
+  box-shadow:
+    0 0 0 1px #2f81f7,
+    0 0 12px rgba(47, 129, 247, 0.35);
+}
+[data-theme='githubdark'] .avatar,
+[data-theme='githubdark'] .bcard {
+  border-color: rgba(1, 4, 9, 0.85);
+}
+/* Buttons: GitHub grey default, green primary, blue focus ring. */
+[data-theme='githubdark'] .btn,
+[data-theme='githubdark'] .menu-btn,
+[data-theme='githubdark'] .seg-btn,
+[data-theme='githubdark'] .su-step {
+  border-color: #3d444d;
+}
+[data-theme='githubdark'] .btn-roll.is-ready,
+[data-theme='githubdark'] .btn-end.is-ready,
+[data-theme='githubdark'] .btn-primary,
+[data-theme='githubdark'] .seg-btn.is-on {
+  border-color: rgba(240, 246, 252, 0.2);
+  box-shadow: none;
+}
+[data-theme='githubdark'] .seg-btn.is-on {
+  background: #1f6feb;
+  color: #fff;
+}
+[data-theme='githubdark'] .btn-ghost {
+  color: var(--ink);
+  border-color: #3d444d;
+}
+[data-theme='githubdark'] :focus-visible {
+  outline: 2px solid #2f81f7;
+  outline-offset: 1px;
+}
+[data-theme='githubdark'] .cover h1,
+[data-theme='githubdark'] .winner h1,
+[data-theme='githubdark'] .su-head h1 {
+  color: #e6edf3;
+}
+[data-theme='githubdark'] .su-seat-x:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.15);
+  color: #ff7b72;
+}
+
+/* Glyph inks: slate card backs with a blue trim. */
+[data-theme='githubdark'] .g-devBack rect:first-child,
+[data-theme='githubdark'] .g-devCards rect:first-child {
+  fill: #30363d;
+}
+[data-theme='githubdark'] .g-devBack rect:nth-child(2),
+[data-theme='githubdark'] .g-devCards rect:nth-child(2) {
+  stroke: #58a6ff;
+}
