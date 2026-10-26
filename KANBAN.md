@@ -7,6 +7,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress — Stage 3 (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
 
+> 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
+
 - **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5
 - **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
 - **BUG-B1** · 🔴 BLOCKER: board camera zooms in over a long game (6 Haiku reports, turns 59-75); spots off-screen/under HUD · `s3-camera-bug` 🟦
