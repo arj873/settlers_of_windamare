@@ -4,6 +4,7 @@
  *  - `board` and `settings` are fixed after createGame and shared, never copied;
  *  - log entries are immutable once written: the array is copied, the entries are shared.
  * Everything else is copied, so a handler may mutate any other part of its draft.
+ * Map-veto candidate boards are shared too (immutable, like `board`).
  * If you add a field to GameState, copy it here (clone.test.ts checks nothing else is shared).
  */
 import type { Building, GameState, Phase, Player, VertexId } from './types';
@@ -36,6 +37,20 @@ function clonePhase(phase: Phase): Phase {
         },
       };
     }
+    case 'mapVeto':
+      // Candidate boards are immutable (like state.board): the list is copied, boards shared.
+      return {
+        ...phase,
+        candidates: [...phase.candidates],
+        vetoed: [...phase.vetoed],
+        order: [...phase.order],
+      };
+    case 'event':
+      return {
+        kind: 'event',
+        event: phase.event,
+        tasks: phase.tasks.map((t) => ({ ...t, targets: [...t.targets] })),
+      };
     default:
       return { ...phase };
   }
@@ -64,5 +79,9 @@ export function cloneState(s: GameState): GameState {
     log: [...s.log],
     rng: s.rng,
     winner: s.winner,
+    // V1 variant fields exist only in games that use them; never add undefined keys.
+    ...(s.eventDeck ? { eventDeck: [...s.eventDeck] } : {}),
+    ...(s.lastEvent !== undefined ? { lastEvent: s.lastEvent } : {}),
+    ...(s.damagedRoads ? { damagedRoads: [...s.damagedRoads] } : {}),
   };
 }

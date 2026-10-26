@@ -9,8 +9,11 @@ import {
   applyAction,
   createGame,
   legalActions,
+  restoreBanks,
   Rng,
+  timerOf,
   type Action,
+  type Banks,
   type GameState,
   type PlayerId,
 } from '../engine';
@@ -31,8 +34,11 @@ import {
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
 import {
   IDLE_CLOCK,
+  bankAfterAction,
   clockView,
+  flushBank,
   isExpired,
+  syncBankClock,
   syncClock,
   tickClock,
   timeoutMove,
@@ -94,6 +100,8 @@ export class GameController {
 
   // Turn timer (settings.turnTimerSec): pure clock in turnTimer.ts, ticked here.
   private clock: TurnClock = IDLE_CLOCK;
+  /** Chess clock (settings.timer): each player's bank in ms; the running one is in `clock`. */
+  private banks: Banks = [];
   private clockInterval: ReturnType<typeof setInterval> | null = null;
   private clockLast = 0;
   /** Whole seconds last sent to the HUD (re-render the pill only when they change). */
@@ -154,7 +162,11 @@ export class GameController {
   // -------------------------------------------------------------------------
 
   /** Start playing `state` with the given seat controllers (index = PlayerId). */
-  start(state: GameState, seats: Seats, opts: { viewer?: PlayerId | null; botRng?: number } = {}) {
+  start(
+    state: GameState,
+    seats: Seats,
+    opts: { viewer?: PlayerId | null; botRng?: number; banks?: unknown } = {},
+  ) {
     if (seats.length !== state.players.length) {
       throw new Error(`seats (${seats.length}) must match players (${state.players.length})`);
     }
@@ -168,6 +180,7 @@ export class GameController {
     this.stallReported = false;
     this.botRng = new Rng(opts.botRng ?? Rng.fromSeed(`bots:${String(state.settings.seed)}`).state);
     this.clock = IDLE_CLOCK;
+    this.banks = restoreBanks(opts.banks, state.settings, state.players.length);
     this.timedOutKey = null;
     this.timeoutRng = Rng.fromSeed(`timer:${String(state.settings.seed)}`);
     this.refresh();
@@ -177,15 +190,21 @@ export class GameController {
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
     const state = createGame(gameConfigOf(cfg, seed, extra.vpToWin));
-    console.info(`New game: map=${cfg.map} seed=${seed}`);
+    console.info(`New game: map=${state.settings.map} seed=${seed}`);
+    // Randomize Turn Order moved the players: seat p holds config player seatOrder[p].
+    const order = state.settings.seatOrder ?? cfg.players.map((_, i) => i);
     this.start(
       state,
-      cfg.players.map((p) => p.controller),
+      order.map((i) => cfg.players[i]?.controller ?? 'bot'),
     );
   }
 
   resume(saved: SavedSession): void {
-    this.start(saved.state, saved.seats, { viewer: saved.viewer, botRng: saved.botRng });
+    this.start(saved.state, saved.seats, {
+      viewer: saved.viewer,
+      botRng: saved.botRng,
+      banks: saved.banks,
+    });
   }
 
   /** The current session in save format (null before the first game). */
@@ -197,6 +216,9 @@ export class GameController {
       seats: [...this.seatList],
       viewer: this.viewerId,
       botRng: this.botRng.state,
+      ...(timerOf(this.current.settings).kind === 'bank'
+        ? { banks: flushBank(this.clock, this.banks) }
+        : {}),
     };
   }
 
@@ -239,6 +261,16 @@ export class GameController {
       this.offers.set(key, (this.offers.get(key) ?? 0) + 1);
     }
     if (action.type === 'endTurn') this.offers.clear();
+    if (timerOf(state.settings).kind === 'bank') {
+      // Chess clock: bank the running time, credit the increment of a finished turn; the next
+      // refresh puts whoever is on the clock now back on it from their bank.
+      ({ clock: this.clock, banks: this.banks } = bankAfterAction(
+        this.clock,
+        this.banks,
+        state,
+        result.state,
+      ));
+    }
     this.current = result.state;
     return true;
   }
@@ -306,9 +338,16 @@ export class GameController {
 
   /** Who is on the clock after a state change; runs the tick only while someone is. */
   private syncClock(state: GameState): void {
-    const sec = state.settings.turnTimerSec;
-    const slot = sec ? timerSlot(state, this.seatList, this.legal, this.viewerId) : null;
-    this.clock = syncClock(this.clock, slot, (sec ?? 0) * 1000);
+    const timer = timerOf(state.settings);
+    const slot =
+      timer.kind === 'off' ? null : timerSlot(state, this.seatList, this.legal, this.viewerId);
+    if (timer.kind === 'bank') {
+      const next = syncBankClock(this.clock, this.banks, slot, timer.bankSec * 1000);
+      this.clock = next.clock;
+      this.banks = next.banks;
+    } else {
+      this.clock = syncClock(this.clock, slot, timer.kind === 'perTurn' ? timer.sec * 1000 : 0);
+    }
     if (this.clock.key === null) {
       this.stopClock();
     } else if (this.clockInterval === null) {

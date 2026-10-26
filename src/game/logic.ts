@@ -16,7 +16,8 @@ export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpT
     discardLimit: cfg.discardLimit,
     balancedDice: cfg.rules.balancedDice,
     hideBankCards: cfg.rules.hideBankCards,
-    turnTimerSec: cfg.turnTimerSec,
+    turnTimerSec: cfg.variants?.timer ? null : cfg.turnTimerSec,
+    ...cfg.variants,
   };
 }
 
@@ -33,13 +34,16 @@ function tableOrder(state: GameState): PlayerId[] {
 
 /**
  * Players who owe a response before the current player can continue: everyone still discarding,
- * or trade responders still 'pending'. In table order.
+ * trade responders still 'pending', or players with an open event-card task. In table order.
  */
 export function obligated(state: GameState): PlayerId[] {
   const phase = state.phase;
   if (phase.kind === 'discard') return tableOrder(state).filter((p) => (phase.pending[p] ?? 0) > 0);
   if (phase.kind === 'trade') {
     return tableOrder(state).filter((p) => phase.offer.responses[p] === 'pending');
+  }
+  if (phase.kind === 'event') {
+    return tableOrder(state).filter((p) => phase.tasks.some((t) => t.player === p));
   }
   return [];
 }
@@ -83,7 +87,8 @@ export function boardActions(
       a.type === 'placeSetupSettlement' ||
       a.type === 'placeSetupRoad' ||
       a.type === 'moveRobber' ||
-      a.type === 'placeFreeRoad',
+      a.type === 'placeFreeRoad' ||
+      a.type === 'eventDamageRoad',
   );
   if (implied.length > 0) return implied;
   const buildType =

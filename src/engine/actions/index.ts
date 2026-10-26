@@ -11,6 +11,8 @@ import { robberHandlers, robberLegal } from './robber';
 import { setupHandlers, setupLegal } from './setup';
 import { tradeHandlers, tradeLegal } from './trade';
 import { turnHandlers, turnLegal } from './turn';
+import { eventHandlers, eventLegal } from './events';
+import { vetoHandlers, vetoLegal } from './veto';
 
 export const HANDLERS: { [K in ActionType]: Handler<K> } = {
   ...setupHandlers,
@@ -19,6 +21,8 @@ export const HANDLERS: { [K in ActionType]: Handler<K> } = {
   ...robberHandlers,
   ...devHandlers,
   ...tradeHandlers,
+  ...vetoHandlers,
+  ...eventHandlers,
 };
 
 export const LEGAL_GENERATORS: readonly LegalGenerator[] = [
@@ -28,4 +32,7 @@ export const LEGAL_GENERATORS: readonly LegalGenerator[] = [
   robberLegal,
   devLegal,
   tradeLegal,
+  // V1 variants last, so the order of every other action (and the bots' picks) is unchanged.
+  vetoLegal,
+  eventLegal,
 ];

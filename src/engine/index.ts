@@ -10,9 +10,17 @@ export * from './resources';
 export * from './selectors';
 export * from './rules/placement';
 export { generateBoard, beginnerBoard, randomBoard, redNumbersSeparated } from './board';
+export * from './variants';
+export * from './clock';
+export { EVENT_CARDS, EVENT_INFO, facesFor, type EventCard } from './rules/events';
+export { MAP_VETO_CANDIDATES, vetoOrder } from './actions/veto';
+export { secondSettlerFor } from './actions/turn';
+export { canRepairRoad } from './actions/build';
 export {
   createGame,
   layoutToMap,
+  randomMapFor,
+  randomSeatOrder,
   resolveSettings,
   type GameConfig,
   type PlayerConfig,

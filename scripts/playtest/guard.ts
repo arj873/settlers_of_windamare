@@ -48,6 +48,10 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
         : `${nameOf(state, phase.offer.from)} offers you a trade: \`click Accept\` or \`click Reject\`.`;
     case 'specialBuild':
       return 'Special build step (5+ players): build or buy a dev card if you like (no trading, no dev cards), then `click Pass`.';
+    case 'mapVeto':
+      return 'Map vote: veto one of the candidate maps (`click Veto map N`).';
+    case 'event':
+      return 'Event card: make your choice in the event dialog (`click <option>`).';
   }
 }
 

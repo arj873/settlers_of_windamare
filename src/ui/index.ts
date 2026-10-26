@@ -6,6 +6,7 @@ export type {
   HudEventName,
   HudView,
   NewGameConfig,
+  NewGameVariants,
   PlaceMode,
   SeatConfig,
 } from './types';

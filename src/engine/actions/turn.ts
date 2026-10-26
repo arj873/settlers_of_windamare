@@ -14,24 +14,56 @@
  *   - otherwise / after the last builder: current = owner+1, turn.number++, phase = preRoll.
  *   Dice stay as the last roll.
  * passSpecialBuild (phase specialBuild, the builder): next builder, or the next turn as above.
+ * V1 variants (RULES.md §18): rollFor draws an event card instead with settings.eventCards
+ *   (actions/events.ts); settings.rushMode rolls automatically as each turn starts (beginTurn);
+ *   settings.secondSettler: endTurn hands a `main` step to the third player to the left
+ *   (turn.secondSettlerOf = owner), whose endTurn starts owner+1's turn.
  */
 import { DEV_CARD_TYPES } from '../constants';
-import { produce } from '../rules/production';
 import { rollTwoDice } from '../rules/dice';
-import { describeBundle, playerName } from '../rules/text';
-import { emptyDevCards, totalResources } from '../resources';
-import { handSize } from '../selectors';
+import { playerName } from '../rules/text';
+import { emptyDevCards } from '../resources';
 import type { Action, GameState, PlayerId } from '../types';
+import { eventCardsOn } from '../variants';
 import { buildLegal } from './build';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 import { canBuyDevCard } from './dev';
+import { payProduction, resolveEventRoll } from './events';
+import { discardAmounts, resolveSeven } from './robber';
 
-/** Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit). */
-export function discardAmounts(state: GameState): number[] {
-  return state.players.map((p) => {
-    const n = handSize(p);
-    return n > state.settings.discardLimit ? Math.floor(n / 2) : 0;
-  });
+export { discardAmounts };
+
+/**
+ * The roll of `player` (turn.current, phase preRoll): two dice (plain or balanced), or an
+ * event card (settings.eventCards). Sets the next phase.
+ */
+export function rollFor(draft: GameState, player: PlayerId): void {
+  if (eventCardsOn(draft.settings)) {
+    resolveEventRoll(draft, player);
+    return;
+  }
+  const { dice, reshuffled } = rollTwoDice(draft);
+  draft.dice = dice;
+  const roll = dice[0] + dice[1];
+  if (reshuffled) log(draft, null, 'The dice deck was shuffled');
+  log(draft, player, `${playerName(draft, player)} rolled ${roll} (${dice[0]}+${dice[1]})`);
+  if (roll === 7) {
+    resolveSeven(draft);
+    return;
+  }
+  payProduction(draft, roll);
+  draft.phase = { kind: 'main' };
+}
+
+/** A turn of turn.current begins: preRoll, or (Rush Mode) the automatic roll. */
+export function beginTurn(draft: GameState): void {
+  draft.phase = { kind: 'preRoll' };
+  if (draft.settings.rushMode) rollFor(draft, draft.turn.current);
+}
+
+/** Second Settler (paired players' turn): Catanian 2 is the third player to the left. */
+export function secondSettlerFor(state: GameState, owner: PlayerId): PlayerId {
+  return (owner + 3) % state.players.length;
 }
 
 /** In a specialBuild phase for `state.turn.current`: can they build or buy anything? */
@@ -80,38 +112,14 @@ function startTurn(draft: GameState, player: PlayerId): void {
     devCardPlayed: false,
     tradeOffers: 0,
   };
-  draft.phase = { kind: 'preRoll' };
+  beginTurn(draft);
 }
 
 export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild'> = {
   rollDice: (draft, action) => {
     if (draft.phase.kind !== 'preRoll') return fail('cannot roll now');
     if (!isCurrent(draft, action.player)) return fail('not your turn');
-
-    const { dice, reshuffled } = rollTwoDice(draft);
-    draft.dice = dice;
-    const roll = dice[0] + dice[1];
-    if (reshuffled) log(draft, null, 'The dice deck was shuffled');
-    log(
-      draft,
-      action.player,
-      `${playerName(draft, action.player)} rolled ${roll} (${dice[0]}+${dice[1]})`,
-    );
-
-    if (roll === 7) {
-      const pending = discardAmounts(draft);
-      draft.phase = pending.some((n) => n > 0)
-        ? { kind: 'discard', pending }
-        : { kind: 'moveRobber', resume: 'main' };
-      return ok(draft);
-    }
-
-    produce(draft, roll).forEach((gain, p) => {
-      if (totalResources(gain) > 0) {
-        log(draft, p, `${playerName(draft, p)} received ${describeBundle(gain)}`);
-      }
-    });
-    draft.phase = { kind: 'main' };
+    rollFor(draft, action.player);
     return ok(draft);
   },
 
@@ -127,7 +135,17 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
     log(draft, action.player, `${playerName(draft, action.player)} ended the turn`);
     draft.turn.devCardPlayed = false;
     draft.turn.tradeOffers = 0;
-    if (draft.settings.specialBuildPhase) {
+    const pairedOwner = draft.turn.secondSettlerOf;
+    if (pairedOwner !== undefined) {
+      // Catanian 2 is done: the next player's turn starts.
+      startTurn(draft, (pairedOwner + 1) % draft.players.length);
+    } else if (draft.settings.secondSettler) {
+      const second = secondSettlerFor(draft, action.player);
+      draft.turn.current = second;
+      draft.turn.secondSettlerOf = action.player;
+      draft.phase = { kind: 'main' };
+      log(draft, second, `${playerName(draft, second)} takes the second settler step`);
+    } else if (draft.settings.specialBuildPhase) {
       advanceSpecialBuild(draft, action.player, action.player);
     } else {
       startTurn(draft, (action.player + 1) % draft.players.length);

@@ -118,6 +118,9 @@ export const tradeHandlers: HandlerMap<
   offerTrade: (draft, { player, give, want, to }) => {
     if (draft.phase.kind !== 'main') return fail('can only trade in the main phase');
     if (!isCurrent(draft, player)) return fail('not your turn');
+    if (draft.turn.secondSettlerOf !== undefined) {
+      return fail('the second settler may not trade with other players');
+    }
     if (!canOfferMore(draft)) {
       return fail(`at most ${MAX_TRADE_OFFERS_PER_TURN} trade offers per turn`);
     }
@@ -229,7 +232,7 @@ export const tradeLegal: LegalGenerator = (state: GameState): Action[] => {
   const player = state.turn.current;
   const hand = getPlayer(state, player).resources;
   const others = state.players.filter((p) => p.id !== player).map((p) => p.id);
-  const offers = canOfferMore(state);
+  const offers = canOfferMore(state) && state.turn.secondSettlerOf === undefined;
   for (const give of RESOURCES) {
     for (const receive of RESOURCES) {
       if (canBankTrade(state, player, give, receive) === null) {
