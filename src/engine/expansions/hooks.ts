@@ -196,6 +196,12 @@ export function runAfterAction(draft: GameState, action: Action): void {
   for (const m of activeModules(draft)) m.hooks?.afterAction?.(draft, action);
 }
 
+/** Does an active module take over the victory check (`deferVictory`)? */
+export function victoryDeferred(state: GameState): boolean {
+  for (const m of activeModules(state)) if (m.hooks?.deferVictory?.(state)) return true;
+  return false;
+}
+
 /**
  * What a terrain is for the core rules: resources, desert and gold are land; 'sea' is sea; 'fog'
  * is fog; a namespaced terrain is whatever its module declares (unknown = land).

@@ -8,6 +8,7 @@
  * No. You can only win during your own turn."). A builder at vpToWin wins when their own turn
  * starts (the pass that hands them the turn runs this check), unless someone wins first.
  */
+import { victoryDeferred } from '../expansions/hooks';
 import { victoryPoints } from '../selectors';
 import type { GameState } from '../types';
 import { playerName } from './text';
@@ -16,6 +17,7 @@ export function checkVictory(draft: GameState): void {
   const kind = draft.phase.kind;
   if (kind === 'gameOver' || kind === 'setup' || kind === 'specialBuild') return;
   if (draft.winner !== null) return;
+  if (victoryDeferred(draft)) return;
   const current = draft.turn.current;
   const vp = victoryPoints(draft, current);
   if (vp < draft.settings.vpToWin) return;

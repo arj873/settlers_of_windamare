@@ -5,7 +5,9 @@
  * one sample layout (a fixed seed), with the map's real terrain mix (e.g. two deserts on 5-6P).
  */
 import {
+  expansionById,
   generateBoard,
+  namespaceOf,
   parseHexId,
   Rng,
   topologyFor,
@@ -69,9 +71,11 @@ export const PREVIEW_COLORS: Record<CoreTerrain, string> = {
   fog: '#8a9099',
 };
 
-/** Preview colour of any terrain (namespaced ones without an entry are grey). */
+/** Preview colour of any terrain (a module's `TerrainInfo.color`; without one: grey). */
 export function previewColor(t: Terrain): string {
-  return Object.hasOwn(PREVIEW_COLORS, t) ? PREVIEW_COLORS[t as CoreTerrain] : '#9a9a9a';
+  if (Object.hasOwn(PREVIEW_COLORS, t)) return PREVIEW_COLORS[t as CoreTerrain];
+  const ns = namespaceOf(t);
+  return (ns === null ? undefined : expansionById(ns)?.terrains?.[t]?.color) ?? '#9a9a9a';
 }
 
 const SQRT3 = Math.sqrt(3);

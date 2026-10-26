@@ -485,7 +485,7 @@ export class Hud {
     const list = logList(state);
     side.classList.toggle('is-open', this.drawerOpen);
     const extPanels = hudExtensionsFor(state).flatMap((x) => {
-      const p = x.panel?.(state, view);
+      const p = x.panel?.(state, view, (a) => this.send(a));
       return p ? [this.section(`ext:${x.id}`, p.body, p.title)] : [];
     });
     side.replaceChildren(

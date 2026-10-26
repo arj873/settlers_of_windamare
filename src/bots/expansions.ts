@@ -3,7 +3,9 @@
  *
  * ADDING A MODULE: one import below and one entry at the END of BOT_EXTENSIONS.
  */
+import { cropBots } from '../expansions/crop/bots';
 import { demoBots } from '../expansions/demo/bots';
+import { oilBots } from '../expansions/oil/bots';
 import type { ExpansionId, GameState } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 
@@ -17,6 +19,8 @@ export interface BotExtension {
 
 export const BOT_EXTENSIONS: readonly BotExtension[] = [
   demoBots,
+  oilBots,
+  cropBots,
   // new modules go here, one per line
 ];
 

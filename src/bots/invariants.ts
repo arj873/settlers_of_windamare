@@ -12,6 +12,7 @@ import {
   LONGEST_ROAD_MIN,
   RESOURCES,
   actingPlayers,
+  cardsInHand,
   edgeVertices,
   expansionVictoryPoints,
   isExpansionId,
@@ -358,8 +359,8 @@ function checkPhase(
 ): void {
   const phase = state.phase;
   const n = state.players.length;
-  const hand = (p: PlayerId) =>
-    RESOURCES.reduce((s, r) => s + (state.players[p]?.resources[r] ?? 0), 0);
+  // Cards as the 7 rule counts them (expansions add oil, commodities ... via the handSize hook).
+  const hand = (p: PlayerId) => (state.players[p] ? cardsInHand(state, p) : 0);
   const setupPhase = phase.kind === 'setup';
   if (setupPhase !== (state.turn.number === 0)) {
     add('phase-actor', `phase ${phase.kind} with turn.number ${state.turn.number}`);

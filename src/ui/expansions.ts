@@ -4,7 +4,9 @@
  * ADDING A MODULE: one import below and one entry at the END of HUD_EXTENSIONS. The HUD only
  * calls the extensions of the expansions active in the shown game.
  */
+import { cropHud } from '../expansions/crop/ui';
 import { demoHud } from '../expansions/demo/ui';
+import { oilHud } from '../expansions/oil/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import type { Child } from './dom';
 import type { GlyphName } from './icons';
@@ -42,7 +44,7 @@ export interface ExtBuildCard {
 export interface HudExtension {
   id: ExpansionId;
   /** A sidebar section between Bank and Players (null = none right now). */
-  panel?(state: GameState, view: HudView): HudPanel | null;
+  panel?(state: GameState, view: HudView, send: (a: Action) => void): HudPanel | null;
   buildCards?: readonly ExtBuildCard[];
   /** A dialog for this module's phases. Base forced dialogs (discard, steal, trade) come first. */
   dialog?(
@@ -59,6 +61,8 @@ export interface HudExtension {
 
 export const HUD_EXTENSIONS: readonly HudExtension[] = [
   demoHud,
+  oilHud,
+  cropHud,
   // new modules go here, one per line
 ];
 

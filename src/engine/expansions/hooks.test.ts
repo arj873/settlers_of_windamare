@@ -289,6 +289,19 @@ describe('costs, pieces, placement, VP, trade, roads, supply', () => {
     expect(won.winner).toBe(1);
   });
 
+  it('deferVictory switches the core victory check off (the module declares winners)', () => {
+    const s = withTst(midGame());
+    const before = victoryPoints(s, 1);
+    hooks.victoryPoints = (_s, p) => (p === 1 ? { public: 10 } : { public: 0 });
+    const target = { ...s, settings: { ...s.settings, vpToWin: before + 4 } };
+    hooks.deferVictory = () => true;
+    const kept = expectOk(applyAction(target, { type: 'buyDevCard', player: 1 }));
+    expect(kept.winner).toBeNull();
+    expect(kept.phase.kind).toBe('main');
+    hooks.deferVictory = () => false;
+    expect(expectOk(applyAction(target, { type: 'buyDevCard', player: 1 })).winner).toBe(1);
+  });
+
   it('bankTradeRatio and roadLength are chained', () => {
     const s = withTst(midGame());
     hooks.bankTradeRatio = (_s, _p, r, n) => (r === 'ore' ? 2 : n);

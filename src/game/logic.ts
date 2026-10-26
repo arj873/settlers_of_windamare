@@ -2,6 +2,7 @@
  * Pure controller decisions (no DOM, no timers): who views the screen, what the board
  * highlights, which legal action a board click means, and which bot moves next.
  */
+import { actingPlayers } from '../engine';
 import type { Action, EdgeId, GameConfig, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
 import type { Controller, NewGameConfig, PlaceMode } from '../ui';
@@ -49,6 +50,13 @@ export function obligated(state: GameState): PlayerId[] {
   if (phase.kind === 'discard') return tableOrder(state).filter((p) => (phase.pending[p] ?? 0) > 0);
   if (phase.kind === 'trade') {
     return tableOrder(state).filter((p) => phase.offer.responses[p] === 'pending');
+  }
+  // Expansion phases that several players act in (the module's `actors`): everyone but the
+  // current player owes a response (the current player is handled as usual).
+  if (phase.kind.includes('/')) {
+    return tableOrder(state).filter(
+      (p) => p !== state.turn.current && actingPlayers(state).includes(p),
+    );
   }
   return [];
 }

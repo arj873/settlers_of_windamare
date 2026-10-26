@@ -9,6 +9,8 @@
  * top level) and modules only read constants / maps / hex data at their own top level.
  */
 import { demoModule } from '../../expansions/demo/engine';
+import { cropModule } from '../../expansions/crop/engine';
+import { oilModule } from '../../expansions/oil/engine';
 import { MAPS, type MapDef } from '../maps';
 import type { ExpansionId, GameSettings, MapId, ModeId, ScenarioId } from '../types';
 import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
@@ -16,6 +18,8 @@ import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
 function builtinModules(): ExpansionModule[] {
   return [
     demoModule,
+    oilModule,
+    cropModule,
     // new modules go here, one per line
   ];
 }

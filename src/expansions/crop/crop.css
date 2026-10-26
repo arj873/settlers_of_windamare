@@ -1,0 +1,126 @@
+/* Crop Trust HUD (classes are prefixed crop-). Colours come from the theme tokens. */
+.crop-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.crop-facts {
+  font-size: 12px;
+}
+.crop-extinct {
+  color: #ff8d84;
+  font-size: 12px;
+}
+.crop-chip {
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--cc, #ccc);
+  border: 1.5px solid #2a1708;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.18);
+}
+.crop-fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.crop-field {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+.crop-field.is-empty {
+  opacity: 0.7;
+}
+.crop-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1e3bf;
+  color: #2a1708;
+  font-size: 12px;
+}
+.crop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.crop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.crop-prow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 6px;
+  border-left: 4px solid var(--pc, #888);
+}
+.crop-pname {
+  font-weight: 600;
+}
+.crop-pname .muted {
+  font-weight: 400;
+  font-size: 12px;
+}
+.crop-rows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.crop-row {
+  display: inline-flex;
+  gap: 2px;
+}
+.crop-cell {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--ink-dim, #aaa);
+  border-radius: 4px;
+}
+.crop-cell.is-card {
+  border-color: #6d47a6;
+}
+.crop-cell.is-vp {
+  border-color: #f2c35a;
+}
+.crop-vault {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.crop-deposit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.crop-deposit .muted {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+.crop-select {
+  font: inherit;
+  font-size: 12px;
+  max-width: 110px;
+}
+.crop-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
