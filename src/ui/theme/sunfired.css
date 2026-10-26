@@ -5,6 +5,10 @@
  */
 :root[data-theme='sunfired'] {
   --page-bg: radial-gradient(ellipse at 42% 45%, #145a7d 0%, #0c3d5a 55%, #072638 100%);
+  /* Terracotta rim round the board. */
+  --board-frame: #b3593a;
+  --board-frame-dark: #5e2914;
+  --board-frame-light: #e09a72;
 
   --font-ui: 'Nunito Variable', 'Nunito', 'Segoe UI', system-ui, sans-serif;
   --font-display: 'Marcellus', 'Trajan Pro', 'Palatino Linotype', Georgia, serif;

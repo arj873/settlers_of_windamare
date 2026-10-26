@@ -145,14 +145,16 @@
 .menu-btn:hover,
 .menu-btn.is-open {
   transform: translateY(-1px);
-  color: var(--accent-2);
+  box-shadow:
+    var(--panel-shadow),
+    0 0 0 2px var(--accent);
 }
 .menu-panel {
   pointer-events: auto;
   position: absolute;
   top: 52px;
   left: 0;
-  min-width: 230px;
+  min-width: 300px;
   padding: 8px;
   border-radius: var(--radius);
   display: flex;

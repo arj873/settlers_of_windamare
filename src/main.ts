@@ -9,7 +9,8 @@ import {
 } from './engine';
 import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
-import { applyTheme, Hud, themeFromSearch, type Controller } from './ui';
+import { setFrameColors } from './render';
+import { boardFrameColors, Hud, initTheme, onThemeChange, type Controller } from './ui';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
 import { measureHudInsets } from './game/layout';
@@ -72,8 +73,8 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
 }
 
 async function boot() {
-  // `?theme=wood|chartroom|parlour|sunfired` (src/ui/theme): HUD look and page background.
-  applyTheme(themeFromSearch(location.search));
+  // HUD look, page background, board frame (src/ui/theme): `?theme=` > saved pick > Sunfired.
+  initTheme(location.search);
   const params = parseParams(location.search);
   const dev = devGame(params);
   // Dev sessions never overwrite the real autosave.
@@ -93,6 +94,14 @@ async function boot() {
   document.getElementById('app')?.appendChild(app.canvas);
 
   const board = new BoardView(app);
+  const frameToTheme = () => {
+    const frame = boardFrameColors();
+    if (!frame) return;
+    setFrameColors(frame);
+    board.retheme();
+  };
+  frameToTheme();
+  onThemeChange(frameToTheme);
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
 

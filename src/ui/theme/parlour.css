@@ -4,6 +4,10 @@
  */
 :root[data-theme='parlour'] {
   --page-bg: radial-gradient(ellipse at 42% 50%, #173a52 0%, #0d2233 60%, #07131d 100%);
+  /* Brass rim round the board. */
+  --board-frame: #c49a45;
+  --board-frame-dark: #5d430f;
+  --board-frame-light: #f3d991;
 
   --font-ui: 'Figtree', 'Segoe UI', system-ui, sans-serif;
   --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;

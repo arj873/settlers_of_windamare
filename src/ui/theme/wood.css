@@ -8,6 +8,10 @@
 :root {
   /* page (behind the transparent board canvas) */
   --page-bg: #0f2a44;
+  /* Pixi board frame (hex colours only: read by boardFrameColors() in ./index.ts) */
+  --board-frame: #7b5431;
+  --board-frame-dark: #4e3320;
+  --board-frame-light: #a57a4c;
 
   /* type */
   --font-ui: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;

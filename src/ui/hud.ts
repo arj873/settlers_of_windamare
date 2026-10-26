@@ -46,6 +46,7 @@ import {
   type BuildKind,
 } from './model';
 import { bankPanel, logList, playersList } from './sidebar';
+import { themePicker } from './theme';
 import type { BotSpeedControl, HudEventName, HudEvents, HudView, PlaceMode } from './types';
 import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
@@ -393,6 +394,7 @@ export class Hud {
               ),
             ),
           ),
+        h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
           {
