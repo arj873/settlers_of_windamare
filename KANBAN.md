@@ -9,9 +9,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - **R1–R5** · Rules research → `docs/rules/`: Seafarers · Cities & Knights · Traders & Barbarians (+Catan for Two) · Explorers & Pirates · Oil Springs + Crop Trust + official combination matrix · `s3-rules-*` 🟩×5
 - **F1** · Expansion framework: registry, hooks, scenario maps with sea/ships/fog/rivers, render + HUD + setup extension points, base game through the registry, docs/EXPANSIONS.md · `s3-framework` 🟦
-- **P2** · Road junctions look clean for any mix of owners (your screenshot) · `s3-road-joints` 🟩
 - **D1** · UI theme refresh (you: like the format, less wood, "unique yet familiar"): 3 directions behind ?theme= → you pick → polish · `s3-ui-theme` 🟦
-- **H1** · Hosting research → docs/HOSTING.md (no deploys) · `s3-hosting` 🟩
 
 ## 🏃 In Progress — Stage 2
 
@@ -89,6 +87,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Show starting seat on setup screen + 'roll for it' animation (from T14)
 
 ## 🧊 Later
+- Deploy to Cloudflare Workers Static Assets (docs/HOSTING.md §1.1; needs your account) + rename the game before going public
+- Online multiplayer on Cloudflare Durable Objects (docs/HOSTING.md §3)
 - Catan: Starfarers (standalone space game; you chose: skip for now)
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -121,3 +121,5 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · merged `f4c609c` · 595 tests · 1200 sim games clean
 - **T14** · Stage-2 integration: turn timer + auto-resolve, SBP hotseat flow, engine map previews, dice faces in log, disabled-button reasons, random starting player, harness check · `s2-integration` 🟦 · merged · 642 tests · schema v4
 - **FIX** · Harness read VP from the old panel (Haiku Seat1, false positive) · orchestrator · `42a2fe8`
+- **P2** · Road junctions look clean for any mix of owners (your screenshot) · `s3-road-joints` 🟩 · merged
+- **H1** · Hosting research → docs/HOSTING.md (no deploys) · `s3-hosting` 🟩 · merged
