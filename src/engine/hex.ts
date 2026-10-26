@@ -10,6 +10,9 @@
  * Canonical IDs (each vertex/edge has exactly one):
  *   - every vertex is the N corner or the S corner of exactly one hex  -> `v:q,r,N|S`
  *   - every edge is the NE, E or SE side of exactly one hex             -> `e:q,r,NE|E|SE`
+ * Plazas (F2, T&B trade hexes; only on frames that declare them, maps.ts `plazas`):
+ *   - the centre of hex (q, r) is a vertex                             -> `v:q,r,C`
+ *   - a spoke from that centre to the hex's corner X is an edge        -> `e:q,r,CX` (X a Corner)
  * The owning hex may be a water hex or off-board; IDs are pure coordinates.
  *
  * Unit geometry: hex "size" (center to corner) = 1, y grows downward (screen coordinates).
@@ -27,6 +30,12 @@ export interface Point {
 
 export type Corner = 'N' | 'NE' | 'SE' | 'S' | 'SW' | 'NW';
 export type Side = 'NE' | 'E' | 'SE' | 'SW' | 'W' | 'NW';
+/** The vertex part of a canonical vertex id: a corner, or 'C' = the hex centre (a plaza, F2). */
+export type VertexKey = 'N' | 'S' | 'C';
+/** A spoke edge from a hex centre to one of its corners (F2). */
+export type SpokeKey = `C${Corner}`;
+/** The edge part of a canonical edge id: a side, or a spoke (F2). */
+export type EdgeKey = 'NE' | 'E' | 'SE' | SpokeKey;
 
 /** Clockwise from N. */
 export const CORNERS: readonly Corner[] = ['N', 'NE', 'SE', 'S', 'SW', 'NW'];
@@ -49,17 +58,37 @@ export function hexId(q: number, r: number): HexId {
   return `h:${q},${r}`;
 }
 
-export function vertexId(q: number, r: number, corner: 'N' | 'S'): VertexId {
+export function vertexId(q: number, r: number, corner: VertexKey): VertexId {
   return `v:${q},${r},${corner}`;
 }
 
-export function edgeId(q: number, r: number, side: 'NE' | 'E' | 'SE'): EdgeId {
+export function edgeId(q: number, r: number, side: EdgeKey): EdgeId {
   return `e:${q},${r},${side}`;
 }
 
+/** The centre vertex of hex (q, r): a trade-hex plaza (F2). */
+export function centreVertex(q: number, r: number): VertexId {
+  return vertexId(q, r, 'C');
+}
+
+/** The spoke edge from the centre of hex (q, r) to its `corner` (F2). */
+export function spokeEdge(q: number, r: number, corner: Corner): EdgeId {
+  return edgeId(q, r, `C${corner}`);
+}
+
+/** A plaza (hex-centre) vertex id. */
+export function isCentreVertex(id: string): boolean {
+  return id.endsWith(',C');
+}
+
+/** A spoke edge id (hex centre to corner). */
+export function isSpokeEdge(id: string): boolean {
+  return /,C[NSEW]+$/.test(id);
+}
+
 const HEX_RE = /^h:(-?\d+),(-?\d+)$/;
-const VERTEX_RE = /^v:(-?\d+),(-?\d+),(N|S)$/;
-const EDGE_RE = /^e:(-?\d+),(-?\d+),(NE|E|SE)$/;
+const VERTEX_RE = /^v:(-?\d+),(-?\d+),(N|S|C)$/;
+const EDGE_RE = /^e:(-?\d+),(-?\d+),(NE|E|SE|C(?:N|NE|SE|S|SW|NW))$/;
 
 export function parseHexId(id: HexId): Axial {
   const m = HEX_RE.exec(id);
@@ -67,16 +96,16 @@ export function parseHexId(id: HexId): Axial {
   return { q: Number(m[1]), r: Number(m[2]) };
 }
 
-export function parseVertexId(id: VertexId): Axial & { corner: 'N' | 'S' } {
+export function parseVertexId(id: VertexId): Axial & { corner: VertexKey } {
   const m = VERTEX_RE.exec(id);
   if (!m) throw new Error(`bad VertexId ${id}`);
-  return { q: Number(m[1]), r: Number(m[2]), corner: m[3] as 'N' | 'S' };
+  return { q: Number(m[1]), r: Number(m[2]), corner: m[3] as VertexKey };
 }
 
-export function parseEdgeId(id: EdgeId): Axial & { side: 'NE' | 'E' | 'SE' } {
+export function parseEdgeId(id: EdgeId): Axial & { side: EdgeKey } {
   const m = EDGE_RE.exec(id);
   if (!m) throw new Error(`bad EdgeId ${id}`);
-  return { q: Number(m[1]), r: Number(m[2]), side: m[3] as 'NE' | 'E' | 'SE' };
+  return { q: Number(m[1]), r: Number(m[2]), side: m[3] as EdgeKey };
 }
 
 export function neighbor(q: number, r: number, side: Side): Axial {
@@ -127,7 +156,9 @@ export function sideEdge(q: number, r: number, side: Side): EdgeId {
 /** The two endpoint vertices of an edge. */
 export function edgeEndpoints(id: EdgeId): [VertexId, VertexId] {
   const { q, r, side } = parseEdgeId(id);
-  const i = SIDES.indexOf(side);
+  if (side.startsWith('C'))
+    return [centreVertex(q, r), cornerVertex(q, r, side.slice(1) as Corner)];
+  const i = SIDES.indexOf(side as Side);
   return [
     cornerVertex(q, r, CORNERS[i] as Corner),
     cornerVertex(q, r, CORNERS[(i + 1) % 6] as Corner),
@@ -156,7 +187,7 @@ export function cornerPoint(q: number, r: number, corner: Corner): Point {
 
 export function vertexPoint(id: VertexId): Point {
   const { q, r, corner } = parseVertexId(id);
-  return cornerPoint(q, r, corner);
+  return corner === 'C' ? hexCenter(q, r) : cornerPoint(q, r, corner);
 }
 
 export function edgeMidpoint(id: EdgeId): Point {

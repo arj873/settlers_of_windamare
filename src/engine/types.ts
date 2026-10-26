@@ -10,10 +10,17 @@
 
 /** Hex at axial (q, r). Example: `h:0,-2`. */
 export type HexId = `h:${number},${number}`;
-/** Vertex = the N or S corner of the hex at (q, r). Example: `v:1,-2,S`. */
-export type VertexId = `v:${number},${number},${'N' | 'S'}`;
-/** Edge = the NE, E or SE side of the hex at (q, r). Example: `e:0,0,NE`. */
-export type EdgeId = `e:${number},${number},${'NE' | 'E' | 'SE'}`;
+/**
+ * Vertex = the N or S corner of the hex at (q, r). Example: `v:1,-2,S`. F2: `v:q,r,C` = the
+ * centre of hex (q, r), a T&B trade-hex plaza (only on frames with `plazas`, maps.ts).
+ */
+export type VertexId = `v:${number},${number},${'N' | 'S' | 'C'}`;
+/**
+ * Edge = the NE, E or SE side of the hex at (q, r). Example: `e:0,0,NE`. F2: `e:q,r,C<corner>`
+ * = the spoke from the centre of hex (q, r) to its corner (`e:2,-2,CSW`), on plaza frames only.
+ */
+export type EdgeId =
+  `e:${number},${number},${'NE' | 'E' | 'SE' | `C${'N' | 'NE' | 'SE' | 'S' | 'SW' | 'NW'}`}`;
 
 /** Index into `GameState.players` (0-based, also turn order). */
 export type PlayerId = number;
