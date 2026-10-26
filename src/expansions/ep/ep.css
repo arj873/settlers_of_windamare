@@ -1,4 +1,18 @@
 /* Explorers & Pirates HUD (classes are prefixed ep-). Colours come from the theme tokens. */
+/* The panel is tall: it shrinks and scrolls instead of squeezing Game Events away. */
+.side-sec.sec-ext-ep:not(.is-collapsed) {
+  flex: 1.4 1 0;
+  min-height: 160px;
+}
+.sec-ext-ep .sec-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.hud-side:has(.sec-ext-ep:not(.is-collapsed)) .sec-log:not(.is-collapsed) {
+  flex: 1 1 0;
+  min-height: 120px;
+}
 .ep-panel {
   display: flex;
   flex-direction: column;

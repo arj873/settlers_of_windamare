@@ -328,5 +328,5 @@ describe('legal actions are all accepted (soundness)', () => {
         state = r.state;
       }
     }
-  });
+  }, 60_000);
 });

@@ -899,7 +899,8 @@ slice (`harbors[vertex]` = its basin): it produces 1 card like a settlement, the
 hook adds its second VP and `pieceLimit` gives the settlement piece back. **Face-down hexes** are
 board hexes of terrain `ep/parrot` / `ep/goose` (kind `fog`, their backs are public), their content
 lives in the slice (`hidden`) and the board is replaced copy-on-write when one is explored.
-**Gold** is a per-player counter in the slice (not a resource card). **Ships** are the module's
+Face-up sea positions are board hexes of terrain `sea` too (so the board view frames the whole
+playing area); the automatic water ring is the frame. **Gold** is a per-player counter in the slice (not a resource card). **Ships** are the module's
 own pieces (`ships[]`: id, owner, edge, cargo), up to 2 per edge, moved by `ep/moveShip`.
 
 | Rule                                                                                                                                                                                                                        | Status                                                                                                                                                                                                              |

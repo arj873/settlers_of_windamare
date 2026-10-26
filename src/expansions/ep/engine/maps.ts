@@ -3,9 +3,9 @@
  * the face-down parrot (north) and goose (south) regions, the Council of Catan hex and the sea.
  * Map ids are 'ep/<key>'.
  *
- * Board hexes = the island, the region hexes (terrain 'ep/parrot' / 'ep/goose' until explored)
- * and the Council hex. Every other position is playable sea (the frame's `sea`); the automatic
- * ring around them is the frame (ships may sail along it, the pirate may not stand on it).
+ * Board hexes = every position: the island, the region hexes (terrain 'ep/parrot' / 'ep/goose'
+ * until explored), the Council hex and face-up sea (terrain 'sea'). The automatic ring around
+ * them is the frame (ships may sail along it, the pirate may not stand on it).
  * What the face-down hexes hide is dealt by the module's init (state.ts `hidden`).
  */
 import { BANK_PER_RESOURCE, RESOURCES } from '../../../engine/constants';
@@ -301,7 +301,6 @@ function prepare(spec: Spec): Prepared {
     const { q } = parseHexId(H(east[0], r));
     harborSpots.push(cornerVertex(q, r, 'NE'), cornerVertex(q, r, 'SE'));
   }
-  const boardSet = new Set(board);
   return {
     spec,
     p,
@@ -313,8 +312,10 @@ function prepare(spec: Spec): Prepared {
     harborSpots,
     frame: {
       id: `${EP}/${spec.key}`,
-      hexes: [...board].sort(byRowMajor),
-      sea: inside.filter((h) => !boardSet.has(h)),
+      // Every position is a board hex (face-up sea = terrain 'sea'), so the camera frames the
+      // whole playing area; the ring around them is the frame.
+      hexes: [...inside].sort(byRowMajor),
+      sea: [],
       harbors: [],
     },
   };
@@ -374,6 +375,7 @@ function generate(rng: Rng, key: MapKey): GeneratedBoard {
   for (const h of p.parrot) hexes[h] = tile(h, T.parrot, null);
   for (const h of p.goose) hexes[h] = tile(h, T.goose, null);
   if (p.council) hexes[p.council] = tile(p.council, T.council, null);
+  for (const h of p.inside) hexes[h] ??= tile(h, 'sea', null);
   const region: Record<HexId, Region> = {};
   for (const h of p.parrot) region[h] = 'parrot';
   for (const h of p.goose) region[h] = 'goose';
