@@ -10,6 +10,13 @@ describe('parseParams', () => {
     expect(p.speed).toBe(0);
   });
 
+  it('reads the playtest names and debug switch', () => {
+    const p = parseParams('?seats=hhh&names=Seat1, Seat2 ,,Seat3&debug=1');
+    expect(p.names).toEqual(['Seat1', 'Seat2', 'Seat3']);
+    expect(p.debug).toBe(true);
+    expect(parseParams('?debug=yes')).toMatchObject({ names: null, debug: false });
+  });
+
   it('keeps the dev params and rejects junk', () => {
     const p = parseParams('?fixture=midGame&seed=42&layout=beginner&seats=hbhb&vp=5&hl=edges');
     expect(p).toMatchObject({

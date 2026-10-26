@@ -38,6 +38,7 @@ import {
   boardBounds,
   pick,
   screenToUnit,
+  unitToScreen,
   type Hit,
   type PickCandidates,
   type ViewTransform,
@@ -214,6 +215,19 @@ export class BoardView {
   /** Screen margins covered by HTML overlays (HUD panels); the fitted board avoids them. */
   setInsets(insets: Insets): void {
     this.viewport.setInsets(insets);
+  }
+
+  /**
+   * Page position (CSS px, viewport-relative like `clientX/Y`) of a vertex, edge midpoint or
+   * hex center; null for unknown ids. For the playtest harness (`?debug=1`).
+   */
+  screenPos(id: string): Point | null {
+    const info =
+      TOPOLOGY.vertex[id as VertexId] ?? TOPOLOGY.edge[id as EdgeId] ?? TOPOLOGY.hex[id as HexId];
+    if (!info) return null;
+    const p = unitToScreen(this.viewport.view, info);
+    const r = this.app.canvas.getBoundingClientRect();
+    return { x: p.x + r.left, y: p.y + r.top };
   }
 
   destroy(): void {

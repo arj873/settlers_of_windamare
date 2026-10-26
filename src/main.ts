@@ -4,6 +4,7 @@ import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
 import { Hud, type Controller } from './ui';
 import { DEFAULT_SPEED, GameController } from './game/controller';
+import { installDebugHook } from './game/debug';
 import { measureHudInsets } from './game/layout';
 import { mountSpeedPicker, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
@@ -19,7 +20,8 @@ import {
 /**
  * Dev params: `?fixture=midGame` (any fixtures.ts function), `?seed=…&layout=beginner|random`
  * (start at once), `?autoplay=4bots&speed=0` (all-bot game), `?seats=hbbb`, `?vp=5`, `?speed=ms`,
- * `?hl=vertices|edges|hexes` (highlight preview). Without any, the new-game / resume screen opens.
+ * `?hl=vertices|edges|hexes` (highlight preview), `?names=A,B,C`, `?debug=1` (playtest hook).
+ * Without any, the new-game / resume screen opens.
  */
 function devGame(params: DevParams): { state: GameState; seats: Controller[] } | null {
   const seatsFor = (n: number, fallback: Controller): Controller[] =>
@@ -38,9 +40,13 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
     const seed = params.seed ?? String(Date.now() % 1e9);
     const layout = params.layout ?? 'random';
     console.info(`Catan dev game: layout=${layout} seed=${seed}`);
+    const names = params.names?.length === n ? params.names : null;
     const state = createGame({
       seed,
-      players: fixtures.FIXTURE_PLAYERS.slice(0, n),
+      players: fixtures.FIXTURE_PLAYERS.slice(0, n).map((p, i) => ({
+        ...p,
+        name: names?.[i] ?? p.name,
+      })),
       layout,
       ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
     });
@@ -98,6 +104,7 @@ async function boot() {
   uiRoot.addEventListener('click', () => requestAnimationFrame(fitBoard));
   // Debug handle for the console.
   (window as unknown as { catan: unknown }).catan = { controller, board, hud };
+  if (params.debug) installDebugHook(controller, board);
 
   if (dev) {
     controller.start(dev.state, dev.seats);

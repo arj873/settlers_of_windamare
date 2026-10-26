@@ -18,6 +18,10 @@ export interface DevParams {
   seats: Controller[] | null;
   /** `?hl=vertices|edges|hexes`: board highlight preview (render dev aid). */
   hl: 'vertices' | 'edges' | 'hexes' | null;
+  /** `?names=Ann,Bob,Cy`: player names for games started from params (count must match). */
+  names: string[] | null;
+  /** `?debug=1`: install the read-only `window.__catanDebug` hook (playtest harness). */
+  debug: boolean;
 }
 
 export function parseParams(search: string): DevParams {
@@ -32,6 +36,10 @@ export function parseParams(search: string): DevParams {
   const auto = /^([34])bots?$/.exec(p.get('autoplay') ?? '');
   const seats = /^[hb]{3,4}$/.exec(p.get('seats') ?? '');
   const hl = p.get('hl');
+  const names = (p.get('names') ?? '')
+    .split(',')
+    .map((s) => s.trim().slice(0, 16))
+    .filter(Boolean);
   return {
     fixture: p.get('fixture'),
     seed: p.get('seed'),
@@ -41,5 +49,7 @@ export function parseParams(search: string): DevParams {
     vpToWin: num('vp', 3, 20),
     seats: seats ? [...seats[0]].map((c) => (c === 'h' ? 'human' : 'bot')) : null,
     hl: hl === 'vertices' || hl === 'edges' || hl === 'hexes' ? hl : null,
+    names: names.length > 0 ? names : null,
+    debug: p.get('debug') === '1',
   };
 }

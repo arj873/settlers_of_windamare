@@ -268,6 +268,7 @@ view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an 
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
 view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
+view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
@@ -322,7 +323,12 @@ c.destroy();
   access in try/catch. On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`,
   `?seed`, `?layout`, `?autoplay`) never autosave.
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?seats=hbbb`, `?vp=`, `?speed=ms`,
-  `?autoplay=4bots|3bots` (all bots), `?hl=`. `window.catan` = `{ controller, board, hud }`.
+  `?autoplay=4bots|3bots` (all bots), `?hl=`, `?names=A,B,C` (names for param games).
+  `window.catan` = `{ controller, board, hud }`.
+- Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
+  `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
+  `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
+  (`pnpm pt:serve`, `pnpm pt`; see `playtest/PLAYBOOK.md`), which acts only through real clicks.
 
 ## 14. Decisions and open questions
 
