@@ -30,7 +30,8 @@ const FIXTURES: GameState[] = [
 /** Paths of objects/arrays that `a` and `b` share by reference (outside the allowed ones). */
 function sharedPaths(a: unknown, b: unknown, path = '$'): string[] {
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return [];
-  if (path === '$.board' || path === '$.settings' || /^\$\.log\[\d+\]$/.test(path)) return [];
+  if (path === '$.board' || path === '$.settings' || path === '$.stats') return [];
+  if (/^\$\.log\[\d+\]$/.test(path)) return [];
   if (a === b) return [path];
   const out: string[] = [];
   for (const k of Object.keys(a)) {
@@ -50,7 +51,7 @@ describe('cloneState', () => {
     for (const s of FIXTURES) expect(cloneState(s)).toEqual(s);
   });
 
-  it('shares nothing mutable: only board, settings and log entries (all immutable)', () => {
+  it('shares nothing mutable: only board, settings, stats and log entries (all immutable)', () => {
     for (const s of FIXTURES) {
       const c = cloneState(s);
       expect(sharedPaths(s, c)).toEqual([]);

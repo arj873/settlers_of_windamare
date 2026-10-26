@@ -22,6 +22,7 @@ import {
   isLandHex,
   isMapId,
   setupPlayerAt,
+  sumCounts,
   supplyOf,
   topologyOf,
   vertexNeighbors,
@@ -45,6 +46,7 @@ export type ViolationCode =
   | 'vp-mismatch'
   | 'award-holder'
   | 'award-mismatch'
+  | 'stats'
   | 'winner'
   | 'phase-actor'
   | 'dice-deck';
@@ -56,6 +58,60 @@ export interface Violation {
 }
 
 const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+
+/**
+ * Game statistics (UX2) agree with the state they describe: per player and resource,
+ * Σ gained − Σ lost = hand; nothing unclassified ('other'); dev cards bought = held + played;
+ * played counts = knightsPlayed / progressCardsPlayed; roads and cities built = on the board.
+ * Only for stats recorded since createGame (`complete`).
+ */
+function checkStats(
+  state: GameState,
+  add: (code: ViolationCode, message: string, player?: PlayerId) => void,
+): void {
+  const stats = state.stats;
+  if (!stats?.complete) return;
+  if (stats.players.length !== state.players.length) {
+    add('stats', `stats for ${stats.players.length} players, game has ${state.players.length}`);
+    return;
+  }
+  const officialSetup = setupPlacementOf(state.settings);
+  const noSetupCities =
+    officialSetup.first.building === 'settlement' && officialSetup.second.building === 'settlement';
+  state.players.forEach((p, i) => {
+    const s = stats.players[i];
+    if (!s) return;
+    const gained = sumCounts(s.gained);
+    const lost = sumCounts(s.lost);
+    for (const r of RESOURCES) {
+      if (gained[r] - lost[r] !== p.resources[r])
+        add('stats', `${r}: gained ${gained[r]} − lost ${lost[r]} ≠ hand ${p.resources[r]}`, i);
+      if (s.gained.other[r] !== 0 || s.lost.other[r] !== 0)
+        add('stats', `${r}: unclassified hand change`, i);
+    }
+    for (const t of DEV_CARD_TYPES) {
+      const played =
+        t === 'knight' ? p.knightsPlayed : t === 'victoryPoint' ? 0 : p.progressCardsPlayed[t];
+      if (s.devPlayed[t] !== played)
+        add('stats', `${t}: devPlayed ${s.devPlayed[t]} ≠ ${played}`, i);
+      const held = p.devCards[t] + p.newDevCards[t] + played;
+      if (s.devBought[t] !== held) add('stats', `${t}: bought ${s.devBought[t]} ≠ ${held}`, i);
+    }
+    const kinds = Object.values(state.pieces.buildings).filter((b) => b.owner === i);
+    const cities = kinds.filter((b) => b.kind === 'city').length;
+    const settlements = kinds.length - cities;
+    const roads = Object.values(state.pieces.roads).filter((o) => o === i).length;
+    if (s.built.road !== roads) add('stats', `built ${s.built.road} roads, board has ${roads}`, i);
+    if (s.built.city !== cities)
+      add('stats', `built ${s.built.city} cities, board has ${cities}`, i);
+    if (noSetupCities && s.built.settlement - s.built.city !== settlements)
+      add(
+        'stats',
+        `built ${s.built.settlement} settlements − ${cities} upgraded ≠ ${settlements}`,
+        i,
+      );
+  });
+}
 
 /** Each vertex's incident on-board roads of `player`. */
 function roadsByVertex(state: GameState, player: PlayerId): Map<VertexId, EdgeId[]> {
@@ -296,6 +352,8 @@ export function checkInvariants(state: GameState): Violation[] {
         p.id,
       );
   }
+
+  checkStats(state, add);
 
   // --- winner / game over --------------------------------------------------------------------
   const over = state.phase.kind === 'gameOver';

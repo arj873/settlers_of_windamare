@@ -23,6 +23,7 @@ import { DEV_CARD_TYPES } from '../constants';
 import { rollTwoDice } from '../rules/dice';
 import { playerName } from '../rules/text';
 import { emptyDevCards } from '../resources';
+import { recordRoll } from '../stats';
 import type { Action, GameState, PlayerId } from '../types';
 import { eventCardsOn } from '../variants';
 import { buildLegal } from './build';
@@ -40,6 +41,7 @@ export { discardAmounts };
 export function rollFor(draft: GameState, player: PlayerId): void {
   if (eventCardsOn(draft.settings)) {
     resolveEventRoll(draft, player);
+    recordRoll(draft, player);
     return;
   }
   const { dice, reshuffled } = rollTwoDice(draft);
@@ -47,6 +49,7 @@ export function rollFor(draft: GameState, player: PlayerId): void {
   const roll = dice[0] + dice[1];
   if (reshuffled) log(draft, null, 'The dice deck was shuffled');
   log(draft, player, `${playerName(draft, player)} rolled ${roll} (${dice[0]}+${dice[1]})`);
+  recordRoll(draft, player);
   if (roll === 7) {
     resolveSeven(draft);
     return;

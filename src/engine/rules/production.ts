@@ -9,6 +9,7 @@ import { RESOURCES } from '../constants';
 import { emptyResources } from '../resources';
 import { hexVertices, topologyOf } from '../topology';
 import type { GameState, HexId, ResourceCounts } from '../types';
+import { recordProduction } from '../stats';
 import { hasRobber } from '../variants';
 
 export interface ProductionOptions {
@@ -56,7 +57,7 @@ export function payableProduction(
   return owed;
 }
 
-/** Pay production for `roll` from the bank into hands. Mutates the draft. */
+/** Pay production for `roll` from the bank into hands (and into the stats). Mutates the draft. */
 export function produce(
   draft: GameState,
   roll: number,
@@ -71,5 +72,6 @@ export function produce(
       draft.bank[r] -= gain[r];
     }
   });
+  recordProduction(draft, roll, pay, opts.cityYield ?? 2);
   return pay;
 }
