@@ -12,7 +12,7 @@ import { resCardFace } from '../../ui/widgets';
 import { CARD_NAMES, type ProgressCard } from '../ck/engine';
 import { ckHud } from '../ck/ui';
 import { has } from '../tb/engine';
-import { TBCK } from './engine';
+import { RANSOM_GOLD, TBCK } from './engine';
 import './tbck.css';
 
 type Send = (a: Action) => void;
@@ -127,13 +127,45 @@ function voteDialog(state: GameState, view: HudView, send: Send): HudDialog | nu
   };
 }
 
+/** Rivers + C&K: keep a pillaged city for 5 gold? */
+function ransomDialog(state: GameState, view: HudView, send: Send): HudDialog | null {
+  if (state.phase.kind !== 'tbck/ransom') return null;
+  const options = mine(view, 'tbck/ransom');
+  if (options.length === 0) return null;
+  const pay = options.find((a) => field(a, 'pay') === true);
+  const no = options.find((a) => field(a, 'pay') === false);
+  return {
+    key: `tbck-ransom-${state.turn.number}-${view.viewer}-${state.log.length}`,
+    title: 'The barbarians pillage your city',
+    modal: true,
+    body: [
+      h(
+        'p',
+        {},
+        `Pay ${RANSOM_GOLD} gold to keep the city (and its wall)? Otherwise it becomes a settlement.`,
+      ),
+      h(
+        'div',
+        { class: 'tbck-buttons' },
+        pay &&
+          h(
+            'button',
+            { class: 'btn btn-primary tbck-btn', on: { click: () => send(pay) } },
+            `Keep it (${RANSOM_GOLD} gold)`,
+          ),
+        no && h('button', { class: 'btn tbck-btn', on: { click: () => send(no) } }, 'Let it go'),
+      ),
+    ],
+  };
+}
+
 export const tbckHud: HudExtension = {
   id: TBCK,
 
   panel: (state, view, send) => panel(state, view, send),
 
   dialog(state, view, legal, send) {
-    const vote = voteDialog(state, view, send);
+    const vote = voteDialog(state, view, send) ?? ransomDialog(state, view, send);
     if (vote) return vote;
     if (state.phase.kind !== 'ck/knight') return null;
     const base = ckHud.dialog?.(state, view, legal, send) ?? null;
@@ -153,6 +185,11 @@ export const tbckHud: HudExtension = {
   },
 
   hint(state, view) {
+    if (state.phase.kind === 'tbck/ransom') {
+      return mine(view, 'tbck/ransom').length > 0
+        ? `Keep your city for ${RANSOM_GOLD} gold?`
+        : 'Waiting for a city owner to pay the barbarians';
+    }
     if (state.phase.kind !== 'ck/knight' || state.turn.current !== view.viewer) return null;
     return mine(view, 'tbck/chaseBarbarian').length > 0
       ? 'Move the knight, or click a barbarian next to it to chase it'

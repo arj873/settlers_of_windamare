@@ -55,6 +55,16 @@ import {
 import { addGold, goldOf, payBank } from '../../tb/engine/common';
 import { fishCost, fishPayment } from '../../tb/engine/fish';
 import { edgeOnRiver, isBridgeSite } from '../../tb/engine/rivers';
+import {
+  noteCities,
+  offerRansom,
+  ransom,
+  ransomActor,
+  ransomLegal,
+  type RansomSlice,
+} from './ransom';
+
+export { RANSOM_GOLD, type RansomPhase } from './ransom';
 import { fishOf, tradersOf } from '../../tb/engine/state';
 
 export const TBCK = 'tbck';
@@ -74,7 +84,7 @@ export const TBCK_SCENARIOS = [SC_FISH, SC_RIVERS, SC_CARAVANS, SC_TRADERS, SC_V
 /** Rivers: Diplomat removing a road next to a river costs this much gold (C4). */
 export const RIVER_ROAD_TOLL = 1;
 
-export interface TbckSlice {
+export interface TbckSlice extends RansomSlice {
   v: 1;
 }
 
@@ -84,6 +94,7 @@ export type TbckAction =
   | { type: 'tbck/fishProgress'; player: PlayerId; card: ProgressCard };
 
 const pn = playerName;
+export const tbckSlice = (state: Pick<GameState, 'ext'>): TbckSlice => state.ext[TBCK] as TbckSlice;
 
 // ---------------------------------------------------------------------------------------------
 // Fishermen + C&K: fish steal resources and commodities; 7 fish buy a progress card
@@ -423,7 +434,7 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
 
 function legal(state: GameState): Action[] {
   const p = state.turn.current;
-  const out: Action[] = [];
+  const out: Action[] = ransomLegal(state) as unknown as Action[];
   const add = (a: TbckAction) => out.push(a as unknown as Action);
   if (has(state, 'fish')) {
     for (const card of fishProgressChoices(state, p)) {
@@ -560,7 +571,7 @@ export const tbckModule: ExpansionModule = {
 
   init(draft, rng) {
     if (has(draft, 'traders')) forestToField(draft, rng);
-    const slice: TbckSlice = { v: 1 };
+    const slice: TbckSlice = { v: 1, roll: null };
     draft.ext[TBCK] = slice;
   },
   cloneExt: (slice) => cloneJson(slice),
@@ -569,7 +580,9 @@ export const tbckModule: ExpansionModule = {
     'tbck/chaseBarbarian': chaseBarbarian,
     'tbck/sellCommodity': sellCommodity,
     'tbck/fishProgress': fishProgress,
+    'tbck/ransom': ransom,
   },
+  actors: (state) => ransomActor(state),
   wraps,
   overrides: {
     // C&K has no development cards: no T&B Swift Journey draws either.
@@ -584,6 +597,17 @@ export const tbckModule: ExpansionModule = {
   filterLegal,
 
   hooks: {
+    // Rivers + C&K: note the cities before C&K's attack may pillage them (ransom.ts).
+    onRoll(draft, roll) {
+      noteCities(draft, tbckSlice(draft), roll);
+      return undefined;
+    },
+    afterAction(draft) {
+      offerRansom(draft, tbckSlice(draft));
+    },
+    statsCategory: (_state, action) =>
+      action.type === 'tbck/ransom' ? { gain: 'production' } : undefined,
+
     afterProduction(draft, roll, paid) {
       const aqueduct = ckModule.hooks?.afterProduction?.(draft, roll, paid);
       tbModule.hooks?.afterProduction?.(draft, roll, paid);

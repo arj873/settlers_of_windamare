@@ -101,4 +101,18 @@ describe('T&B + C&K HUD', () => {
     byText('Vote 2')?.click();
     expect(actions.at(-1)).toEqual({ type: 'tb/bid', player: 0, brick: 1, lumber: 1 });
   });
+
+  it('Rivers: a pillaged city owner may pay 5 gold to keep it', () => {
+    const s = main('tb/rivers');
+    s.phase = {
+      kind: 'tbck/ransom',
+      queue: [{ vertex: 'v:0,0,N', owner: 0, wall: false }],
+      roll: 5,
+    } as unknown as GameState['phase'];
+    s.pieces.buildings['v:0,0,N'] = { owner: 0, kind: 'settlement' };
+    (s.ext['tb'] as { gold: number[] }).gold[0] = 5;
+    show(s);
+    byText('Keep it')?.click();
+    expect(actions.at(-1)).toEqual({ type: 'tbck/ransom', player: 0, pay: true });
+  });
 });

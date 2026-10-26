@@ -211,6 +211,47 @@ describe('Rivers + C&K', () => {
   });
 });
 
+describe('Rivers + C&K: keeping a city for 5 gold', () => {
+  /** Player 1 has one city (and a wall); the barbarians land on player 0's roll, unopposed. */
+  function attack(gold: number): GameState {
+    const s = main('tb/rivers');
+    const t = topologyOf(s);
+    const v = t.vertices.find((x) => (t.vertex[x]?.hexes.length ?? 0) === 3) as VertexId;
+    s.pieces.buildings[v] = { owner: 1, kind: 'city' };
+    ckSlice(s).walls[v] = 1;
+    ckSlice(s).barbarian = 6;
+    tbSlice(s).gold[1] = gold;
+    s.phase = { kind: 'preRoll' };
+    s.rng = rngFor(2, 1, 'ship');
+    return run(s, { type: 'rollDice', player: 0 });
+  }
+  const cityAt = (s: GameState) =>
+    (Object.entries(s.pieces.buildings) as [VertexId, { owner: number; kind: string }][]).find(
+      ([, b]) => b.owner === 1,
+    );
+
+  it('the owner of a pillaged city with 5 gold may pay to keep it (with its wall)', () => {
+    const s = attack(6);
+    expect(s.phase.kind).toBe('tbck/ransom');
+    expect(legalActions(s).map((a) => (a as { pay?: boolean }).pay)).toEqual([false, true]);
+    const kept = run(s, { type: 'tbck/ransom', player: 1, pay: true } as Action);
+    const [v, b] = cityAt(kept)!;
+    expect(b.kind).toBe('city');
+    expect(ckSlice(kept).walls[v]).toBe(1);
+    expect(goldOf(kept, 1)).toBe(1);
+    expect(kept.phase.kind).toBe('main');
+    const lost = run(s, { type: 'tbck/ransom', player: 1, pay: false } as Action);
+    expect(cityAt(lost)![1].kind).toBe('settlement');
+    expect(goldOf(lost, 1)).toBe(6);
+  });
+
+  it('without 5 gold the city is simply pillaged', () => {
+    const s = attack(4);
+    expect(s.phase.kind).toBe('main');
+    expect(cityAt(s)![1].kind).toBe('settlement');
+  });
+});
+
 describe('Caravans + C&K', () => {
   function vote(): GameState {
     const s = main('tb/caravans');
