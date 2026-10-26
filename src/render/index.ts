@@ -16,4 +16,4 @@ export {
   type ViewTransform,
 } from './geometry';
 export { drawResourceIcon } from './art';
-export { RESOURCE_COLORS, TERRAIN_COLORS, TERRAIN_PALETTE } from './theme';
+export { RESOURCE_COLORS, TERRAIN_COLORS, TERRAIN_PALETTE, setFrameColors } from './theme';

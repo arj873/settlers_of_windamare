@@ -246,6 +246,11 @@ export class BoardView {
     return { x: p.x + r.left, y: p.y + r.top };
   }
 
+  /** Redraw the sea and frame after `setFrameColors` (a UI theme change). */
+  retheme(): void {
+    this.buildSea();
+  }
+
   destroy(): void {
     this.app.renderer.off('resize', this.onResize);
     this.app.ticker.remove(this.tick);

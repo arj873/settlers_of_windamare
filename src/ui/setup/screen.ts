@@ -3,6 +3,7 @@
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
 import { h, type Child } from '../dom';
+import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
 import {
@@ -87,6 +88,7 @@ export class SetupScreen {
           'div',
           { class: 'su-footer-in' },
           this.summary,
+          themePicker({ compact: true }),
           opts.onBack &&
             h(
               'button',
