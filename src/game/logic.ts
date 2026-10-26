@@ -150,6 +150,65 @@ export function nextBot(state: GameState, seats: Seats, legal: readonly Action[]
   return seats[cur] === 'bot' && canAct(legal, cur) ? { player: cur, fast: false } : null;
 }
 
+/** Log entries `next` appended after `prev`'s newest one (the engine trims old entries). */
+function appendedLog(prev: GameState, next: GameState): GameState['log'] {
+  const last = prev.log[prev.log.length - 1];
+  if (!last) return next.log;
+  for (let i = next.log.length - 1; i >= 0; i--) {
+    const e = next.log[i];
+    if (e && e.turn === last.turn && e.player === last.player && e.text === last.text) {
+      return next.log.slice(i + 1);
+    }
+  }
+  return next.log;
+}
+
+/**
+ * What `viewer` should be told when a trade offer they took part in ended between two states:
+ * withdrawn (by the offerer or their timeout), rejected by everyone, or done with someone. Null
+ * when no offer ended, `viewer` was not part of it, or `viewer` closed it themselves (`ownClose`:
+ * their last move was the cancel / confirm / reject that ended it).
+ */
+export function tradeEndNotice(
+  prev: GameState,
+  next: GameState,
+  viewer: PlayerId,
+  ownClose = false,
+): string | null {
+  if (prev.phase.kind !== 'trade') return null;
+  const offer = prev.phase.offer;
+  const sameOffer =
+    next.phase.kind === 'trade' &&
+    next.turn.number === prev.turn.number &&
+    next.turn.tradeOffers === prev.turn.tradeOffers;
+  if (sameOffer) return null;
+  const mine = offer.from === viewer;
+  const answer = offer.responses[viewer] ?? null;
+  if (!mine && answer === null) return null;
+  const offerer = prev.players[offer.from]?.name ?? 'The offerer';
+  const end = appendedLog(prev, next).find(
+    (e) =>
+      /withdrew the offer$/.test(e.text) ||
+      e.text === 'Everyone rejected the offer' ||
+      / traded .* to .* for /.test(e.text),
+  );
+  if (ownClose) return null;
+  if (!end) return mine ? 'Your trade offer closed' : `${offerer}'s trade offer closed`;
+  if (end.text.endsWith('withdrew the offer')) {
+    if (mine) return 'Your trade offer was withdrawn';
+    return answer === 'accepted'
+      ? `${offerer} withdrew the offer you accepted`
+      : `${offerer} withdrew the offer`;
+  }
+  if (end.text === 'Everyone rejected the offer')
+    return mine ? 'Everyone rejected your offer' : null;
+  // A completed trade: tell the partner, and an accepter who was not picked.
+  if (mine || end.player === viewer) return null;
+  const partner = prev.players.find((p) => end.text.includes(` to ${p.name} for `));
+  if (partner?.id === viewer) return `Trade done: ${end.text}`;
+  return answer === 'accepted' ? `${offerer} traded with ${partner?.name ?? 'someone else'}` : null;
+}
+
 /** Nobody can move but the game is not over: the controller reports this instead of hanging. */
 export function isStalled(state: GameState, legal: readonly Action[]): boolean {
   return state.phase.kind !== 'gameOver' && legal.length === 0;

@@ -4,11 +4,17 @@
  * clock down between messages. Same board/HUD wiring as the hotseat GameController, no engine
  * calls on the view (docs/MULTIPLAYER.md §6).
  */
-import type { Action, PlayerId } from '../../engine';
+import type { Action, GameState, PlayerId } from '../../engine';
 import type { RoomClient, RoomInfo } from '../../net';
 import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
-import { actionForClick, boardActions, highlightsFor, type BoardClick } from '../logic';
+import {
+  actionForClick,
+  boardActions,
+  highlightsFor,
+  tradeEndNotice,
+  type BoardClick,
+} from '../logic';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -55,6 +61,10 @@ export class NetGameController {
   private placeMode: PlaceMode | null = null;
   private stopTimer: (() => void) | null = null;
   private shownSec = -1;
+  /** The last rendered view, to notice an ended trade offer (`tradeEndNotice`). */
+  private shown: GameState | null = null;
+  /** The last action this seat sent (a cancel / confirm / reject ends offers on purpose). */
+  private lastSent: Action['type'] | null = null;
   private readonly offs: (() => void)[] = [];
 
   constructor(opts: NetControllerOptions) {
@@ -138,6 +148,7 @@ export class NetGameController {
   }
 
   private send(action: Action): void {
+    this.lastSent = action.type;
     if (!this.client.intent(action)) {
       this.toast('Not connected: your move was not sent. Reconnecting…', 'error');
     }
@@ -153,11 +164,26 @@ export class NetGameController {
     const g = this.client.game;
     const hv = this.hudView();
     if (!g || !hv) return;
+    this.noticeTradeEnd(g.view, hv.viewer);
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
     this.board.render(g.view);
     this.hud.render(g.view, hv);
     this.updateHighlights();
     this.onRender();
+  }
+
+  /** Toast how a trade offer this seat took part in ended, unless the seat ended it itself. */
+  private noticeTradeEnd(view: GameState, viewer: PlayerId): void {
+    const prev = this.shown;
+    this.shown = view;
+    if (!prev || prev === view || viewer < 0) return;
+    const own =
+      this.lastSent === 'cancelTrade' ||
+      this.lastSent === 'confirmTrade' ||
+      this.lastSent === 'rejectTrade';
+    const notice = tradeEndNotice(prev, view, viewer, own);
+    if (prev.phase.kind === 'trade' && view.phase.kind !== 'trade') this.lastSent = null;
+    if (notice) this.toast(notice, 'info');
   }
 
   private updateHighlights(): void {

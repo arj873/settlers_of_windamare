@@ -7,7 +7,7 @@ import {
   midGame,
   tradeOfferGame,
 } from '../../src/engine/fixtures';
-import { actingVerdict, mustDo, newLogEntries, wakeReason } from './guard';
+import { actingVerdict, mustDo, newLogEntries, staleTradeHint, wakeReason } from './guard';
 import type { Snapshot, UiScan } from './protocol';
 
 const EMPTY_UI: UiScan = {
@@ -70,6 +70,38 @@ describe('online snapshots (own legal actions only)', () => {
   it('wakes the seat on the clock', () => {
     const state = freshGame(3);
     expect(wakeReason(mine(state.turn.current), state.turn.current)).toMatch(/^YOUR MOVE/);
+  });
+
+  // BUG-B3: Cancel offer is always legal for the offerer, so `wait` returned at once.
+  it('keeps the offerer waiting while addressees still owe an answer', () => {
+    const own = (state: GameState, seat: PlayerId): Snapshot => ({
+      ...snap(state, seat),
+      legal: legalActions(state).filter((a) => a.player === seat),
+      online: online(),
+    });
+    // Blue (1) offered; Red rejected, White (2) still pending, Orange (3) accepted.
+    const t = tradeOfferGame();
+    expect(wakeReason(own(t, 1), 1)).toBeNull();
+    expect(mustDo(t, 1, legalActions(t))).toMatch(/waiting for White to answer: `wait`/);
+    // The pending responder is woken to answer.
+    const pendingSeat = t.phase.kind === 'trade' ? t.phase.offer.responses.indexOf('pending') : -1;
+    expect(wakeReason(own(t, pendingSeat), pendingSeat)).toMatch(
+      /^YOUR MOVE: .* offers you a trade/,
+    );
+    // Everyone answered: the offerer wakes to confirm or cancel.
+    if (t.phase.kind === 'trade') t.phase.offer.responses[pendingSeat] = 'rejected';
+    expect(wakeReason(own(t, 1), 1)).toMatch(/^YOUR MOVE: Your trade offer is open: confirm/);
+  });
+
+  it('explains a click on a trade button of an offer that already closed', () => {
+    const m = midGame();
+    m.log.push({ turn: 46, player: null, text: 'Everyone rejected the offer' });
+    expect(staleTradeHint(m, 'Cancel offer')).toMatch(
+      /already closed.*"T46 Everyone rejected the offer"/,
+    );
+    expect(staleTradeHint(m, 'Roll dice')).toBeNull();
+    expect(staleTradeHint(m, 'Trade')).toBeNull(); // the Trade (composer) button itself
+    expect(staleTradeHint(tradeOfferGame(), 'Cancel offer')).toBeNull();
   });
 
   it('wakes on a fatal close and refuses acting while offline', () => {

@@ -564,7 +564,9 @@ c.destroy();
 - Bots: `defaultBot = createRandomBot({ progressBias: 0.5 })`, private `Rng` seeded `bots:<seed>`
   (saved with the session), one move per tick (`speed` ms, ×0.4 for discards / trade replies;
   speed 0 = batches of moves per 12 ms slice). The controller hides `offerTrade` from a bot after
-  `BOT_OFFERS_PER_TURN` (1) offers in a turn. Nobody able to act → error toast + state on console.
+  `BOT_OFFERS_PER_TURN` (1) offers in a turn. The random bot confirms an accepted own offer with a
+  random accepter (it withdraws only while nobody has accepted). Nobody able to act → error toast
+  - state on console.
 - Game duration (UX2): `start` notes the wall clock (`ControllerOptions.wallClock`, default
   `Date.now`); at game over the controller fixes `durationMs` and passes it as
   `HudView.gameDurationMs`. Saved as `SavedSession.playedMs` (time played so far); `resume` shifts

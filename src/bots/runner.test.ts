@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Rng, type Action, type ActionResult, type GameState } from '../engine';
-import { discardGame, midGame } from '../engine/fixtures';
+import { legalActions, Rng, type Action, type ActionResult, type GameState } from '../engine';
+import { discardGame, midGame, tradeOfferGame } from '../engine/fixtures';
 import { actorsFor, createRandomBot } from './index';
 import { checkInvariants } from './invariants';
 import {
@@ -275,5 +275,54 @@ describe('random bot', () => {
 
   it('rejects an unknown mode', () => {
     expect(() => createRandomBot({ mode: 'nope' as 'uniform' })).toThrow();
+  });
+});
+
+describe('random bot as a trade offerer (BUG-B3)', () => {
+  /** Blue (1) offers 1 ore for 1 brick to Red, Orange and White with these responses. */
+  type Resp = 'pending' | 'accepted' | 'rejected' | null;
+  const offerState = (responses: Resp[]) => {
+    const s = tradeOfferGame();
+    for (const p of s.players) p.resources = { ...p.resources, ore: 2, brick: 2 };
+    if (s.phase.kind === 'trade') s.phase.offer.responses = responses;
+    return s;
+  };
+  const offererPicks = (state: GameState, bot = createRandomBot(), n = 300) => {
+    const rng = new Rng(5);
+    const legal = legalActions(state);
+    const seen = new Map<string, number>();
+    for (let i = 0; i < n; i++) {
+      const a = bot(state, 1, rng, legal)!;
+      const k = a.type === 'confirmTrade' ? `confirm:${a.partner}` : a.type;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+    }
+    return seen;
+  };
+
+  it('confirms with an accepting partner instead of withdrawing, picking among accepters', () => {
+    const picks = offererPicks(offerState(['accepted', null, 'rejected', 'accepted']));
+    expect([...picks.keys()].sort()).toEqual(['confirm:0', 'confirm:3']);
+    // Also with the progress bias of the default (hotseat + server) bot.
+    const biased = offererPicks(
+      offerState(['rejected', null, 'pending', 'accepted']),
+      createRandomBot({ progressBias: 0.5 }),
+    );
+    expect([...biased.keys()]).toEqual(['confirm:3']);
+  });
+
+  it('may still withdraw while nobody has accepted', () => {
+    const picks = offererPicks(offerState(['rejected', null, 'pending', 'pending']));
+    expect([...picks.keys()]).toEqual(['cancelTrade']);
+  });
+
+  it('simulated games still withdraw and confirm offers (fuzz coverage)', () => {
+    const seen = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const result = runGame({ initial: newGame({ seed, players: 4 }), maxSteps: 3000 });
+      expect(result.failure).toBeNull();
+      for (const a of result.history) seen.add(a.type);
+    }
+    expect(seen).toContain('cancelTrade');
+    expect(seen).toContain('confirmTrade');
   });
 });
