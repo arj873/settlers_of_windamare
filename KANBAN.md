@@ -13,6 +13,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
+- **T18** · AI playtest, 6 players: 6 Haiku agents on the Base 5-6P map via the harness, file bugs → triage → fixes · `s2-haiku6-1..6` (Haiku) · deps: T10, T15, map wiring
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
 - **T12** · Render scale: big boards fit, 8 player colours, map previews from engine data, special-build UI hook (HUD side moved to T17) · `s2-render-hud` 🟩 · deps: T10, T11
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10
