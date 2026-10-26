@@ -1,19 +1,29 @@
-// T&B + Seafarers (C2) in vite preview: the setup screen with the mode's scenario tiles, then an
-// all-bot game per scenario (start, and mid-game in two or more themes). No page errors allowed.
-// Usage: node scripts/shots-tbsea.mjs <baseUrl> <outDir>
+// T&B + Seafarers and the T&B scenario pairs (C2) in vite preview: the setup screen with the
+// mode's scenario tiles, then an all-bot game per scenario (start, and mid-game in two or more
+// themes). No page errors allowed.
+// Usage: node scripts/shots-tbsea.mjs <baseUrl> <outDir> [--pairs] [--setup-only]
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-const [base = 'http://localhost:4173', out = 'playtest/shots/tbsea'] = process.argv.slice(2);
+const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const [base = 'http://localhost:4173', out = 'playtest/shots/tbsea'] = args;
 mkdirSync(out, { recursive: true });
-const MODE = 'tb+seafarers';
-const GAMES = [
-  { scenario: 'tbsea/traders', themes: ['sunfired', 'chartroom', 'githubdark'], turn: 45 },
-  { scenario: 'tbsea/fishermen', themes: ['parlour', 'materialdark'], turn: 40 },
-  { scenario: 'tbsea/rivers', themes: ['wood', 'githubdark'], turn: 40 },
-  { scenario: 'tbsea/caravans', themes: ['sunfired', 'materialdark'], turn: 50 },
-  { scenario: 'tbsea/barbarianAttack', themes: ['chartroom', 'githubdark'], turn: 40 },
-];
+const PAIRS = process.argv.includes('--pairs');
+const MODE = PAIRS ? 'tb+tb' : 'tb+seafarers';
+const GAMES = PAIRS
+  ? [
+      { scenario: 'tbpair/fishRivers', themes: ['sunfired', 'githubdark'], turn: 40 },
+      { scenario: 'tbpair/fishTraders', themes: ['chartroom', 'materialdark'], turn: 40 },
+      { scenario: 'tbpair/fishBa', themes: ['parlour', 'githubdark'], turn: 40 },
+      { scenario: 'tbpair/fishCaravans', themes: ['wood', 'materialdark'], turn: 40 },
+    ]
+  : [
+      { scenario: 'tbsea/traders', themes: ['sunfired', 'chartroom', 'githubdark'], turn: 45 },
+      { scenario: 'tbsea/fishermen', themes: ['parlour', 'materialdark'], turn: 40 },
+      { scenario: 'tbsea/rivers', themes: ['wood', 'githubdark'], turn: 40 },
+      { scenario: 'tbsea/caravans', themes: ['sunfired', 'materialdark'], turn: 50 },
+      { scenario: 'tbsea/barbarianAttack', themes: ['chartroom', 'githubdark'], turn: 40 },
+    ];
 
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -38,10 +48,10 @@ const setTheme = (page, t) =>
   await page.waitForSelector(`[data-k="mode-${MODE}"]`, { timeout: 30_000 });
   await page.click(`[data-k="mode-${MODE}"]`);
   await page.waitForTimeout(400);
-  await page.screenshot({ path: `${out}/setup-tbsea.png` });
+  await page.screenshot({ path: `${out}/setup-${MODE.replace('+', '_')}.png` });
   await page.locator(`[data-k="scenario-${GAMES[0].scenario}"]`).scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
-  await page.screenshot({ path: `${out}/setup-tbsea-scenarios.png` });
+  await page.screenshot({ path: `${out}/setup-${MODE.replace('+', '_')}-scenarios.png` });
   await page.close();
 }
 

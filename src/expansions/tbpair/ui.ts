@@ -25,7 +25,7 @@ export function pairRules(state: GameState): string[] {
       'Conquered buildings catch no fish.',
     );
   }
-  if (has(state, 'caravans')) out.push('The hex with the 2 also produces on a 12.');
+  if (has(state, 'caravans')) out.push('The 12 hex carries the 2 too: it produces on both.');
   return out;
 }
 
