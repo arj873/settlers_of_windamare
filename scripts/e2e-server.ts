@@ -181,6 +181,12 @@ class Client {
     if (parsed.msg.type === 'game' && this.autopilot) {
       setTimeout(() => this.act(), 5);
     }
+    // A rate-limited intent was dropped and no new state follows: try that move again later
+    // (without this the game hangs on that player's move: no turn timer in this test).
+    if (parsed.msg.type === 'error' && parsed.msg.code === 'rate_limited' && this.autopilot) {
+      this.actedOn = -1;
+      setTimeout(() => this.act(), 500);
+    }
   }
 
   /** Play the latest game message once (a stale_state reply re-sends it with a new seq). */
@@ -291,7 +297,19 @@ async function main(): Promise<void> {
       clients.map((c) =>
         c.waitFor((m) => m.type === 'game' && m.view.winner !== null, TIMEOUT_MS - 20_000),
       ),
-    );
+    ).catch((e: unknown) => {
+      // Say where it hung: phase, log tail and each client's legal moves.
+      for (const c of clients) {
+        const g = c.last('game');
+        const errs = c.inbox.filter((m) => m.type === 'error').slice(-2);
+        console.error(
+          `${c.name}: seq ${g?.seq} phase ${g?.view.phase.kind} legal ${JSON.stringify(g?.legal.map((a) => a.type))} errors ${JSON.stringify(errs)}`,
+        );
+      }
+      const g = clients[0]?.last('game');
+      for (const l of g?.view.log.slice(-8) ?? []) console.error(`  T${l.turn} ${l.text}`);
+      throw e;
+    });
     const final = must(over[0], 'final game');
     if (final.type !== 'game') throw new Error('unreachable');
     const winner = must(final.view.players[must(final.view.winner, 'winner')], 'winner');

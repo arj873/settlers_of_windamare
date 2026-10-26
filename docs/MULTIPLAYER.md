@@ -325,7 +325,9 @@ totalMs }` in every `game` message and count down locally (≤ 1 s drift per mes
 
 `src/bots` random bot, `defaultBot` + `BOT_OFFERS_PER_TURN` (1 player-trade offer per turn) +
 `nextBot` (bots owing a response first; a bot offerer waits for human replies) — exactly the
-hotseat controller's policy. One move every `botDelayMs` (reactions ×0.4) so people can follow.
+hotseat controller's policy. A bot whose offer was accepted confirms with a random accepter (it
+only withdraws while nobody has accepted; BUG-B3). One move every `botDelayMs` (reactions ×0.4)
+so people can follow.
 Bots read the full state (the random bot ignores hands anyway); a smarter bot must be given
 `viewFor(state, seat)` to play fair.
 

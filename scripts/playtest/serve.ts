@@ -21,7 +21,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { build, preview } from 'vite';
 import type { GameState, PlayerId } from '../../src/engine';
 import { formatLogEntry, formatStatus } from './format';
-import { actingVerdict, newLogEntries, wakeReason, waitingOn } from './guard';
+import { actingVerdict, newLogEntries, staleTradeHint, wakeReason, waitingOn } from './guard';
 import {
   BUGS_DIR,
   PLAYTEST_DIR,
@@ -366,6 +366,8 @@ const commands: Record<string, Handler> = {
       );
       if (off.kind !== 'none')
         return refuse(`That button is disabled right now. ${listButtons(snap)}`);
+      const stale = snap.state ? staleTradeHint(snap.state, query) : null;
+      if (stale) return refuse(`${stale} ${listButtons(snap)}`);
       return refuse(`No button matches "${query}". ${listButtons(snap)}`);
     }
     const c = enabled[m.index];

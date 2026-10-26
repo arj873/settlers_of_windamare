@@ -174,6 +174,60 @@ async function main() {
     check(true, 'in-game chat and reaction');
     await shot(ann, '5-game-ann');
 
+    // Player trade between two humans (BUG-B3): the other human gets the offer card, the
+    // offerer only sees "thinking…" for them, and how the offer ends is toasted.
+    const offerExpr = `(${clientExpr}.game.legal.find(a => a.type === 'offerTrade' && a.to.length === 2) || null)`;
+    let offerer: Page | null = null;
+    for (let i = 0; i < 300 && !offerer; i++) {
+      for (const p of [ann, bob]) if (!offerer && (await p.evaluate(offerExpr))) offerer = p;
+      if (offerer) break;
+      for (const p of [ann, bob]) {
+        await p.evaluate(
+          `(() => { const c = ${clientExpr}; const l = c.game && c.game.legal; if (l && l.length) c.intent(l.find(a => !/Trade$|buyDevCard/.test(a.type)) || l[0]); })()`,
+        );
+      }
+      await ann.waitForTimeout(150);
+    }
+    if (!offerer) throw new Error('FAILED: nobody got to offer a player trade');
+    const responder = offerer === ann ? bob : ann;
+    await offerer.evaluate(`${clientExpr}.intent(${offerExpr})`);
+    await responder.waitForSelector('[role="dialog"][aria-label$="offers a trade"]');
+    check(true, 'the other human gets the trade offer card');
+    await offerer.waitForSelector('[role="dialog"][aria-label="Your trade offer"]');
+    check(
+      (await offerer.textContent('[role="dialog"][aria-label="Your trade offer"]'))?.includes(
+        'thinking…',
+      ),
+      'the offerer sees the other human thinking',
+    );
+    await shot(responder, '5c-trade-offer');
+    const respond = responder.locator('[role="dialog"] .dialog-actions button');
+    if (await respond.filter({ hasText: 'Accept' }).isEnabled()) {
+      await respond.filter({ hasText: 'Accept' }).click();
+      const cancel = offerer.locator('[role="dialog"] button', { hasText: 'Cancel offer' });
+      await offerer.waitForFunction(() =>
+        document
+          .querySelector('[aria-label="Your trade offer"]')
+          ?.textContent?.includes('accepted'),
+      );
+      await cancel.click();
+      await responder.waitForSelector('.game-toast:has-text("withdrew the offer you accepted")');
+      check(true, 'accepter is told the offer was withdrawn');
+    } else {
+      await respond.filter({ hasText: 'Reject' }).click();
+      // The bot (seat 2) answered first: everyone rejected, or the bot accepted.
+      const closed = await offerer
+        .waitForSelector('.game-toast:has-text("Everyone rejected your offer")', { timeout: 4000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!closed) {
+        await offerer.locator('[role="dialog"] button', { hasText: 'Cancel offer' }).click();
+      }
+      check(true, closed ? 'offerer is told everyone rejected' : 'offerer withdrew (bot accepted)');
+    }
+    await offerer.waitForFunction(() => !document.querySelector('[aria-label="Your trade offer"]'));
+    check(true, 'the offer card is gone once the offer ended');
+
     if (REMOTE) {
       // Network drop (real sockets only): banner, then back with the same seat.
       await ann.context().setOffline(true);

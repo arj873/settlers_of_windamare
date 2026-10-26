@@ -516,7 +516,9 @@ c.destroy();
 - Bots: `defaultBot = createRandomBot({ progressBias: 0.5 })`, private `Rng` seeded `bots:<seed>`
   (saved with the session), one move per tick (`speed` ms, ×0.4 for discards / trade replies;
   speed 0 = batches of moves per 12 ms slice). The controller hides `offerTrade` from a bot after
-  `BOT_OFFERS_PER_TURN` (1) offers in a turn. Nobody able to act → error toast + state on console.
+  `BOT_OFFERS_PER_TURN` (1) offers in a turn. The random bot confirms an accepted own offer with a
+  random accepter (it withdraws only while nobody has accepted). Nobody able to act → error toast
+  - state on console.
 - Autosave: `localStorage['catan:save:v1']` = `{ version, state, seats, viewer, botRng, banks? }`, every
   access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
