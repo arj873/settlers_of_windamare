@@ -27,8 +27,8 @@ function tokenPair(s: GameState): [number, HexId, HexId] {
 }
 
 const terrainOf = (s: GameState, h: HexId) => s.board.hexes[h]!.terrain as Resource;
-const N = (h: HexId) => hexVertices(h)[0]!;
-const S = (h: HexId) => hexVertices(h)[3]!;
+const N = (h: HexId) => hexVertices(TOPOLOGY, h)[0]!;
+const S = (h: HexId) => hexVertices(TOPOLOGY, h)[3]!;
 
 describe('rollDice', () => {
   it('rolls two dice from the seeded RNG and records them', () => {
@@ -87,7 +87,7 @@ describe('production', () => {
     const s = emptyBoardGame();
     const [, a] = tokenPair(s);
     place(s, 0, N(a));
-    const nearby = vertexHexes(N(a)).map((h) => s.board.hexes[h]!.token);
+    const nearby = vertexHexes(TOPOLOGY, N(a)).map((h) => s.board.hexes[h]!.token);
     const other = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].find((x) => !nearby.includes(x))!;
     expect(rollTotal(s, other).players[0]!.resources).toEqual(emptyResources());
   });
@@ -106,7 +106,7 @@ describe('production', () => {
   it('7 produces nothing', () => {
     const s = emptyBoardGame();
     for (const h of TOPOLOGY.landHexes) {
-      for (const v of hexVertices(h)) if (!s.pieces.buildings[v]) place(s, 0, v);
+      for (const v of hexVertices(TOPOLOGY, h)) if (!s.pieces.buildings[v]) place(s, 0, v);
     }
     const after = rollTotal(s, 7);
     expect(after.players[0]!.resources).toEqual(emptyResources());
@@ -192,6 +192,25 @@ describe('rolling a 7', () => {
     const after = rollTotal(s, 7);
     expect(after.phase).toEqual({ kind: 'discard', pending: [5, 4, 0, 4] });
     expect(after.dice![0] + after.dice![1]).toBe(7);
+  });
+
+  it('settings.discardLimit replaces 7: only hands above the limit discard half', () => {
+    const s = emptyBoardGame();
+    s.settings = { ...s.settings, discardLimit: 9 };
+    setHand(s, 0, { ore: 6, wool: 5 }); // 11 -> 5
+    setHand(s, 1, { brick: 9 }); // 9 = limit -> 0
+    setHand(s, 2, { grain: 10 }); // 10 -> 5
+    setHand(s, 3, { lumber: 8 }); // 8 -> 0
+    expect(rollTotal(s, 7).phase).toEqual({ kind: 'discard', pending: [5, 0, 5, 0] });
+  });
+
+  it('a lower discardLimit makes smaller hands discard; nobody above it skips discard', () => {
+    const s = emptyBoardGame();
+    s.settings = { ...s.settings, discardLimit: 5 };
+    setHand(s, 1, { ore: 6 }); // 6 -> 3
+    expect(rollTotal(s, 7).phase).toEqual({ kind: 'discard', pending: [0, 3, 0, 0] });
+    setHand(s, 1, { ore: 5 });
+    expect(rollTotal(s, 7).phase).toEqual({ kind: 'moveRobber', resume: 'main' });
   });
 });
 

@@ -10,7 +10,7 @@ import { RESOURCES } from '../constants';
 import { canPlaceRoad, canPlaceSettlement } from '../rules/placement';
 import { describeBundle, playerName } from '../rules/text';
 import { piecesLeft, setupPlayerAt } from '../selectors';
-import { isBoardEdge, isBoardVertex, vertexEdges, vertexHexes, TOPOLOGY } from '../topology';
+import { isBoardEdge, isBoardVertex, topologyOf, vertexEdges, vertexHexes } from '../topology';
 import { emptyResources } from '../resources';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../types';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
@@ -33,7 +33,7 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
       return fail('not placing a setup settlement now');
     }
     if (!isCurrent(draft, action.player)) return fail('not your turn');
-    if (!isBoardVertex(action.vertex)) return fail('invalid vertex');
+    if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
     if (!canSetupSettlement(draft, action.player, action.vertex)) {
       return fail('vertex is taken or too close to another building');
     }
@@ -42,7 +42,7 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
     let text = `${playerName(draft, action.player)} placed a settlement`;
     if (phase.index >= draft.players.length) {
       const gain = emptyResources();
-      for (const h of vertexHexes(action.vertex)) {
+      for (const h of vertexHexes(topologyOf(draft), action.vertex)) {
         const terrain = draft.board.hexes[h]?.terrain;
         if (terrain && terrain !== 'desert' && draft.bank[terrain] > gain[terrain]) {
           gain[terrain] += 1;
@@ -68,7 +68,7 @@ export const setupHandlers: HandlerMap<'placeSetupSettlement' | 'placeSetupRoad'
       return fail('not placing a setup road now');
     }
     if (!isCurrent(draft, action.player)) return fail('not your turn');
-    if (!isBoardEdge(action.edge)) return fail('invalid edge');
+    if (!isBoardEdge(topologyOf(draft), action.edge)) return fail('invalid edge');
     if (!canSetupRoad(draft, action.player, action.edge, phase.lastSettlement)) {
       return fail('road must be on an empty edge touching the settlement just placed');
     }
@@ -96,13 +96,13 @@ export const setupLegal: LegalGenerator = (state: GameState): Action[] => {
   if (phase.kind !== 'setup') return [];
   const player = state.turn.current;
   if (phase.step === 'settlement') {
-    return TOPOLOGY.vertices
-      .filter((v) => canSetupSettlement(state, player, v))
+    return topologyOf(state)
+      .vertices.filter((v) => canSetupSettlement(state, player, v))
       .map((vertex) => ({ type: 'placeSetupSettlement', player, vertex }));
   }
   const from = phase.lastSettlement;
   if (from === null) return [];
-  return vertexEdges(from)
+  return vertexEdges(topologyOf(state), from)
     .filter((e) => canSetupRoad(state, player, e, from))
     .map((edge) => ({ type: 'placeSetupRoad', player, edge }));
 };

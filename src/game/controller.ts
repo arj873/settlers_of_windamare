@@ -8,6 +8,8 @@
 import {
   applyAction,
   createGame,
+  isMapId,
+  layoutToMap,
   legalActions,
   Rng,
   type Action,
@@ -148,13 +150,15 @@ export class GameController {
   /** New game from the HUD's new-game screen. */
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
+    // Forward compat: the stage-2 setup screen adds `map` to NewGameConfig; `layout` is the v1 field.
+    const map = 'map' in cfg && isMapId(cfg.map) ? cfg.map : layoutToMap(cfg.layout);
     const state = createGame({
       seed,
       players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-      layout: cfg.layout,
+      map,
       ...(extra.vpToWin === undefined ? {} : { vpToWin: extra.vpToWin }),
     });
-    console.info(`New game: layout=${cfg.layout} seed=${seed}`);
+    console.info(`New game: map=${map} seed=${seed}`);
     this.start(
       state,
       cfg.players.map((p) => p.controller),

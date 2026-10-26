@@ -1,5 +1,12 @@
 import { Application } from 'pixi.js';
-import { TOPOLOGY, createGame, type GameState } from './engine';
+import {
+  PLAYER_COLORS,
+  createGame,
+  defaultMapFor,
+  layoutToMap,
+  topologyOf,
+  type GameState,
+} from './engine';
 import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
 import { Hud, type Controller } from './ui';
@@ -18,7 +25,8 @@ import {
 
 /**
  * Dev params: `?fixture=midGame` (any fixtures.ts function), `?seed=…&layout=beginner|random`
- * (start at once), `?autoplay=4bots&speed=0` (all-bot game), `?seats=hbbb`, `?vp=5`, `?speed=ms`,
+ * or `?map=base|baseRandom|base56|base78` (start at once), `?autoplay=4bots&speed=0` (all-bot
+ * game, 3..8 bots), `?seats=hbbb`, `?vp=5`, `?speed=ms`,
  * `?hl=vertices|edges|hexes` (highlight preview). Without any, the new-game / resume screen opens.
  */
 function devGame(params: DevParams): { state: GameState; seats: Controller[] } | null {
@@ -33,17 +41,23 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
     }
     showToast(`Unknown fixture "${params.fixture}"`, 'error');
   }
-  if (params.autoplay || params.seed !== null || params.layout) {
+  if (params.autoplay || params.seed !== null || params.layout || params.map) {
     const n = params.autoplay ?? params.seats?.length ?? 4;
     const seed = params.seed ?? String(Date.now() % 1e9);
-    const layout = params.layout ?? 'random';
-    console.info(`Catan dev game: layout=${layout} seed=${seed}`);
-    const state = createGame({
-      seed,
-      players: fixtures.FIXTURE_PLAYERS.slice(0, n),
-      layout,
-      ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
-    });
+    const map = params.map ?? (params.layout ? layoutToMap(params.layout) : defaultMapFor(n));
+    console.info(`Catan dev game: map=${map} seed=${seed}`);
+    let state: GameState;
+    try {
+      state = createGame({
+        seed,
+        players: PLAYER_COLORS.slice(0, n),
+        map,
+        ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
+      });
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), 'error');
+      return null;
+    }
     return { state, seats: params.autoplay ? seatsFor(n, 'bot') : seatsFor(n, 'human') };
   }
   return null;
@@ -103,12 +117,13 @@ async function boot() {
     controller.start(dev.state, dev.seats);
     const hl = params.hl;
     const s = dev.state;
+    const topo = topologyOf(s);
     if (hl === 'vertices') {
-      board.setHighlights({ vertices: TOPOLOGY.vertices.filter((v) => !s.pieces.buildings[v]) });
+      board.setHighlights({ vertices: topo.vertices.filter((v) => !s.pieces.buildings[v]) });
     } else if (hl === 'edges') {
-      board.setHighlights({ edges: TOPOLOGY.edges.filter((e) => !s.pieces.roads[e]) });
+      board.setHighlights({ edges: topo.edges.filter((e) => !s.pieces.roads[e]) });
     } else if (hl === 'hexes') {
-      board.setHighlights({ hexes: TOPOLOGY.landHexes.filter((h) => h !== s.robber) });
+      board.setHighlights({ hexes: topo.landHexes.filter((h) => h !== s.robber) });
     }
     return;
   }

@@ -5,11 +5,10 @@
  */
 import {
   AWARD_VP,
-  BANK_PER_RESOURCE,
   DEV_CARD_TYPES,
-  DEV_DECK_COMPOSITION,
   LARGEST_ARMY_MIN,
   LONGEST_ROAD_MIN,
+  MAPS,
   PIECE_LIMITS,
   RESOURCES,
   actingPlayers,
@@ -17,7 +16,10 @@ import {
   isBoardEdge,
   isBoardVertex,
   isLandHex,
+  isMapId,
   setupPlayerAt,
+  supplyOf,
+  topologyOf,
   vertexNeighbors,
   victoryPoints,
   type DevCardType,
@@ -52,10 +54,11 @@ const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isI
 
 /** Each vertex's incident on-board roads of `player`. */
 function roadsByVertex(state: GameState, player: PlayerId): Map<VertexId, EdgeId[]> {
+  const t = topologyOf(state);
   const byVertex = new Map<VertexId, EdgeId[]>();
   for (const [edge, owner] of Object.entries(state.pieces.roads) as [EdgeId, PlayerId][]) {
-    if (owner !== player || !isBoardEdge(edge)) continue;
-    for (const v of edgeVertices(edge)) {
+    if (owner !== player || !isBoardEdge(t, edge)) continue;
+    for (const v of edgeVertices(t, edge)) {
       const list = byVertex.get(v);
       if (list) list.push(edge);
       else byVertex.set(v, [edge]);
@@ -69,13 +72,14 @@ function roadsByVertex(state: GameState, player: PlayerId): Map<VertexId, EdgeId
  * Deliberately independent of the engine's rules/longestRoad.ts (a cross-check).
  */
 export function longestRoadLength(state: GameState, player: PlayerId): number {
+  const t = topologyOf(state);
   const byVertex = roadsByVertex(state, player);
   const used = new Set<EdgeId>();
   const walk = (at: VertexId): number => {
     let best = 0;
     for (const edge of byVertex.get(at) ?? []) {
       if (used.has(edge)) continue;
-      const next = edgeVertices(edge).find((v) => v !== at);
+      const next = edgeVertices(t, edge).find((v) => v !== at);
       if (next === undefined) continue;
       used.add(edge);
       const blocked = (state.pieces.buildings[next]?.owner ?? player) !== player;
@@ -97,13 +101,22 @@ export function checkInvariants(state: GameState): Violation[] {
   const validPlayer = (p: unknown): p is PlayerId => isCount(p) && p < n;
 
   // --- structure -----------------------------------------------------------------------------
-  if (n < 3 || n > 4) add('structure', `expected 3-4 players, got ${n}`);
+  if (!isMapId(state.settings.map)) {
+    add('structure', `unknown map ${String(state.settings.map)}`);
+    return out; // every board check below needs the map's topology
+  }
+  const map = MAPS[state.settings.map];
+  const t = topologyOf(state);
+  const supply = supplyOf(state);
+  if (n < map.minPlayers || n > map.maxPlayers) {
+    add('structure', `map ${map.id} expects ${map.minPlayers}-${map.maxPlayers} players, got ${n}`);
+  }
   state.players.forEach((p, i) => {
     if (p.id !== i) add('structure', `players[${i}].id is ${p.id}`, i);
   });
   if (!validPlayer(state.turn.current)) add('structure', `turn.current ${state.turn.current}`);
 
-  // --- resources: bank + hands = 19 each ------------------------------------------------------
+  // --- resources: bank + hands = the map's stock (19 / 24 / 29) each --------------------------
   for (const r of RESOURCES) {
     const counts = [state.bank[r], ...state.players.map((p) => p.resources[r])];
     if (!counts.every((c) => isCount(c))) {
@@ -111,12 +124,15 @@ export function checkInvariants(state: GameState): Violation[] {
       continue;
     }
     const total = counts.reduce((a, b) => a + b, 0);
-    if (total !== BANK_PER_RESOURCE) {
-      add('resource-conservation', `${r}: bank + hands = ${total}, expected ${BANK_PER_RESOURCE}`);
+    if (total !== supply.bankPerResource) {
+      add(
+        'resource-conservation',
+        `${r}: bank + hands = ${total}, expected ${supply.bankPerResource}`,
+      );
     }
   }
 
-  // --- dev cards: deck + hands + played = composition, exactly, per type (25 in all) ----------
+  // --- dev cards: deck + hands + played = the map's composition, exactly, per type ------------
   // Played knights live in knightsPlayed, played progress cards in progressCardsPlayed; VP cards
   // are never played.
   const played = (p: (typeof state.players)[number], t: DevCardType): number =>
@@ -131,7 +147,7 @@ export function checkInvariants(state: GameState): Violation[] {
     const inDeck = state.devDeck.filter((c) => c === t).length;
     const held = state.players.reduce((s, p) => s + p.devCards[t] + p.newDevCards[t], 0);
     const out = state.players.reduce((s, p) => s + played(p, t), 0);
-    const cap = DEV_DECK_COMPOSITION[t];
+    const cap = supply.devDeck[t];
     if (inDeck + held + out !== cap) {
       add(
         'dev-conservation',
@@ -147,14 +163,14 @@ export function checkInvariants(state: GameState): Violation[] {
   const buildings = Object.entries(state.pieces.buildings) as [VertexId, { owner: PlayerId }][];
   const roads = Object.entries(state.pieces.roads) as [EdgeId, PlayerId][];
   for (const [v, b] of buildings) {
-    if (!isBoardVertex(v)) add('board-id', `building on off-board vertex ${v}`);
+    if (!isBoardVertex(t, v)) add('board-id', `building on off-board vertex ${v}`);
     if (!validPlayer(b.owner)) add('structure', `building ${v} has owner ${b.owner}`);
   }
   for (const [e, owner] of roads) {
-    if (!isBoardEdge(e)) add('board-id', `road on off-board edge ${e}`);
+    if (!isBoardEdge(t, e)) add('board-id', `road on off-board edge ${e}`);
     if (!validPlayer(owner)) add('structure', `road ${e} has owner ${owner}`);
   }
-  if (!isLandHex(state.robber)) add('robber-position', `robber on non-land hex ${state.robber}`);
+  if (!isLandHex(t, state.robber)) add('robber-position', `robber on non-land hex ${state.robber}`);
 
   // --- piece limits --------------------------------------------------------------------------
   for (const p of state.players) {
@@ -177,8 +193,8 @@ export function checkInvariants(state: GameState): Violation[] {
 
   // --- distance rule -------------------------------------------------------------------------
   for (const [v] of buildings) {
-    if (!isBoardVertex(v)) continue;
-    for (const nb of vertexNeighbors(v)) {
+    if (!isBoardVertex(t, v)) continue;
+    for (const nb of vertexNeighbors(t, v)) {
       if (v < nb && state.pieces.buildings[nb])
         add('building-adjacent', `buildings on adjacent ${v} and ${nb}`);
     }
@@ -189,8 +205,8 @@ export function checkInvariants(state: GameState): Violation[] {
   // by an opponent's later settlement, so we only require a neighbouring own road or own building.
   const roadsAt = state.players.map((p) => roadsByVertex(state, p.id));
   for (const [e, owner] of roads) {
-    if (!isBoardEdge(e)) continue;
-    const linked = edgeVertices(e).some(
+    if (!isBoardEdge(t, e)) continue;
+    const linked = edgeVertices(t, e).some(
       (v) =>
         state.pieces.buildings[v]?.owner === owner ||
         (roadsAt[owner]?.get(v) ?? []).some((e2) => e2 !== e),

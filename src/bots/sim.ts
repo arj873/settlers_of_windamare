@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Action, Layout } from '../engine';
+import { MAP_IDS, defaultMapFor, isMapId, layoutToMap, type Action, type MapId } from '../engine';
 import { createRandomBot, type PickMode } from './index';
 import {
   botSeedFor,
@@ -23,13 +23,14 @@ import {
 export interface SimArgs {
   games: number;
   seed: number;
-  players: 3 | 4;
+  players: number;
   maxSteps: number;
   verbose: boolean;
   trace: boolean;
   bias: number;
   pick: PickMode;
-  layout: Layout;
+  /** null = the default map for the player count (baseRandom / base56 / base78). */
+  map: MapId | null;
   outDir: string;
   maxDumps: number;
   replay: string | null;
@@ -39,11 +40,13 @@ export interface SimArgs {
 export const USAGE = `pnpm sim -- [options]
   --games N       games to play (default 10)
   --seed S        seed of the first game; game i uses S+i (default 1)
-  --players 3|4   (default 4)
+  --players N     3..8, must fit the map (default 4)
   --max-steps M   per-game step cap (default 5000)
   --bias P        0..1: chance per move of skipping endTurn when possible (default 0 = pure uniform)
   --pick MODE     byType (an action type first, then an action of it) | uniform (default byType)
-  --layout L      random | beginner (default random)
+  --map M         ${MAP_IDS.join(' | ')}
+                  (default: baseRandom for 3-4 players, base56 for 5-6, base78 for 7-8)
+  --layout L      random | beginner (old alias for --map baseRandom | base)
   --verbose       one line per game
   --trace         print every action (use with few games)
   --out-dir DIR   where failure dumps go (default sim-failures)
@@ -61,7 +64,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
     trace: false,
     bias: 0,
     pick: 'byType',
-    layout: 'random',
+    map: null,
     outDir: 'sim-failures',
     maxDumps: 5,
     replay: null,
@@ -99,7 +102,7 @@ export function parseArgs(argv: readonly string[]): SimArgs {
         args.seed = num(-Infinity);
         break;
       case '--players':
-        args.players = num(3, 4) as 3 | 4;
+        args.players = num(3, 8);
         break;
       case '--max-steps':
         args.maxSteps = num(1);
@@ -115,7 +118,11 @@ export function parseArgs(argv: readonly string[]): SimArgs {
       case '--layout':
         if (value !== 'random' && value !== 'beginner')
           throw new Error(`--layout: "${String(value)}"`);
-        args.layout = value;
+        args.map = layoutToMap(value);
+        break;
+      case '--map':
+        if (!isMapId(value)) throw new Error(`--map: "${String(value)}"`);
+        args.map = value;
         break;
       case '--out-dir':
         args.outDir = value as string;
@@ -229,7 +236,11 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const started = performance.now();
   for (let i = 0; i < args.games; i++) {
     const seed = args.seed + i;
-    const setup: GameSetup = { seed, players: args.players, layout: args.layout };
+    const setup: GameSetup = {
+      seed,
+      players: args.players,
+      map: args.map ?? defaultMapFor(args.players),
+    };
     const t0 = performance.now();
     const result = runGame({
       initial: newGame(setup),
@@ -260,7 +271,7 @@ export function main(argv: readonly string[], out: (line: string) => void = cons
   const violations = stats.stalls + stats.errors + stats.invariantFailures;
   const avgTurns = stats.finished ? (stats.totalTurnsFinished / stats.finished).toFixed(1) : 'n/a';
   out(
-    `\n=== sim: ${stats.games} games, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
+    `\n=== sim: ${stats.games} games, map ${args.map ?? defaultMapFor(args.players)}, ${args.players} players, seeds ${args.seed}..${args.seed + args.games - 1}, bias ${args.bias}, pick ${args.pick} ===`,
   );
   out(`finished:             ${stats.finished}`);
   out(`hit --max-steps:      ${stats.maxSteps}`);

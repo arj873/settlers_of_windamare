@@ -26,7 +26,7 @@ function playSetup(n: 3 | 4, seed: number) {
     if (action.type === 'placeSetupSettlement') {
       settlers.push(action.player);
       if (phase.index >= n) {
-        for (const h of vertexHexes(action.vertex)) {
+        for (const h of vertexHexes(TOPOLOGY, action.vertex)) {
           const t = s.board.hexes[h]!.terrain;
           if (t !== 'desert') expected[action.player]![t] += 1;
         }
@@ -85,15 +85,15 @@ describe('placeSetupSettlement', () => {
     const desert = TOPOLOGY.landHexes.find((h) => base.board.hexes[h]!.terrain === 'desert')!;
     const v = TOPOLOGY.vertices.find(
       (x) =>
-        vertexHexes(x).includes(desert) &&
-        vertexHexes(x).length === 3 &&
+        vertexHexes(TOPOLOGY, x).includes(desert) &&
+        vertexHexes(TOPOLOGY, x).length === 3 &&
         applyAction(base, { type: 'placeSetupSettlement', player: 2, vertex: x }).ok,
     )!;
     expect(v).toBeDefined();
     const before = { ...base.players[2]!.resources };
     const s = run(base, { type: 'placeSetupSettlement', player: 2, vertex: v });
     const gain = emptyResources();
-    for (const h of vertexHexes(v)) {
+    for (const h of vertexHexes(TOPOLOGY, v)) {
       const t = s.board.hexes[h]!.terrain;
       if (t !== 'desert') gain[t] += 1;
     }
@@ -106,8 +106,8 @@ describe('placeSetupSettlement', () => {
     const base = setupInProgressGame();
     const v = TOPOLOGY.vertices.find(
       (x) =>
-        vertexHexes(x).length === 1 &&
-        base.board.hexes[vertexHexes(x)[0]!]!.terrain !== 'desert' &&
+        vertexHexes(TOPOLOGY, x).length === 1 &&
+        base.board.hexes[vertexHexes(TOPOLOGY, x)[0]!]!.terrain !== 'desert' &&
         applyAction(base, { type: 'placeSetupSettlement', player: 2, vertex: x }).ok,
     )!;
     const before = base.players[2]!.resources;
@@ -126,9 +126,9 @@ describe('placeSetupSettlement', () => {
     const s = run(
       freshGame(),
       { type: 'placeSetupSettlement', player: 0, vertex: v0 },
-      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(v0)[0]! },
+      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(TOPOLOGY, v0)[0]! },
     );
-    for (const nb of vertexNeighbors(v0)) {
+    for (const nb of vertexNeighbors(TOPOLOGY, v0)) {
       expectFail(applyAction(s, { type: 'placeSetupSettlement', player: 1, vertex: nb }), /close/);
     }
   });
@@ -137,7 +137,7 @@ describe('placeSetupSettlement', () => {
     const s = run(
       freshGame(),
       { type: 'placeSetupSettlement', player: 0, vertex: v0 },
-      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(v0)[0]! },
+      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(TOPOLOGY, v0)[0]! },
     );
     expectFail(applyAction(s, { type: 'placeSetupSettlement', player: 1, vertex: v0 }));
   });
@@ -192,7 +192,7 @@ describe('placeSetupRoad', () => {
     run(freshGame(), { type: 'placeSetupSettlement', player: 0, vertex: v0 });
 
   it('places a road touching the settlement and passes to the next player', () => {
-    const e = vertexEdges(v0)[1]!;
+    const e = vertexEdges(TOPOLOGY, v0)[1]!;
     const s = run(afterSettlement(), { type: 'placeSetupRoad', player: 0, edge: e });
     expect(s.pieces.roads[e]).toBe(0);
     expect(s.phase).toEqual({ kind: 'setup', index: 1, step: 'settlement', lastSettlement: null });
@@ -217,7 +217,7 @@ describe('placeSetupRoad', () => {
       applyAction(afterSettlement(), {
         type: 'placeSetupRoad',
         player: 0,
-        edge: TOPOLOGY.edges.find((e) => !vertexEdges(v0).includes(e))!,
+        edge: TOPOLOGY.edges.find((e) => !vertexEdges(TOPOLOGY, v0).includes(e))!,
       }),
       /touching/,
     );
@@ -228,15 +228,21 @@ describe('placeSetupRoad', () => {
     const first = cornerVertex(-2, 0, 'N');
     const second = cornerVertex(1, 1, 'S');
     const s = run(base, { type: 'placeSetupSettlement', player: 2, vertex: second });
-    const freeAtFirst = vertexEdges(first).find((e) => s.pieces.roads[e] === undefined)!;
+    const freeAtFirst = vertexEdges(TOPOLOGY, first).find((e) => s.pieces.roads[e] === undefined)!;
     expectFail(applyAction(s, { type: 'placeSetupRoad', player: 2, edge: freeAtFirst }));
-    expectOk(applyAction(s, { type: 'placeSetupRoad', player: 2, edge: vertexEdges(second)[0]! }));
+    expectOk(
+      applyAction(s, {
+        type: 'placeSetupRoad',
+        player: 2,
+        edge: vertexEdges(TOPOLOGY, second)[0]!,
+      }),
+    );
   });
 
   it('rejects an occupied edge', () => {
     // Unreachable through legal play (distance rule), so plant an opponent road directly.
     const s = afterSettlement();
-    const e = vertexEdges(v0)[0]!;
+    const e = vertexEdges(TOPOLOGY, v0)[0]!;
     s.pieces.roads[e] = 1;
     expectFail(applyAction(s, { type: 'placeSetupRoad', player: 0, edge: e }), /empty edge/);
     expect(setupLegal(s).map((a) => (a.type === 'placeSetupRoad' ? a.edge : null))).not.toContain(
@@ -251,11 +257,15 @@ describe('placeSetupRoad', () => {
       /invalid edge/,
     );
     expectFail(
-      applyAction(s, { type: 'placeSetupRoad', player: 1, edge: vertexEdges(v0)[0]! }),
+      applyAction(s, { type: 'placeSetupRoad', player: 1, edge: vertexEdges(TOPOLOGY, v0)[0]! }),
       /not your turn/,
     );
     expectFail(
-      applyAction(freshGame(), { type: 'placeSetupRoad', player: 0, edge: vertexEdges(v0)[0]! }),
+      applyAction(freshGame(), {
+        type: 'placeSetupRoad',
+        player: 0,
+        edge: vertexEdges(TOPOLOGY, v0)[0]!,
+      }),
       /not placing/,
     );
   });
@@ -271,19 +281,19 @@ describe('setupLegal', () => {
     const s = run(
       freshGame(),
       { type: 'placeSetupSettlement', player: 0, vertex: v0 },
-      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(v0)[0]! },
+      { type: 'placeSetupRoad', player: 0, edge: vertexEdges(TOPOLOGY, v0)[0]! },
     );
     const vs = setupLegal(s).map((a) => (a.type === 'placeSetupSettlement' ? a.vertex : null));
-    expect(vs).toHaveLength(54 - 1 - vertexNeighbors(v0).length);
+    expect(vs).toHaveLength(54 - 1 - vertexNeighbors(TOPOLOGY, v0).length);
     expect(vs).not.toContain(v0);
-    for (const nb of vertexNeighbors(v0)) expect(vs).not.toContain(nb);
+    for (const nb of vertexNeighbors(TOPOLOGY, v0)) expect(vs).not.toContain(nb);
   });
 
   it('road step offers exactly the free edges at the new settlement', () => {
     const v0 = cornerVertex(0, 0, 'N');
     const s = run(freshGame(), { type: 'placeSetupSettlement', player: 0, vertex: v0 });
     const edges = setupLegal(s).map((a) => (a.type === 'placeSetupRoad' ? a.edge : null));
-    expect(edges.sort()).toEqual([...vertexEdges(v0)].sort());
+    expect(edges.sort()).toEqual([...vertexEdges(TOPOLOGY, v0)].sort());
   });
 
   it('is empty outside setup', () => {

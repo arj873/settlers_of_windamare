@@ -12,7 +12,7 @@ import {
 import { isVertexOpen, canPlaceRoad } from './rules/placement';
 import { handSize, piecesLeft } from './selectors';
 import { totalDevCards } from './resources';
-import { isBoardEdge, isBoardVertex, isLandHex } from './topology';
+import { isBoardEdge, isBoardVertex, isLandHex, topologyOf } from './topology';
 import type { EdgeId, GameState, VertexId } from './types';
 
 const ALL = {
@@ -27,9 +27,10 @@ const ALL = {
 
 function checkConsistent(s: GameState) {
   // Pieces on the board, within limits.
-  for (const v of Object.keys(s.pieces.buildings)) expect(isBoardVertex(v)).toBe(true);
-  for (const e of Object.keys(s.pieces.roads)) expect(isBoardEdge(e)).toBe(true);
-  expect(isLandHex(s.robber)).toBe(true);
+  const t = topologyOf(s);
+  for (const v of Object.keys(s.pieces.buildings)) expect(isBoardVertex(t, v)).toBe(true);
+  for (const e of Object.keys(s.pieces.roads)) expect(isBoardEdge(t, e)).toBe(true);
+  expect(isLandHex(t, s.robber)).toBe(true);
   for (const p of s.players) {
     const left = piecesLeft(s, p.id);
     expect(left.road).toBeGreaterThanOrEqual(0);

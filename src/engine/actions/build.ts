@@ -9,7 +9,7 @@ import { canPlaceCity, canPlaceRoad, canPlaceSettlement } from '../rules/placeme
 import { playerName } from '../rules/text';
 import { hasResources } from '../resources';
 import { buildingsOf, piecesLeft } from '../selectors';
-import { isBoardEdge, isBoardVertex, TOPOLOGY } from '../topology';
+import { isBoardEdge, isBoardVertex, topologyOf } from '../topology';
 import type {
   Action,
   ActionResult,
@@ -68,7 +68,7 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
   buildRoad: (draft, action) => {
     const err = buildPrecheck(draft, action.player, 'road');
     if (err) return fail(err);
-    if (!isBoardEdge(action.edge)) return fail('invalid edge');
+    if (!isBoardEdge(topologyOf(draft), action.edge)) return fail('invalid edge');
     if (!canPlaceRoad(draft, action.player, action.edge)) {
       return fail('road must be on an empty edge connected to your network');
     }
@@ -79,7 +79,7 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
   buildSettlement: (draft, action) => {
     const err = buildPrecheck(draft, action.player, 'settlement');
     if (err) return fail(err);
-    if (!isBoardVertex(action.vertex)) return fail('invalid vertex');
+    if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
     if (!canPlaceSettlement(draft, action.player, action.vertex, { requireRoad: true })) {
       return fail('settlement must be on an open vertex touching your road');
     }
@@ -90,7 +90,7 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
   buildCity: (draft, action) => {
     const err = buildPrecheck(draft, action.player, 'city');
     if (err) return fail(err);
-    if (!isBoardVertex(action.vertex)) return fail('invalid vertex');
+    if (!isBoardVertex(topologyOf(draft), action.vertex)) return fail('invalid vertex');
     if (!canPlaceCity(draft, action.player, action.vertex)) {
       return fail('a city must replace one of your settlements');
     }
@@ -104,12 +104,12 @@ export const buildLegal: LegalGenerator = (state: GameState): Action[] => {
   const player = state.turn.current;
   const out: Action[] = [];
   if (buildPrecheck(state, player, 'road') === null) {
-    for (const edge of TOPOLOGY.edges) {
+    for (const edge of topologyOf(state).edges) {
       if (canPlaceRoad(state, player, edge)) out.push({ type: 'buildRoad', player, edge });
     }
   }
   if (buildPrecheck(state, player, 'settlement') === null) {
-    for (const vertex of TOPOLOGY.vertices) {
+    for (const vertex of topologyOf(state).vertices) {
       if (canPlaceSettlement(state, player, vertex, { requireRoad: true })) {
         out.push({ type: 'buildSettlement', player, vertex });
       }

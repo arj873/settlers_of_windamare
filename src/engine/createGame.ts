@@ -1,16 +1,16 @@
 import { generateBoard } from './board';
 import {
-  BANK_PER_RESOURCE,
+  DEFAULT_DISCARD_LIMIT,
   DEFAULT_VP_TO_WIN,
   DEV_CARD_TYPES,
-  DEV_DECK_COMPOSITION,
-  MAX_PLAYERS,
-  MIN_PLAYERS,
+  DISCARD_LIMIT_RANGE,
   RESOURCES,
+  VP_TO_WIN_RANGE,
 } from './constants';
+import { MAPS, defaultMapFor, isMapId } from './maps';
 import { emptyDevCards, emptyProgressCards, emptyResources } from './resources';
 import { Rng } from './rng';
-import type { DevCardType, GameState, Layout, Player } from './types';
+import type { DevCardType, GameSettings, GameState, Layout, MapId, Player } from './types';
 
 export interface PlayerConfig {
   name: string;
@@ -19,26 +19,80 @@ export interface PlayerConfig {
 
 export interface GameConfig {
   seed: number | string;
-  /** 3–4 players, in turn order. Player 0 places first in setup. */
+  /** In turn order; player 0 places first in setup. Count must fit the map (3..8 overall). */
   players: PlayerConfig[];
-  layout: Layout;
-  /** Default 10. */
+  /**
+   * Board. Default: `layout` if given (compat), else the smallest random map designed for the
+   * player count (`defaultMapFor`).
+   */
+  map?: MapId;
+  /** @deprecated v1 compat: 'beginner' = map 'base', 'random' = map 'baseRandom'. Ignored if `map` is set. */
+  layout?: Layout;
+  /** 3..20, default 10. */
   vpToWin?: number;
+  /** 5..20, default 7. */
+  discardLimit?: number;
+  /** Default false. Stored only (T13). */
+  balancedDice?: boolean;
+  /** Default: true with 5+ players. Stored only (T13). */
+  specialBuildPhase?: boolean;
+  /** Default false. Client-side only. */
+  hideBankCards?: boolean;
+  /** Default null (no timer). Client-side only. */
+  turnTimerSec?: number | null;
+}
+
+export function layoutToMap(layout: Layout): MapId {
+  return layout === 'beginner' ? 'base' : 'baseRandom';
+}
+
+function intInRange(name: string, v: number, range: { min: number; max: number }): number {
+  if (!Number.isInteger(v) || v < range.min || v > range.max) {
+    throw new Error(`${name} must be an integer ${range.min}-${range.max}, got ${v}`);
+  }
+  return v;
+}
+
+/** Resolve and validate the settings for `config` (throws on invalid values). */
+export function resolveSettings(config: GameConfig): GameSettings {
+  const n = config.players.length;
+  const map = config.map ?? (config.layout ? layoutToMap(config.layout) : defaultMapFor(n));
+  if (!isMapId(map)) throw new Error(`unknown map ${String(map)}`);
+  const def = MAPS[map];
+  if (n < def.minPlayers || n > def.maxPlayers) {
+    throw new Error(`map ${map} needs ${def.minPlayers}-${def.maxPlayers} players, got ${n}`);
+  }
+  const timer = config.turnTimerSec ?? null;
+  if (timer !== null && (!Number.isInteger(timer) || timer <= 0)) {
+    throw new Error(`turnTimerSec must be a positive integer or null, got ${timer}`);
+  }
+  return {
+    seed: config.seed,
+    map,
+    vpToWin: intInRange('vpToWin', config.vpToWin ?? DEFAULT_VP_TO_WIN, VP_TO_WIN_RANGE),
+    discardLimit: intInRange(
+      'discardLimit',
+      config.discardLimit ?? DEFAULT_DISCARD_LIMIT,
+      DISCARD_LIMIT_RANGE,
+    ),
+    balancedDice: config.balancedDice ?? false,
+    specialBuildPhase: config.specialBuildPhase ?? n >= 5,
+    hideBankCards: config.hideBankCards ?? false,
+    turnTimerSec: timer,
+  };
 }
 
 /** Build the initial state: board generated, deck shuffled, phase = setup (player 0, settlement). */
 export function createGame(config: GameConfig): GameState {
-  const n = config.players.length;
-  if (n < MIN_PLAYERS || n > MAX_PLAYERS) {
-    throw new Error(`need ${MIN_PLAYERS}-${MAX_PLAYERS} players, got ${n}`);
-  }
+  const settings = resolveSettings(config);
+  const def = MAPS[settings.map];
 
   const rng = Rng.fromSeed(config.seed);
-  const { board, robber } = generateBoard(config.layout, rng);
+  const { board, robber } = generateBoard(settings.map, rng);
 
   const deck: DevCardType[] = [];
   for (const t of DEV_CARD_TYPES) {
-    for (let i = 0; i < DEV_DECK_COMPOSITION[t]; i++) deck.push(t);
+    for (let i = 0; i < def.devDeck[t]; i++) deck.push(t);
   }
   const devDeck = rng.shuffle(deck);
 
@@ -54,15 +108,11 @@ export function createGame(config: GameConfig): GameState {
   }));
 
   const bank = emptyResources();
-  for (const r of RESOURCES) bank[r] = BANK_PER_RESOURCE;
+  for (const r of RESOURCES) bank[r] = def.bankPerResource;
 
   return {
-    schemaVersion: 1,
-    settings: {
-      seed: config.seed,
-      layout: config.layout,
-      vpToWin: config.vpToWin ?? DEFAULT_VP_TO_WIN,
-    },
+    schemaVersion: 2,
+    settings,
     board,
     pieces: { buildings: {}, roads: {} },
     robber,
@@ -77,7 +127,7 @@ export function createGame(config: GameConfig): GameState {
       {
         turn: 0,
         player: null,
-        text: `Game created (${config.layout} board, seed ${String(config.seed)})`,
+        text: `Game created (${def.name} map, seed ${String(config.seed)})`,
       },
     ],
     rng: rng.state,

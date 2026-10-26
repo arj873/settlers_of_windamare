@@ -16,6 +16,9 @@ Compiled by T8 (2026-10-25). Rule numbers (e.g. **5.3**) are stable; tests cite 
 | **R6**  | _CATAN – The Game_ rulebook, 6th ed. (2025): https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf. Used to clarify and cross-check.               |
 | **FAQ** | Official base game FAQ: https://www.catan.com/faq/basegame. Entries are numbered #n in page order (77 entries, read 2026-10-25).                                                                                   |
 | **IMG** | R5 p.3 Illustration A (the beginner map), rendered at high resolution and read by eye.                                                                                                                             |
+| **E56** | _Catan 5–6 Player Extension_ rules, 5th ed. (© 2020 Catan GmbH / Catan Studio), 4 pages. Copy hosted by a retailer: https://www.world-of-board-games.com.sg/docs/Catan-5-6-Ext.pdf (read 2026-10-25). See §16.     |
+| **PPT** | _The Paired Players Turn Rule for the 5-6 Player Extensions_ (catan.com, 2021): https://www.catan.com/sites/default/files/2021-09/CATAN_New5-6Player_ruleEN.pdf. See §16.D.                                        |
+| **COL** | Colonist.io rules page "5-6 / 7-8 Players": https://colonist.io/catan-rules/5-6-player (read 2026-10-25). **Unofficial** (a digital adaptation); used only for the 7-8 player supply, see §16.C.                   |
 
 R5 p.14: the 2015 rules take precedence over all earlier editions. We found no documented
 gameplay change between the 4th and 5th editions. R6 (2025) mostly renames things (see §14).
@@ -95,7 +98,7 @@ The **Where** column points to the code: `a/` is `src/engine/actions/` and `r/` 
 
 | #    | Rule                                                                                                                          | Source           | Status    | Where / notes                                                                                                                                                                                                           |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5.2  | Every player with **more than 7** resource cards, including the roller, discards half, rounded down. Discards go to the bank. | R5 p.5, 11       | OK        | `discardAmounts`                                                                                                                                                                                                        |
+| 5.2  | Every player with **more than 7** resource cards, including the roller, discards half, rounded down. Discards go to the bank. | R5 p.5, 11       | OK        | `discardAmounts`. The 7 is `settings.discardLimit` (default 7, range 5–20; a house-rule option since T10).                                                                                                              |
 | 5.3  | Only resource cards count toward the 7-card limit. Development cards do not.                                                  | R5; R6 p.9       | OK        | `rulesAudit.test.ts`                                                                                                                                                                                                    |
 | 5.4  | Each player discards once per 7, even if they still hold more than 7 afterwards.                                              | FAQ #56          | OK        |                                                                                                                                                                                                                         |
 | 5.5  | Only a rolled 7 causes discards. A Knight never does.                                                                         | FAQ #2           | OK        | `rulesAudit.test.ts`                                                                                                                                                                                                    |
@@ -291,3 +294,85 @@ With 3 players, leave out red (R5) or white (R6).
   - No dev card play while an offer is open (8.8).
 - **Unclear in the sources, our choices:** 6.19, 8.10, 8.12a, 8.13a.
 - **Every other rule checked: OK.** The OK rules are covered by the per-area `*.test.ts` files. Rules the audit found without an explicit test now have one in `src/engine/rulesAudit.test.ts`.
+
+## 16. Larger boards: 5-6 and 7-8 players (T10)
+
+Compiled by T10 (2026-10-25). Map ids, definitions and counts live in `src/engine/maps.ts`;
+tests in `src/engine/maps.test.ts`. Players per map: `base`/`baseRandom` 3–4, `base56` 3–6,
+`base78` 3–8. Everything not listed here follows the base rules above.
+
+### 16.A 5-6 player extension (official, `base56`)
+
+| #     | Rule                                                                                                                                                               | Source     | Status    | Where / notes                                                                                                                                                  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16.1  | Adds 11 terrain hexes (1 desert, 2 each of fields, forest, pasture, mountains, hills): 30 in all = 6 forest, 6 pasture, 6 fields, 5 hills, 5 mountains, 2 deserts. | E56 p.1    | OK        | `MAPS.base56.terrain`                                                                                                                                          |
+| 16.2  | 28 number tokens (the extension's own set replaces the base set): two each of 2 and 12, three each of 3–6 and 8–11.                                                | E56 p.1–2  | OK        | `MAPS.base56.tokens`. The pdf text extraction of Illustration B is ambiguous about one 2/12 token; 2×2 + 12×2 is the only split that sums to 28 symmetrically. |
+| 16.3  | 11 harbors: the base 9 plus one generic 3:1 and one wool 2:1, shuffled onto the frame's harbor spots.                                                              | E56 p.1, 3 | OK        | `MAPS.base56.harbors`                                                                                                                                          |
+| 16.4  | Bank: +5 cards per resource, so 24 each.                                                                                                                           | E56 p.1    | OK        | `bankPerResource: 24`                                                                                                                                          |
+| 16.5  | Dev deck: +9 cards (6 Knight, 1 Monopoly, 1 Year of Plenty, 1 Road Building) = 34: 20 / 5 VP / 3 / 3 / 3.                                                          | E56 p.1    | OK        | `MAPS.base56.devDeck`                                                                                                                                          |
+| 16.6  | Each player still has 5 settlements, 4 cities and 15 roads.                                                                                                        | E56 p.1    | OK        | `PIECE_LIMITS` unchanged                                                                                                                                       |
+| 16.7  | Board: 30 hexes in rows 3-4-5-6-5-4-3, the base frame plus 4 small frame pieces (2 plain sea, 1 generic harbor, 1 wool harbor).                                    | E56 p.1–2  | OK        | `FRAME_STD30`. Harbor spots: §16.B.                                                                                                                            |
+| 16.8  | Tokens are placed in a lettered spiral (A–Za/Zb/Zc) skipping the deserts.                                                                                          | E56 p.3    | deviation | Like 2.5: random placement, no adjacent 6/8 (rejection sampling). The spiral is not implemented.                                                               |
+| 16.9  | The robber starts on **either** desert.                                                                                                                            | E56 p.3    | OK        | `randomBoard` picks one with the game RNG.                                                                                                                     |
+| 16.10 | Special Building Phase after each turn: in clockwise order every other player may build or buy dev cards (no trading, no dev card play).                           | E56 p.3–4  | not yet   | `settings.specialBuildPhase` (default on with 5+ players) is stored only; T13 implements it. See also §16.D (paired turns).                                    |
+
+### 16.B 5-6 harbor spots
+
+Read by eye from E56 p.2 Illustration A (rendered at 900 dpi). Clockwise from the top-left
+corner of the water ring, as `[water hex, land hex it faces]` in our axial coordinates
+(`FRAME_STD30` in `maps.ts`; land rows centered half a hex right of x = 0):
+
+`[1,-4 → 1,-3] [3,-4 → 2,-3] [4,-3 → 3,-3] [4,0 → 3,0] [2,2 → 1,2] [1,3 → 0,3] [-1,4 → -1,3] [-3,4 → -2,3] [-3,2 → -2,2] [-3,1 → -2,1] [-2,-1 → -1,-1]`
+
+The **water hexes** are clear in the image. The **facing** (which of two touching land hexes the
+harbor's piers point to) is small in the illustration; where unclear we used the base-frame rule
+(face the non-corner hex) and checked that no two harbors share a vertex. Coastal-edge gaps
+between harbors are 3,3,6,4,2,3,3,3,2,4,5: the long gaps (6, 5) sit where the plain sea pieces
+are inserted (joints A, D) and the short ones (2, 2) where the harbor pieces are (B, C), which
+matches the assembly text. Confidence: water hexes high, facing medium.
+
+### 16.C 7-8 players (`base78`): our design
+
+We could **not** find an official 7-8 player rulebook. Searches (catan.com, retailers, BGG) only
+turned up the 5-6 extension and a BGG thread about a long out-of-print 1st-edition 7-8 rulebook
+that joined two boards. The only concrete numbers come from Colonist.io's digital version
+(**COL**, unofficial): 37 tiles, 29 cards per resource, 43 dev cards (26 Knight, 5 VP, 4 Road
+Building, 4 Year of Plenty, 4 Monopoly). So `base78` is our own design in the spirit of the
+5-6 extension:
+
+| Item     | Value                                                                                    | Basis                                                                       |
+| -------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Shape    | 37 hexes, rows 4-5-6-7-6-5-4 (the radius-3 hexagon), water ring of 24                    | COL's 37 tiles; the most symmetric shape of that size                       |
+| Terrain  | 7 forest, 8 pasture, 7 fields, 6 hills, 6 mountains, 3 deserts                           | ours: base ratios (brick/ore scarcest), ~1 desert per 12 hexes              |
+| Tokens   | 34: two each of 2 and 12, three each of 3 and 11, four each of 4–6 and 8–10              | ours: symmetric, follows the dice odds more closely than adding flat copies |
+| Harbors  | 12 on every other ring hex (6-fold symmetric, gaps 4,3): 6 generic, 2 wool, 1 each other | ours: base 9 + 5-6's two (generic, wool) + one more generic                 |
+| Bank     | 29 per resource                                                                          | COL                                                                         |
+| Dev deck | 43: 26 Knight, 5 VP, 4 Road Building, 4 Year of Plenty, 4 Monopoly                       | COL                                                                         |
+| Pieces   | unchanged (15 / 5 / 4)                                                                   | as 16.6                                                                     |
+| 6/8 rule | no adjacent 6/8 (random placement, as 2.5)                                               | as 16.8                                                                     |
+| Robber   | starts on a random desert                                                                | as 16.9                                                                     |
+
+If an official 7-8 extension turns up, only `MAPS.base78` / `FRAME_HEX37` need changing.
+
+### 16.D Turn structure with 5+ players (for T13)
+
+- E56 (2020 printing) still describes the **Special Building Phase** (16.10).
+- **PPT** (catan.com, 2021) says a "paired players' turn" rule "officially replaces the previous
+  special build phase": each turn has two players, Catanian 1 (rolls, trades, builds, plays a dev
+  card) and Catanian 2, the **third player to the left**, who afterwards may trade with the bank
+  and build and play a dev card, but may not roll, trade with players, or play a dev card before
+  Catanian 1's roll. It lists Seafarers, C&K, T&B and E&P extensions; whether it also applies to
+  the base 5-6 extension is implied ("applies to CATAN and to all extensions") but not spelled out.
+- Our settings only carry `specialBuildPhase: boolean`. T13 should decide whether to implement
+  the special build phase, paired turns, or both (a setting with three values).
+
+### 16.E Other T10 settings (house rules / client options)
+
+| Setting             | Engine status                                                              |
+| ------------------- | -------------------------------------------------------------------------- |
+| `discardLimit`      | Implemented: replaces the 7 in 5.2 (5–20, default 7).                      |
+| `vpToWin`           | Implemented since T2; range now validated 3–20.                            |
+| `balancedDice`      | Stored only (T13).                                                         |
+| `specialBuildPhase` | Stored only (T13), see §16.D.                                              |
+| `hideBankCards`     | Client-side only: the UI hides bank counts. The engine ignores it.         |
+| `turnTimerSec`      | Client-side only: the controller/UI may enforce it. The engine ignores it. |

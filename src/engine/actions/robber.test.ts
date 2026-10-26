@@ -18,14 +18,16 @@ import {
 } from './testkit';
 
 const HEX: HexId = 'h:0,0';
-const N = (h: HexId) => hexVertices(h)[0]!;
-const S = (h: HexId) => hexVertices(h)[3]!;
+const N = (h: HexId) => hexVertices(TOPOLOGY, h)[0]!;
+const S = (h: HexId) => hexVertices(TOPOLOGY, h)[3]!;
 
 /** Player 0 must move the robber (resume main); robber away from HEX. */
 function robberGame(): GameState {
   const s = emptyBoardGame();
   s.phase = { kind: 'moveRobber', resume: 'main' };
-  s.robber = TOPOLOGY.landHexes.find((h) => h !== HEX && !hexVertices(h).includes(N(HEX)))!;
+  s.robber = TOPOLOGY.landHexes.find(
+    (h) => h !== HEX && !hexVertices(TOPOLOGY, h).includes(N(HEX)),
+  )!;
   return s;
 }
 
@@ -173,7 +175,7 @@ describe('moveRobber', () => {
     const s = robberGame();
     place(s, 3, N(HEX));
     place(s, 1, S(HEX), 'city');
-    place(s, 0, hexVertices(HEX)[1]!); // own building: never a candidate
+    place(s, 0, hexVertices(TOPOLOGY, HEX)[1]!); // own building: never a candidate
     setHand(s, 3, { ore: 1 });
     setHand(s, 1, { wool: 2 });
     setHand(s, 0, { wool: 2 });

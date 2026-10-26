@@ -1,15 +1,16 @@
 /** Dev query parameters. */
-import type { Layout } from '../engine';
+import { isMapId, type Layout, type MapId } from '../engine';
 import type { Controller } from '../ui';
 
 export interface DevParams {
   /** `?fixture=midGame`: load an engine fixture (all seats human unless `?seats`). */
   fixture: string | null;
-  /** `?seed=…` / `?layout=beginner|random`: start a game right away (skips the new-game screen). */
+  /** `?seed=…` / `?layout=beginner|random` / `?map=base56`: start a game right away (skips the new-game screen). */
   seed: string | null;
   layout: Layout | null;
-  /** `?autoplay=4bots` (or `3bots`): all-bot game, no autosave. */
-  autoplay: 3 | 4 | null;
+  map: MapId | null;
+  /** `?autoplay=4bots` (3..8): all-bot game, no autosave. */
+  autoplay: number | null;
   /** `?speed=ms`: bot delay per move; 0 = instant. */
   speed: number | null;
   /** `?vp=5`: points to win (new games started from params). */
@@ -29,14 +30,16 @@ export function parseParams(search: string): DevParams {
     return Number.isFinite(n) && n >= min && n <= max ? n : null;
   };
   const layout = p.get('layout');
-  const auto = /^([34])bots?$/.exec(p.get('autoplay') ?? '');
-  const seats = /^[hb]{3,4}$/.exec(p.get('seats') ?? '');
+  const map = p.get('map');
+  const auto = /^([3-8])bots?$/.exec(p.get('autoplay') ?? '');
+  const seats = /^[hb]{3,8}$/.exec(p.get('seats') ?? '');
   const hl = p.get('hl');
   return {
     fixture: p.get('fixture'),
     seed: p.get('seed'),
     layout: layout === 'beginner' || layout === 'random' ? layout : null,
-    autoplay: auto ? (Number(auto[1]) as 3 | 4) : null,
+    map: isMapId(map) ? map : null,
+    autoplay: auto ? Number(auto[1]) : null,
     speed: num('speed', 0, 60000),
     vpToWin: num('vp', 3, 20),
     seats: seats ? [...seats[0]].map((c) => (c === 'h' ? 'human' : 'bot')) : null,

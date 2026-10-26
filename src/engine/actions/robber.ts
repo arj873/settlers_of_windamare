@@ -12,7 +12,7 @@ import { describeBundle, playerName } from '../rules/text';
 import { Rng } from '../rng';
 import { hasResources, isValidBundle, totalResources } from '../resources';
 import { handSize } from '../selectors';
-import { hexVertices, isLandHex, TOPOLOGY } from '../topology';
+import { hexVertices, isLandHex, topologyOf } from '../topology';
 import type {
   Action,
   GameState,
@@ -27,7 +27,7 @@ import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from '
 /** Opponents of `player` with a building on `hex` and at least one card, ascending. */
 export function stealCandidates(state: GameState, player: PlayerId, hex: HexId): PlayerId[] {
   const owners = new Set<PlayerId>();
-  for (const v of hexVertices(hex)) {
+  for (const v of hexVertices(topologyOf(state), hex)) {
     const b = state.pieces.buildings[v];
     if (b && b.owner !== player) owners.add(b.owner);
   }
@@ -90,7 +90,7 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
     const phase = draft.phase;
     if (phase.kind !== 'moveRobber') return fail('cannot move the robber now');
     if (!isCurrent(draft, action.player)) return fail('not your turn');
-    if (!isLandHex(action.hex)) return fail('invalid hex');
+    if (!isLandHex(topologyOf(draft), action.hex)) return fail('invalid hex');
     if (action.hex === draft.robber) return fail('the robber must move to a different hex');
 
     draft.robber = action.hex;
@@ -146,8 +146,8 @@ export const robberLegal: LegalGenerator = (state: GameState): Action[] => {
         }));
       });
     case 'moveRobber':
-      return TOPOLOGY.landHexes
-        .filter((h) => h !== state.robber)
+      return topologyOf(state)
+        .landHexes.filter((h) => h !== state.robber)
         .map((hex): Action => ({ type: 'moveRobber', player, hex }));
     case 'steal':
       return phase.candidates.map((victim): Action => ({ type: 'steal', player, victim }));

@@ -15,7 +15,7 @@ import { COSTS, RESOURCES } from '../constants';
 import { addResources, hasResources, isResource, subtractResources } from '../resources';
 import { canPlaceRoad } from '../rules/placement';
 import { getPlayer, piecesLeft } from '../selectors';
-import { TOPOLOGY } from '../topology';
+import { topologyOf } from '../topology';
 import type {
   Action,
   DevCardType,
@@ -67,7 +67,7 @@ function canPlay(
 
 /** Edges where `player` could place a road right now (geometry only). */
 function roadSpots(state: GameState, player: PlayerId): EdgeId[] {
-  return TOPOLOGY.edges.filter((e) => canPlaceRoad(state, player, e));
+  return topologyOf(state).edges.filter((e) => canPlaceRoad(state, player, e));
 }
 
 function canPlaceAnyRoad(state: GameState, player: PlayerId): boolean {

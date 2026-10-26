@@ -63,12 +63,20 @@ export interface Port {
   waterHex: HexId;
 }
 
+/**
+ * Board chosen at createGame (definitions in maps.ts):
+ * 'base' = 19-hex beginner layout, 'baseRandom' = 19-hex random, 'base56' = 30-hex 5-6 player
+ * extension board (random), 'base78' = 37-hex 7-8 player board (random).
+ */
+export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';
+
+/** @deprecated v1 board choice; 'beginner' = map 'base', 'random' = map 'baseRandom'. */
 export type Layout = 'beginner' | 'random';
 
 export interface Board {
-  /** The 19 land hexes. */
+  /** The land hexes (19 / 30 / 37 depending on the map). */
   hexes: Record<HexId, HexTile>;
-  /** The 9 ports. */
+  /** The harbors (9 / 11 / 12). */
   ports: Port[];
 }
 
@@ -101,7 +109,7 @@ export interface Player {
   newDevCards: DevCardCounts;
   /** Knights played so far (for Largest Army). */
   knightsPlayed: number;
-  /** Progress cards played so far (face up, out of the game). Deck + hands + played = 25. */
+  /** Progress cards played so far (face up, out of the game). Deck + hands + played = map's deck. */
   progressCardsPlayed: ProgressCardCounts;
 }
 
@@ -166,14 +174,26 @@ export interface LogEntry {
   text: string;
 }
 
+/** Schema v2. Fixed after createGame. */
 export interface GameSettings {
   seed: number | string;
-  layout: Layout;
+  map: MapId;
+  /** 3..20, default 10. */
   vpToWin: number;
+  /** 5..20, default 7. On a 7, players holding MORE than this many cards discard half. */
+  discardLimit: number;
+  /** Not implemented yet (T13): stored only. */
+  balancedDice: boolean;
+  /** Not implemented yet (T13): stored only. Default true with 5+ players. */
+  specialBuildPhase: boolean;
+  /** Client-side only (UI hides the bank's card counts); the engine ignores it. */
+  hideBankCards: boolean;
+  /** Client-side only (seconds per turn, null = no timer); the engine ignores it. */
+  turnTimerSec: number | null;
 }
 
 export interface GameState {
-  schemaVersion: 1;
+  schemaVersion: 2;
   settings: GameSettings;
   board: Board;
   pieces: Pieces;
