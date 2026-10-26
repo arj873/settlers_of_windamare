@@ -273,8 +273,29 @@ now allow cities with C&K and check E&P's own VP hook (composition-safe).
 
 `pnpm sim --mode <mode> --scenario <s> --players <n> --games <g> --bias 0.5 --max-steps 20000`:
 
-SIM_RESULTS_TABLE
+Final code, every run: **0 invariant failures, 0 errors, 0 stalls, 0 games capped** (finished /
+games, average turns):
 
-The first sims found: Inventor swapping a captured lair's number (fixed: gold fields excluded), a
-setup stall when the cities blocked every marked harbor corner (fixed: coastal fallback), and E&P
-free roads ignoring spice farms (fixed in `ep`).
+| Mode / scenario        | 4p (300)  | 3p (50)  |
+| ---------------------- | --------- | -------- |
+| `ep+ck` Pirate Lairs   | 300 / 177 | 50 / 161 |
+| `ep+ck` Fish for Catan | 300 / 223 | 50 / 192 |
+| `ep+ck` Spices         | 300 / 223 | 50 / 192 |
+| `ep+ck` full game      | 300 / 243 | 50 / 201 |
+| `ep+tb` Land Ho!       | 300 / 76  | 50 / 63  |
+| `ep+tb` Pirate Lairs   | 300 / 163 | 50 / 149 |
+| `ep+tb` Fish for Catan | 300 / 246 | 50 / 205 |
+| `ep+tb` Spices         | 300 / 251 | 50 / 217 |
+| `ep+tb` full game      | 300 / 297 | 50 / 244 |
+
+The sims found five bugs, all fixed with a test: Inventor swapping a captured lair's number (gold
+fields excluded), a setup stall when the cities blocked every marked harbor corner (coastal
+fallback), E&P free roads ignoring spice farms (`ep`), C&K counting E&P harbor settlements as
+settlement pieces once a pillaged city lay on its side (city limit −1, a sixth settlement could
+land: C&K's `settlementPieces`), and a fish ship's exploring card left out of the statistics.
+
+Online: `e2e:server` plays one `ep+ck` and one `ep+tb` game over the room server (2 clients + 2
+server bots, every view checked for masked C&K hands, fish tokens and face-down hexes);
+`src/net/sessionExpansions.test.ts` runs both modes. Browser check:
+`node scripts/shots-ep-combos.mjs <preview url> <dir>` (setup tiles; bot games mid-game in three
+themes, no page errors).

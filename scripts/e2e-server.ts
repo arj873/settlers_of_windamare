@@ -231,8 +231,14 @@ function ckHidden(view: GameView): string | null {
   };
   const decks = Object.values(ck.decks).flat();
   if (new Set(decks).size > 1) return 'progress deck order is visible';
+  // The Spy shows its victim's hand to the spy (the viewer), on purpose.
+  const phase = view.phase as { kind: string; card?: string; victim?: number | null };
+  const spied = phase.kind === 'ck/card' && phase.card === 'spy' ? phase.victim : null;
   for (const p of opponents(view)) {
-    if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
+    if (p.id === spied) continue;
+    if (new Set(ck.players[p.id]?.progress).size > 1) {
+      return `${p.name}'s progress cards (phase ${phase.kind} ${phase.card ?? ''})`;
+    }
   }
   return null;
 }
