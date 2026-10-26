@@ -46,6 +46,8 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
       return phase.offer.from === seat
         ? 'Your trade offer is open: confirm with an accepting player (`click <name>: Trade`) or `click Cancel offer`.'
         : `${nameOf(state, phase.offer.from)} offers you a trade: \`click Accept\` or \`click Reject\`.`;
+    case 'specialBuild':
+      return 'Special build step (5+ players): build or buy a dev card if you like (no trading, no dev cards), then `click Pass`.';
   }
 }
 

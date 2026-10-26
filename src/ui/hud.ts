@@ -626,16 +626,31 @@ export class Hud {
           glyph('dice', 24),
           h('span', {}, 'Roll dice'),
         ),
-        h(
-          'button',
-          {
-            class: `act btn-end${av.endTurn && !av.roll ? ' is-ready' : ''}`,
-            disabled: !av.endTurn || over,
-            on: { click: () => this.send({ type: 'endTurn', player: view.viewer }) },
-          },
-          glyph('next', 20),
-          h('span', {}, 'End turn'),
-        ),
+        // During a special build step (5+ players) the same button passes the step instead.
+        av.passSpecialBuild
+          ? h(
+              'button',
+              {
+                class: 'act btn-end is-ready',
+                disabled: over,
+                title: 'End your special build step',
+                on: {
+                  click: () => this.send({ type: 'passSpecialBuild', player: view.viewer }),
+                },
+              },
+              glyph('next', 20),
+              h('span', {}, 'Pass'),
+            )
+          : h(
+              'button',
+              {
+                class: `act btn-end${av.endTurn && !av.roll ? ' is-ready' : ''}`,
+                disabled: !av.endTurn || over,
+                on: { click: () => this.send({ type: 'endTurn', player: view.viewer }) },
+              },
+              glyph('next', 20),
+              h('span', {}, 'End turn'),
+            ),
       ),
     ];
   }

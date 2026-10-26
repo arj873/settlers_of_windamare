@@ -59,6 +59,7 @@ export function cloneState(s: GameState): GameState {
     turn: { ...s.turn },
     phase: clonePhase(s.phase),
     dice: s.dice === null ? null : [s.dice[0], s.dice[1]],
+    diceDeck: [...s.diceDeck],
     awards: { ...s.awards },
     log: [...s.log],
     rng: s.rng,

@@ -58,6 +58,9 @@ a human can watch). Your seat number is given to you (below: `K`). Every command
   `click to: SeatN` to drop a recipient -> `click Send offer`. Then `wait`; when you wake,
   `click SeatN: Trade` to confirm with someone who accepted, or `click Cancel offer`.
 - **Answering an offer:** `click Accept` or `click Reject`.
+- **Special build step (5+ players):** after each turn, every other player in order may build
+  or buy a dev card (no trading, no playing dev cards). Build as usual, then `click Pass`
+  (the button that is normally End turn). Not the same as the `pass` command for the cover.
 - **Rolled 7, too many cards:** a "Discard N cards" dialog. `set <resource> <n>` until it
   says "Discarding N of N", then `click Discard`.
 - **Robber:** `spots` -> `click-spot N` (pick a hex with an opponent, not yours). Then

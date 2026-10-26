@@ -37,9 +37,12 @@ export interface RandomBotOptions {
    * reach game end instead of every player ending the turn at the first chance.
    */
   progressBias?: number;
-  /** Actions dropped when the bias triggers. Default: endTurn. */
+  /** Actions dropped when the bias triggers. Default: endTurn and passSpecialBuild. */
   avoid?: readonly ActionType[];
 }
+
+/** The "stop doing things" actions a progress bias skips by default. */
+export const STALLING_ACTIONS: readonly ActionType[] = ['endTurn', 'passSpecialBuild'];
 
 /** Uniform pick of a type, then of an action of that type. */
 function pickByType(options: readonly Action[], rng: Rng): Action {
@@ -52,10 +55,15 @@ function pickByType(options: readonly Action[], rng: Rng): Action {
   return rng.pick(rng.pick([...byType.values()]));
 }
 
-/** Random bot (see PickMode), with an optional bias away from `endTurn`. Uses the bot's own `rng`. */
+/**
+ * Random bot (see PickMode), with an optional bias away from `endTurn` / `passSpecialBuild`.
+ * Uses the bot's own `rng`. In a special build step its options are the builds, buyDevCard and
+ * passSpecialBuild, so with byType it passes with probability 1/(number of types) per decision;
+ * every build spends cards, so a step always ends.
+ */
 export function createRandomBot(options: RandomBotOptions = {}): Bot {
   const bias = options.progressBias ?? 0;
-  const avoid = options.avoid ?? ['endTurn'];
+  const avoid = options.avoid ?? STALLING_ACTIONS;
   const mode = options.mode ?? 'byType';
   if (!(bias >= 0 && bias <= 1)) throw new Error(`progressBias must be in [0, 1], got ${bias}`);
   if (mode !== 'byType' && mode !== 'uniform') throw new Error(`unknown pick mode ${String(mode)}`);

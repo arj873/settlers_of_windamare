@@ -1,6 +1,6 @@
 /**
  * OWNER: T2 (rules-core).
- * Phase main only. Pay COSTS.* into the bank; respect piecesLeft().
+ * Phase main, or specialBuild for its builder (T13). Pay COSTS.* into the bank; respect piecesLeft().
  * buildCity returns the settlement piece to the supply (implicit: piecesLeft is derived).
  * Helpers: canPlaceRoad, canPlaceSettlement(.., { requireRoad: true }), canPlaceCity.
  */
@@ -24,9 +24,14 @@ import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from '
 type Piece = 'road' | 'settlement' | 'city';
 const PLURAL: Record<Piece, string> = { road: 'roads', settlement: 'settlements', city: 'cities' };
 
+/** Building is allowed in `main` and in the special building phase (turn.current = builder). */
+export function isBuildPhase(state: GameState): boolean {
+  return state.phase.kind === 'main' || state.phase.kind === 'specialBuild';
+}
+
 /** Phase, turn, cost and supply checks shared by all builds. Returns an error or null. */
 function buildPrecheck(state: GameState, player: PlayerId, piece: Piece): string | null {
-  if (state.phase.kind !== 'main') return 'can only build in the main phase';
+  if (!isBuildPhase(state)) return 'can only build in the main or special building phase';
   if (!isCurrent(state, player)) return 'not your turn';
   const hand = state.players[player]?.resources;
   if (!hand || !hasResources(hand, COSTS[piece])) return `cannot afford a ${piece}`;
@@ -100,7 +105,7 @@ export const buildHandlers: HandlerMap<'buildRoad' | 'buildSettlement' | 'buildC
 };
 
 export const buildLegal: LegalGenerator = (state: GameState): Action[] => {
-  if (state.phase.kind !== 'main') return [];
+  if (!isBuildPhase(state)) return [];
   const player = state.turn.current;
   const out: Action[] = [];
   if (buildPrecheck(state, player, 'road') === null) {

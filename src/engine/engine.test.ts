@@ -19,6 +19,7 @@ const SAMPLES: { [K in ActionType]: Extract<Action, { type: K }> } = {
   placeSetupRoad: { type: 'placeSetupRoad', player: 0, edge: 'e:0,0,NE' },
   rollDice: { type: 'rollDice', player: 0 },
   endTurn: { type: 'endTurn', player: 0 },
+  passSpecialBuild: { type: 'passSpecialBuild', player: 0 },
   buildRoad: { type: 'buildRoad', player: 0, edge: 'e:0,0,NE' },
   buildSettlement: { type: 'buildSettlement', player: 0, vertex: 'v:0,0,N' },
   buildCity: { type: 'buildCity', player: 0, vertex: 'v:0,0,N' },

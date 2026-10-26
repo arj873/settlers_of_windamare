@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyStats, main, parseArgs, record } from './sim';
+import { defaultMaxSteps, emptyStats, main, parseArgs, record } from './sim';
 import type { GameResult } from './runner';
 import { midGame } from '../engine/fixtures';
 
@@ -48,6 +48,19 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['--bias', '1.5'])).toThrow();
     expect(() => parseArgs(['--games'])).toThrow();
     expect(() => parseArgs(['--nope'])).toThrow();
+    expect(() => parseArgs(['--sbp', 'maybe'])).toThrow();
+  });
+
+  it('parses the T13 rule flags; max steps default grows with the player count', () => {
+    expect(parseArgs([])).toMatchObject({ sbp: null, balancedDice: false, maxSteps: null });
+    expect(parseArgs(['--sbp', 'off', '--balanced-dice'])).toMatchObject({
+      sbp: false,
+      balancedDice: true,
+    });
+    expect(parseArgs(['--sbp=on']).sbp).toBe(true);
+    expect([3, 4, 5, 6, 7, 8].map(defaultMaxSteps)).toEqual([
+      5000, 5000, 15000, 15000, 30000, 30000,
+    ]);
   });
 });
 

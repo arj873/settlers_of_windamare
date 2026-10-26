@@ -10,15 +10,16 @@ Compiled by T8 (2026-10-25). Rule numbers (e.g. **5.3**) are stable; tests cite 
 
 ## Sources
 
-| Key     | Source                                                                                                                                                                                                             |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **R5**  | _Catan Game Rules & Almanac_, 5th ed. (2015 rules, 2020 printing): https://www.catan.com/sites/default/files/2021-06/catan_base_rules_2020_200707.pdf. Page numbers are cited as R5 p.N. **This is our baseline.** |
-| **R6**  | _CATAN – The Game_ rulebook, 6th ed. (2025): https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf. Used to clarify and cross-check.               |
-| **FAQ** | Official base game FAQ: https://www.catan.com/faq/basegame. Entries are numbered #n in page order (77 entries, read 2026-10-25).                                                                                   |
-| **IMG** | R5 p.3 Illustration A (the beginner map), rendered at high resolution and read by eye.                                                                                                                             |
-| **E56** | _Catan 5–6 Player Extension_ rules, 5th ed. (© 2020 Catan GmbH / Catan Studio), 4 pages. Copy hosted by a retailer: https://www.world-of-board-games.com.sg/docs/Catan-5-6-Ext.pdf (read 2026-10-25). See §16.     |
-| **PPT** | _The Paired Players Turn Rule for the 5-6 Player Extensions_ (catan.com, 2021): https://www.catan.com/sites/default/files/2021-09/CATAN_New5-6Player_ruleEN.pdf. See §16.D.                                        |
-| **COL** | Colonist.io rules page "5-6 / 7-8 Players": https://colonist.io/catan-rules/5-6-player (read 2026-10-25). **Unofficial** (a digital adaptation); used only for the 7-8 player supply, see §16.C.                   |
+| Key       | Source                                                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **R5**    | _Catan Game Rules & Almanac_, 5th ed. (2015 rules, 2020 printing): https://www.catan.com/sites/default/files/2021-06/catan_base_rules_2020_200707.pdf. Page numbers are cited as R5 p.N. **This is our baseline.** |
+| **R6**    | _CATAN – The Game_ rulebook, 6th ed. (2025): https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf. Used to clarify and cross-check.               |
+| **FAQ**   | Official base game FAQ: https://www.catan.com/faq/basegame. Entries are numbered #n in page order (77 entries, read 2026-10-25).                                                                                   |
+| **IMG**   | R5 p.3 Illustration A (the beginner map), rendered at high resolution and read by eye.                                                                                                                             |
+| **E56**   | _Catan 5–6 Player Extension_ rules, 5th ed. (© 2020 Catan GmbH / Catan Studio), 4 pages. Copy hosted by a retailer: https://www.world-of-board-games.com.sg/docs/Catan-5-6-Ext.pdf (read 2026-10-25). See §16.     |
+| **PPT**   | _The Paired Players Turn Rule for the 5-6 Player Extensions_ (catan.com, 2021): https://www.catan.com/sites/default/files/2021-09/CATAN_New5-6Player_ruleEN.pdf. See §16.D.                                        |
+| **FAQ56** | The 5-6 player questions on catan.com's FAQ page https://catan.com/node/68 (read 2026-10-25), e.g. "Can I win during the special building phase? No." See §16.A.1.                                                 |
+| **COL**   | Colonist.io rules page "5-6 / 7-8 Players": https://colonist.io/catan-rules/5-6-player (read 2026-10-25). **Unofficial** (a digital adaptation); used only for the 7-8 player supply, see §16.C.                   |
 
 R5 p.14: the 2015 rules take precedence over all earlier editions. We found no documented
 gameplay change between the 4th and 5th editions. R6 (2025) mostly renames things (see §14).
@@ -314,7 +315,25 @@ tests in `src/engine/maps.test.ts`. Players per map: `base`/`baseRandom` 3–4, 
 | 16.7  | Board: 30 hexes in rows 3-4-5-6-5-4-3, the base frame plus 4 small frame pieces (2 plain sea, 1 generic harbor, 1 wool harbor).                                    | E56 p.1–2  | OK        | `FRAME_STD30`. Harbor spots: §16.B.                                                                                                                            |
 | 16.8  | Tokens are placed in a lettered spiral (A–Za/Zb/Zc) skipping the deserts.                                                                                          | E56 p.3    | deviation | Like 2.5: random placement, no adjacent 6/8 (rejection sampling). The spiral is not implemented.                                                               |
 | 16.9  | The robber starts on **either** desert.                                                                                                                            | E56 p.3    | OK        | `randomBoard` picks one with the game RNG.                                                                                                                     |
-| 16.10 | Special Building Phase after each turn: in clockwise order every other player may build or buy dev cards (no trading, no dev card play).                           | E56 p.3–4  | not yet   | `settings.specialBuildPhase` (default on with 5+ players) is stored only; T13 implements it. See also §16.D (paired turns).                                    |
+| 16.10 | Special Building Phase after each turn: in clockwise order every other player may build or buy dev cards (no trading, no dev card play).                           | E56 p.3–4  | OK        | `settings.specialBuildPhase` (default on with 5+ players, any player count allowed). Phase `specialBuild`, details 16.10a–h (T13). Paired turns: §16.D.        |
+
+#### 16.A.1 Special Building Phase details (T13)
+
+Source **FAQ56**: the catan.com base game FAQ page (https://catan.com/node/68, read 2026-10-25),
+which also holds the 5-6 player questions. Its entries are quoted by question, not number.
+All rules below: `a/turn.ts` (phase flow), `a/build.ts` / `a/dev.ts` (what is allowed), tests in
+`a/specialBuild.test.ts`.
+
+| #      | Rule                                                                                                                                            | Source                                                                         | Status    | Where / notes                                                                                                                                                                                                                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16.10a | The phase comes after the turn ends, between turns. Each other player, in clockwise order from the next player, gets one special build turn.    | E56 p.3                                                                        | OK        | `endTurn` → `specialBuild{builder, owner}`. `turn.current` = builder (as in setup); `turn.number` still counts the ended turn. After the last builder, owner+1's turn starts (`preRoll`).                                                                                                                |
+| 16.10b | The builder may build roads, settlements and cities and buy development cards, with the cards in hand.                                          | E56 p.3                                                                        | OK        | `buildRoad/buildSettlement/buildCity/buyDevCard`, then `passSpecialBuild`.                                                                                                                                                                                                                               |
+| 16.10c | A card bought in the phase may be played on the buyer's next turn.                                                                              | FAQ56 ("…bought…during the special building phase right before my turn…": Yes) | OK        | It goes straight into `devCards` (not `newDevCards`), since it was bought before the buyer's turn.                                                                                                                                                                                                       |
+| 16.10d | No trading with players, no maritime (bank/harbor) trade, no dev card play (incl. Road Building), no rolling.                                   | E56 p.3; FAQ56                                                                 | OK        | All are `main`/`preRoll`-only actions.                                                                                                                                                                                                                                                                   |
+| 16.10e | The player who just ended their turn does not take part.                                                                                        | FAQ56                                                                          | OK        |                                                                                                                                                                                                                                                                                                          |
+| 16.10f | The phase happens even if the player who ended the turn built nothing.                                                                          | FAQ56                                                                          | OK        |                                                                                                                                                                                                                                                                                                          |
+| 16.10g | **You cannot win during the special building phase.** "Can I win during the special building phase? No. You can only win during your own turn." | FAQ56                                                                          | OK        | `checkVictory` skips `specialBuild`. A builder who reaches `vpToWin` wins when their own turn starts (11.4), unless someone wins first. The same holds for an owner who gains Longest Road during someone's step (11.3).                                                                                 |
+| 16.10h | Players who could not build or buy anything are skipped.                                                                                        | (ours)                                                                         | deviation | Saves a pointless step (and a hotseat "pass the screen" cover) per player per turn. It shows that the skipped player could afford nothing, which their public hand size often shows anyway. If nobody can act, `endTurn` goes straight to the next turn. A builder who spent everything must still pass. |
 
 ### 16.B 5-6 harbor spots
 
@@ -363,16 +382,36 @@ If an official 7-8 extension turns up, only `MAPS.base78` / `FRAME_HEX37` need c
   and build and play a dev card, but may not roll, trade with players, or play a dev card before
   Catanian 1's roll. It lists Seafarers, C&K, T&B and E&P extensions; whether it also applies to
   the base 5-6 extension is implied ("applies to CATAN and to all extensions") but not spelled out.
-- Our settings only carry `specialBuildPhase: boolean`. T13 should decide whether to implement
-  the special build phase, paired turns, or both (a setting with three values).
+- **Decision (T13): we implement the Special Building Phase only.** It is what E56, the printed
+  rules of the extension we model, describes, and it works the same for 3–8 players. Paired turns
+  are a different turn structure (two active players, a second player who trades with the bank
+  and plays a dev card), and catan.com does not spell out that it applies to the base 5-6
+  extension. `settings.specialBuildPhase` stays a boolean. Paired turns are a backlog idea; they
+  would make the setting a 3-value turn mode (`'normal' | 'specialBuild' | 'pairedTurns'`).
+- 7-8 players (`base78`, our design): the same Special Building Phase, default on.
 
 ### 16.E Other T10 settings (house rules / client options)
 
-| Setting             | Engine status                                                              |
-| ------------------- | -------------------------------------------------------------------------- |
-| `discardLimit`      | Implemented: replaces the 7 in 5.2 (5–20, default 7).                      |
-| `vpToWin`           | Implemented since T2; range now validated 3–20.                            |
-| `balancedDice`      | Stored only (T13).                                                         |
-| `specialBuildPhase` | Stored only (T13), see §16.D.                                              |
-| `hideBankCards`     | Client-side only: the UI hides bank counts. The engine ignores it.         |
-| `turnTimerSec`      | Client-side only: the controller/UI may enforce it. The engine ignores it. |
+| Setting             | Engine status                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `discardLimit`      | Implemented: replaces the 7 in 5.2 (5–20, default 7). Only `discardAmounts` reads it; tested at 5, 9 and 20 (T13). |
+| `vpToWin`           | Implemented since T2; range now validated 3–20.                                                                    |
+| `balancedDice`      | Implemented (T13), see §17.                                                                                        |
+| `specialBuildPhase` | Implemented (T13), see 16.10 and §16.D.                                                                            |
+| `hideBankCards`     | Client-side only: the UI hides bank counts. The engine ignores it.                                                 |
+| `turnTimerSec`      | Client-side only: the controller/UI may enforce it. The engine ignores it.                                         |
+
+## 17. Balanced dice (`settings.balancedDice`, T13)
+
+A variant in the spirit of the official _Catan Event Cards_ / dice deck: rolls come from a deck
+instead of dice, so over a cycle every outcome appears as often as the odds say. The
+event-card texts of that product are **not** modelled; only the dice values are.
+
+| #    | Rule                                                                                                                                                   | Status | Where / notes                                                                                                                              |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 17.1 | The deck has 36 cards, one per ordered outcome of two dice (so a total of 7 appears 6 times, 2 and 12 once each).                                      | OK     | `DICE_CARDS` in `r/dice.ts`; card = `(d1-1)*6 + (d2-1)`. Kept in `state.diceDeck` (undrawn cards), drawn with `pop()`.                     |
+| 17.2 | Before a roll, when **5 or fewer** cards remain, all 36 are reshuffled. The last cards of a cycle stay unknown, so the final rolls cannot be counted.  | ours   | `DICE_DECK_RESHUFFLE_AT = 5`. A cycle is 31 rolls; the 5 unseen cards are discarded. The deck starts empty, so the first roll shuffles.    |
+| 17.3 | Shuffles use the seeded game RNG, so games stay deterministic per seed. Plain-dice games use the RNG exactly as before.                                | OK     | `rollTwoDice`                                                                                                                              |
+| 17.4 | A roll is still two dice values in `state.dice`; the roll log line is unchanged. A reshuffle adds the log line "The dice deck was shuffled".           | OK     |                                                                                                                                            |
+| 17.5 | Per cycle, drawn + unseen cards = the 36-card deck exactly. So over k cycles each total appears at most `ways × k` and at least `ways × k − 5k` times. | OK     | `r/dice.test.ts`. Because of 17.2, counts over 36·k rolls are **not** exact; they are exact per cycle once the 5 unseen cards are counted. |
+| 17.6 | Saves: the deck is part of the state (schema v3). Older saves get an empty deck, so their next balanced roll shuffles a fresh one.                     | OK     | `migrate.ts`                                                                                                                               |

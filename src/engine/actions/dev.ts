@@ -1,6 +1,8 @@
 /**
  * OWNER: T3 (rules-trade).
  * buyDevCard (main): pay COSTS.devCard, pop devDeck into newDevCards.
+ *   Also in specialBuild (T13), by the builder: the card goes straight into devCards, since it
+ *   was bought before the builder's own turn and may be played on it (RULES.md §16.10c).
  * play* (preRoll or main): at most one per turn (turn.devCardPlayed), only from devCards
  *   (never newDevCards). VP cards are never "played"; they count automatically.
  *   Played cards are recorded (knightsPlayed / progressCardsPlayed) so deck + hands + played = 25.
@@ -37,8 +39,11 @@ const CARD_NAMES: Record<PlayableCard, string> = {
   monopoly: 'Monopoly',
 };
 
-function canBuyDevCard(state: GameState, player: PlayerId): string | null {
-  if (state.phase.kind !== 'main') return 'can only buy development cards in the main phase';
+/** Buying is allowed in `main` and in the special building phase (turn.current = builder). */
+export function canBuyDevCard(state: GameState, player: PlayerId): string | null {
+  if (state.phase.kind !== 'main' && state.phase.kind !== 'specialBuild') {
+    return 'can only buy development cards in the main or special building phase';
+  }
   if (!isCurrent(state, player)) return 'not your turn';
   if (state.devDeck.length === 0) return 'no development cards left';
   if (!hasResources(getPlayer(state, player).resources, COSTS.devCard)) {
@@ -108,7 +113,9 @@ export const devHandlers: HandlerMap<
     p.resources = subtractResources(p.resources, COSTS.devCard);
     draft.bank = addResources(draft.bank, COSTS.devCard);
     const card = draft.devDeck.pop() as DevCardType;
-    p.newDevCards[card] += 1;
+    // Bought outside your own turn (special build) -> playable on your next turn (FAQ).
+    if (draft.phase.kind === 'specialBuild') p.devCards[card] += 1;
+    else p.newDevCards[card] += 1;
     log(draft, player, `${p.name} bought a development card`);
     return ok(draft);
   },

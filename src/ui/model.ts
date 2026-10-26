@@ -38,6 +38,8 @@ export function ofType<T extends ActionType>(legal: readonly Action[], type: T):
 export interface Availability {
   roll: boolean;
   endTurn: boolean;
+  /** Special building phase: the End turn button passes the build step instead. */
+  passSpecialBuild: boolean;
   buildRoad: boolean;
   buildSettlement: boolean;
   buildCity: boolean;
@@ -56,6 +58,7 @@ export function availability(legal: readonly Action[]): Availability {
   return {
     roll: has('rollDice'),
     endTurn: has('endTurn'),
+    passSpecialBuild: has('passSpecialBuild'),
     buildRoad: has('buildRoad'),
     buildSettlement: has('buildSettlement'),
     buildCity: has('buildCity'),
@@ -348,6 +351,10 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
       return phase.offer.from === view.viewer
         ? { text: 'Waiting for trade responses…', tone: 'wait' }
         : { text: 'Respond to the trade offer', tone: 'action' };
+    case 'specialBuild':
+      return placeMode
+        ? { text: `Place a ${placeMode} — pick a highlighted spot (Esc to cancel)`, tone: 'action' }
+        : { text: 'Special build — build or buy a card, then pass', tone: 'action' };
   }
 }
 

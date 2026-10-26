@@ -36,6 +36,10 @@ export interface GameSetup {
   /** @deprecated v1 dumps; use `map`. */
   layout?: Layout;
   vpToWin?: number;
+  /** Default: createGame's (on with 5+ players). */
+  specialBuildPhase?: boolean;
+  /** Default false. */
+  balancedDice?: boolean;
 }
 
 export function newGame(setup: GameSetup): GameState {
@@ -45,6 +49,10 @@ export function newGame(setup: GameSetup): GameState {
     ...(setup.map === undefined ? {} : { map: setup.map }),
     ...(setup.layout === undefined ? {} : { layout: setup.layout }),
     ...(setup.vpToWin === undefined ? {} : { vpToWin: setup.vpToWin }),
+    ...(setup.specialBuildPhase === undefined
+      ? {}
+      : { specialBuildPhase: setup.specialBuildPhase }),
+    ...(setup.balancedDice === undefined ? {} : { balancedDice: setup.balancedDice }),
   });
 }
 

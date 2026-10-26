@@ -30,6 +30,14 @@ export const VP_TO_WIN_RANGE = { min: 3, max: 20 } as const;
 export const DEFAULT_DISCARD_LIMIT = 7;
 export const DISCARD_LIMIT_RANGE = { min: 5, max: 20 } as const;
 
+/** Balanced dice: cards in the dice deck (every ordered outcome of two dice once). */
+export const DICE_DECK_SIZE = 36;
+/**
+ * Balanced dice: before a roll, the deck is reshuffled when this many cards or fewer remain, so
+ * the last rolls of a cycle stay unpredictable (like the Catan dice deck's reshuffle card).
+ */
+export const DICE_DECK_RESHUFFLE_AT = 5;
+
 /**
  * Default seat colours, one per player (up to 8), in seat order. Chosen to stay distinct for
  * common colour-vision deficiencies where possible (white, orange, brown and teal differ in
