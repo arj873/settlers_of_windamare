@@ -248,20 +248,23 @@ Eve: hello{token:null,name:'Eve'} → welcome (seat:null) → game{view(spectato
 `viewFor(state, viewer)` returns a **GameView**: the GameState shape with secrets masked, plus
 `view: ViewInfo`. Because the shape is unchanged, `BoardView.render` and `Hud.render` accept it.
 
-| Secret                                                | In a view                                 | Public replacement                                                |
-| ----------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| other players' `resources`                            | all 0                                     | `view.handCounts[p]`                                              |
-| other players' `devCards`, `newDevCards`              | all 0                                     | `view.devCardCounts[p]`                                           |
-| `devDeck` order and composition                       | `HIDDEN_DEV_CARD` × length                | `devDeck.length`                                                  |
-| `diceDeck` (balanced dice)                            | `0` × length                              | `diceDeck.length`                                                 |
-| `rng`                                                 | `0`                                       | —                                                                 |
-| `settings.seed` (+ "Game created …, seed X" log line) | `HIDDEN_SEED`; seed removed from the line | —                                                                 |
-| exact special-build queue (depends on hands)          | —                                         | `view.specialBuildQueue` (all builders still to come, unfiltered) |
+| Secret                                                    | In a view                                 | Public replacement                                                |
+| --------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| other players' `resources`                                | all 0                                     | `view.handCounts[p]`                                              |
+| other players' `devCards`, `newDevCards`                  | all 0                                     | `view.devCardCounts[p]`                                           |
+| `devDeck` order and composition                           | `HIDDEN_DEV_CARD` × length                | `devDeck.length`                                                  |
+| `diceDeck` (balanced dice)                                | `0` × length                              | `diceDeck.length`                                                 |
+| `rng`                                                     | `0`                                       | —                                                                 |
+| `settings.seed` (+ "Game created …, seed X" log line)     | `HIDDEN_SEED`; seed removed from the line | —                                                                 |
+| exact special-build queue (depends on hands)              | —                                         | `view.specialBuildQueue` (all builders still to come, unfiltered) |
+| `stats` (UX2: stolen cards, dev cards bought, VP history) | absent until `gameOver`, then all of it   | —                                                                 |
 
 Kept (public by the rules): board, pieces, robber, bank, dice, phase (incl. discard `pending`
 counts, trade offers, steal candidates), awards, knights and progress cards played, turn, log.
-A spectator is masked like an opponent for every seat. At `gameOver` hands and dev cards are
-revealed to all; decks, rng and seed stay hidden.
+A spectator is masked like an opponent for every seat. At `gameOver` hands, dev cards and the
+game statistics are revealed to all; decks, rng and seed stay hidden. The game-over `game`
+message also carries `durationMs` (room clock: `GameRec.startedAt` at `start` → `endedAt` at game
+over; absent for games started before UX2) for the stats screen.
 
 **UI code reads only public info:** `handCount(state, p)`, `devCardCount(state, p)`,
 `visibleSpecialBuildQueue(state)` work on full states (hotseat) and on views; the player list,

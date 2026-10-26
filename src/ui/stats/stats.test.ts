@@ -234,6 +234,9 @@ describe('stats panel in the HUD', () => {
 
   it('collapses to a bar (board visible) and expands; Results goes back to the winner card', () => {
     open(GAME);
+    expect(root.querySelector('.gs-overlay.is-entering')).not.toBeNull();
+    tab('dice').click(); // no fade replay on a tab switch
+    expect(root.querySelector('.gs-overlay')!.classList.contains('is-entering')).toBe(false);
     root.querySelector<HTMLButtonElement>('.gs-collapse')!.click();
     expect(root.querySelector('.gs-dock .gstats.is-collapsed')).not.toBeNull();
     expect(root.querySelector('.gs-overlay')).toBeNull();

@@ -142,7 +142,10 @@ function overview(state: GameState, stats: GameStats): HTMLElement[] {
     ];
     return h(
       'li',
-      { class: `gs-stand${b.player === state.winner ? ' is-winner' : ''}` },
+      {
+        class: `gs-stand${b.player === state.winner ? ' is-winner' : ''}`,
+        style: playerStyle(state.players[b.player]?.color ?? '#999'),
+      },
       h('span', { class: 'gs-rank' }, String(i + 1)),
       who(state, b.player),
       h('span', { class: 'gs-vp' }, `${b.total} VP`),
@@ -183,7 +186,7 @@ function chip(label: string, vp: number): HTMLElement {
 
 function diceChart(stats: GameStats): HTMLElement {
   const bars = diceHistogram(stats);
-  const W = 440,
+  const W = Math.round(Math.max(300, Math.min(440, (globalThis.innerWidth || 440) - 40))),
     H = 200,
     L = 28,
     B = 24,
@@ -253,8 +256,10 @@ function roundTop(x: number, base: number, w: number, hgt: number): string {
   return `M${x},${base}V${base - hgt + r}Q${x},${base - hgt} ${x + r},${base - hgt}H${x + w - r}Q${x + w},${base - hgt} ${x + w},${base - hgt + r}V${base}Z`;
 }
 
-function niceTicks(max: number): number[] {
-  const step = max <= 5 ? 1 : max <= 10 ? 2 : max <= 25 ? 5 : max <= 50 ? 10 : 20;
+/** 0, step, 2·step … ≤ max, with a round step giving at most `count` intervals. */
+function niceTicks(max: number, count = 6): number[] {
+  const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500];
+  const step = steps.find((s) => max / s <= count) ?? Math.ceil(max / count);
   const out: number[] = [];
   for (let t = 0; t <= max; t += step) out.push(t);
   return out;
@@ -423,8 +428,9 @@ function resourceDetail(ps: PlayerStats, state: GameState, p: PlayerId): HTMLEle
 function vpChart(state: GameState, stats: GameStats): HTMLElement {
   const series = vpSeries(stats, state.players.length);
   const n = series.turns.length;
-  const W = 600,
-    H = 240,
+  // Narrow screens get a narrower viewBox, so the axis text keeps its size.
+  const W = Math.round(Math.max(320, Math.min(600, (globalThis.innerWidth || 600) - 40))),
+    H = W < 480 ? 220 : 240,
     L = 30,
     R = 12,
     T = 12,
@@ -436,7 +442,7 @@ function vpChart(state: GameState, stats: GameStats): HTMLElement {
   const span = Math.max(1, last - first);
   const x = (turn: number) => L + ((W - L - R) * (turn - first)) / span;
   const y = (v: number) => H - B - ((H - B - T) * v) / top;
-  const xTicks = niceTicks(span).map((t) => t + first);
+  const xTicks = niceTicks(span, W < 480 ? 5 : 10).map((t) => t + first);
 
   const tip = h('div', { class: 'gs-tip', attrs: { hidden: '' } });
   const cross = svg('line', { class: 'gs-cross', y1: T, y2: H - B, x1: -10, x2: -10 });
@@ -541,7 +547,7 @@ function activity(state: GameState, stats: GameStats): HTMLElement[] {
       'Building, trading and the robber',
       playerTable(state, stats, 'Activity per player', [
         { label: 'Roads', cell: (s) => s.built.road },
-        { label: '  of them free', cell: (s) => s.freeRoads },
+        { label: 'Free roads (Road Building)', cell: (s) => s.freeRoads },
         { label: 'Settlements', cell: (s) => s.built.settlement },
         { label: 'Cities', cell: (s) => s.built.city },
         { label: 'Trade offers', cell: (s) => s.offersMade },

@@ -8,6 +8,8 @@
   padding: 16px;
   pointer-events: auto;
   background: radial-gradient(circle at 50% 30%, transparent, var(--scrim-deep) 80%), var(--scrim);
+}
+.gs-overlay.is-entering {
   animation: fade 0.2s ease;
 }
 /* Collapsed: no scrim, the board is free to pan; only the bar takes pointer events. */
@@ -517,9 +519,10 @@
   min-width: 120px;
   padding: 6px 10px;
   border-radius: var(--btn-radius);
-  background: var(--surface-pop);
+  /* The panel's own surface + ink: readable in every theme (--surface-pop is light in some). */
+  background: var(--surface);
   color: var(--ink);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--edge);
   box-shadow: var(--panel-shadow);
   font-size: 13px;
   pointer-events: none;
@@ -598,7 +601,18 @@
     padding: 4px 6px;
   }
   .gs-table thead .gs-who {
-    max-width: 64px;
+    max-width: 58px;
+  }
+  .gs-table tbody th {
+    white-space: normal;
+    min-width: 84px;
+  }
+  .gs-tab {
+    font-size: 13px;
+    padding: 10px 7px 8px;
+  }
+  .gs-awards {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
   .gs-dock {
     bottom: 8px;

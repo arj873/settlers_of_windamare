@@ -138,6 +138,8 @@ export class Hud {
   private statsCollapsed = false;
   private statsTab: StatsTab = 'overview';
   private statsPlayer: PlayerId | null = null;
+  /** The panel was just opened / expanded: play its fade-in once. */
+  private statsEntering = false;
   private botSpeed: BotSpeedControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
@@ -381,7 +383,12 @@ export class Hud {
       r.controls.replaceChildren(...this.controls(state, view, av));
       this.renderDialog(state, view, legal);
     }
+    // Stats panel: keep the body's scroll position across re-renders of the same tab.
+    const prevBody = r.overlay.querySelector<HTMLElement>('.gs-body');
+    const keep = prevBody ? { tab: prevBody.dataset.tab, top: prevBody.scrollTop } : null;
     r.overlay.replaceChildren(...this.gameOverScreen(state, view));
+    const body = r.overlay.querySelector<HTMLElement>('.gs-body');
+    if (body && keep && body.dataset.tab === keep.tab) body.scrollTop = keep.top;
   }
 
   /** Winner card, or (UX2) the statistics panel; nothing before game over. */
@@ -404,13 +411,14 @@ export class Hud {
       },
       onToggle: () => {
         this.statsCollapsed = !this.statsCollapsed;
+        this.statsEntering = !this.statsCollapsed;
         this.refresh();
       },
       actions: [
         h(
           'button',
           {
-            class: 'btn btn-ghost',
+            class: 'btn gs-results',
             on: {
               click: () => {
                 this.statsOpen = false;
@@ -423,7 +431,11 @@ export class Hud {
         ...this.endActions(''),
       ],
     });
-    return [h('div', { class: this.statsCollapsed ? 'gs-dock' : 'gs-overlay' }, panel)];
+    // Fade in only when the panel opens, not on every tab switch.
+    const entering = this.statsEntering;
+    this.statsEntering = false;
+    const cls = this.statsCollapsed ? 'gs-dock' : `gs-overlay${entering ? ' is-entering' : ''}`;
+    return [h('div', { class: cls }, panel)];
   }
 
   /** "New game" (hotseat) or the online session actions, as buttons. */
@@ -1769,11 +1781,12 @@ export class Hud {
             h(
               'button',
               {
-                class: 'btn btn-ghost btn-lg winner-stats',
+                class: 'btn btn-lg winner-stats',
                 on: {
                   click: () => {
                     this.statsOpen = true;
                     this.statsCollapsed = false;
+                    this.statsEntering = true;
                     this.refresh();
                   },
                 },
