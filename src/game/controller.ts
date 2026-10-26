@@ -20,6 +20,7 @@ import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import {
   actionForClick,
   boardActions,
+  gameConfigOf,
   highlightsFor,
   isStalled,
   nextBot,
@@ -175,24 +176,7 @@ export class GameController {
   /** New game from the HUD's new-game screen. */
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
-    const base = (cfg.mode ?? 'base') === 'base';
-    const state = createGame({
-      seed,
-      players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-      // Expansion modes take the map from their scenario (docs/EXPANSIONS.md §3).
-      ...(base
-        ? { map: cfg.map }
-        : {
-            mode: cfg.mode,
-            ...(cfg.scenario === undefined ? {} : { scenario: cfg.scenario }),
-            ...(cfg.options === undefined ? {} : { options: cfg.options }),
-          }),
-      vpToWin: extra.vpToWin ?? cfg.vpToWin,
-      discardLimit: cfg.discardLimit,
-      balancedDice: cfg.rules.balancedDice,
-      hideBankCards: cfg.rules.hideBankCards,
-      turnTimerSec: cfg.turnTimerSec,
-    });
+    const state = createGame(gameConfigOf(cfg, seed, extra.vpToWin));
     console.info(`New game: mode=${state.settings.mode} map=${state.settings.map} seed=${seed}`);
     this.start(
       state,

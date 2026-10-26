@@ -13,7 +13,7 @@ import { setFrameColors } from './render';
 import { boardFrameColors, Hud, initTheme, onThemeChange, type Controller } from './ui';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
-import { measureHudInsets } from './game/layout';
+import { createFitButton, measureHudInsets } from './game/layout';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import {
@@ -108,9 +108,10 @@ async function boot() {
   const hud = new Hud(uiRoot);
 
   const fitBoard = () => {
-    const insets = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
-    if (insets) board.setInsets(insets);
+    const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
+    if (layout) board.setInsets(layout.insets, layout.avoid);
   };
+  uiRoot.after(createFitButton(() => board.fit()));
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,

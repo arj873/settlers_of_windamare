@@ -1,10 +1,25 @@
 {
-  // Inert until someone runs `npx wrangler deploy`. See docs/HOSTING.md.
+  // Static game (dist/) + room server (src/server/worker.ts). See docs/HOSTING.md and
+  // docs/MULTIPLAYER.md §18. Build the client first: `pnpm build`, then `pnpm dev:server`.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "colonizers-of-windamere",
+  "main": "src/server/worker.ts",
   "compatibility_date": "2026-10-25",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
+    // Only these paths run Worker code; everything else is free static traffic.
+    "run_worker_first": ["/api/*", "/ws/*"],
   },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }],
+  },
+  // SQLite-backed Durable Objects are the ones on the free plan.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "vars": {
+    // Extra allowed origins, comma separated. The Worker's own host and loopback are always allowed.
+    "ALLOWED_ORIGINS": "",
+  },
+  "observability": { "enabled": true },
 }
