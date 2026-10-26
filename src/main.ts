@@ -123,6 +123,7 @@ async function boot() {
   // Online play (M3): `?room=CODE` joins a room; otherwise the home screen picks a mode.
   const online = (roomId: string, then: (app: OnlineApp) => void = (app) => void app.run()) => {
     void pickBackend(location.search).then((backend) => {
+      // `params` was read at boot: creating a room rewrites the URL and may drop `?debug=1`.
       const room = new OnlineApp(
         {
           board,
@@ -144,6 +145,7 @@ async function boot() {
         roomId,
       );
       (window as unknown as { catan: unknown }).catan = { online: room, board, hud };
+      if (params.debug) installDebugHook(room.debugController, board);
       then(room);
     });
   };

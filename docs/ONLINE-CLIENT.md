@@ -68,6 +68,15 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 - The turn pill drops in only when its content changes (it used to replay the animation on every
   render and timer tick).
 
+## Playtest harness (online)
+
+`pnpm pt:serve --online --seats N [--bots B] [--map M] [--timer SEC] [--vp N] [--headed] [--remote URL]`:
+reuses or starts `pnpm dev:server` (:8787), creates a room as Seat1 through the real home screen,
+applies the table settings with a `configure`, joins Seat2..N from the invite link, sits them,
+starts. One browser context (own token) per seat; the `pnpm pt <seat> ...` CLI is routed to that
+seat's page (`scripts/playtest/`, `playtest/PLAYBOOK.md`). `?debug=1` installs `__catanDebug`
+over the server view (`OnlineApp.debugController`). Extra commands: `chat`, `drop`, `reconnect`, `reload`.
+
 ## Tests
 
 - `src/net/client.test.ts`: RoomClient over LocalNet — lobby → start → intents, errors, backoff

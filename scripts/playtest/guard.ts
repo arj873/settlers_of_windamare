@@ -57,10 +57,14 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
 
 /** Why `seat` should wake from `wait`, or null to keep waiting. */
 export function wakeReason(snap: Snapshot, seat: PlayerId): string | null {
+  if (snap.online?.fatal) {
+    return `DISCONNECTED for good (${snap.online.fatal.code}): ${snap.online.fatal.message} Report it if unexpected.`;
+  }
   const state = snap.state;
   if (!state) return null;
   if (state.phase.kind === 'gameOver') return `GAME OVER: ${nameOf(state, state.winner)} won.`;
-  if (snap.legal.length === 0) {
+  // Online, `legal` is only this seat's: empty just means "not your move".
+  if (!snap.online && snap.legal.length === 0) {
     return `STALLED: nobody has a legal action in phase "${state.phase.kind}". Report this as a blocker.`;
   }
   if (snap.viewer !== seat || !snap.legal.some((a) => a.player === seat)) return null;
@@ -72,9 +76,26 @@ export function wakeReason(snap: Snapshot, seat: PlayerId): string | null {
 export function waitingOn(snap: Snapshot): string {
   const state = snap.state;
   if (!state) return 'the game to load';
+  if (snap.online) return onlineWaitingOn(state);
   const who = actors(snap.legal).map((p) => nameOf(state, p));
   const screen = nameOf(state, snap.viewer);
   return `screen is with ${screen}; can act: ${who.length > 0 ? who.join(', ') : 'nobody'}`;
+}
+
+/** Online: the page only knows its own legal actions, so name the table's wait from the state. */
+function onlineWaitingOn(state: GameState): string {
+  const phase = state.phase;
+  const cur = nameOf(state, state.turn.current);
+  if (phase.kind === 'discard') {
+    const owing = phase.pending.flatMap((n, p) => (n > 0 ? [nameOf(state, p)] : []));
+    return `waiting for ${owing.join(', ') || cur} to discard`;
+  }
+  if (phase.kind === 'trade') {
+    return `waiting on the open trade offer from ${nameOf(state, phase.offer.from)}`;
+  }
+  if (phase.kind === 'specialBuild')
+    return `waiting for ${nameOf(state, phase.builder)} (special build)`;
+  return `waiting for ${cur} (phase ${phase.kind})`;
 }
 
 /**
@@ -86,6 +107,12 @@ export function actingVerdict(snap: Snapshot, seat: PlayerId, cmd: 'act' | 'pass
   if (!state) return { ok: false, reason: 'The game has not loaded yet.' };
   if (snap.ui.screen === 'winner' || state.phase.kind === 'gameOver') {
     return { ok: false, reason: 'The game is over. You can still use status, shot and report.' };
+  }
+  if (snap.online && snap.online.status !== 'open') {
+    return {
+      ok: false,
+      reason: `You are offline (connection ${snap.online.status}); nothing you click reaches the server. Run \`reconnect\`, or wait for the automatic retry.`,
+    };
   }
   if (snap.viewer !== seat) {
     return {

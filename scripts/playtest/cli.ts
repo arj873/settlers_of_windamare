@@ -23,12 +23,18 @@ Look (always allowed):
   report --title "..." --severity blocker|major|minor|visual --expected "..." --actual "..." --steps "..."
 
 Act (only when it is your move; others are refused):
-  pass                   dismiss the "Pass to <you>" hotseat cover
+  pass                   dismiss the "Pass to <you>" hotseat cover (hotseat only)
   click <button text>    click a HUD/dialog button by its text, e.g. click Roll dice
   click-tile <text>      same as click (resource tiles, dev cards, players)
   set <label> <n>        set a stepper (discard / trade), e.g. set brick 2, set give wool 1
   click-spot <n>         click spot n from the last \`spots\` list
   click-board <id>       click a board id (v:.., e:.., h:..)
+
+Online games only (each seat is its own browser; no pass-the-device cover):
+  chat <message>         say something in the room chat (optional)
+  drop                   cut your network, like dropped Wi-Fi (the others see you away)
+  reconnect              restore the network and wait until you are back in your seat
+  reload                 reload your tab (your stored token should put you back in your seat)
 
 Session: pnpm -s pt stop   (stops the server)`;
 

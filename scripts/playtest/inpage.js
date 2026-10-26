@@ -174,9 +174,36 @@
     };
   }
 
+  /** Online pages: connection and room facts from the page's RoomClient (see OnlineScan). */
+  function onlineScan() {
+    const c = window.catan && window.catan.online && window.catan.online.roomClient;
+    if (!c) return null;
+    const room = c.room;
+    const members = new Map(((room && room.members) || []).map((m) => [m.id, m]));
+    const banner = document.querySelector('.conn-banner:not([hidden])');
+    const notice = document.querySelector('.online-screen .ol-home-card');
+    return {
+      room: window.catan.online.roomId,
+      status: c.status,
+      attempts: c.attempts,
+      seq: c.game ? c.game.seq : null,
+      roomPhase: room ? room.phase : null,
+      fatal: c.fatal ? { code: c.fatal.code, message: c.fatal.message } : null,
+      seats: ((room && room.seats) || []).map((s) => {
+        const who = s.occupant !== null && members.get(s.occupant);
+        return `${s.index + 1} ${who ? who.name : s.color} ${s.status}`;
+      }),
+      chat: c.chat.slice(-8).map((e) => ({ id: e.id, line: `${e.name || 'room'}: ${e.text}` })),
+      timerLeftMs: c.game && c.game.timer ? c.timerLeftMs() : null,
+      banner: banner ? text(banner) : null,
+      notice: notice ? text(notice).slice(0, 200) : null,
+    };
+  }
+
   function snapshot() {
     const dbg = window.__catanDebug;
     return {
+      online: onlineScan() || undefined,
       state: dbg ? dbg.state() : null,
       viewer: dbg ? dbg.viewer() : null,
       legal: dbg ? dbg.legal() : [],
