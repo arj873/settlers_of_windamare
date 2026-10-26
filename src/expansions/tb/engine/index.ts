@@ -776,7 +776,7 @@ export const tbModule: ExpansionModule = {
       id: TB,
       name: 'Traders & Barbarians',
       blurb: 'Five scenarios and the variants, Catan for Two included',
-      status: 'wip',
+      status: 'ready',
       expansions: [TB],
       scenarios: [SC_FISH, SC_RIVERS, SC_CARAVANS, SC_BA, SC_TRADERS, SC_BASE],
       players: { min: 2, max: 6 },

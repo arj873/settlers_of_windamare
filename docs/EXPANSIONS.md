@@ -305,6 +305,9 @@ interface HudExtension {
   shrink and scroll (see `ck.css`).
 - The Buy card button is hidden when the game has no development deck (`supply` hook).
 
+- E4: a build card's optional `available(state)` hides it in games that do not use it (one
+  module, several scenarios: T&B's Bridge / Wagon / Move knights); the turn pill names an active
+  module place mode by its card label (`placeModeLabel`).
 - A build card toggles its namespaced `PlaceMode`; the controller (`game/logic.ts`
   `boardActions`) highlights the legal actions of its `actionType` and maps clicks to them.
   Implied actions (setup ship, pirate move, knight move) are highlighted whenever legal.
