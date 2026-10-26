@@ -370,40 +370,152 @@ export function drawResourceIcon(g: Graphics, res: Resource, x: number, y: numbe
       break;
     }
     case 'ore': {
-      g.poly([
-        x - 0.48 * u,
-        y + 0.1 * u,
-        x - 0.2 * u,
-        y - 0.36 * u,
-        x + 0.24 * u,
-        y - 0.36 * u,
-        x + 0.5 * u,
-        y + 0.1 * u,
-        x + 0.1 * u,
-        y + 0.42 * u,
-        x - 0.24 * u,
-        y + 0.42 * u,
-      ])
-        .fill(0x8f9ba7)
-        .stroke({ width: 1.3, color: 0x2f3842, join: 'round' });
-      g.poly([
-        x - 0.2 * u,
-        y - 0.36 * u,
-        x + 0.24 * u,
-        y - 0.36 * u,
-        x + 0.05 * u,
-        y + 0.02 * u,
-        x - 0.3 * u,
-        y + 0.02 * u,
-      ]).fill({ color: 0xffffff, alpha: 0.35 });
-      g.poly([
-        x + 0.05 * u,
-        y + 0.02 * u,
-        x + 0.5 * u,
-        y + 0.1 * u,
-        x + 0.1 * u,
-        y + 0.42 * u,
-      ]).fill({ color: 0x000000, alpha: 0.22 });
+      // Two faceted rocks (coords on a 32-unit grid), a gold vein and white glints.
+      const at = (pts: Pt[]) =>
+        pts.flatMap(([a, b]) => [x + ((a - 16) / 32) * u, y + ((b - 16) / 32) * u]);
+      const edge = { width: 1.1, color: 0x2f3842, join: 'round' as const };
+      const rock = (outline: Pt[], facets: [Pt[], number][]) => {
+        g.poly(at(outline)).fill(facets[0]?.[1] ?? 0x8795a5);
+        for (const [f, c] of facets) g.poly(at(f)).fill(c);
+        g.poly(at(outline)).stroke(edge);
+      };
+      rock(
+        [
+          [19, 25],
+          [20, 17],
+          [25, 13],
+          [29, 17],
+          [29, 25],
+        ],
+        [
+          [
+            [
+              [20, 17],
+              [25, 13],
+              [25, 20],
+            ],
+            0xa9b6c4,
+          ],
+          [
+            [
+              [25, 13],
+              [29, 17],
+              [25, 20],
+            ],
+            0x8795a5,
+          ],
+          [
+            [
+              [29, 17],
+              [29, 25],
+              [25, 20],
+            ],
+            0x5f6c7b,
+          ],
+          [
+            [
+              [19, 25],
+              [20, 17],
+              [25, 20],
+            ],
+            0x74828f,
+          ],
+          [
+            [
+              [19, 25],
+              [25, 20],
+              [29, 25],
+            ],
+            0x56626f,
+          ],
+        ],
+      );
+      rock(
+        [
+          [3, 26],
+          [5, 15],
+          [12, 9],
+          [19, 12],
+          [22, 19],
+          [20, 26],
+        ],
+        [
+          [
+            [
+              [5, 15],
+              [12, 9],
+              [13, 18],
+            ],
+            0xbac7d4,
+          ],
+          [
+            [
+              [12, 9],
+              [19, 12],
+              [13, 18],
+            ],
+            0x93a1b1,
+          ],
+          [
+            [
+              [19, 12],
+              [22, 19],
+              [20, 26],
+              [13, 18],
+            ],
+            0x6c7a8a,
+          ],
+          [
+            [
+              [3, 26],
+              [5, 15],
+              [13, 18],
+            ],
+            0x8190a0,
+          ],
+          [
+            [
+              [3, 26],
+              [13, 18],
+              [20, 26],
+            ],
+            0x566370,
+          ],
+        ],
+      );
+      for (const [vx, vy, vr] of [
+        [9, 22.5, 1.7],
+        [14.5, 22, 1.3],
+        [17.5, 18.5, 1.1],
+      ] as const) {
+        g.poly(
+          at([
+            [vx, vy - vr],
+            [vx + vr, vy],
+            [vx, vy + vr],
+            [vx - vr, vy],
+          ]),
+        )
+          .fill(0xf0c040)
+          .stroke({ width: 0.7, color: 0x8a6a14 });
+      }
+      const glint = (cx: number, cy: number, r: number) =>
+        g
+          .poly(
+            at([
+              [cx, cy - r],
+              [cx + r * 0.3, cy - r * 0.3],
+              [cx + r, cy],
+              [cx + r * 0.3, cy + r * 0.3],
+              [cx, cy + r],
+              [cx - r * 0.3, cy + r * 0.3],
+              [cx - r, cy],
+              [cx - r * 0.3, cy - r * 0.3],
+            ]),
+          )
+          .fill(0xffffff);
+      glint(10, 13, 3);
+      glint(25.5, 16.5, 2.2);
       break;
     }
   }
@@ -422,9 +534,15 @@ export function shade(color: number, amount: number): number {
   return (mix((color >> 16) & 255) << 16) | (mix((color >> 8) & 255) << 8) | mix(color & 255);
 }
 
+const ROAD_W = px(0.17); // outline width
+const ROAD_FILL_W = px(0.115);
+/** Distance from a vertex where two road strips at 120° stop overlapping: w / (2 tan 60°). */
+const ROAD_INSET = (ROAD_W / (2 * SQRT3)) * 1.02;
+
 /**
- * Road along a segment (design px). The inset is smaller than the round cap's radius, so roads
- * meeting at a vertex join up visually; buildings are drawn on a higher layer and cover the joint.
+ * Road along a segment (design px). Butt caps, stopped just short of each vertex so roads meeting
+ * there touch without overlapping; `drawRoadJoint` fills the gap between same-owner roads, and
+ * buildings (higher layer) cover the vertex.
  */
 export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
   const dx = b[0] - a[0];
@@ -432,25 +550,40 @@ export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
   const len = Math.hypot(dx, dy);
   const ux = dx / len;
   const uy = dy / len;
-  const inset = px(0.03);
-  const x0 = a[0] + ux * inset;
-  const y0 = a[1] + uy * inset;
-  const x1 = b[0] - ux * inset;
-  const y1 = b[1] - uy * inset;
+  const x0 = a[0] + ux * ROAD_INSET;
+  const y0 = a[1] + uy * ROAD_INSET;
+  const x1 = b[0] - ux * ROAD_INSET;
+  const y1 = b[1] - uy * ROAD_INSET;
   g.moveTo(x0 + 1.5, y0 + 2.5)
     .lineTo(x1 + 1.5, y1 + 2.5)
-    .stroke({ width: px(0.17), color: 0x000000, alpha: 0.28, cap: 'round' });
-  g.moveTo(x0, y0)
-    .lineTo(x1, y1)
-    .stroke({ width: px(0.17), color: INK, cap: 'round' });
-  g.moveTo(x0, y0)
-    .lineTo(x1, y1)
-    .stroke({ width: px(0.115), color, cap: 'round' });
+    .stroke({ width: ROAD_W, color: 0x000000, alpha: 0.28, cap: 'butt' });
+  g.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: ROAD_W, color: INK, cap: 'butt' });
+  g.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: ROAD_FILL_W, color, cap: 'butt' });
   const nx = -uy * px(0.03);
   const ny = ux * px(0.03);
   g.moveTo(x0 + nx, y0 + ny)
     .lineTo(x1 + nx, y1 + ny)
-    .stroke({ width: px(0.03), color: shade(color, 0.45), alpha: 0.7, cap: 'round' });
+    .stroke({ width: px(0.03), color: shade(color, 0.45), alpha: 0.7, cap: 'butt' });
+}
+
+/**
+ * Round joint disc at a vertex (x, y) where two or more roads of one owner meet, drawn in the
+ * road style. Must be layered BELOW the roads. `away` is the unit direction of a differently
+ * owned road at the same vertex: the disc is then cut to the half facing away from it so it
+ * never pokes into that road.
+ */
+export function drawRoadJoint(g: Graphics, x: number, y: number, color: number, away?: Pt) {
+  const disc = (cx: number, cy: number, r: number) => {
+    if (!away) return g.circle(cx, cy, r);
+    const a0 = Math.atan2(away[1], away[0]) + Math.PI / 2;
+    return g
+      .moveTo(cx, cy)
+      .arc(cx, cy, r, a0, a0 + Math.PI)
+      .closePath();
+  };
+  disc(x + 1.5, y + 2.5, ROAD_W / 2).fill({ color: 0x000000, alpha: 0.28 });
+  disc(x, y, ROAD_W / 2).fill(INK);
+  disc(x, y, ROAD_FILL_W / 2).fill(color);
 }
 
 export function drawSettlement(g: Graphics, x: number, y: number, color: number) {
