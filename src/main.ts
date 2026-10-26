@@ -50,7 +50,7 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
     const n = params.autoplay ?? params.seats?.length ?? 4;
     const seed = params.seed ?? String(Date.now() % 1e9);
     const map = params.map ?? (params.layout ? layoutToMap(params.layout) : defaultMapFor(n));
-    console.info(`Catan dev game: map=${map} seed=${seed}`);
+    console.info(`Windamere dev game: map=${map} seed=${seed}`);
     const names = params.names?.length === n ? params.names : null;
     let state: GameState;
     try {

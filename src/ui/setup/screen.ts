@@ -149,7 +149,12 @@ export class SetupScreen {
         'header',
         { class: 'su-head' },
         h('span', { class: 'su-logo' }, icon('logo', 38)),
-        h('div', {}, h('h1', {}, 'New game'), h('p', { class: 'muted' }, 'Set up your island')),
+        h(
+          'div',
+          {},
+          h('h1', {}, 'New game'),
+          h('p', { class: 'muted' }, 'Colonizers of Windamere'),
+        ),
       ),
       this.modeSection(),
       this.mapSection(),

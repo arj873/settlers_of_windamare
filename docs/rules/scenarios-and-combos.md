@@ -4,6 +4,7 @@ Rules research for the engine/framework agents. Written in our own words from th
 rulebooks (read in full where noted). Nothing here is implemented yet.
 
 **Target editions**
+
 - **Oil Springs**: the only edition is the 2011 Mayfair/Catan GmbH scenario (written against the
   4th/5th-edition base game and its 5-6 extension). Target = that text.
 - **Crop Trust**: the only edition is the 2018 Catan Studio scenario. Target = that text.
@@ -16,6 +17,7 @@ text. `[IMG]` = read from a diagram image in the rulebook (re-verify against the
 `[WEB]` = from catan.com product page text only. `[INF]` = my inference, flagged.
 
 **Sources (used throughout)**
+
 - S1. Catan: Oil Springs rulebook, 4 pp, https://tesera.ru/images/items/74859/Catan-OilSprings-Scenario.pdf
   (mirror of the Mayfair/Catan GmbH PDF; free originals were hosted at oilsprings.catan.com). `[RB]`
 - S2. Catan Scenario: Crop Trust rules + almanac, https://www.catan.com/sites/default/files/2021-06/catan-crop_trust_rulesalmanaceng_180705xs.pdf `[RB]`
@@ -46,14 +48,14 @@ extension (S3 confirms).
 
 Everything from the base game, plus (S1 p1):
 
-| Component | 3-4 players | 5-6 players | Box total |
-|---|---|---|---|
-| Oil tokens (back side = "sequestered oil") | 15 | 21 | 21 |
-| Metropolis tokens | 4 | 6 | 6 |
-| Oil Spring tiles | 3 | 4 | 4 |
-| Champion of the Environment token | 1 | 1 | 1 |
-| Victory Point tokens | 7 (only 5 can ever be earned, see A6) | 7 | 7 |
-| Disaster Track (+ marker) | 1 | 1 | 1 |
+| Component                                  | 3-4 players                           | 5-6 players | Box total |
+| ------------------------------------------ | ------------------------------------- | ----------- | --------- |
+| Oil tokens (back side = "sequestered oil") | 15                                    | 21          | 21        |
+| Metropolis tokens                          | 4                                     | 6           | 6         |
+| Oil Spring tiles                           | 3                                     | 4           | 4         |
+| Champion of the Environment token          | 1                                     | 1           | 1         |
+| Victory Point tokens                       | 7 (only 5 can ever be earned, see A6) | 7           | 7         |
+| Disaster Track (+ marker)                  | 1                                     | 1           | 1         |
 
 - The Disaster Track has a marker lane 0..5 and a set of **open circles** that receive destroyed
   number tokens. 3-4 players: the game ends when the 5th token is destroyed; 5-6 players: 8th.
@@ -71,6 +73,7 @@ Confidence: `[RB]`.
 ## A2. Setup
 
 ### A2.1 3-4 players, fixed ("first game") layout `[IMG]`
+
 19 hexes, rows top to bottom, tiles left to right. Format: `terrain number` ; `*` = Oil Spring.
 Everything is the normal base-game frame (sea ring + 9 harbors); the PDF diagram does not let me
 read exact harbor positions, so **use the engine's default harbor layout** `[INF]`.
@@ -82,6 +85,7 @@ Row 3 (5):  desert 5 * | forest 3    | fields 11  | forest 4    | fields 8
 Row 4 (4):  hills 8    | pasture 10  | forest 9 * | mountains 3
 Row 5 (3):  mountains 5| fields 2    | forest 6
 ```
+
 Check: forest 4, pasture 4, fields 4, hills 3, mountains 3, desert 1 = 19. 3 Oil Springs.
 The desert Oil Spring tile carries its **own printed number 5**; it is the only numbered tile.
 The forest 9 and pasture 10 oil tiles keep their hex's number token (variable setup says
@@ -92,10 +96,11 @@ Starting settlements/roads: normal base-game snake placement by players (no fixe
 positions in this scenario). Starting resources: see A10 Q1.
 
 ### A2.2 3-4 players, variable setup `[RB]`
+
 1. Lay out the board with the base-game variable setup (random terrain, spiral number tokens).
    The robber starts off board.
 2. Numbered Oil Spring tile onto the desert. If possible the desert's number must not be a
-   number of a hex adjacent to the desert.  `[INF]` meaning: pick (among the numbers available on
+   number of a hex adjacent to the desert. `[INF]` meaning: pick (among the numbers available on
    the numbered tile) one not already on any neighbor; the tile is a "numbered" tile, so the
    rulebook intends you to choose its number. The rulebook's wording is thin; the tile has one
    fixed printed number in the fixed layout, so the engine can pick any number token value
@@ -108,6 +113,7 @@ positions in this scenario). Starting resources: see A10 Q1.
 5. Rulebook warns variable setup "can lead to a very volatile game". Default to the fixed layout.
 
 ### A2.3 5-6 players, fixed layout `[IMG]` (terrain NOT visible)
+
 30 hexes, rows (3,4,5,6,5,4,3), numbers only (diagram prints terrain in white):
 
 ```
@@ -119,6 +125,7 @@ Row 5 (5): 8   | 5    | 2    | 5    | 3
 Row 6 (4): 11  | 4    | 9    | 6
 Row 7 (3): 11  | 5 [desert, OIL] | 10
 ```
+
 - Terrain comes from the base 5-6 extension's own fixed layout, with exactly these changes (S1 p3):
   second desert becomes an Oil Spring (numbered tile); the tile in the left "10" position
   becomes a forest and gets an oil spring; the tile in the right "4" position becomes a pasture and
@@ -133,6 +140,7 @@ Row 7 (3): 11  | 5 [desert, OIL] | 10
 - Special Building Phase restrictions: see A3.8.
 
 ### A2.4 5-6 variable setup
+
 Variable setup from the 5-6 extension, then follow the 3-4 oil steps (A2.2); the only change is
 that the **second desert also gets an Oil Spring** (numbered). `[RB]`
 
@@ -161,17 +169,17 @@ Base-game turn order stands; the changes are:
    stays under the cap. If the thief picks an unaffordable oil, it is not allowed.
 4. **Trade phase.**
    - Maritime trade (4:1, harbors) can **never give you oil** (you may trade resources away for
-     other resources as normal; oil as the *input* of a maritime trade is not allowed either: oil is
+     other resources as normal; oil as the _input_ of a maritime trade is not allowed either: oil is
      not a resource card. `[INF]`).
    - **Domestic trade can include oil** (the rulebook only restricts it where it would push
      the receiver over the cap). `[RB]` implied by "you may not ... trade with other players for
      oil ... if it would result in holding more than 4 oil".
 5. **Build/oil actions (your turn, any order, interleaved with build/trade).**
-   - *Convert oil:* spend 1 oil (return to supply): take 2 resource cards of one chosen
+   - _Convert oil:_ spend 1 oil (return to supply): take 2 resource cards of one chosen
      non-oil type from the bank. Repeatable.
-   - *Build metropolis:* pay 1 brick + 1 grain + 1 ore + **2 oil** (returned to supply):
+   - _Build metropolis:_ pay 1 brick + 1 grain + 1 ore + **2 oil** (returned to supply):
      place a Metropolis token under one of your cities. See A4.2.
-   - *Sequester oil:* see A4.3 (once per turn, exclusive with using oil).
+   - _Sequester oil:_ see A4.3 (once per turn, exclusive with using oil).
    - Each oil **used** (convert or metropolis) moves the Disaster marker +1.
    - **Limit:** you may not use oil in a way that moves the marker beyond 5 (A4.4).
 6. **Development cards.** Year of Plenty may take oil from the bank; Monopoly may name oil
@@ -192,6 +200,7 @@ Confidence: `[RB]`.
 ## A4. New actions, pieces, costs, timing, edge cases
 
 ### A4.1 Oil token
+
 - Per-player visible stock. Cap 4 (6 in 5-6): you cannot gain oil by production, stealing, player
   trade, Year of Plenty or Monopoly beyond the cap (excess simply not taken).
 - Supply is finite: 15 (3-4p) / 21 (5-6p). Sequestered oil (flipped) and oil removed by disasters
@@ -199,6 +208,7 @@ Confidence: `[RB]`.
   the supply.
 
 ### A4.2 Metropolis
+
 - Cost: **1 brick, 1 grain, 1 ore, 2 oil**. Applies to one of **your own cities** (a settlement
   must first be upgraded to a city); the Metropolis token is placed under the city.
 - Effect: produces **3** resources (or 3 oil on an oil spring) instead of 2; worth **3 VP total**
@@ -209,6 +219,7 @@ Confidence: `[RB]`.
 - Metropolises cannot be reverted, destroyed or downgraded by disasters.
 
 ### A4.3 Sequestering
+
 - On your turn, instead of using that oil, you may flip **one** oil from your stock upside down in
   front of you ("sequestered"). It never returns to the supply.
 - **Max 1 per turn**, and (default rules) **not on a turn when you have already used oil**
@@ -222,7 +233,8 @@ Confidence: `[RB]`.
 - Sequestered oil is not "used": it does not move the marker.
 
 ### A4.4 Pollution and the Disaster Track
-- Marker starts at 0. Each oil *used* (converted or put into a metropolis) = +1. Oil discarded for
+
+- Marker starts at 0. Each oil _used_ (converted or put into a metropolis) = +1. Oil discarded for
   a 7, returned by the robber's theft, or sequestered does **not** count. (Theft: S1 says "(but not
   those ... returned to the bank because of the robber)", i.e. oil discarded under a 7.)
 - When the marker is at 5, a disaster is "triggered" and is resolved at end of turn.
@@ -232,6 +244,7 @@ Confidence: `[RB]`.
 - Marker carries over between turns and between players (shared).
 
 ### A4.5 Disaster Phase (when marker = 5, at the end of the active player's turn)
+
 Roll both dice (nothing is "rolled for production"):
 
 - **7: Coastal flooding.** Every **settlement** that touches a sea hex is removed from the board and
@@ -258,6 +271,7 @@ Roll both dice (nothing is "rolled for production"):
   robber may **not** be placed on them.
 
 ### A4.6 Robbing and oil
+
 Covered in A3 steps 2 and 3. Robber on a oil spring hex stops oil production there.
 
 ## A5. Victory conditions and scoring
@@ -266,6 +280,7 @@ VP sources: settlement 1, city 2, **metropolis 3**, Longest Road 2, Largest Army
 each, **VP token 1 per 3 sequestered oil**, **Champion token 1**.
 
 End conditions (S1 p3):
+
 1. First player with **>= 12 VP at the end of their own turn, including resolution of the Disaster
    Phase**, wins. (S1 example: a player reaches 12 through a metropolis, the oil used triggers
    a disaster, a 7 floods the coast, they drop to 10, the game continues.)
@@ -280,7 +295,7 @@ Max supply-bound VP from sequestering: 3-4p 15 oil -> max 5 VP tokens; 5-6p 21 o
 ## A6. Edge cases and rulings (numbered)
 
 1. Oil may be stolen only by deliberate choice of the robbing player; otherwise the robber steals a
-   random *resource card* (oil is not in the random pool). `[RB]`
+   random _resource card_ (oil is not in the random pool). `[RB]`
 2. A player at cap cannot take oil by theft, trade, Year of Plenty, or Monopoly (partial amounts up
    to the cap are fine for Monopoly; see item 5). `[RB]`
 3. Maritime 4:1 / harbor trades can never yield oil. Year of Plenty and Monopoly can. `[RB]`
@@ -300,19 +315,19 @@ Max supply-bound VP from sequestering: 3-4p 15 oil -> max 5 VP tokens; 5-6p 21 o
 
 ## A7. Interactions with base rules
 
-| Base rule | Change |
-|---|---|
-| Win target 10 VP | 12 VP, checked at end of own turn after the Disaster Phase |
-| Resource production | oil-spring hexes pay oil, round-robin starting with the roller, cap per player |
-| 7 / discard | oil counts as 1 card; oil may be discarded to the supply |
-| Robber | starts off board; cannot enter destroyed hexes; may block oil springs; theft may target oil |
-| Domestic trade | oil tradable (cap-limited); maritime never gives oil |
-| Dev cards | Year of Plenty may take oil; Monopoly may take oil (cap, clockwise order) |
-| Cities | may become metropolises (extra tier); metropolis token pool is finite |
-| Settlements/cities on the coast | exposed to flooding on a disaster 7 |
-| Longest Road | roads never flooded, but removing a coastal settlement can reconnect or cut routes: recompute (A10 Q3) |
-| Largest Army | unchanged |
-| 5-6 SBP | oil restrictions described in A3 step 8 |
+| Base rule                       | Change                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Win target 10 VP                | 12 VP, checked at end of own turn after the Disaster Phase                                             |
+| Resource production             | oil-spring hexes pay oil, round-robin starting with the roller, cap per player                         |
+| 7 / discard                     | oil counts as 1 card; oil may be discarded to the supply                                               |
+| Robber                          | starts off board; cannot enter destroyed hexes; may block oil springs; theft may target oil            |
+| Domestic trade                  | oil tradable (cap-limited); maritime never gives oil                                                   |
+| Dev cards                       | Year of Plenty may take oil; Monopoly may take oil (cap, clockwise order)                              |
+| Cities                          | may become metropolises (extra tier); metropolis token pool is finite                                  |
+| Settlements/cities on the coast | exposed to flooding on a disaster 7                                                                    |
+| Longest Road                    | roads never flooded, but removing a coastal settlement can reconnect or cut routes: recompute (A10 Q3) |
+| Largest Army                    | unchanged                                                                                              |
+| 5-6 SBP                         | oil restrictions described in A3 step 8                                                                |
 
 ## A8. Combinations
 
@@ -334,15 +349,15 @@ Semi-cooperative: players harvest crops from fields for food (grain) but must al
 a seed vault; the game can end by crop collapse. Grain cards are called **food cards** (same
 card, same trading). 10 VP target, plus two crop-collapse endings.
 
-| Component | Count | Notes |
-|---|---|---|
-| Fields hex (watermarked seed-vial icon) | 1 | **replaces the desert**: board has 5 fields hexes, no desert (4 + this one) |
-| Number token "9" | 1 | third 9 (matches 19 hexes with no desert) |
-| Crop tokens | 90 | 5 species (beans, maize, quinoa, rice, wheat); front = crop, back = seed-vial. **18 each** `[INF]` (90/5; not printed) |
-| Event tokens | 41 | 4 categories (see B4.3). Face-down side = seed-vial. **Per-category counts not printed in the sources I could reach** |
-| Seed vault display | 1 | one 2-space storage area per player colour (red/white/orange/blue) |
-| Crop Storage Record | 4 | one per player; 2 rows x 5 spaces; also lists build costs |
-| Rulebook + almanac | 1 | |
+| Component                               | Count | Notes                                                                                                                  |
+| --------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------- |
+| Fields hex (watermarked seed-vial icon) | 1     | **replaces the desert**: board has 5 fields hexes, no desert (4 + this one)                                            |
+| Number token "9"                        | 1     | third 9 (matches 19 hexes with no desert)                                                                              |
+| Crop tokens                             | 90    | 5 species (beans, maize, quinoa, rice, wheat); front = crop, back = seed-vial. **18 each** `[INF]` (90/5; not printed) |
+| Event tokens                            | 41    | 4 categories (see B4.3). Face-down side = seed-vial. **Per-category counts not printed in the sources I could reach**  |
+| Seed vault display                      | 1     | one 2-space storage area per player colour (red/white/orange/blue)                                                     |
+| Crop Storage Record                     | 4     | one per player; 2 rows x 5 spaces; also lists build costs                                                              |
+| Rulebook + almanac                      | 1     |                                                                                                                        |
 
 Per player at setup: 4 crop tokens of an assigned species sit on one of their two vault spaces;
 the player keeps 7 face-down event tokens under their unbuilt pieces (3 settlements + 4 cities).
@@ -351,7 +366,9 @@ Players: 3-4 only; 3-player: set one colour aside. No 5-6 rules exist (S4).
 ## B2. Setup
 
 ### B2.1 First game ("fixed") layout `[IMG]`
+
 Row by row, left to right. Standard base frame; **desert replaced by extra fields hex**.
+
 ```
 Row 1 (3): hills 8     | forest 10   | pasture 2  [ROBBER starts here]
 Row 2 (4): forest 11   | fields 9    | mountains 8 | fields 3
@@ -359,21 +376,23 @@ Row 3 (5): pasture 9   | mountains 5 | pasture 12  | pasture 5 | forest 6
 Row 4 (4): fields 10 (the EXTRA fields hex) | hills 3 | fields 6 | hills 11
 Row 5 (3): mountains 4 | forest 9    | fields 4
 ```
+
 Check: hills 3, forest 4, pasture 4, mountains 3, fields 5 = 19; numbers are 2,3,3,4,4,5,5,6,6,
 8,8,9,9,**9**,10,10,11,11,12 (three 9s). Harbors: standard 9-harbor frame (positions not
 legible in my images, use engine default `[INF]`).
 Robber starts on the **pasture hex marked 2** (not off-board, no desert).
 
-Starting settlements (diagram stars mark each player's *second* settlement = starting resources)
+Starting settlements (diagram stars mark each player's _second_ settlement = starting resources)
 `[IMG]`, described by the 3 hexes around each:
+
 - Red: S1 {hills 8, forest 11, fields 9} (second, gets starting resources), S2 {forest 11, pasture 9, mountains 5}.
 - Blue: S1 {forest 10, fields 9, mountains 8}, S2 {pasture 5, fields 6, hills 11} (second).
 - Orange: S1 {mountains 8, pasture 12, pasture 5}, S2 {hills 3, fields 6, forest 9} (second).
 - White: S1 {fields 3, pasture 5, forest 6}, S2 {fields 10, hills 3, mountains 4} (second).
-Each start road is one adjacent road (edges not read exactly: let the data pick any legal edge).
-Player colours -> crop species for the vault (first game): **Red rice, White beans, Orange maize,
-Blue quinoa**. (Wheat is not seeded in any vault.) 3-player: the unused colour's species/space is
-simply not used `[INF]`.
+  Each start road is one adjacent road (edges not read exactly: let the data pick any legal edge).
+  Player colours -> crop species for the vault (first game): **Red rice, White beans, Orange maize,
+  Blue quinoa**. (Wheat is not seeded in any vault.) 3-player: the unused colour's species/space is
+  simply not used `[INF]`.
 
 Crop tokens on fields hexes (first game): the diagram shows the same pattern as the variable
 rule below (fields 9 about 4 tokens, fields 3 about 2, fields 10 about 3, fields 6 about 5,
@@ -381,8 +400,10 @@ fields 4 about 3); exact species not legible. Use the variable-setup distributio
 species per the formula.
 
 ### B2.2 Variable setup `[RB]`
+
 Shuffle terrain (the extra fields hex replaces the desert), place number tokens in the printed
 spiral (diagram below), place crops on every fields hex **by its number**:
+
 - 2 or 12: 1 quinoa
 - 3 or 11: 1 quinoa + 1 maize
 - 4 or 10: 1 quinoa + 1 maize + 1 wheat
@@ -391,6 +412,7 @@ spiral (diagram below), place crops on every fields hex **by its number**:
 
 Number layout for the variable setup `[IMG]` (the **first-game** number layout differs only in
 row 3, col 4 (5 vs 9)):
+
 ```
 Row 1: 8  10  2
 Row 2: 11  9  8  3
@@ -398,10 +420,12 @@ Row 3: 9  5  12  9  6
 Row 4: 10  3  6  11
 Row 5: 4  5  4
 ```
+
 Vault seeding in the variable setup: the starting player places 4 rice, then clockwise players
 take 4 beans, 4 wheat, 4 maize (this differs from the fixed Red/White/Orange/Blue species).
 
 ### B2.3 Common setup steps
+
 1. One Crop Storage Record per player; supply of remaining crop tokens beside the board.
 2. Each player gets starting resources from their **second** settlement (standard).
 3. Shuffle all 41 event tokens face down. Each player takes 7 and places one under each of their
@@ -427,6 +451,7 @@ there on a matching roll), but **does not stop seed deposits** from that hex (S2
 ## B4. New mechanics (exact)
 
 ### B4.1 Harvesting
+
 - Applies only to **fields hexes** (a fields hex "produces food").
 - On a roll matching a fields hex, in **player order starting with the roller** (if the roller has
   no building there, start with the next entitled player clockwise): each entitled player in
@@ -439,7 +464,9 @@ there on a matching roll), but **does not stop seed deposits** from that hex (S2
 - Removing the last token of a hex may trigger end condition 2/3 (B5).
 
 ### B4.2 Seed deposit (once per turn, at most)
+
 Costs and sequence (S2 pp4-5); all four steps are mandatory once you start:
+
 1. **Pay** 1 lumber + 1 ore to the supply.
 2. **Record:** take 1 crop token (your choice of species) from a fields hex adjacent to one of
    your settlements/cities (only species present on such a hex are allowed). Place it on an
@@ -450,12 +477,12 @@ Costs and sequence (S2 pp4-5); all four steps are mandatory once you start:
    - No reward for the 1st token in a row; the **2nd token in a row = 1 free development card**;
      the **3rd, 4th, 5th tokens in a row = 1 VP each** (so up to 3 VP per row, 6 VP total; 2 dev
      cards total).
-   - *Row choice:* the player aid summary says "your choice: top row or bottom row"; the long text
+   - _Row choice:_ the player aid summary says "your choice: top row or bottom row"; the long text
      says upper row first and the second row only if the species is already on the upper row. See
      A10/B7 Q2 (I recommend: free choice of row, subject to the 1-per-species-per-row rule).
-3. **Vault:** take 4 tokens of the *same species* you just recorded from the supply and put them on
+3. **Vault:** take 4 tokens of the _same species_ you just recorded from the supply and put them on
    your empty vault space.
-4. **Replant:** take the 4 tokens from your *other* vault space (the previous deposit, or the
+4. **Replant:** take the 4 tokens from your _other_ vault space (the previous deposit, or the
    starting seed at the beginning) and place them on **4 different fields hexes**: no adjacency
    requirement, a hex may hold at most **7** tokens (not placeable on a full hex); extra tokens
    that cannot be placed return to the supply. Species can repeat on a hex.
@@ -463,8 +490,10 @@ Costs and sequence (S2 pp4-5); all four steps are mandatory once you start:
    Result: your vault always holds the 4 tokens of your most recent deposit's species.
 
 ### B4.3 Event tokens ("Effects of Growth")
+
 Tokens are revealed when:
-- you **build a settlement or city**: reveal the token under *that* piece (the piece you place);
+
+- you **build a settlement or city**: reveal the token under _that_ piece (the piece you place);
 - you gain **Longest Road or Largest Army** (first time or by transfer): reveal the token on that
   card. After the event, take a new token from the stack and put it under the **settlement piece
   you returned to your supply when upgrading to a city**; (for a transferred special card: the new
@@ -473,14 +502,16 @@ Tokens are revealed when:
   go to a discard pile first (the rulebook says "shuffle them" after the stack is exhausted).
 
 Four event categories (S2 pp6, 11):
+
 1. **Regional crop loss:** token shows a species + one or more numbers. Remove **all** tokens of
    that species from the fields hexes bearing those numbers.
 2. **Small-scale crop loss:** remove **2** tokens of the shown species from the board. Remove from
-   fields hexes adjacent to *your* settlements/cities first; if fewer than 2 are there, take the
+   fields hexes adjacent to _your_ settlements/cities first; if fewer than 2 are there, take the
    remainder from other fields hexes.
 3. **Large-scale crop loss:** same as small but **3** tokens.
 4. **Monoculture:** every fields hex that contains only **one species** (of any species, and any count
-   >= 1) loses **all** its tokens.
+   > = 1) loses **all** its tokens.
+
 - **Extinction:** a species with 0 tokens on the board **and** none in any vault is extinct;
   return all of its remaining supply tokens to the box (tokens on Crop Storage Records stay).
   Extinct species cannot be planted, harvested or stored. If you reveal an event token for an
@@ -488,23 +519,26 @@ Four event categories (S2 pp6, 11):
 - The revealed token's text is read aloud and resolved immediately by the revealing player.
 
 ### B4.4 Costs table
-| Action | Cost | Reward |
-|---|---|---|
-| Seed deposit step 1 | 1 lumber + 1 ore | records the crop; free dev card on 2nd token per row; 1 VP on each 3rd/4th/5th token per row |
-| Harvest | none | 1 food per removed crop token (1 per settlement, up to 2 for a city) |
-| Settlement/city build | normal cost | reveals 1 event token |
+
+| Action                | Cost             | Reward                                                                                       |
+| --------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| Seed deposit step 1   | 1 lumber + 1 ore | records the crop; free dev card on 2nd token per row; 1 VP on each 3rd/4th/5th token per row |
+| Harvest               | none             | 1 food per removed crop token (1 per settlement, up to 2 for a city)                         |
+| Settlement/city build | normal cost      | reveals 1 event token                                                                        |
 
 ## B5. Victory conditions and scoring
 
 VP target **10**. The game ends as soon as one of these happens:
+
 1. A player has **10 VP on their own turn** -> that player wins (checked at the end of their action).
    Even if they just built, they must still reveal the event token first; if the token ends the game
    per 2 or 3, those endings take precedence (but see the build-phase exception below).
 2. **3 of the 5 fields hexes contain no crop tokens.**
 3. **2 of the 5 species are extinct.**
-Endings 2/3: the winner is the player with the **most crop tokens on their Crop Storage Record**;
-ties: most VP; still tied: tied players share the win.
-Exceptions (S2 p7):
+   Endings 2/3: the winner is the player with the **most crop tokens on their Crop Storage Record**;
+   ties: most VP; still tied: tied players share the win.
+   Exceptions (S2 p7):
+
 - If the player who **removed a crop during the production phase (harvest)** causes ending 2 or 3,
   they **lose**, even if they have the most stored tokens; the player with the second-most wins.
 - If a player hits 10 VP on their **build phase**, then reveals an event token that causes ending 2 or 3,
@@ -531,18 +565,19 @@ Special VP cards remain 2 each.
 
 ## B7. Interactions with base rules
 
-| Base rule | Change |
-|---|---|
+| Base rule        | Change                                                            |
+| ---------------- | ----------------------------------------------------------------- |
 | Grain production | replaced for fields hexes by harvest rounds consuming crop tokens |
-| Desert | removed; extra fields hex instead; robber starts on pasture 2 |
-| Robber | blocks harvest but not deposit |
-| Build | each settlement/city reveals an event token |
-| Special cards | Longest Road / Largest Army reveal an event on each award |
-| Win condition | 10 VP *or* the collapse endings; harvesting to collapse = loss |
-| Dev cards | gained free via 2nd record token per row |
-| Trading | unchanged (food = grain) |
+| Desert           | removed; extra fields hex instead; robber starts on pasture 2     |
+| Robber           | blocks harvest but not deposit                                    |
+| Build            | each settlement/city reveals an event token                       |
+| Special cards    | Longest Road / Largest Army reveal an event on each award         |
+| Win condition    | 10 VP _or_ the collapse endings; harvesting to collapse = loss    |
+| Dev cards        | gained free via 2nd record token per row                          |
+| Trading          | unchanged (food = grain)                                          |
 
 ## B8. Combinations
+
 No official combination document. S4 says the scenario "requires the base game" and generically that
 it may be combined with the base game or expansions (without naming any). Seafarers/C&K/T&B/E&P do
 not provide a Crop Trust combination PDF. See Part C.
@@ -556,17 +591,18 @@ not provide a Crop Trust combination PDF. See Part C.
 Legend: **OFF** official with rules, **OFF-p** official but only listed scenarios, **NO** officially
 impossible, **UNS** no official statement; treat as unsupported.
 
-| A \ B | 5-6 ext | Seafarers | Cities & Knights | Traders & Barbarians | Explorers & Pirates | Oil Springs | Crop Trust |
-|---|---|---|---|---|---|---|---|
-| **Base 5-6** | n/a | OFF (Seafarers 5-6 ext; 4 boxes) | OFF (C&K 5-6 ext; 4 boxes) | OFF (T&B 5-6; 4 boxes) | OFF (E&P 5-6 rules PDF CN3086; 4 boxes) | OFF (Oil 5-6 variation) | UNS (S4: 3-4p only) |
-| **Seafarers** | OFF | n/a | **OFF-p** (S5/S6) | **OFF-p** (S9, per scenario) | **NO** (S7) | UNS | UNS |
-| **C&K** | OFF | OFF-p | n/a | **OFF-p** (S9) | **OFF** (S9, 2025-08) | UNS | UNS |
-| **T&B** | OFF | OFF-p | OFF-p | n/a | **OFF-p** (S9; Fishing only, see C5) | UNS | UNS |
-| **E&P** | OFF | NO | OFF | OFF-p | n/a | UNS | UNS |
-| **Oil Springs** | OFF | UNS | UNS | UNS | UNS | n/a | UNS |
-| **Crop Trust** | UNS | UNS | UNS | UNS | UNS | UNS | n/a |
+| A \ B           | 5-6 ext | Seafarers                        | Cities & Knights           | Traders & Barbarians         | Explorers & Pirates                     | Oil Springs             | Crop Trust          |
+| --------------- | ------- | -------------------------------- | -------------------------- | ---------------------------- | --------------------------------------- | ----------------------- | ------------------- |
+| **Base 5-6**    | n/a     | OFF (Seafarers 5-6 ext; 4 boxes) | OFF (C&K 5-6 ext; 4 boxes) | OFF (T&B 5-6; 4 boxes)       | OFF (E&P 5-6 rules PDF CN3086; 4 boxes) | OFF (Oil 5-6 variation) | UNS (S4: 3-4p only) |
+| **Seafarers**   | OFF     | n/a                              | **OFF-p** (S5/S6)          | **OFF-p** (S9, per scenario) | **NO** (S7)                             | UNS                     | UNS                 |
+| **C&K**         | OFF     | OFF-p                            | n/a                        | **OFF-p** (S9)               | **OFF** (S9, 2025-08)                   | UNS                     | UNS                 |
+| **T&B**         | OFF     | OFF-p                            | OFF-p                      | n/a                          | **OFF-p** (S9; Fishing only, see C5)    | UNS                     | UNS                 |
+| **E&P**         | OFF     | NO                               | OFF                        | OFF-p                        | n/a                                     | UNS                     | UNS                 |
+| **Oil Springs** | OFF     | UNS                              | UNS                        | UNS                          | UNS                                     | n/a                     | UNS                 |
+| **Crop Trust**  | UNS     | UNS                              | UNS                        | UNS                          | UNS                                     | UNS                     | n/a                 |
 
 Notes
+
 - S5 (C&K page) also states the Seafarers scenarios chosen for C&K must be suitable; S6 repeats it.
 - A catan.com summary snippet attributes the sentence "impossible to combine these expansions"
   (ship rules differ) to the **E&P** page; S7 confirms that is E&P vs Seafarers. T&B + Seafarers is
@@ -577,7 +613,9 @@ Notes
   per-scenario and each lists its own Seafarers/C&K combination.
 
 ## C2. Seafarers + Cities & Knights (S5, S6) `[WEB]`
+
 Official summary (the only official text I found; the Seafarers rulebook is not online as text):
+
 1. **Scenarios:** suitable = Heading for New Shores, Through the Desert. Exploratory scenarios and
    those with many small islands are unsuitable.
 2. **Raise each scenario's VP target by 2.**
@@ -599,9 +637,10 @@ Official summary (the only official text I found; the Seafarers rulebook is not 
 10. The robber rule also applies to the pirate: neither may enter play until the barbarians first
     reach Catan (my reading of the truncated bullet; the cut-off source text says "robber rule also
     applies to the pirate: neither may move until ..."). `[INF]`
-Edition note: older (5th ed) C&K combined rules are the same list.
+    Edition note: older (5th ed) C&K combined rules are the same list.
 
 ## C3. E&P + C&K (S9) `[RB]`
+
 Setup: return 1 field hex **and** 1 forest hex to the box (instead of 2 field hexes); use the barbarian
 track sea frame; first placement = a **city**, second = a **harbor settlement**.
 Rules: barbarian strength = number of cities incl. metropolises (no harbor settlements, include
@@ -616,12 +655,14 @@ for a harbor settlement), Taxation (activate the pirate ship instead of the robb
 only), Road Building (roads only, no ships).
 
 ## C4. T&B + C&K (S9) `[RB]`
+
 Generic (Traders & Barbarians scenario "TnB"): remove 1 forest (instead of 1 field); use the
 barbarian-track frame; Barbarian Attack's development cards unused. Two barbarian sets: the C&K track
 barbarians and the 3 wagon-blocking barbarians of the scenario. Coins buy resources only, not
 commodities. "Chase away the robber": an active knight adjacent to a barbarian may move it to any
 free edge (steal 1 random resource/commodity if on a road); the knight deactivates. **Win 15 VP.**
 Per-scenario (all use "Except where noted, both rules apply"):
+
 - **Barbarian Attack + C&K:** do not use the C&K sea frame/barbarian ship or the scenario's knights
   and dev cards. The 3 dice: a ship on the event die places a barbarian on the coastal hex
   matching the production roll (max 3 per hex; not on a 7). Walls conquer as normal; a metropolis
@@ -648,7 +689,9 @@ Per-scenario (all use "Except where noted, both rules apply"):
   you remove your own). **Win 13 VP (12 with the old boot).**
 
 ## C5. T&B + Seafarers (S9) `[RB]`
+
 General rules for each scenario's Seafarers combination:
+
 - **Traders & Barbarians (main scenario):** wagons may cross sea hexes: 2 MP if the edge has no ship,
   1 MP if it has your ship, 1 MP + 1 gold (paid to the owner) if it has another player's ship. Robber
   and pirate are not in the game. A barbarian may be placed on a sea edge without a barbarian. **Win +3 VP.**
@@ -664,20 +707,23 @@ General rules for each scenario's Seafarers combination:
 - **Rivers of Catan + SEA:** 1 gold per ship built on a river-tile edge, pay 1 gold to move away; no
   ships on bridge sites; playable with Heading for New Shores and Fog Islands (not Four Islands);
   Fog Islands: robber starts on a swamp hex, gold fields produce resources.
-Edition note: all of these PDFs are the 2025 (6th-ed) documents.
+  Edition note: all of these PDFs are the 2025 (6th-ed) documents.
 
 ## C6. E&P + T&B (S9) `[RB]`
+
 Only the **Fishing on Catan** pairing is described (setup for 6 fishing grounds, optional lake at the
 12 hex after removing 1 mountain, fish -> gold if only fish are received, spend fish: 2 fish ignores
 the pirate ship). **Friendly Robber, Harbors of Catan: impossible** (no robber/harbors in E&P). Event
 cards: may be used for dice distribution only, ignoring effects. Other T&B scenarios: no combo doc, UNS.
 
 ## C7. 5-6 player rules
+
 Each expansion has a dedicated 5-6 player product and requires 4 boxes in total (base, expansion,
 base 5-6, expansion 5-6) (S5-S8). Oil Springs adds its own 5-6 board/limits (A2.3). Crop Trust is 3-4.
 Combined 5-6 + 2 expansions: UNS.
 
 ## C8. Engine-level combination policy (recommendation)
+
 - Represent each mode as a feature flag with an explicit `compat` table; reject unsupported
   combos at game-setup validation, with the reason from this matrix.
 - Oil Springs / Crop Trust are mutually exclusive with everything but the base game (and Oil Springs +
@@ -690,7 +736,9 @@ Combined 5-6 + 2 expansions: UNS.
 # PART D: IMPLEMENTATION NOTES (engine)
 
 ## D1. New state
+
 **Oil Springs**
+
 - `oil[playerId]`, `sequesteredOil[playerId]`, `oilSupply`, `reserveRemoved` (oil removed by disasters).
 - `disasterMarker` (0..5), `destroyedTokens: number[]` (+ slot count 5/8), hex `destroyed: boolean`,
   hex `oilSpring: boolean` (+ numbered tile flag for desert).
@@ -699,6 +747,7 @@ Combined 5-6 + 2 expansions: UNS.
 - 5-6: `maxOil = 6`, ruin threshold 8, SBP restrictions (`phase: 'sbp'`).
 
 **Crop Trust**
+
 - `crops: {hexId: Record<Species, number>}` per fields hex (cap 7), `species[5]`, `extinct` flags.
 - Per player: `vault: {species, count}`, `record: [row1: Species[], row2: Species[]]`,
   `eventTokens` under pieces (settlement slots, city slots) + on LR/LA, `eventStack`, `eventDiscard`.
@@ -706,6 +755,7 @@ Combined 5-6 + 2 expansions: UNS.
 - End conditions 2/3 triggered from harvest/events.
 
 ## D2. New phases/actions
+
 Oil: `convertOil`, `buildMetropolis`, `sequesterOil`, `resolveDisaster` (auto, seeded RNG), `stealOil`
 variant on robber, oil discard choice on 7, round-robin oil distribution, Monopoly/YoP oil.
 Crop: `harvest` decisions (new interactive phase per roll; bots need `harvest|decline`),
@@ -714,16 +764,19 @@ Crop: `harvest` decisions (new interactive phase per roll; bots need `harvest|de
 with the "harvester loses" and "build-phase" rules.
 
 ## D3. HUD
+
 Oil: oil count, sequestered count, disaster track (marker + destroyed tokens), champion, metropolis
 count remaining. Crop: per-hex crop pips (species colours), vault display, record panel (2x5),
 event stack/last event log, extinct species indicator, fields-hex emptiness progress (n/5, species n/5).
 
 ## D4. Bots
+
 Oil: simple greedy convert/metropolis under marker cap; sequester heuristics; random is fine for legal moves.
 Crop: random harvest/decline (always harvest), deposit when affordable; ensure `legalActions` only offers
 legal species/rows/hexes.
 
 ## D5. Suggested tests
+
 Oil: oil round-robin distribution with supply shortage; cap enforcement via production/theft/trade/
 YoP/Monopoly; marker cap 5 per turn (metropolis at marker 4 rejected); disaster flood (7) removes coastal
 settlements, downgrades cities, spares metropolis; hex hit removes token to track; oil hex hit removes 3
@@ -740,6 +793,7 @@ reshuffle; end condition precedence and the production-phase-loses rule; variabl
 # PART E: OPEN QUESTIONS (with recommended interpretation)
 
 ## Oil Springs
+
 1. **Starting resources:** do oil-spring hexes give oil at the second settlement? Not stated.
    Recommend: yes, oil (subject to the cap), because the base rule gives one resource card per
    adjacent hex.
@@ -764,6 +818,7 @@ reshuffle; end condition precedence and the production-phase-loses rule; variabl
 12. **VP tokens:** only (supply of oil)/3 can be earned; don't model physical tokens, compute VP.
 
 ## Crop Trust
+
 1. **Event category counts (41):** unknown. They are not in the rulebook text or on catan.com, and I
    did not invent numbers. Recommend a data-driven event deck (species x category x numbers), seeded
    with a clearly marked placeholder, and verify against the physical product before shipping.
@@ -782,6 +837,7 @@ reshuffle; end condition precedence and the production-phase-loses rule; variabl
 9. **Harvest on a hex when the roller has no building:** start from the next entitled player.
 
 ## General
+
 1. T&B/E&P/C&K combination PDFs are 2025 6th-ed documents and may differ from 5th-ed boxes; our target
    is the 2025 set.
 2. Triple expansions and any scenario + expansion: UNS, rejected by validation.
