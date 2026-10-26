@@ -686,6 +686,12 @@ export class GameSession {
       if (m.conn) this.gameFor.add(m.conn);
       return ['stale_state', 'the game moved on; here is the current state'];
     }
+    // Only a kind of move legalActions offers this seat now (base or expansion alike). Legal
+    // lists are complete except open-ended payloads (trade offers, bundles spelled with zeros),
+    // so the payload itself is applyAction's to judge.
+    if (!this.legal().some((a) => a.player === seat && a.type === action.type)) {
+      return ['illegal_action', `${action.type} is not a legal move for seat ${seat} now`];
+    }
     const err = this.apply(action);
     return err === null ? null : ['illegal_action', err];
   }

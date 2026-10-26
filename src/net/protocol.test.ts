@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createGame, legalActions, PLAYER_COLORS, Rng, type Action } from '../engine';
+import {
+  applyAction,
+  createGame,
+  legalActions,
+  listModes,
+  modeById,
+  PLAYER_COLORS,
+  Rng,
+  type Action,
+} from '../engine';
+import { createRandomBot } from '../bots';
+import { newGame, runGame } from '../bots/runner';
+import {
+  buildConfig,
+  defaultSetup,
+  modeOf,
+  modeOptions,
+  setMode,
+  setOption,
+  setScenario,
+  setupError,
+} from '../ui/setup/model';
 import { Invalid } from './guard';
 import {
   cleanText,
@@ -87,6 +108,65 @@ describe('parseAction', () => {
   });
 });
 
+/** Every legal action of bot games in each expansion mode (a sample of states). */
+function expansionActions(): Action[] {
+  const out: Action[] = [];
+  for (const m of listModes().filter((x) => x.id !== 'base')) {
+    for (const scenario of m.scenarios.length ? m.scenarios : [undefined]) {
+      runGame({
+        initial: newGame({ seed: `p-${m.id}`, players: 4, mode: m.id, scenario }),
+        maxSteps: 300,
+        bot: createRandomBot({ progressBias: 0.5 }),
+        onStep: ({ step, state }) => {
+          if (step % 3 === 0) out.push(...legalActions(state));
+        },
+      });
+    }
+  }
+  return out;
+}
+
+describe('parseAction: expansion actions', () => {
+  it('accepts every expansion action the engine produces, unchanged', () => {
+    const actions = expansionActions().filter((a) => a.type.includes('/'));
+    const types = new Set(actions.map((a) => a.type));
+    for (const ns of ['ck', 'seafarers', 'tb', 'ep', 'oil', 'crop']) {
+      expect([...types].some((t) => t.startsWith(`${ns}/`))).toBe(true);
+    }
+    for (const a of actions) expect(parseAction(JSON.parse(JSON.stringify(a)), 'a')).toEqual(a);
+  });
+
+  it('rebuilds the payload as plain JSON', () => {
+    const raw = JSON.parse('{"type":"ck/play","player":1,"card":"spy","__proto__":{"evil":1}}');
+    expect(() => parseAction(raw, 'a')).toThrow(Invalid);
+    const a = parseAction({ type: 'ck/play', player: 1, card: 'spy' }, 'a');
+    expect(a).toEqual({ type: 'ck/play', player: 1, card: 'spy' });
+    expect(Object.getPrototypeOf(a)).toBe(Object.prototype);
+  });
+
+  const deep = { a: { b: { c: { d: { e: 1 } } } } };
+  it.each([
+    ['unknown module', { type: 'zz/foo', player: 0 }],
+    ['unknown action of a known module', { type: 'ck/teleport', player: 0 }],
+    ['a phase kind, not an action', { type: 'ck/pillage', player: 0 }],
+    ['bad player', { type: 'ck/cancel', player: 9 }],
+    ['bad key', { type: 'ck/play', player: 0, 'card!': 'spy' }],
+    ['not finite', { type: 'ck/alchemist', player: 0, yellow: Infinity, red: 1 }],
+    ['nested too deep', { type: 'ck/play', player: 0, card: deep }],
+    ['too many items', { type: 'ck/play', player: 0, card: Array.from({ length: 65 }, () => 1) }],
+    ['too large', { type: 'ck/play', player: 0, ...bigPayload() }],
+    ['long string', { type: 'ck/play', player: 0, card: 'x'.repeat(65) }],
+  ])('rejects %s', (_label, x) => {
+    expect(() => parseAction(x, 'a')).toThrow(Invalid);
+  });
+});
+
+function bigPayload(): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  for (let i = 0; i < 10; i++) out[`k${i}`] = Array.from({ length: 30 }, () => i);
+  return out;
+}
+
 describe('parseClientMessage', () => {
   it('parses every message type', () => {
     expect(parseOk({ v, type: 'hello', token: null })).toEqual({ v, type: 'hello', token: null });
@@ -159,11 +239,54 @@ describe('parseRoomConfig', () => {
     [{ vpToWin: 2 }],
     [{ discardLimit: 21 }],
     [{ turnTimerSec: 31 }], // not one of the setup screen's steps
-    [{ mode: 'seafarers' }],
+    [{ mode: 'atlantis' }],
+    [{ scenario: 'seafarers/newShores' }], // base mode: no scenario
+    [{ options: {} }], // base mode: no options
+    [{ mode: 'ck', scenario: 'seafarers/newShores' }], // not one of the mode's scenarios
+    [{ mode: 'ck', options: { zz: {} } }],
+    [{ mode: 'ck', options: { ck: { nope: true } } }],
+    [{ mode: 'ck', options: { seafarers: {} } }], // not a module of the mode
+    [{ mode: 'ck', seatCount: 7 }], // C&K: 3-6
+    [{ mode: 'seafarers', scenario: 'seafarers/fogIslands', seatCount: 2 }],
+    [{ mode: 'ck', variants: { rushMode: true } }], // a module's validate refuses it
     [{ rules: { balancedDice: 'yes', hideBankCards: false } }],
     [{ rules: null }],
   ])('rejects %j', (patch) => {
     expect(() => parseRoomConfig(cfg(patch), 'c')).toThrow(Invalid);
+  });
+
+  it('accepts every mode, scenario and option the setup screen can make, unchanged', () => {
+    let n = 0;
+    for (const mode of listModes()) {
+      const scenarios = mode.scenarios.length ? mode.scenarios : [null];
+      for (const scenario of scenarios) {
+        let d = setMode(defaultSetup(4), mode.id);
+        if (scenario) d = setScenario(d, scenario);
+        for (const { ext, def } of modeOptions(modeOf(d))) {
+          const value =
+            def.type === 'boolean'
+              ? !def.default
+              : def.type === 'int'
+                ? def.max
+                : (def.choices[def.choices.length - 1]?.value ?? def.default);
+          d = setOption(d, ext, def.key, value);
+        }
+        if (setupError(d) !== null) continue; // e.g. an option the scenario refuses
+        const { players, seed: _seed, ...rest } = buildConfig(d);
+        const config = { ...rest, seatCount: players.length };
+        expect(parseRoomConfig(JSON.parse(JSON.stringify(config)), 'c')).toEqual(config);
+        n += 1;
+      }
+    }
+    expect(n).toBeGreaterThan(25);
+  });
+
+  it('checks option types and ranges', () => {
+    const boolOpt = modeOptions(modeById('ck')!).find((o) => o.def.type === 'boolean')!;
+    const bad = { mode: 'ck', options: { [boolOpt.ext]: { [boolOpt.def.key]: 'yes' } } };
+    expect(() => parseRoomConfig(cfg(bad), 'c')).toThrow(Invalid);
+    const ok = { mode: 'ck', options: { [boolOpt.ext]: { [boolOpt.def.key]: true } } };
+    expect(parseRoomConfig(cfg(ok), 'c').options).toEqual(ok.options);
   });
 });
 
