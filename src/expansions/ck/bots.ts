@@ -19,6 +19,7 @@ import {
 } from '../../engine';
 import type { BotExtension } from '../../bots/expansions';
 import type { Violation } from '../../bots/invariants';
+import { ckGoals, ckScore } from './strategy';
 import {
   BARBARIAN_STEPS,
   CK,
@@ -185,4 +186,7 @@ export const ckBots: BotExtension = {
   invariants: check,
   // Knights break roads: the base Longest Road cross-check does not know them (checked above).
   relax: ['award-mismatch'],
+  // Smart bots: knights vs barbarians, improvements, progress cards (strategy.ts).
+  score: ckScore,
+  goals: ckGoals,
 };

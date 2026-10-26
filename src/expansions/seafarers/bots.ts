@@ -4,6 +4,7 @@
  */
 import { steerAway, type BotExtension } from '../../bots/expansions';
 import { checkSeafarers } from './invariants';
+import { seaGoals, seaScore } from './strategy';
 
 export const seafarersBots: BotExtension = {
   id: 'seafarers',
@@ -15,4 +16,7 @@ export const seafarersBots: BotExtension = {
   relax: ['award-mismatch', 'robber-position', 'dev-conservation', 'winner'],
   // A random bot gains nothing from moving ships around; it still does so without the bias.
   steer: steerAway(['seafarers/pickShip', 'seafarers/cancelMove']),
+  // Smart bots: ships toward islands, new-land VP, pirate, gold, wonders (strategy.ts).
+  score: seaScore,
+  goals: seaGoals,
 };
