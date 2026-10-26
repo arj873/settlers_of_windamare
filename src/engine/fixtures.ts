@@ -22,7 +22,7 @@ export function freshGame(playerCount: 3 | 4 = 4): GameState {
   return createGame({
     seed: 'fixture',
     players: FIXTURE_PLAYERS.slice(0, playerCount),
-    layout: 'beginner',
+    map: 'base',
   });
 }
 

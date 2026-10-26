@@ -1,26 +1,30 @@
 /**
- * Static topology of the standard 19-hex base-game board (radius 2) plus its water ring.
- * Computed once at import; identical for every game, so it is NOT stored in GameState.
+ * Static topology of a board frame (land hexes plus the surrounding water ring), derived from the
+ * map definition (maps.ts). Computed once per frame and cached; NOT stored in GameState. Get it
+ * with `topologyOf(state)` or `topologyFor(mapId)`.
  *
- * Counts: 19 land hexes, 18 water hexes, 54 vertices, 72 edges, 30 coastal edges, 9 port slots.
+ * Counts per frame (land / water / vertices / edges / coastal edges / harbor slots):
+ *   std19 (base, baseRandom)  19 / 18 /  54 /  72 / 30 /  9
+ *   std30 (base56)            30 / 22 /  80 / 109 / 38 / 11
+ *   hex37 (base78)            37 / 24 /  96 / 132 / 42 / 12
  * All adjacency lists only contain land hexes and on-board vertices/edges.
  */
 import {
   CORNERS,
-  DIRECTIONS,
   SIDES,
   cornerVertex,
   edgeEndpoints,
   edgeMidpoint,
   hexCenter,
-  hexDistance,
   hexId,
   neighbor,
   sideEdge,
   vertexPoint,
-  type Side,
+  type Axial,
+  type Point,
 } from './hex';
-import type { EdgeId, HexId, VertexId } from './types';
+import { MAPS, type FrameDef, type FrameId } from './maps';
+import type { EdgeId, HexId, MapId, VertexId } from './types';
 
 export interface HexInfo {
   id: HexId;
@@ -72,7 +76,7 @@ export interface EdgeInfo {
 }
 
 export interface PortSlot {
-  /** 0..8, clockwise from the top-left water corner. */
+  /** 0..n-1, clockwise from the top-left of the water ring. */
   index: number;
   edge: EdgeId;
   vertices: [VertexId, VertexId];
@@ -80,14 +84,16 @@ export interface PortSlot {
 }
 
 export interface Topology {
-  radius: number;
+  frame: FrameId;
+  /** Center of the board (unit coordinates); (0,0) for the standard 19-hex board. */
+  center: Point;
   /** Row-major: top row first, left to right. Beginner/random layouts fill hexes in this order. */
   landHexes: readonly HexId[];
-  /** Water ring, clockwise starting at the top-left corner h:0,-3. */
+  /** Water ring, clockwise starting at its top-left hex (h:0,-3 on the base board). */
   waterHexes: readonly HexId[];
   vertices: readonly VertexId[];
   edges: readonly EdgeId[];
-  /** 30 coastal edges, clockwise starting at port slot 0. */
+  /** Coastal edges, clockwise starting at port slot 0. */
   coastalEdges: readonly EdgeId[];
   portSlots: readonly PortSlot[];
   hex: Readonly<Record<HexId, HexInfo>>;
@@ -96,18 +102,26 @@ export interface Topology {
   edge: Readonly<Record<EdgeId, EdgeInfo>>;
 }
 
-export const BOARD_RADIUS = 2;
+/**
+ * Land hexes, row-major. Rows are centered on x = 0 (odd middle row) or on half a hex to the right
+ * (even middle row), so the 19-hex board is exactly the radius-2 hexagon around h:0,0.
+ */
+function landCoordsOf(rows: readonly number[]): Axial[] {
+  if (rows.length % 2 !== 1) throw new Error('frame needs an odd number of rows');
+  const mid = (rows.length - 1) / 2;
+  const xc = (rows[mid] ?? 1) % 2 === 1 ? 0 : 0.5;
+  const out: Axial[] = [];
+  rows.forEach((w, i) => {
+    const r = i - mid;
+    const q0 = xc - r / 2 - (w - 1) / 2;
+    if (!Number.isInteger(q0)) throw new Error(`frame row ${i} cannot be centered`);
+    for (let k = 0; k < w; k++) out.push({ q: q0 + k + 0, r: r + 0 }); // + 0: no -0
+  });
+  return out;
+}
 
-function buildTopology(radius: number): Topology {
-  const origin = { q: 0, r: 0 };
-
-  // Land hexes, row-major.
-  const landCoords: { q: number; r: number }[] = [];
-  for (let r = -radius; r <= radius; r++) {
-    for (let q = Math.max(-radius, -radius - r); q <= Math.min(radius, radius - r); q++) {
-      landCoords.push({ q, r });
-    }
-  }
+function buildTopology(frame: FrameDef): Topology {
+  const landCoords = landCoordsOf(frame.rows);
   const landSet = new Set(landCoords.map((c) => hexId(c.q, c.r)));
   const isLand = (q: number, r: number) => landSet.has(hexId(q, r));
 
@@ -172,63 +186,79 @@ function buildTopology(radius: number): Topology {
     info.edges = [...adj];
   }
 
-  // Water ring, clockwise from the top-left corner (0, -radius-1).
-  const ringRadius = radius + 1;
-  const walk: Side[] = ['E', 'SE', 'SW', 'W', 'NW', 'NE'];
-  const waterCoords: { q: number; r: number }[] = [];
-  let cur = { q: 0, r: -ringRadius };
-  for (const side of walk) {
-    for (let i = 0; i < ringRadius; i++) {
-      waterCoords.push(cur);
-      cur = { q: cur.q + DIRECTIONS[side].q, r: cur.r + DIRECTIONS[side].r };
+  // Board center = mean of land hex centers (the frames are point-symmetric).
+  const center = { x: 0, y: 0 };
+  for (const id of landSet) {
+    center.x += (hex[id] as HexInfo).x / landSet.size;
+    center.y += (hex[id] as HexInfo).y / landSet.size;
+  }
+  // Screen coords (y down): increasing atan2 around the center is clockwise.
+  const angle = (p: Point) => Math.atan2(p.y - center.y, p.x - center.x);
+
+  // Water ring: non-land hexes touching land, clockwise from the top-left one (min r, then min q).
+  const waterMap = new Map<HexId, Axial>();
+  for (const { q, r } of landCoords) {
+    for (const s of SIDES) {
+      const n = neighbor(q, r, s);
+      if (!isLand(n.q, n.r)) waterMap.set(hexId(n.q, n.r), n);
     }
   }
+  const ring = [...waterMap.values()].sort(
+    (a, b) => angle(hexCenter(a.q, a.r)) - angle(hexCenter(b.q, b.r)),
+  );
+  const topLeft = [...ring].sort((a, b) => a.r - b.r || a.q - b.q)[0];
+  const startAt = ring.findIndex((c) => c === topLeft);
+  const waterCoords = [...ring.slice(startAt), ...ring.slice(0, startAt)];
   const water: Record<HexId, WaterHexInfo> = {};
   for (const { q, r } of waterCoords) {
     const c = hexCenter(q, r);
     water[hexId(q, r)] = { id: hexId(q, r), q, r, x: c.x, y: c.y };
   }
 
-  // Port slots: every other water hex starting at index 0, as on the official 5th-edition frame
-  // (verified against the rulebook's beginner map, Illustration A). A water hex touching two land
-  // hexes faces the one that is NOT a corner of the land hexagon (see ARCHITECTURE.md §12).
-  const isRingCorner = (q: number, r: number) =>
-    hexDistance({ q, r }, origin) === radius &&
-    SIDES.filter((s) => {
-      const n = neighbor(q, r, s);
-      return isLand(n.q, n.r);
-    }).length === 3;
-  const portSlots: PortSlot[] = [];
-  waterCoords.forEach((w, i) => {
-    if (i % 2 !== 0) return;
-    const shared = SIDES.map((s) => ({ s, n: neighbor(w.q, w.r, s) })).filter(({ n }) =>
-      isLand(n.q, n.r),
-    );
-    let pick = shared[0];
-    if (shared.length === 2) pick = shared.find(({ n }) => !isRingCorner(n.q, n.r));
-    if (!pick) throw new Error('port slot construction failed');
-    const e = sideEdge(w.q, w.r, pick.s);
-    portSlots.push({
-      index: portSlots.length,
-      edge: e,
-      vertices: edgeEndpoints(e),
-      waterHex: hexId(w.q, w.r),
-    });
+  // Harbor slots (see FrameDef.harbors). Corner land hexes have exactly 3 land neighbors.
+  const landNeighbors = (w: Axial) =>
+    SIDES.map((s) => ({ s, n: neighbor(w.q, w.r, s) })).filter(({ n }) => isLand(n.q, n.r));
+  const facing: [Axial, Axial][] =
+    frame.harbors === 'alternate'
+      ? waterCoords
+          .filter((_, i) => i % 2 === 0)
+          .map((w) => {
+            const degree = (n: Axial) => (hex[hexId(n.q, n.r)] as HexInfo).neighbors.length;
+            const wc = hexCenter(w.q, w.r);
+            const clockwiseOf = (n: Axial) => {
+              const nc = hexCenter(n.q, n.r);
+              const cross =
+                (wc.x - center.x) * (nc.y - center.y) - (wc.y - center.y) * (nc.x - center.x);
+              return cross > 0 ? 1 : 0;
+            };
+            const [pick] = landNeighbors(w)
+              .map(({ n }) => n)
+              .sort((a, b) => degree(b) - degree(a) || clockwiseOf(b) - clockwiseOf(a));
+            if (!pick) throw new Error('harbor slot without land');
+            return [w, pick];
+          })
+      : frame.harbors.map(([wId, lId]) => {
+          const w = waterMap.get(wId);
+          const l = hex[lId];
+          if (!w || !l) throw new Error(`bad harbor slot ${wId} -> ${lId}`);
+          return [w, { q: l.q, r: l.r }];
+        });
+  const portSlots: PortSlot[] = facing.map(([w, l], index) => {
+    const side = landNeighbors(w).find(({ n }) => n.q === l.q && n.r === l.r)?.s;
+    if (!side) throw new Error(`harbor ${hexId(w.q, w.r)} does not touch ${hexId(l.q, l.r)}`);
+    const e = sideEdge(w.q, w.r, side);
+    return { index, edge: e, vertices: edgeEndpoints(e), waterHex: hexId(w.q, w.r) };
   });
 
-  // Coastal edges clockwise (screen coords, y down => increasing atan2 is clockwise),
-  // rotated to start at port slot 0.
-  const angle = (e: EdgeId) => {
-    const p = edge[e] as EdgeInfo;
-    return Math.atan2(p.y, p.x);
-  };
+  // Coastal edges clockwise, rotated to start at port slot 0.
   const coastal = edgeOrder.filter((e) => (edge[e] as EdgeInfo).coastal);
-  coastal.sort((a, b) => angle(a) - angle(b));
+  coastal.sort((a, b) => angle(edge[a] as EdgeInfo) - angle(edge[b] as EdgeInfo));
   const start = coastal.indexOf((portSlots[0] as PortSlot).edge);
   const coastalEdges = [...coastal.slice(start), ...coastal.slice(0, start)];
 
   return {
-    radius,
+    frame: frame.id,
+    center,
     landHexes: landCoords.map((c) => hexId(c.q, c.r)),
     waterHexes: waterCoords.map((c) => hexId(c.q, c.r)),
     vertices: vertexOrder,
@@ -242,7 +272,35 @@ function buildTopology(radius: number): Topology {
   };
 }
 
-export const TOPOLOGY: Topology = buildTopology(BOARD_RADIUS);
+const CACHE = new Map<FrameId, Topology>();
+
+export function topologyOfFrame(frame: FrameDef): Topology {
+  let t = CACHE.get(frame.id);
+  if (!t) {
+    t = buildTopology(frame);
+    CACHE.set(frame.id, t);
+  }
+  return t;
+}
+
+/** Topology of a map (built on first use, then cached; maps sharing a frame share it). */
+export function topologyFor(map: MapId): Topology {
+  const def = MAPS[map];
+  if (!def) throw new Error(`unknown map ${String(map)}`);
+  return topologyOfFrame(def.frame);
+}
+
+/** Topology of the board a game is played on. */
+export function topologyOf(state: { settings: { map: MapId } }): Topology {
+  return topologyFor(state.settings.map);
+}
+
+/**
+ * Topology of the standard 19-hex board ('base' / 'baseRandom').
+ * @deprecated Only valid for base-map games; use `topologyOf(state)`. Kept for fixtures, tests
+ * and UI code that only deals with the base board.
+ */
+export const TOPOLOGY: Topology = topologyFor('base');
 
 // ---------------------------------------------------------------------------
 // Convenience accessors. Unknown IDs return [] / false instead of throwing.
@@ -250,37 +308,37 @@ export const TOPOLOGY: Topology = buildTopology(BOARD_RADIUS);
 
 const NONE: readonly never[] = [];
 
-export function isLandHex(id: string): id is HexId {
-  return Object.hasOwn(TOPOLOGY.hex, id);
+export function isLandHex(t: Topology, id: string): id is HexId {
+  return Object.hasOwn(t.hex, id);
 }
-export function isBoardVertex(id: string): id is VertexId {
-  return Object.hasOwn(TOPOLOGY.vertex, id);
+export function isBoardVertex(t: Topology, id: string): id is VertexId {
+  return Object.hasOwn(t.vertex, id);
 }
-export function isBoardEdge(id: string): id is EdgeId {
-  return Object.hasOwn(TOPOLOGY.edge, id);
+export function isBoardEdge(t: Topology, id: string): id is EdgeId {
+  return Object.hasOwn(t.edge, id);
 }
 
-export function hexVertices(h: HexId): readonly VertexId[] {
-  return TOPOLOGY.hex[h]?.vertices ?? NONE;
+export function hexVertices(t: Topology, h: HexId): readonly VertexId[] {
+  return t.hex[h]?.vertices ?? NONE;
 }
-export function hexEdges(h: HexId): readonly EdgeId[] {
-  return TOPOLOGY.hex[h]?.edges ?? NONE;
+export function hexEdges(t: Topology, h: HexId): readonly EdgeId[] {
+  return t.hex[h]?.edges ?? NONE;
 }
-export function hexNeighbors(h: HexId): readonly HexId[] {
-  return TOPOLOGY.hex[h]?.neighbors ?? NONE;
+export function hexNeighbors(t: Topology, h: HexId): readonly HexId[] {
+  return t.hex[h]?.neighbors ?? NONE;
 }
-export function vertexHexes(v: VertexId): readonly HexId[] {
-  return TOPOLOGY.vertex[v]?.hexes ?? NONE;
+export function vertexHexes(t: Topology, v: VertexId): readonly HexId[] {
+  return t.vertex[v]?.hexes ?? NONE;
 }
-export function vertexEdges(v: VertexId): readonly EdgeId[] {
-  return TOPOLOGY.vertex[v]?.edges ?? NONE;
+export function vertexEdges(t: Topology, v: VertexId): readonly EdgeId[] {
+  return t.vertex[v]?.edges ?? NONE;
 }
-export function vertexNeighbors(v: VertexId): readonly VertexId[] {
-  return TOPOLOGY.vertex[v]?.vertices ?? NONE;
+export function vertexNeighbors(t: Topology, v: VertexId): readonly VertexId[] {
+  return t.vertex[v]?.vertices ?? NONE;
 }
-export function edgeVertices(e: EdgeId): readonly VertexId[] {
-  return TOPOLOGY.edge[e]?.vertices ?? NONE;
+export function edgeVertices(t: Topology, e: EdgeId): readonly VertexId[] {
+  return t.edge[e]?.vertices ?? NONE;
 }
-export function edgeNeighbors(e: EdgeId): readonly EdgeId[] {
-  return TOPOLOGY.edge[e]?.edges ?? NONE;
+export function edgeNeighbors(t: Topology, e: EdgeId): readonly EdgeId[] {
+  return t.edge[e]?.edges ?? NONE;
 }

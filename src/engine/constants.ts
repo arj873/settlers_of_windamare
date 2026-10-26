@@ -21,11 +21,32 @@ export const PROGRESS_CARD_TYPES: readonly ProgressCardType[] = [
   'monopoly',
 ];
 
+/** Player range over all maps; each map narrows it (MapDef.minPlayers/maxPlayers in maps.ts). */
 export const MIN_PLAYERS = 3;
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 8;
 export const DEFAULT_VP_TO_WIN = 10;
+export const VP_TO_WIN_RANGE = { min: 3, max: 20 } as const;
+/** Default `settings.discardLimit`: on a 7, players holding MORE than this discard half. */
+export const DEFAULT_DISCARD_LIMIT = 7;
+export const DISCARD_LIMIT_RANGE = { min: 5, max: 20 } as const;
 
-/** Bank starts with 19 of each resource. */
+/**
+ * Default seat colours, one per player (up to 8), in seat order. Chosen to stay distinct for
+ * common colour-vision deficiencies where possible (white, orange, brown and teal differ in
+ * lightness from red/green/blue/purple). The first six match the original new-game screen.
+ */
+export const PLAYER_COLORS: readonly { name: string; color: string }[] = [
+  { name: 'Red', color: '#d64541' },
+  { name: 'Blue', color: '#3a7bd5' },
+  { name: 'White', color: '#ecf0f1' },
+  { name: 'Orange', color: '#f39c12' },
+  { name: 'Green', color: '#3fae6a' },
+  { name: 'Purple', color: '#9b59b6' },
+  { name: 'Brown', color: '#8d5a3b' },
+  { name: 'Teal', color: '#2ec4c4' },
+];
+
+/** Bank stock per resource on the 19-hex maps (bigger maps: MapDef.bankPerResource). */
 export const BANK_PER_RESOURCE = 19;
 
 /** Pieces per player. */
@@ -38,7 +59,7 @@ export const COSTS = {
   devCard: { brick: 0, lumber: 0, wool: 1, grain: 1, ore: 1 },
 } as const satisfies Record<string, ResourceCounts>;
 
-/** 25 cards in the base game. */
+/** 25 cards on the 19-hex maps (bigger maps: MapDef.devDeck; use `supplyOf(state)`). */
 export const DEV_DECK_COMPOSITION: DevCardCounts = {
   knight: 14,
   victoryPoint: 5,
@@ -56,8 +77,6 @@ export const MAX_TRADE_OFFERS_PER_TURN = 3;
 /** GameState.log keeps only the newest LOG_LIMIT entries (older ones are dropped). */
 export const LOG_LIMIT = 200;
 
-/** On a 7, players holding MORE than this many cards discard half (rounded down). */
-export const DISCARD_THRESHOLD = 7;
 export const LONGEST_ROAD_MIN = 5;
 export const LARGEST_ARMY_MIN = 3;
 export const AWARD_VP = 2;

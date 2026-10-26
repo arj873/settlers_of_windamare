@@ -3,7 +3,8 @@
  * Direct state edits keep the bank conserved, so tests can assert resource conservation.
  */
 import { expect } from 'vitest';
-import { BANK_PER_RESOURCE, RESOURCES } from '../constants';
+import { RESOURCES } from '../constants';
+import { supplyOf } from '../maps';
 import { applyAction } from '../engine';
 import { freshGame } from '../fixtures';
 import { Rng } from '../rng';
@@ -81,11 +82,11 @@ export function rollTotal(s: GameState, total: number): GameState {
   return run(copy, { type: 'rollDice', player: copy.turn.current });
 }
 
-/** Bank + hands = 19 of each resource; nothing negative. */
+/** Bank + hands = the map's stock (19 on the base board) of each resource; nothing negative. */
 export function expectConserved(s: GameState) {
   for (const r of RESOURCES) {
     const held = s.players.reduce((sum, p) => sum + p.resources[r], 0);
-    expect(s.bank[r] + held, r).toBe(BANK_PER_RESOURCE);
+    expect(s.bank[r] + held, r).toBe(supplyOf(s).bankPerResource);
     expect(s.bank[r]).toBeGreaterThanOrEqual(0);
     for (const p of s.players) expect(p.resources[r]).toBeGreaterThanOrEqual(0);
   }

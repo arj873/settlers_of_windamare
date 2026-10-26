@@ -1,6 +1,6 @@
 # Architecture — the contract
 
-Browser Catan clone (base game, 3–4 players). TypeScript strict, PixiJS v8, Vite, Vitest, pnpm.
+Browser Catan clone (base game, 3–8 players on 19/30/37-hex maps). TypeScript strict, PixiJS v8, Vite, Vitest, pnpm.
 **If you change a public type in `src/engine/types.ts`, update this file in the same commit.**
 Game rules (sourced, with engine status per rule): `docs/RULES.md`.
 
@@ -21,7 +21,8 @@ Import from `src/engine` (the barrel `index.ts`). Deep imports are fine inside t
 
 ## 2. IDs and geometry
 
-Pointy-top hexes, axial coordinates `(q, r)`. Board = all hexes with distance ≤ 2 from `h:0,0`.
+Pointy-top hexes, axial coordinates `(q, r)`. The land hexes depend on the map (§3): the 19-hex
+board is all hexes with distance ≤ 2 from `h:0,0`.
 
 ```
             N
@@ -42,27 +43,52 @@ The owning hex of a vertex/edge may be water or off-board — IDs are pure coord
 Never build ID strings by hand from a corner name; use `cornerVertex(q, r, 'NE')` and `sideEdge(q, r, 'SW')` (they canonicalize).
 IDs are TS template-literal types (`HexId`, `VertexId`, `EdgeId`), so mixing them up is a type error.
 
-**Unit geometry** (in `hex.ts` / `TOPOLOGY`): hex size (center→corner) = 1, y grows downward.
-Hex center `x = √3·(q + r/2)`, `y = 1.5·r`. Multiply by your pixel size. `TOPOLOGY.hex[id].x/y`,
-`TOPOLOGY.vertex[id].x/y`, `TOPOLOGY.edge[id].x/y` (midpoint) are precomputed.
+**Unit geometry** (in `hex.ts` / topology): hex size (center→corner) = 1, y grows downward.
+Hex center `x = √3·(q + r/2)`, `y = 1.5·r`. Multiply by your pixel size. `topo.hex[id].x/y`,
+`topo.vertex[id].x/y`, `topo.edge[id].x/y` (midpoint) are precomputed.
 
-## 3. Topology (`src/engine/topology.ts`)
+## 3. Maps and topology (`src/engine/maps.ts`, `src/engine/topology.ts`)
 
-Static, identical for every game, **not stored in GameState**. `import { TOPOLOGY } from '../engine'`.
+The board is chosen at `createGame` as `settings.map: MapId` and never changes.
 
-| Field                         | Content                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------ |
-| `landHexes` (19)              | row-major, top row first. Layouts fill in this order.                                |
-| `waterHexes` (18)             | ring, clockwise from top-left `h:0,-3`                                               |
-| `vertices` (54), `edges` (72) | all on-board ids                                                                     |
-| `coastalEdges` (30)           | clockwise, starting at port slot 0                                                   |
-| `portSlots` (9)               | `{ index, edge, vertices, waterHex }` — fixed positions                              |
-| `hex[id]`                     | `vertices` (6, clockwise from N), `edges` (6, clockwise from NE), `neighbors` (land) |
-| `vertex[id]`                  | `hexes` (1–3 land), `edges` (2–3), `vertices` (2–3), `coastal`                       |
-| `edge[id]`                    | `vertices` [2], `edges` (2–4), `hexes` (1–2 land), `coastal`                         |
+| `MapId`      | Board                                | Players | Land / water / vertices / edges / harbors | Bank | Dev deck |
+| ------------ | ------------------------------------ | ------- | ----------------------------------------- | ---- | -------- |
+| `base`       | 19 hexes, fixed beginner layout      | 3–4     | 19 / 18 / 54 / 72 / 9                     | 19   | 25       |
+| `baseRandom` | 19 hexes, random layout              | 3–4     | same frame as `base`                      | 19   | 25       |
+| `base56`     | 30 hexes (3-4-5-6-5-4-3), random     | 3–6     | 30 / 22 / 80 / 109 / 11                   | 24   | 34       |
+| `base78`     | 37 hexes (4-5-6-7-6-5-4, our design) | 3–8     | 37 / 24 / 96 / 132 / 12                   | 29   | 43       |
 
-Accessors that return `[]` for unknown ids: `hexVertices, hexEdges, hexNeighbors, vertexHexes, vertexEdges, vertexNeighbors, edgeVertices, edgeNeighbors`.
-Validators for untrusted input: `isLandHex, isBoardVertex, isBoardEdge`.
+`MAPS[id]: MapDef` = `{ frame, minPlayers, maxPlayers, layout: 'beginner'|'random', terrain, tokens,
+harbors, bankPerResource, devDeck }`. A `FrameDef` = land row widths + harbor spots. Sources and
+design notes: `docs/RULES.md` §16. Helpers: `MAP_IDS, isMapId, mapOf(state), supplyOf(state)`
+(bank per resource + dev deck composition of the game's map), `defaultMapFor(players)`
+(3–4 → `baseRandom`, 5–6 → `base56`, 7–8 → `base78`).
+
+**Topology** is derived from the frame, built once per frame and cached, **not stored in GameState**:
+
+```ts
+const t = topologyOf(state); // the board of this game — use this everywhere
+const t = topologyFor('base56'); // by map id (generators, previews)
+```
+
+`TOPOLOGY` still exists but is **deprecated**: it is the 19-hex topology (`topologyFor('base')`),
+valid only for base-map games (fixtures, old tests, UI dev pages).
+
+| Field               | Content                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `frame`, `center`   | frame id (`std19`/`std30`/`hex37`); board center in units (`(0,0)` on 19 hexes)      |
+| `landHexes`         | row-major, top row first. Layouts fill in this order.                                |
+| `waterHexes`        | ring, clockwise from its top-left hex (`h:0,-3` on 19 hexes)                         |
+| `vertices`, `edges` | all on-board ids                                                                     |
+| `coastalEdges`      | clockwise, starting at port slot 0                                                   |
+| `portSlots`         | `{ index, edge, vertices, waterHex }` — fixed positions                              |
+| `hex[id]`           | `vertices` (6, clockwise from N), `edges` (6, clockwise from NE), `neighbors` (land) |
+| `vertex[id]`        | `hexes` (1–3 land), `edges` (2–3), `vertices` (2–3), `coastal`                       |
+| `edge[id]`          | `vertices` [2], `edges` (2–4), `hexes` (1–2 land), `coastal`                         |
+
+Accessors take the topology first and return `[]` for unknown ids: `hexVertices(t, h), hexEdges,
+hexNeighbors, vertexHexes, vertexEdges, vertexNeighbors, edgeVertices, edgeNeighbors`.
+Validators for untrusted input: `isLandHex(t, id), isBoardVertex(t, id), isBoardEdge(t, id)`.
 
 ## 4. GameState (`src/engine/types.ts`)
 
@@ -70,14 +96,14 @@ Plain JSON. `JSON.parse(JSON.stringify(s))` must equal `s`. Never mutate a state
 
 ```ts
 GameState {
-  schemaVersion: 1
-  settings: { seed, layout: 'beginner'|'random', vpToWin }
-  board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[9] }   // fixed after createGame
+  schemaVersion: 2
+  settings: GameSettings             // see below; fixed after createGame
+  board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
   robber:  HexId
   players: Player[]   // {id,name,color,resources,devCards,newDevCards,knightsPlayed,progressCardsPlayed}
-  bank:    ResourceCounts            // starts 19 each
-  devDeck: DevCardType[]             // shuffled; draw with pop()
+  bank:    ResourceCounts            // starts at supplyOf(state).bankPerResource each (19/24/29)
+  devDeck: DevCardType[]             // shuffled; draw with pop(); composition per map (25/34/43)
   turn:    { number, current, devCardPlayed, tradeOffers }   // number: 0 in setup, 1 = first real turn
   phase:   Phase                     // see §5
   dice:    [d1, d2] | null           // last roll
@@ -88,11 +114,28 @@ GameState {
 }
 ```
 
+**GameSettings v2** (validated by `createGame`, which throws on bad values):
+
+| Field               | Type / range         | Default         | Engine                                                     |
+| ------------------- | -------------------- | --------------- | ---------------------------------------------------------- |
+| `seed`              | number \| string     | —               | seeds `state.rng`                                          |
+| `map`               | `MapId`              | `defaultMapFor` | board, topology, supply, player range                      |
+| `vpToWin`           | int 3..20            | 10              | victory check                                              |
+| `discardLimit`      | int 5..20            | 7               | on a 7, hands **above** it discard half                    |
+| `balancedDice`      | boolean              | false           | stored only (T13)                                          |
+| `specialBuildPhase` | boolean              | players ≥ 5     | stored only (T13)                                          |
+| `hideBankCards`     | boolean              | false           | client-side only (UI hides bank counts); engine ignores it |
+| `turnTimerSec`      | positive int \| null | null            | client-side only; engine ignores it                        |
+
+**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v2 state from a v1 or v2 one, or null.
+v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new fields get their defaults
+(`specialBuildPhase: false`). Bump `schemaVersion` and add a step there whenever GameState changes shape.
+
 - `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. `token` is `null` only on the desert.
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
 - Pieces left are **derived**, not stored: `piecesLeft(state, p)` (limits 15 roads / 5 settlements / 4 cities).
 - `devCards` = playable; `newDevCards` = bought this turn (not playable until next turn; merged on `endTurn`). VP cards in either count toward `victoryPoints()`.
-- Played cards: knights in `knightsPlayed`, Road Building / Year of Plenty / Monopoly in `progressCardsPlayed` (`ProgressCardCounts`). So per type, deck + hands + played = `DEV_DECK_COMPOSITION` exactly (checked by the sim's invariants).
+- Played cards: knights in `knightsPlayed`, Road Building / Year of Plenty / Monopoly in `progressCardsPlayed` (`ProgressCardCounts`). So per type, deck + hands + played = `supplyOf(state).devDeck` exactly (checked by the sim's invariants). `BANK_PER_RESOURCE` / `DEV_DECK_COMPOSITION` are the 19-hex values only.
 - `turn.tradeOffers`: player trade offers made this turn; `offerTrade` is rejected once it reaches `MAX_TRADE_OFFERS_PER_TURN` (3). Reset on `endTurn`. House rule, see §12.
 - `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
 - Hidden info (hands, deck order) lives in state. Fine for hotseat; an online server would redact.
@@ -103,7 +146,7 @@ GameState {
 createGame
    │
    ▼
-setup{index 0..2n-1, step settlement→road}   snake order 0,1,2,3,3,2,1,0 (setupPlayerAt)
+setup{index 0..2n-1, step settlement→road}   snake order 0,1,…,n-1,n-1,…,1,0 (setupPlayerAt)
    │  index ≥ n: settlement yields 1 resource per adjacent non-desert hex
    │  after last road: turn.number=1, current=0
    ▼
@@ -112,8 +155,8 @@ preRoll ──playKnight──► moveRobber{resume:preRoll} ──► [steal] �
    │    (YoP / Monopoly resolve instantly, stay in preRoll)
    │
    rollDice
-   ├─ 7, someone has >7 cards ─► discard{pending[]} ─(all 0)─► moveRobber{resume:main}
-   ├─ 7, nobody over 7 ──────────────────────────────────────► moveRobber{resume:main}
+   ├─ 7, someone has >discardLimit cards ─► discard{pending[]} ─(all 0)─► moveRobber{resume:main}
+   ├─ 7, nobody over discardLimit ──────────────────────────────────────► moveRobber{resume:main}
    │                                   moveRobber ─► steal{candidates} ─► main
    │                                              └─(no candidates)─────► main
    └─ other ─► production ─► main
@@ -194,7 +237,7 @@ applyAction(state, action):
 
 1. Find your action in `src/engine/actions/<area>.ts`. Replace `() => notImplemented()` with
    `(draft, action) => { …validate…; …mutate draft…; log(draft, action.player, '…'); return ok(draft); }`.
-2. Validate **everything**: phase, actor (`isCurrent`), ids (`isBoardVertex` …), bundles (`isValidBundle`), costs (`hasResources`), pieces (`piecesLeft`).
+2. Validate **everything**: phase, actor (`isCurrent`), ids (`isBoardVertex(topologyOf(draft), v)` …), bundles (`isValidBundle`), costs (`hasResources`), pieces (`piecesLeft`).
 3. Fill in the area's `<area>Legal` generator. Keep it consistent with the handler (ideally share a `canX(state, …)` predicate).
 4. Tests next to the file: `src/engine/actions/<area>.test.ts`. Every rule gets a test.
 5. **New action type?** Add it to the `Action` union in `types.ts`, to your area's `HandlerMap<…>`, the table in §6, and the `SAMPLES` map in `engine.test.ts`. TypeScript will flag any missing handler. You should not need to touch `actions/index.ts`.
@@ -203,17 +246,19 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 8. Shared helpers (already implemented + tested)
 
-| Module                 | Exports                                                                                                                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DISCARD_THRESHOLD, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, tokenPips` … |
-| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                         |
-| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                            |
-| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                          |
-| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                               |
-| `board.ts`             | `generateBoard, beginnerBoard, randomBoard, redNumbersSeparated`                                                                                                                                                |
-| `createGame.ts`        | `createGame({ seed, players: {name,color}[], layout, vpToWin? })` → setup phase, player 0 first                                                                                                                 |
-| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                            |
-| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                 |
+| Module                 | Exports                                                                                                                                                                                                                                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constants.ts`         | `RESOURCES, DEV_CARD_TYPES, PROGRESS_CARD_TYPES, COSTS, PIECE_LIMITS, DEV_DECK_COMPOSITION, DEFAULT_DISCARD_LIMIT, LONGEST_ROAD_MIN, LARGEST_ARMY_MIN, AWARD_VP, MAX_TRADE_OFFERS_PER_TURN, LOG_LIMIT, PLAYER_COLORS (8 default seat colours), tokenPips` …                                         |
+| `maps.ts`              | `MAPS, MAP_IDS, isMapId, mapOf, supplyOf, defaultMapFor`, frames (§3)                                                                                                                                                                                                                               |
+| `migrate.ts`           | `upgradeState`, `SCHEMA_VERSION` (§4)                                                                                                                                                                                                                                                               |
+| `resources.ts`         | `emptyResources, emptyDevCards, emptyProgressCards, toCounts, isValidBundle, isResource, addResources, subtractResources, hasResources, totalResources`                                                                                                                                             |
+| `clone.ts`             | `cloneState` — applyAction's draft copy (structural sharing, see §7)                                                                                                                                                                                                                                |
+| `rules/placement.ts`   | `isVertexOpen` (distance rule), `canPlaceSettlement(s,p,v,{requireRoad})`, `canPlaceCity`, `canPlaceRoad(s,p,e,{fromVertex?})`, `touchesOwnRoad` — geometry only, no cost/phase/pieces                                                                                                              |
+| `selectors.ts`         | `setupPlayerAt, getPlayer, currentPlayer, buildingsOf, roadsOf, piecesLeft, publicVictoryPoints, victoryPoints, handSize, portsOf, actingPlayers`                                                                                                                                                   |
+| `board.ts`             | `generateBoard(map, rng), beginnerBoard(), randomBoard(rng, map), redNumbersSeparated(hexes, map)`                                                                                                                                                                                                  |
+| `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec? })` → setup phase, player 0 first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. |
+| `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                |
+| `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                     |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -231,7 +276,7 @@ Bots should use their **own** `Rng` so bot choices don't perturb game randomness
 
 ## 10. Fixtures (`src/engine/fixtures.ts`)
 
-Each returns a fresh, internally consistent state on the beginner board (checked in `fixtures.test.ts`):
+Each returns a fresh, internally consistent state on the beginner board (map `base`; checked in `fixtures.test.ts`):
 
 | Fixture                 | Situation                                                                                                                  |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -273,7 +318,8 @@ view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
 - While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
 - Drag = pan, wheel = zoom at cursor, pinch on touch, double-click = refit. Refits on renderer resize until the user moves it.
-- Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
+- The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
+- Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
 
 ## 13. UI contract (`src/ui`, T6)
@@ -319,16 +365,19 @@ c.destroy();
   speed 0 = batches of moves per 12 ms slice). The controller hides `offerTrade` from a bot after
   `BOT_OFFERS_PER_TURN` (1) offers in a turn. Nobody able to act → error toast + state on console.
 - Autosave: `localStorage['catan:save:v1']` = `{ version, state, seats, viewer, botRng }`, every
-  access in try/catch. On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`,
-  `?seed`, `?layout`, `?autoplay`) never autosave.
-- Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?seats=hbbb`, `?vp=`, `?speed=ms`,
-  `?autoplay=4bots|3bots` (all bots), `?hl=`. `window.catan` = `{ controller, board, hud }`.
+  access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
+  On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
+  `?layout`, `?map`, `?autoplay`) never autosave.
+- `newGame(cfg)` uses `cfg.map` when the new-game config carries one (stage-2 setup screen), else `layoutToMap(cfg.layout)`.
+- Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
+  `?autoplay=4bots` (3–8 bots), `?hl=`. `window.catan` = `{ controller, board, hud }`.
 
 ## 14. Decisions and open questions
 
-- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12.
+- **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12. The 37-hex frame uses the same rule (ties: the clockwise hex); the 30-hex frame lists its 11 spots explicitly, read from the 5-6 rulebook (RULES.md §16.B).
 - **Beginner layout** (`board.ts`): terrain, tokens and harbor kinds verified (T8) against the rulebook's Illustration A. Starting settlements of the beginner setup are not encoded (see RULES.md §12 for them).
-- **Random layout:** terrain shuffled, tokens rejection-sampled until no 6/8 are adjacent, port kinds shuffled (positions fixed).
+- **Random layout:** terrain shuffled, tokens rejection-sampled until no 6/8 are adjacent, port kinds shuffled (positions fixed). Same for every random map; with several deserts the robber starts on a random one (one extra RNG draw only then, so 19-hex boards are unchanged per seed).
+- **Bigger maps (T10):** `base56` follows the official 5-6 extension; `base78` is our own design because no official 7-8 rules could be found (RULES.md §16). Map player ranges are hard limits in `createGame`. The sim's default `--max-steps 5000` is too low for some 8-bot games (13% hit it); 20000 finishes all.
 - **Turn order:** config order; player 0 starts (no "highest roll starts"). The controller may shuffle players before `createGame`.
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.

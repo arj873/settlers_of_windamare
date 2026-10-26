@@ -94,7 +94,7 @@ describe('checkInvariants on deliberately broken states', () => {
   it('adjacent buildings', () => {
     const s = midGame();
     const v = Object.keys(s.pieces.buildings)[0] as VertexId;
-    s.pieces.buildings[vertexNeighbors(v)[0]!] = { owner: 3, kind: 'settlement' };
+    s.pieces.buildings[vertexNeighbors(TOPOLOGY, v)[0]!] = { owner: 3, kind: 'settlement' };
     expect(codes(s)).toContain('building-adjacent');
   });
   it('disconnected road', () => {

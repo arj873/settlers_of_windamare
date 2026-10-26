@@ -31,8 +31,19 @@ describe('parseArgs', () => {
     ]);
     expect(a).toMatchObject({ games: 5, seed: 42, players: 3, maxSteps: 99, verbose: true });
   });
+  it('parses --map, the --layout alias and up to 8 players', () => {
+    expect(parseArgs([]).map).toBeNull();
+    expect(parseArgs(['--map', 'base78', '--players', '8'])).toMatchObject({
+      map: 'base78',
+      players: 8,
+    });
+    expect(parseArgs(['--layout', 'beginner']).map).toBe('base');
+    expect(parseArgs(['--layout=random']).map).toBe('baseRandom');
+  });
   it('rejects bad input', () => {
-    expect(() => parseArgs(['--players', '5'])).toThrow();
+    expect(() => parseArgs(['--players', '9'])).toThrow();
+    expect(() => parseArgs(['--players', '2'])).toThrow();
+    expect(() => parseArgs(['--map', 'huge'])).toThrow();
     expect(() => parseArgs(['--games', '0'])).toThrow();
     expect(() => parseArgs(['--bias', '1.5'])).toThrow();
     expect(() => parseArgs(['--games'])).toThrow();

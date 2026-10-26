@@ -6,7 +6,17 @@
  *   screen CSS pixels relative to the canvas
  * A `ViewTransform` maps unit -> screen: `screen = (x, y) + unit * scale` (scale = px per unit).
  */
-import { TOPOLOGY, isLandHex, type EdgeId, type HexId, type Point, type VertexId } from '../engine';
+import {
+  CORNERS,
+  TOPOLOGY,
+  cornerPoint,
+  isLandHex,
+  type EdgeId,
+  type HexId,
+  type Point,
+  type Topology,
+  type VertexId,
+} from '../engine';
 
 /** Design size (px per unit) the Pixi scene graph is drawn at. The world container is scaled from it. */
 export const HEX_SIZE = 100;
@@ -31,11 +41,33 @@ export interface Rect {
   maxY: number;
 }
 
+/**
+ * Radius (units) of the flat-top hexagonal sea backdrop around `topo.center`: BACKDROP_RADIUS on
+ * the 19-hex board, otherwise just big enough to hold every water hex plus a small margin.
+ */
+export function backdropRadius(topo: Topology = TOPOLOGY): number {
+  if (topo.frame === TOPOLOGY.frame) return BACKDROP_RADIUS;
+  let r = 0;
+  for (const id of topo.waterHexes) {
+    const w = topo.water[id];
+    if (!w) continue;
+    for (const c of CORNERS) {
+      const p = cornerPoint(w.q, w.r, c);
+      const dx = Math.abs(p.x - topo.center.x);
+      const dy = Math.abs(p.y - topo.center.y);
+      // Smallest flat-top hexagon radius containing (dx, dy).
+      r = Math.max(r, (2 * dy) / Math.sqrt(3), dx + dy / Math.sqrt(3));
+    }
+  }
+  return r + 0.4;
+}
+
 /** Bounds of the whole drawn board (sea backdrop included), in units. */
-export function boardBounds(): Rect {
-  const r = BACKDROP_RADIUS + FRAME_WIDTH;
+export function boardBounds(topo: Topology = TOPOLOGY): Rect {
+  const r = backdropRadius(topo) + FRAME_WIDTH;
   const h = r * Math.sin(Math.PI / 3);
-  return { minX: -r, minY: -h, maxX: r, maxY: h };
+  const { x, y } = topo.center;
+  return { minX: x - r, minY: y - h, maxX: x + r, maxY: y + h };
 }
 
 export function unitToScreen(view: ViewTransform, p: Point): Point {
@@ -125,7 +157,7 @@ export function distToSegment(p: Point, a: Point, b: Point): number {
 }
 
 /** The land hex containing unit point `p`, or null (water / off board). */
-export function hexAt(p: Point): HexId | null {
+export function hexAt(p: Point, topo: Topology = TOPOLOGY): HexId | null {
   // Pointy-top pixel -> fractional axial, then cube rounding.
   const fq = (Math.sqrt(3) / 3) * p.x - p.y / 3;
   const fr = (2 / 3) * p.y;
@@ -139,21 +171,26 @@ export function hexAt(p: Point): HexId | null {
   if (dq > dr && dq > ds) q = -r - s;
   else if (dr > ds) r = -q - s;
   const id: string = `h:${q + 0},${r + 0}`; // `+ 0` turns -0 into 0
-  return isLandHex(id) ? id : null;
+  return isLandHex(topo, id) ? id : null;
 }
 
 /**
  * Best hit for unit point `p`. Vertices and edges are scored by distance / radius so the closer one
  * wins; a hex only wins when nothing else is in reach. `cand` undefined = everything on the board.
  */
-export function pick(p: Point, pxPerUnit: number, cand?: PickCandidates): Hit | null {
+export function pick(
+  p: Point,
+  pxPerUnit: number,
+  cand?: PickCandidates,
+  topo: Topology = TOPOLOGY,
+): Hit | null {
   const radii = pickRadii(pxPerUnit);
   let best: Hit | null = null;
   let bestScore = Infinity;
 
-  const vertices = cand ? (cand.vertices ?? []) : TOPOLOGY.vertices;
+  const vertices = cand ? (cand.vertices ?? []) : topo.vertices;
   for (const id of vertices) {
-    const v = TOPOLOGY.vertex[id];
+    const v = topo.vertex[id];
     if (!v) continue;
     const score = Math.hypot(p.x - v.x, p.y - v.y) / radii.vertex;
     if (score <= 1 && score < bestScore) {
@@ -162,11 +199,11 @@ export function pick(p: Point, pxPerUnit: number, cand?: PickCandidates): Hit | 
     }
   }
 
-  const edges = cand ? (cand.edges ?? []) : TOPOLOGY.edges;
+  const edges = cand ? (cand.edges ?? []) : topo.edges;
   for (const id of edges) {
-    const e = TOPOLOGY.edge[id];
-    const a = e && TOPOLOGY.vertex[e.vertices[0]];
-    const b = e && TOPOLOGY.vertex[e.vertices[1]];
+    const e = topo.edge[id];
+    const a = e && topo.vertex[e.vertices[0]];
+    const b = e && topo.vertex[e.vertices[1]];
     if (!a || !b) continue;
     // Only the middle half of the edge counts, so near the ends the vertex wins.
     const near = { x: a.x + (b.x - a.x) * 0.25, y: a.y + (b.y - a.y) * 0.25 };
@@ -180,7 +217,7 @@ export function pick(p: Point, pxPerUnit: number, cand?: PickCandidates): Hit | 
 
   if (best) return best;
 
-  const hex = hexAt(p);
+  const hex = hexAt(p, topo);
   if (hex && (!cand || cand.hexes?.includes(hex))) return { kind: 'hex', id: hex };
   return null;
 }

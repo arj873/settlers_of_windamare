@@ -20,7 +20,7 @@ import {
 const RICH = { brick: 5, lumber: 5, wool: 5, grain: 5, ore: 5 };
 const v0 = cornerVertex(0, 0, 'N');
 
-const otherEnd = (e: EdgeId, v: VertexId) => edgeVertices(e).find((x) => x !== v)!;
+const otherEnd = (e: EdgeId, v: VertexId) => edgeVertices(TOPOLOGY, e).find((x) => x !== v)!;
 
 /** A path of edges starting at `from`: returns [edges, vertices] with vertices[0] = from. */
 function path(from: VertexId, length: number): [EdgeId[], VertexId[]] {
@@ -28,7 +28,9 @@ function path(from: VertexId, length: number): [EdgeId[], VertexId[]] {
   const verts: VertexId[] = [from];
   for (let i = 0; i < length; i++) {
     const at = verts.at(-1)!;
-    const e = vertexEdges(at).find((x) => !edges.includes(x) && !verts.includes(otherEnd(x, at)))!;
+    const e = vertexEdges(TOPOLOGY, at).find(
+      (x) => !edges.includes(x) && !verts.includes(otherEnd(x, at)),
+    )!;
     edges.push(e);
     verts.push(otherEnd(e, at));
   }
@@ -47,7 +49,7 @@ function buildGame(): GameState {
 describe('buildRoad', () => {
   it('builds next to an own settlement and pays brick + lumber to the bank', () => {
     const s = buildGame();
-    const e = vertexEdges(v0)[0]!;
+    const e = vertexEdges(TOPOLOGY, v0)[0]!;
     const after = expectOk(applyAction(s, { type: 'buildRoad', player: 0, edge: e }));
     expect(after.pieces.roads[e]).toBe(0);
     expect(after.players[0]!.resources).toEqual({ ...RICH, brick: 4, lumber: 4 });
@@ -66,7 +68,10 @@ describe('buildRoad', () => {
   it('rejects an unconnected edge', () => {
     const s = buildGame();
     const far = TOPOLOGY.edges.find(
-      (e) => !edgeVertices(e).some((v) => v === v0 || vertexNeighbors(v0).includes(v)),
+      (e) =>
+        !edgeVertices(TOPOLOGY, e).some(
+          (v) => v === v0 || vertexNeighbors(TOPOLOGY, v0).includes(v),
+        ),
     )!;
     expectFail(applyAction(s, { type: 'buildRoad', player: 0, edge: far }), /connected/);
   });
@@ -78,7 +83,7 @@ describe('buildRoad', () => {
     place(s, 1, v2!);
     expectFail(applyAction(s, { type: 'buildRoad', player: 0, edge: e3! }), /connected/);
     // The other branch at v1 is still fine.
-    const branch = vertexEdges(v1!).find((e) => e !== e1 && e !== e2)!;
+    const branch = vertexEdges(TOPOLOGY, v1!).find((e) => e !== e1 && e !== e2)!;
     expectOk(applyAction(s, { type: 'buildRoad', player: 0, edge: branch }));
   });
 
@@ -86,7 +91,7 @@ describe('buildRoad', () => {
     const s = buildGame();
     const [[e1], [, v1]] = path(v0, 1);
     road(s, 0, e1!);
-    const [opp, mine] = vertexEdges(v1!).filter((e) => e !== e1);
+    const [opp, mine] = vertexEdges(TOPOLOGY, v1!).filter((e) => e !== e1);
     road(s, 1, opp!);
     expectOk(applyAction(s, { type: 'buildRoad', player: 0, edge: mine! }));
   });
@@ -101,7 +106,7 @@ describe('buildRoad', () => {
 
   it('rejects an occupied edge', () => {
     const s = buildGame();
-    const e = vertexEdges(v0)[0]!;
+    const e = vertexEdges(TOPOLOGY, v0)[0]!;
     road(s, 1, e);
     expectFail(applyAction(s, { type: 'buildRoad', player: 0, edge: e }));
     road(s, 0, e);
@@ -112,14 +117,14 @@ describe('buildRoad', () => {
     const s = buildGame();
     setHand(s, 0, { brick: 1, wool: 3 });
     expectFail(
-      applyAction(s, { type: 'buildRoad', player: 0, edge: vertexEdges(v0)[0]! }),
+      applyAction(s, { type: 'buildRoad', player: 0, edge: vertexEdges(TOPOLOGY, v0)[0]! }),
       /afford/,
     );
   });
 
   it('rejects after 15 roads', () => {
     const s = buildGame();
-    const target = vertexEdges(v0)[0]!;
+    const target = vertexEdges(TOPOLOGY, v0)[0]!;
     const spare = TOPOLOGY.edges.filter((e) => e !== target).slice(-15);
     road(s, 0, ...spare);
     expect(piecesLeft(s, 0).road).toBe(0);
@@ -129,7 +134,7 @@ describe('buildRoad', () => {
 
   it('rejects invalid edges, wrong player, wrong phase', () => {
     const s = buildGame();
-    const e = vertexEdges(v0)[0]!;
+    const e = vertexEdges(TOPOLOGY, v0)[0]!;
     expectFail(applyAction(s, { type: 'buildRoad', player: 0, edge: 'e:5,5,E' }), /invalid edge/);
     expectFail(applyAction(s, { type: 'buildRoad', player: 1, edge: e }), /not your turn/);
     const pre = structuredClone(s);
@@ -178,7 +183,7 @@ describe('buildSettlement', () => {
     place(
       s,
       1,
-      vertexNeighbors(v2).find((x) => x !== v1)!,
+      vertexNeighbors(TOPOLOGY, v2).find((x) => x !== v1)!,
     );
     expectFail(applyAction(s, { type: 'buildSettlement', player: 0, vertex: v2 }), /open vertex/);
   });
@@ -197,7 +202,9 @@ describe('buildSettlement', () => {
 
   it('rejects after 5 settlements', () => {
     const [s, v2] = withRoads();
-    const far = TOPOLOGY.vertices.filter((v) => v !== v2 && !vertexNeighbors(v2).includes(v));
+    const far = TOPOLOGY.vertices.filter(
+      (v) => v !== v2 && !vertexNeighbors(TOPOLOGY, v2).includes(v),
+    );
     for (const v of far.slice(-4)) place(s, 0, v);
     expect(piecesLeft(s, 0).settlement).toBe(0);
     expectFail(
@@ -287,7 +294,7 @@ describe('buildLegal', () => {
     const s = buildGame();
     const actions = buildLegal(s);
     const roads = actions.flatMap((a) => (a.type === 'buildRoad' ? [a.edge] : []));
-    expect(roads.sort()).toEqual([...vertexEdges(v0)].sort());
+    expect(roads.sort()).toEqual([...vertexEdges(TOPOLOGY, v0)].sort());
     expect(actions.filter((a) => a.type === 'buildCity')).toEqual([
       { type: 'buildCity', player: 0, vertex: v0 },
     ]);

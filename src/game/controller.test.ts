@@ -385,6 +385,20 @@ describe('GameController: autosave', () => {
     warn.mockRestore();
   });
 
+  it('loads a stage-1 save (schemaVersion 1) upgraded to v2', () => {
+    const v1 = {
+      ...midGame(),
+      schemaVersion: 1,
+      settings: { seed: 'old', layout: 'beginner', vpToWin: 10 },
+    };
+    const seats = ['human', 'bot', 'bot', 'bot'];
+    store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: v1, seats, viewer: 0, botRng: 5 }));
+    const saved = loadSession(store);
+    expect(saved?.state.schemaVersion).toBe(2);
+    expect(saved?.state.settings).toMatchObject({ map: 'base', discardLimit: 7, vpToWin: 10 });
+    expect(saved?.state.pieces).toEqual(midGame().pieces);
+  });
+
   it('ignores a corrupt save', () => {
     store.setItem(SAVE_KEY, '{not json');
     expect(loadSession(store)).toBeNull();

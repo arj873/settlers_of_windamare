@@ -151,10 +151,12 @@ export class GameController {
     const state = createGame({
       seed,
       players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-      // T14 wires the rest of the setup config (maps, rules, timer); until then only the
-      // base map pair exists in the engine.
-      layout: cfg.map === 'base' ? 'beginner' : 'random',
-      ...(extra.vpToWin === undefined ? {} : { vpToWin: extra.vpToWin }),
+      map: cfg.map,
+      vpToWin: extra.vpToWin ?? cfg.vpToWin,
+      discardLimit: cfg.discardLimit,
+      balancedDice: cfg.rules.balancedDice,
+      hideBankCards: cfg.rules.hideBankCards,
+      turnTimerSec: cfg.turnTimerSec,
     });
     console.info(`New game: map=${cfg.map} seed=${seed}`);
     this.start(

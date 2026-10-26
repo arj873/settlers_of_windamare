@@ -1,5 +1,5 @@
 /** Autosave: one session in localStorage. Every storage access is wrapped (private mode, quota...). */
-import type { GameState, PlayerId } from '../engine';
+import { upgradeState, type GameState, type PlayerId } from '../engine';
 import type { Controller } from '../ui';
 
 export const SAVE_KEY = 'catan:save:v1';
@@ -58,8 +58,9 @@ export function loadSession(store: KeyValueStore | null): SavedSession | null {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw) as Partial<SavedSession>;
-    const state = s.state;
-    if (s.version !== 1 || !state || state.schemaVersion !== 1) return null;
+    // Engine state of any schema version we ever saved, upgraded to the current one (v1 -> v2).
+    const state = upgradeState(s.state);
+    if (s.version !== 1 || !state) return null;
     if (!Array.isArray(state.players) || !Array.isArray(s.seats)) return null;
     if (s.seats.length !== state.players.length) return null;
     if (!s.seats.every((c) => c === 'human' || c === 'bot')) return null;

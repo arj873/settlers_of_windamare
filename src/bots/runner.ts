@@ -6,11 +6,13 @@ import {
   applyAction,
   createGame,
   legalActions,
+  PLAYER_COLORS,
   Rng,
   type Action,
   type ActionResult,
   type GameState,
   type Layout,
+  type MapId,
   type PlayerId,
 } from '../engine';
 import { actorsFor, createRandomBot, type Bot } from './index';
@@ -24,26 +26,24 @@ export interface EngineDeps {
 
 export const ENGINE_DEPS: EngineDeps = { legalActions, applyAction, checkInvariants };
 
-const PLAYER_NAMES = [
-  { name: 'Red', color: '#d64541' },
-  { name: 'Blue', color: '#3a7bd5' },
-  { name: 'White', color: '#ecf0f1' },
-  { name: 'Orange', color: '#f39c12' },
-];
-
 /** Everything needed to rebuild a game's initial state. */
 export interface GameSetup {
   seed: number | string;
-  players: 3 | 4;
-  layout: Layout;
+  /** 3..8 (must fit the map). */
+  players: number;
+  /** Default: `layout` (old dumps) or createGame's default for the player count. */
+  map?: MapId;
+  /** @deprecated v1 dumps; use `map`. */
+  layout?: Layout;
   vpToWin?: number;
 }
 
 export function newGame(setup: GameSetup): GameState {
   return createGame({
     seed: setup.seed,
-    players: PLAYER_NAMES.slice(0, setup.players),
-    layout: setup.layout,
+    players: PLAYER_COLORS.slice(0, setup.players),
+    ...(setup.map === undefined ? {} : { map: setup.map }),
+    ...(setup.layout === undefined ? {} : { layout: setup.layout }),
     ...(setup.vpToWin === undefined ? {} : { vpToWin: setup.vpToWin }),
   });
 }

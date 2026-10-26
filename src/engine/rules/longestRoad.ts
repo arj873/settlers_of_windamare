@@ -5,11 +5,12 @@
  * road: a trail may end there but not pass through. The player's own buildings never break it.
  * Brute-force DFS over edges: a player has at most 15 roads, so this is cheap.
  */
-import { edgeVertices, vertexEdges } from '../topology';
+import { edgeVertices, topologyOf, vertexEdges } from '../topology';
 import { roadsOf } from '../selectors';
 import type { EdgeId, GameState, PlayerId, VertexId } from '../types';
 
 export function longestRoadLength(state: GameState, player: PlayerId): number {
+  const t = topologyOf(state);
   const roads = state.pieces.roads;
   const buildings = state.pieces.buildings;
   const blocked = (v: VertexId) => {
@@ -21,9 +22,9 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   let best = 0;
   const walk = (v: VertexId, len: number): void => {
     if (len > best) best = len;
-    for (const e of vertexEdges(v)) {
+    for (const e of vertexEdges(t, v)) {
       if (roads[e] !== player || used.has(e)) continue;
-      const [a, b] = edgeVertices(e) as [VertexId, VertexId];
+      const [a, b] = edgeVertices(t, e) as [VertexId, VertexId];
       const next = a === v ? b : a;
       if (blocked(next)) {
         if (len + 1 > best) best = len + 1;
@@ -37,7 +38,7 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
 
   // Starting at a blocked vertex is fine: the trail simply ends there.
   const starts = new Set<VertexId>();
-  for (const e of roadsOf(state, player)) for (const v of edgeVertices(e)) starts.add(v);
+  for (const e of roadsOf(state, player)) for (const v of edgeVertices(t, e)) starts.add(v);
   for (const v of starts) walk(v, 0);
   return best;
 }

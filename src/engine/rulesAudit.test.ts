@@ -39,7 +39,7 @@ describe('RULES.md audit', () => {
     const s = emptyBoardGame();
     s.phase = { kind: 'moveRobber', resume: 'main' };
     s.robber = 'h:1,-1';
-    place(s, 2, hexVertices(DESERT)[0]!);
+    place(s, 2, hexVertices(TOPOLOGY, DESERT)[0]!);
     setHand(s, 2, { wool: 1 });
     const after = expectOk(applyAction(s, { type: 'moveRobber', player: 0, hex: DESERT }));
     expect(after.phase).toEqual({ kind: 'steal', candidates: [2], resume: 'main' });

@@ -75,6 +75,12 @@ export class Viewport {
     this.set(v);
   }
 
+  /** New board bounds (a different map was loaded): refit. */
+  setBounds(bounds: Rect) {
+    this.o.bounds = bounds;
+    this.fit();
+  }
+
   /** Keep the fitted board clear of overlays; refits unless the user has moved the view. */
   setInsets(insets: Insets) {
     const i = this.insets;

@@ -3,6 +3,7 @@
  * state, EVERY legal action is applied and must be accepted. Also checks invariants on the way.
  */
 import { describe, expect, it } from 'vitest';
+import { PLAYER_COLORS } from '../constants';
 import { createGame } from '../createGame';
 import { applyAction, legalActions } from '../engine';
 import {
@@ -15,7 +16,7 @@ import {
 } from '../fixtures';
 import { Rng } from '../rng';
 import { piecesLeft } from '../selectors';
-import { isLandHex, vertexNeighbors } from '../topology';
+import { isLandHex, topologyOf, vertexNeighbors } from '../topology';
 import type { Action, GameState, PhaseKind, VertexId } from '../types';
 import { expectConserved, expectOk } from './testkit';
 
@@ -28,13 +29,15 @@ function expectAllAccepted(s: GameState, actions: Action[]) {
 
 function checkInvariants(s: GameState) {
   expectConserved(s);
-  expect(isLandHex(s.robber)).toBe(true);
+  const t = topologyOf(s);
+  expect(isLandHex(t, s.robber)).toBe(true);
   for (const p of s.players) {
     const left = piecesLeft(s, p.id);
     expect(Math.min(left.road, left.settlement, left.city)).toBeGreaterThanOrEqual(0);
   }
   for (const v of Object.keys(s.pieces.buildings) as VertexId[]) {
-    for (const n of vertexNeighbors(v)) expect(s.pieces.buildings[n], `${v}~${n}`).toBeUndefined();
+    for (const n of vertexNeighbors(t, v))
+      expect(s.pieces.buildings[n], `${v}~${n}`).toBeUndefined();
   }
 }
 
@@ -109,6 +112,24 @@ describe('legalActions soundness', () => {
         vpToWin: c.vpToWin,
       });
       const { s, phases } = playout(start, c.seed, 600);
+      for (const k of ['setup', 'preRoll', 'main', 'moveRobber'] as const) {
+        expect(phases.has(k), k).toBe(true);
+      }
+      expect(s.turn.number).toBeGreaterThan(5);
+    });
+  }
+
+  const bigMaps = [
+    { seed: 5, n: 6, map: 'base56' },
+    { seed: 6, n: 5, map: 'base56' },
+    { seed: 7, n: 8, map: 'base78' },
+    { seed: 8, n: 7, map: 'base78' },
+  ] as const;
+
+  for (const c of bigMaps) {
+    it(`random playout: ${c.n} players, ${c.map}, seed ${c.seed}`, () => {
+      const start = createGame({ seed: c.seed, players: PLAYER_COLORS.slice(0, c.n), map: c.map });
+      const { s, phases } = playout(start, c.seed, 800);
       for (const k of ['setup', 'preRoll', 'main', 'moveRobber'] as const) {
         expect(phases.has(k), k).toBe(true);
       }

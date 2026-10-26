@@ -7,16 +7,17 @@
  */
 import { RESOURCES } from '../constants';
 import { emptyResources } from '../resources';
-import { hexVertices } from '../topology';
+import { hexVertices, topologyOf } from '../topology';
 import type { GameState, HexId, ResourceCounts } from '../types';
 
 /** What each player is owed for `roll` before the bank-shortage rule. Indexed by PlayerId. */
 export function computeProduction(state: GameState, roll: number): ResourceCounts[] {
   const owed = state.players.map(() => emptyResources());
+  const t = topologyOf(state);
   for (const id of Object.keys(state.board.hexes) as HexId[]) {
     const hex = state.board.hexes[id];
     if (!hex || hex.token !== roll || hex.terrain === 'desert' || id === state.robber) continue;
-    for (const v of hexVertices(id)) {
+    for (const v of hexVertices(t, id)) {
       const b = state.pieces.buildings[v];
       const hand = b && owed[b.owner];
       if (hand) hand[hex.terrain] += b.kind === 'city' ? 2 : 1;
