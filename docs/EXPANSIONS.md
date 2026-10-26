@@ -217,6 +217,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `afterAction(draft, action)`                    | `applyAction`, before awards                                                  | additive                    | fog reveal, island VP, closed-route marking                                                                                                                                                                                                                      |
 | `deferVictory(state)`                           | `checkVictory`                                                                | additive OR                 | Oil Springs: the win is declared at the end of the turn                                                                                                                                                                                                          |
 | `wins(state, p)` → `boolean \| undefined`       | `checkVictory` (after the awards), instead of the VP-target test              | first-wins                  | Seafarers: fortress + 10 VP, a completed / highest wonder                                                                                                                                                                                                        |
+| `maskFor(view, viewer, state)` → `GameState`    | `viewFor` (online views, engine/view.ts), after the base masks                | chained                     | X1: hide your secrets from `viewer` (see "Online views" below)                                                                                                                                                                                                   |
 
 **Variant settings** (V1/V2, `docs/RULES.md` §18-20) apply in expansion modes too. Read the
 blocked hex and the city yield from `ctx` (or `hasRobber(settings)`), not `state.robber` / 2, so
@@ -226,6 +227,35 @@ your module cannot support; the setup screen shows that message and disables Sta
 from the board); see ARCHITECTURE.md "Variants × expansions". With Event Cards the drawn card is
 the roll: the `onRoll` hooks run after the draw and before the card's event (an interrupt resumes
 with `continueRoll`, which then resolves the card); `rollDice` hooks are not called.
+
+**Online views (X1, `maskFor`).** Online, every seat and spectator gets `viewFor(state, viewer)`
+(docs/MULTIPLAYER.md §6). `state.ext`, `board.ext`, phases and log lines reach every viewer as
+they are, so **a module with hidden information must mask it** in `maskFor`: return the view with
+each secret replaced by a constant placeholder of the same shape (a face-down stack keeps its
+length, a hand its size), sharing the unchanged parts, mutating nothing. Rules:
+
+- Per-player secrets (a hand): hidden when `hiddenFrom(state, viewer, owner)` (engine/viewer.ts:
+  everyone but the owner, until game over, when hands are revealed). Stacks, decks, unexplored
+  tiles: hidden from every viewer, game over included. A phase that shows one player a secret
+  (Spy, Master Merchant) reveals it to that viewer only.
+- Counts stay public. A count the masked shape no longer carries goes into an optional view-only
+  field of your slice, read through a helper that also works on full states (C&K
+  `commodityCount`). Cards held outside the base hands that count as dev / resource cards go into
+  the view's public counts with `addPublicCounts` (T&B Swift Journeys).
+- No log line may name a secret (log "drew a science progress card", not the card).
+- HUD / render code must render the masked shape (counts, backs) and never call `legalActions` /
+  `applyAction` on a view; build choices from the `legal` actions the server sends.
+- Test it: `src/expansions/maskTestkit.ts` (`sampleStates`, `expectNoLeak`: plant canaries in
+  your secrets, no other viewer's serialized view may contain them, the owner's must).
+  Masks today: C&K `ck/engine/mask.ts` (progress hands, commodity split, progress decks; Spy /
+  Master Merchant reveals), Seafarers `seafarers/engine/mask.ts` (fog stacks, face-down Forgotten
+  Tribe dev-card gifts), T&B `tb/engine/mask.ts` (fish hands and pool, BA deck, commodity stacks,
+  Swift Journeys), E&P `ep/engine/mask.ts` (face-down hexes, disc stacks, lair tokens). Oil, Crop,
+  demo, seack, tbck hold no secrets of their own (their tests run the C&K mask in the combos).
+
+Online actions: `parseAction` (src/net/protocol.ts) accepts any registered `<id>/<name>` type
+with a plain-JSON payload (identifier keys, depth / size limits); your handler validates every
+field. The server only accepts action types `legalActions` offers that seat at that moment.
 
 **Special build phase:** a builder whose only possible moves are your module's (`legal` returns
 something in `specialBuild`) still gets a step (C&K knights, walls, improvements).
@@ -480,9 +510,7 @@ seafarers]`).
   edges: roads, pieces, highlights, clicks; the hex's 6 corners / sides are unchanged).
 - **Bank-trade HUD ratios** still show harbour ratios only; expansions with `bankTradeRatio` hooks
   should check `bestRatios` in `ui/model.ts` when they need it.
-- **Secret expansion state online:** `viewFor` passes `state.ext` unmasked (C&K progress hands
-  and stack orders, oil is public anyway). Online play is base-only for now; a module masking
-  hook is needed before an expansion with secrets goes online.
+- ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
 - **Combinations (C1):** Seafarers + C&K and T&B + C&K are built (§11). Not built: T&B +
   Seafarers (the 2025 sheets need T&B features on Seafarers scenarios: a seam in `tb` or

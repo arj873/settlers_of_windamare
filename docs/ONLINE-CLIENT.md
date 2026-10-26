@@ -70,7 +70,10 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 
 ## Playtest harness (online)
 
-`pnpm pt:serve --online --seats N [--bots B] [--map M] [--timer SEC] [--vp N] [--headed] [--remote URL]`:
+`pnpm pt:serve --online --seats N [--bots B] [--map M] [--timer SEC] [--vp N] [--headed] [--remote URL]
+[--mode ck|seafarers|tb|ep|oil|crop|seafarers+ck|tb+ck [--scenario fogIslands]]` (X1: an expansion
+room with the setup screen's defaults for that mode / scenario; `<id>/` may be left out of the
+scenario; the seat total must fit its player range):
 reuses or starts `pnpm dev:server` (:8787), creates a room as Seat1 through the real home screen,
 applies the table settings with a `configure`, joins Seat2..N from the invite link, sits them,
 starts. One browser context (own token) per seat; the `pnpm pt <seat> ...` CLI is routed to that

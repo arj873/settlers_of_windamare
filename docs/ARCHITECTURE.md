@@ -19,7 +19,10 @@ src/server/  Cloudflare room server   Worker + Durable Object around GameSession
 ```
 
 Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
-clients get `viewFor(state, seat)` (§8) and their legal actions. Browser client (home, lobby,
+clients get `viewFor(state, seat)` (§8) and their legal actions. Every mode, scenario, option and
+combo plays online (X1): the lobby wraps the setup screen (mode tiles included), `RoomConfig`
+carries `mode/scenario/options`, expansion actions go over the wire, and each module masks its
+own secrets in views with the `maskFor` hook (docs/EXPANSIONS.md §5 "Online views"). Browser client (home, lobby,
 `RoomClient`, `NetGameController`, `src/game/online`, `src/ui/online`; `HudView.spectator` /
 `.away`, `Hud.setChat` / `.setSessionActions`): `docs/ONLINE-CLIENT.md`.
 
@@ -261,7 +264,9 @@ board, which must not change afterwards); `'random'` in a scenario picks among i
 - `log` keeps only the newest `LOG_LIMIT` (200) entries (trimmed by `applyAction`). A UI that wants the whole history must accumulate it itself.
 - Hidden info (hands, dev cards, deck orders, rng, seed) lives in state. Fine for hotseat; online,
   `viewFor(state, seat | 'spectator')` (`view.ts`, M1) masks it and adds public counts
-  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`).
+  (`GameView.view`). A new secret GameState field must be masked there (`src/bots/viewLeak.test.ts`);
+  a module's secrets in its `maskFor` hook (`hiddenFrom` / `addPublicCounts` in `viewer.ts`,
+  tests with `src/expansions/maskTestkit.ts`).
 
 ## 5. Phase state machine
 

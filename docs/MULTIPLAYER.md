@@ -274,6 +274,13 @@ p)` gives public VP for masked players and the full count for the viewer. Rules 
 never read another player's `resources`/`devCards` directly; never call `legalActions` or
 `applyAction` on a view (use the `legal` from the server).
 
+**Expansion secrets (X1).** After the base masks, each active module's `maskFor` hook masks its
+own (docs/EXPANSIONS.md §5 "Online views"): C&K progress hands, commodity split and progress
+decks; Seafarers fog stacks and face-down gift cards; T&B fish hands / pool, Barbarian Attack
+deck, commodity stacks, Swift Journeys (counted in `view.devCardCounts`); E&P face-down hexes,
+disc stacks, lair tokens. Per-module proofs: `src/expansions/<id>/mask.test.ts` (canaries over
+bot games, `src/expansions/maskTestkit.ts`).
+
 Proofs: `src/engine/view.test.ts` (unit) and `src/bots/viewLeak.test.ts` (property test over 5
 simulated games, 3–7 players, balanced dice: no secret fields, counts match, and the view does
 not change when only secrets change — redistributed hands, reshuffled decks, new rng/seed).
@@ -388,8 +395,10 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 | `sync`      | —                                | any member          | — (resends `room` + `game`)                                         |
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
-plus `seatCount` (`mode: 'base'`, `map`, `rules{balancedDice, hideBankCards}`, `turnTimerSec`,
-`vpToWin` 3–20, `discardLimit` 5–20; seat count within the map's range), plus optional
+plus `seatCount` (`mode` (any registered mode, X1), `scenario?` (one of the mode's), `options?`
+(the mode's modules' options: known keys, typed, in range; neither in base games), `map`,
+`rules{balancedDice, hideBankCards}`, `turnTimerSec`, `vpToWin` 3–20, `discardLimit` 5–20; seat
+count within the map's range (base) or the mode + scenario's (`playerRange`)), plus optional
 `variants` (V1, RULES.md §18: `robberMode, eventCards, rushMode, turboMode, secondSettler,
 randomTurnOrder, mapSelection, setupPlacement, timer`; V2, §19/§20: `rules56` (5+ seats, not with
 second settler) and `mapRules`, strict keys, only `true` flags kept). `parseVariants` is strict (unknown keys
@@ -398,6 +407,13 @@ rejected, a named clock preset must carry its own values) and normalises default
 (`bad_message`): event cards + balanced dice, chess clock + `turnTimerSec`, second settler with
 fewer than 4 seats. The V1 game actions (`vetoMap`, `eventGain`, `eventGive`, `eventSteal` with an
 explicit `victim: null` to pass, `eventDamageRoad`, `repairRoad`) have strict parsers like the rest.
+Finally `roomConfigError` runs `resolveSettings` on the config (placeholder players): anything
+else createGame would refuse (a module's `validate`, e.g. C&K + Rush) is `bad_message` too, so
+`start` cannot fail. Expansion actions (`<id>/<name>`, X1): the type must be a registered
+module's action; the payload is rebuilt as plain JSON (identifier keys, `EXT_ACTION_LIMITS`), the
+handler checks its meaning. **Intent guard:** an intent is refused (`illegal_action`) unless
+`legalActions` offers that seat an action of that type right now; the payload is then
+`applyAction`'s to judge (legal lists sample open-ended trade offers).
 
 **Server → client**
 
@@ -449,8 +465,8 @@ Clients should not auto-reconnect after 4000–4004.
 - Engine state inside `view` carries `schemaVersion`. `SessionSnapshot.version` (1) is for DO
   storage; `GameSession.restore` throws on unknown versions — add a migration step there (and
   run `upgradeState` on `game.state`) when either changes.
-- When the expansion framework (F1) changes `NewGameConfig` (new `mode`s), extend
-  `parseRoomConfig` and `RoomConfig`; `mode` is already validated.
+- Expansion modes are on the wire (X1, additive: same protocol version): `mode`, `scenario`,
+  `options` in `RoomConfig`, expansion actions in `intent`.
 
 ## 16. Notes for M3 (client)
 
