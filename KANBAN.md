@@ -7,7 +7,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
-- **T14** · Stage-2 integration: turn timer + auto-resolve, SBP hotseat flow, engine map previews, dice faces in log, disabled-button reasons, random starting player, harness check · `s2-integration` 🟦 · tab `s2-integration`
 - **T18** · AI playtest, 6 players (LIVE, headed window): game 2 on latest build (wood HUD + SBP), seed pt6b, fresh Haiku agents; game 1 (pt6a) ended at turn 32 on the old-build discard bug · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
@@ -66,6 +65,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Paired players' turns as an alternative to SBP (from T13)
 - Catan Event Cards variant on the dice deck (from T13)
 
+- Shorter reaction timer for discards / trade replies (from T14)
+- Timer sound/vibration in the last 10s (from T14)
+- Show starting seat on setup screen + 'roll for it' animation (from T14)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -96,3 +99,5 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **BUG** · Discard dialog kept the previous player's picks in hotseat (Haiku Seat2+Seat5) · orchestrator · `239fd62` · regression test
 - **BUG** · Build card showed dev deck 34/25 on 5-6P (spotted by orchestrator while triaging) · `1909494`
 - **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · merged `f4c609c` · 595 tests · 1200 sim games clean
+- **T14** · Stage-2 integration: turn timer + auto-resolve, SBP hotseat flow, engine map previews, dice faces in log, disabled-button reasons, random starting player, harness check · `s2-integration` 🟦 · merged · 642 tests · schema v4
+- **FIX** · Harness read VP from the old panel (Haiku Seat1, false positive) · orchestrator · `42a2fe8`
