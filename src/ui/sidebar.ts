@@ -127,12 +127,12 @@ function stat(icon: Child, value: number | string, title: string, cls = ''): HTM
   return h('span', { class: `pstat${cls}`, title }, icon, h('span', {}, String(value)));
 }
 
-function playerBar(p: PlayerSummary, viewer: PlayerId): HTMLElement {
+function playerBar(p: PlayerSummary, viewer: PlayerId, away: boolean): HTMLElement {
   const you = p.id === viewer;
   return h(
     'div',
     {
-      class: `pp${p.isCurrent ? ' is-current' : ''}${you ? ' is-you' : ''}${p.isActing && !p.isCurrent ? ' is-acting' : ''}`,
+      class: `pp${p.isCurrent ? ' is-current' : ''}${you ? ' is-you' : ''}${p.isActing && !p.isCurrent ? ' is-acting' : ''}${away ? ' is-away' : ''}`,
       style: playerStyle(p.color),
     },
     avatar(
@@ -150,6 +150,17 @@ function playerBar(p: PlayerSummary, viewer: PlayerId): HTMLElement {
         h('span', { class: 'pp-name' }, p.name),
         you && h('span', { class: 'tag' }, 'You'),
         p.isBot && h('span', { class: 'tag tag-bot' }, 'Bot'),
+        away &&
+          h(
+            'span',
+            {
+              class: 'pp-away',
+              title: p.isBot
+                ? 'Disconnected: a bot plays until they return'
+                : 'Disconnected: a bot takes over if they do not return soon',
+            },
+            glyph('offline', 15, 'Disconnected'),
+          ),
         p.hiddenVp > 0 &&
           h(
             'span',
@@ -191,6 +202,6 @@ export function playersList(state: GameState, view: HudView): HTMLElement {
   return h(
     'div',
     { class: `hud-players${list.length > 4 ? ' is-compact' : ''}` },
-    ...list.map((p) => playerBar(p, view.viewer)),
+    ...list.map((p) => playerBar(p, view.viewer, view.away?.[p.id] === true)),
   );
 }

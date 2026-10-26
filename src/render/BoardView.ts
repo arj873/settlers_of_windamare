@@ -526,8 +526,10 @@ export class BoardView {
 
     for (const [id, owner] of Object.entries(state.pieces.roads) as [EdgeId, PlayerId][]) {
       const color = this.colorOf(state, owner);
+      // Earthquake event: the damaged road is "turned sideways" (drawn faded, rotated a bit).
+      const damaged = state.damagedRoads?.[owner] === id;
       wanted.set(id, {
-        sig: `road:${color}`,
+        sig: `road:${color}${damaged ? ':damaged' : ''}`,
         layer: this.roadLayer,
         make: () => {
           const info = this.topo.edge[id];
@@ -542,6 +544,10 @@ export class BoardView {
             [b.x * S - info.x * S, b.y * S - info.y * S],
             color,
           );
+          if (damaged) {
+            g.alpha = 0.55;
+            g.rotation = 0.35;
+          }
           c.addChild(g);
           return c;
         },
@@ -601,6 +607,8 @@ export class BoardView {
   }
 
   private syncRobber(state: GameState) {
+    // settings.robberMode 'none': there is no robber piece.
+    this.robber.visible = state.settings.robberMode !== 'none';
     const info = this.topo.hex[state.robber];
     if (!info) return;
     const hasToken = state.board.hexes[state.robber]?.token != null;

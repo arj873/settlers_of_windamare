@@ -9,6 +9,7 @@ import {
   parseHexId,
   Rng,
   topologyFor,
+  type Board,
   type HexId,
   type PortKind,
   type Terrain,
@@ -21,7 +22,7 @@ export interface PreviewHex {
 }
 
 export interface PreviewBoard {
-  land: (PreviewHex & { terrain: Terrain })[];
+  land: (PreviewHex & { terrain: Terrain; token?: number | null })[];
   water: PreviewHex[];
   /** Harbor markers on their water hexes. */
   harbors: (PreviewHex & { kind: PortKind })[];
@@ -37,18 +38,24 @@ const cache = new Map<MapId, PreviewBoard>();
 export function previewBoard(map: MapId): PreviewBoard {
   const hit = cache.get(map);
   if (hit) return hit;
-  const topo = topologyFor(map);
   const { board } = generateBoard(map, Rng.fromSeed(`preview:${map}`));
-  const out: PreviewBoard = {
+  const out = previewOf(map, board);
+  cache.set(map, out);
+  return out;
+}
+
+/** The preview of a concrete board of `map` (e.g. a map-veto candidate), with its tokens. */
+export function previewOf(map: MapId, board: Board): PreviewBoard {
+  const topo = topologyFor(map);
+  return {
     land: topo.landHexes.map((id) => ({
       ...hexAt(id),
       terrain: board.hexes[id]?.terrain ?? 'desert',
+      token: board.hexes[id]?.token ?? null,
     })),
     water: topo.waterHexes.map(hexAt),
     harbors: board.ports.map((p) => ({ ...hexAt(p.waterHex), kind: p.kind })),
   };
-  cache.set(map, out);
-  return out;
 }
 
 /** The land hexes of a map (row-major, top row first). */
@@ -91,7 +98,15 @@ function el(tag: string, attrs: Record<string, string>): SVGElement {
 
 /** A small SVG of the map's board: land by terrain, the water ring, harbor dots. */
 export function mapPreviewSvg(map: MapId): SVGSVGElement {
-  const { land, water, harbors } = previewBoard(map);
+  return previewSvg(previewBoard(map), false);
+}
+
+/** A concrete board (map veto): like mapPreviewSvg, plus the number tokens (6/8 in red). */
+export function boardPreviewSvg(map: MapId, board: Board): SVGSVGElement {
+  return previewSvg(previewOf(map, board), true);
+}
+
+function previewSvg({ land, water, harbors }: PreviewBoard, tokens: boolean): SVGSVGElement {
   const pad = 0.9;
   const centers = water.map(hexCenter);
   const minX = Math.min(...centers.map((c) => c.x)) - pad;
@@ -127,6 +142,21 @@ export function mapPreviewSvg(map: MapId): SVGSVGElement {
         'stroke-width': '0.08',
       }),
     );
+    if (tokens && hx.token) {
+      svg.append(
+        el('circle', { cx: c.x.toFixed(2), cy: c.y.toFixed(2), r: '0.42', fill: '#f4ead2' }),
+      );
+      const t = el('text', {
+        x: c.x.toFixed(2),
+        y: (c.y + 0.2).toFixed(2),
+        'text-anchor': 'middle',
+        'font-size': '0.58',
+        'font-weight': '700',
+        fill: hx.token === 6 || hx.token === 8 ? '#b3261e' : '#2b2118',
+      });
+      t.textContent = String(hx.token);
+      svg.append(t);
+    }
   }
   for (const hb of harbors) {
     const c = hexCenter(hb);
