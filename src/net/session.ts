@@ -271,9 +271,17 @@ export class GameSession {
     return !this.anyoneConnected() && now - this.d.lastActiveAt >= this.opts.idleExpiryMs;
   }
 
-  /** When `tick` must be called next (absolute ms), or null if nothing is pending. */
+  /**
+   * When `tick` must be called next (absolute ms, never before the last `now`), or null if
+   * nothing is pending. Every call already did all work due by its `now`; what is still past
+   * due cannot happen until some other event (e.g. a host handover waiting for a named member),
+   * so it is left out: an alarm in the past would fire in a loop.
+   */
   nextWakeAt(): number | null {
     const times: number[] = [];
+    const push = (t: number) => {
+      if (t > this.now) times.push(t);
+    };
     for (const m of this.d.members) {
       if (m.conn !== null || m.leftAt === null) continue;
       const seat = this.seatOf(m.id);
@@ -282,18 +290,17 @@ export class GameSession {
         (this.d.phase === 'lobby' ||
           (this.d.phase === 'playing' && this.seatRec(seat).status === 'away'));
       const hostPending = this.d.host === m.id && this.anyoneConnected();
-      if (seatPending || hostPending) times.push(m.leftAt + this.opts.graceMs);
+      if (seatPending || hostPending) push(m.leftAt + this.opts.graceMs);
     }
     const g = this.d.game;
     if (g && this.d.phase === 'playing' && this.anyoneConnected()) {
       if (g.clock.key !== null) {
-        times.push(
-          isExpired(g.clock) ? (g.timeoutDueAt ?? g.clockAt) : g.clockAt + g.clock.remainingMs,
-        );
+        push(isExpired(g.clock) ? (g.timeoutDueAt ?? g.clockAt) : g.clockAt + g.clock.remainingMs);
       }
-      if (g.botDueAt !== null) times.push(g.botDueAt);
+      // Kept even when due now: a zero-delay bot that hit MAX_STEPS_PER_CALL continues next tick.
+      if (g.botDueAt !== null) times.push(Math.max(g.botDueAt, this.now));
     }
-    if (!this.anyoneConnected()) times.push(this.d.lastActiveAt + this.opts.idleExpiryMs);
+    if (!this.anyoneConnected()) push(this.d.lastActiveAt + this.opts.idleExpiryMs);
     return times.length > 0 ? Math.min(...times) : null;
   }
 

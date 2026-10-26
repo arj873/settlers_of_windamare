@@ -362,6 +362,20 @@ describe('GameSession identity and safety', () => {
     expect(net.last('bob', 'chat')!.entry.text).toBe('Bob is now the host');
   });
 
+  it('nextWakeAt never asks for a past tick (no alarm loop while a handover must wait)', () => {
+    const { net, session } = room();
+    net.connect('anon');
+    net.send('anon', { type: 'hello', token: null }); // no name: cannot become host
+    net.disconnect('host');
+    net.advance(GRACE * 3);
+    const wake = session.nextWakeAt();
+    expect(wake === null || wake > net.now).toBe(true);
+    expect(net.last('anon', 'room')!.room.host).toBe('m1');
+    net.send('anon', { type: 'setName', name: 'Zed' });
+    net.advance(1);
+    expect(net.last('anon', 'room')!.room.host).toBe('m2');
+  });
+
   it('rejects junk, wrong versions and messages before hello', () => {
     const { net } = room();
     net.connect('x');
