@@ -37,7 +37,12 @@ import type {
   ResumePhase,
   VertexId,
 } from '../../../engine/types';
-import { isRobberProtected, nextToDamagedRoad, roadsBlocked } from '../../../engine/variants';
+import {
+  isRobberProtected,
+  nextToDamagedRoad,
+  roadsBlocked,
+  robberTargets,
+} from '../../../engine/variants';
 import {
   collectGift,
   discover,
@@ -229,6 +234,19 @@ export function robberAllowed(state: GameState, h: HexId): boolean {
   if (!tile || terrainKind(tile.terrain) !== 'land') return false;
   const region = seaBoard(state).region[h];
   return region === undefined || !rulesOf(state).robberBans.includes(region);
+}
+
+/**
+ * May the robber go to `h` now? The scenario's bans apply unless they (with the friendly robber's
+ * own limits) leave no hex at all and the pirate cannot move either: then any land hex will do,
+ * so a 7 never stalls the game.
+ */
+export function robberMoveOk(state: GameState, p: PlayerId, h: HexId): boolean {
+  if (robberAllowed(state, h)) return true;
+  const tile = state.board.hexes[h];
+  if (!tile || terrainKind(tile.terrain) !== 'land') return false;
+  const targets = robberTargets(state, p);
+  return !targets.some((x) => robberAllowed(state, x)) && pirateTargets(state, p).length === 0;
 }
 
 /** Every bundle of `count` cards the bank can give. */
@@ -722,7 +740,7 @@ export function seaFilterLegal(state: GameState, actions: Action[]): Action[] {
       case 'placeSetupRoad':
         return true;
       case 'moveRobber':
-        return key !== 'pirateIslands' && robberAllowed(state, a.hex);
+        return key !== 'pirateIslands' && robberMoveOk(state, a.player, a.hex);
       case 'buildSettlement':
         return beachheadOk(state, a.player, a.vertex);
       case 'playKnight':
@@ -807,7 +825,7 @@ export const OVERRIDES: {
 
   moveRobber: (draft, action, next) => {
     if (scenarioKey(draft) === 'pirateIslands') return fail('there is no robber');
-    if (typeof action.hex === 'string' && !robberAllowed(draft, action.hex)) {
+    if (typeof action.hex === 'string' && !robberMoveOk(draft, action.player, action.hex)) {
       return fail('the robber cannot go there');
     }
     return next(draft, action);

@@ -13,4 +13,6 @@ export const seafarersBots: BotExtension = {
   // the board; Pirate Islands, Wonders and Cloth have their own ends. The module checks all of
   // them itself.
   relax: ['award-mismatch', 'robber-position', 'dev-conservation', 'winner'],
+  // A random bot gains nothing from moving ships around; it still does so without the bias.
+  stalling: ['seafarers/pickShip', 'seafarers/cancelMove'],
 };

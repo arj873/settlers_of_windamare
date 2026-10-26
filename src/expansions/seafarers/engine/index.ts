@@ -125,10 +125,12 @@ function init(draft: GameState, rng: Rng): void {
   }
   const n = draft.players.length;
   const data = prepared(key).spec.data;
+  // New World (no printed map): the pirate starts on the frame, top centre (§2.10).
+  const pirateAt = data === null ? '3,-1' : data.pirate;
   const slice: SeaSlice = {
     v: 1,
     ships: {},
-    pirate: rules.pirate && data?.pirate ? cellHex(parseCell(data.pirate)) : null,
+    pirate: rules.pirate && pirateAt ? cellHex(parseCell(pirateAt)) : null,
     built: [],
     moved: false,
     chits: [],

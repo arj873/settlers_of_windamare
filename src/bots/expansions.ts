@@ -16,6 +16,11 @@ export interface BotExtension {
   invariants?(state: GameState): Violation[];
   /** Base invariant codes that do not hold under this module (e.g. 'award-mismatch'). */
   relax?: readonly ViolationCode[];
+  /**
+   * Module actions that do not move the game forward (Seafarers: picking up a ship, cancelling a
+   * move). The random bot's progress bias skips them like endTurn.
+   */
+  stalling?: readonly string[];
 }
 
 export const BOT_EXTENSIONS: readonly BotExtension[] = [

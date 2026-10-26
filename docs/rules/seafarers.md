@@ -1829,7 +1829,14 @@ Variants: Event Cards, the friendly robber, the chess clock, balanced dice, rush
 turn order and the second settler work with every scenario. Refused in `createGame` (and so on the
 setup screen): Event Cards with the Pirate Islands (the fleet sails by the dice), the 5+ rule set
 and map balance rules (scenario maps have their own set-ups). `robberMode: 'none'` also keeps the
-pirate still (both move on the same 7 / Knight step).
+pirate still (both move on the same 7 / Knight step). When the scenario's robber bans (with the
+friendly robber's limits) leave no hex and the pirate cannot move, the robber may go to any land
+hex, so a 7 never stalls the game.
+
+Statistics: gold picks count as production, discovery and fleet rewards as events, pirate
+steals as steals, the fleet's attacks as stolen cards; special VP show as "New land", "Gifts"
+and "Cloth" chips (`statsSource` / `vpSources` hooks). Online play is base-only (the protocol
+pins `mode: 'base'`); the fog stack and gift cards are not masked by `viewFor` yet.
 
 Open questions answered by the engine (§10): Q4 frame edges, Q5 gold with a short bank, Q6
 closed routes, Q7 roads count for the free end, Q8 FT robber start, Q9 discovered gold, Q11

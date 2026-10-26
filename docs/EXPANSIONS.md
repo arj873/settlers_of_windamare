@@ -195,6 +195,8 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `bankTradeRatio(state, p, r, base)`       | `bankTradeRatio`                               | chained                     | C&K trading house / merchant, Oil Springs                      |
 | `roadLength(state, p, base)`              | Longest Road award                             | chained                     | Seafarers longest trade route                                  |
 | `armySize(state, p, base)`                | Largest Army award (base = knights played)     | chained                     | Pirate Islands: no award (0)                                   |
+| `vpSources(state, p)` → `{label, vp}[]`   | statistics screen (VP chips)                   | additive                    | Seafarers: "New land", "Gifts", "Cloth" instead of "Other"     |
+| `statsSource(prev, action, p, change)`    | `recordAction` (stats.ts), per hand change     | first-wins                  | Seafarers: gold picks = production, the fleet = stolen         |
 | `onEndTurn(draft, p)`                     | `endTurn`, before SBP / next turn              | additive                    | upkeep, lair resolution, disaster phase                        |
 | `onStartTurn(draft, p)`                   | `beginTurn` (turn 1, after SBP, Catanian 2)    | additive                    | reset per-turn flags (ship moved, fast gold used)              |
 | `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |

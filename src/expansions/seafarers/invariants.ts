@@ -21,7 +21,6 @@ import { mapKeyOf, OFF_BOARD, type MapKey } from './engine/maps';
 import { fortressOf, lineOf } from './engine/pirates';
 import { SHIP, tradeRouteLength } from './engine/ships';
 import { rulesOf, scenarioKey, type SeaSlice } from './engine/state';
-import { robberAllowed } from './engine/actions';
 import { villagesWithCloth } from './engine/effects';
 
 export function checkSeafarers(state: GameState): Violation[] {
@@ -55,10 +54,10 @@ export function checkSeafarers(state: GameState): Violation[] {
   // --- pirate, robber -------------------------------------------------------------------------
   if (s.pirate !== null && !isSeaHex(state, s.pirate)) bad(`pirate on ${s.pirate}`);
   if (!rules.pirate && s.pirate !== null) bad('pirate in a scenario without one');
-  if (state.robber !== OFF_BOARD && !robberAllowed(state, state.robber)) {
-    // The Forgotten Tribe's robber starts on a small-island desert it may never return to.
-    const start = state.board.hexes[state.robber];
-    if (!(key.startsWith('tribe') && start?.terrain === 'desert')) bad(`robber on ${state.robber}`);
+  // The robber stands on land (a banned region only at its start or when nothing else is open).
+  const robberTile = state.board.hexes[state.robber];
+  if (state.robber !== OFF_BOARD && (!robberTile || terrainKind(robberTile.terrain) !== 'land')) {
+    bad(`robber on ${state.robber}`);
   }
   if (scenarioKey(state) === 'pirateIslands' && state.robber !== OFF_BOARD) bad('robber in play');
 

@@ -242,6 +242,12 @@ describe('special victory points for new land (§4.6, E5, E6, FAQ #3)', () => {
     expect(seaSlice(t).chits).toEqual([{ player: 0, vp: 2, area: 'I1', vertex: va }]);
   });
 
+  it('New World: robber beside the board, pirate on the frame (E19)', () => {
+    const s = seaGame('newWorld', 4);
+    expect(s.robber).toBe(OFF_BOARD);
+    expect(seaSlice(s).pirate).toBe(H(3, -1));
+  });
+
   it('New World: only one special VP per player (5th edition)', () => {
     const s = mainPhase(seaGame('newWorld', 4));
     seaSlice(s).chits.push({ player: 0, vp: 1, area: 'I9', vertex: 'v:0,0,N' });

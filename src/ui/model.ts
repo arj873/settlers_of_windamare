@@ -438,7 +438,7 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
         text:
           phase.step === 'settlement'
             ? 'Place a settlement'
-            : 'Place a road next to your new settlement',
+            : `Place a ${piece ?? 'road'} next to your new settlement`,
         tone: 'action',
       };
     case 'preRoll':
