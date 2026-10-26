@@ -15,6 +15,7 @@ import { ckModule } from '../../expansions/ck/engine';
 import { seafarersModule } from '../../expansions/seafarers/engine';
 import { tbModule } from '../../expansions/tb/engine';
 import { seackModule } from '../../expansions/seack/engine';
+import { tbckModule } from '../../expansions/tbck/engine';
 import { MAPS, type MapDef } from '../maps';
 import type { ExpansionId, GameSettings, MapId, ModeId, ScenarioId } from '../types';
 import type { ExpansionModule, ModeDef, ScenarioDef } from './types';
@@ -28,6 +29,7 @@ function builtinModules(): ExpansionModule[] {
     seafarersModule,
     tbModule,
     seackModule,
+    tbckModule,
     // new modules go here, one per line
   ];
 }

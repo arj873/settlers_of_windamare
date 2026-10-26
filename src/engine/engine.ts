@@ -5,7 +5,7 @@ import { LOG_LIMIT } from './constants';
 import { namespaceOf } from './expansions/ext';
 import { moduleChangesRoads, runAfterAction } from './expansions/hooks';
 import { activeModules } from './expansions/registry';
-import type { ExtHandler } from './expansions/types';
+import type { ExpansionModule, ExtHandler } from './expansions/types';
 import { changesRoads, updateAwards } from './rules/awards';
 import { checkVictory } from './rules/victory';
 import { recordAction } from './stats';
@@ -22,6 +22,15 @@ import type {
 type AnyHandler = (draft: GameState, action: Action) => ActionResult;
 
 /**
+ * Order in which modules wrap a handler (first = innermost): settings order, except that modules
+ * with `before` (combination modules) wrap last, so they see the action first.
+ */
+function wrapOrder(active: readonly ExpansionModule[]): readonly ExpansionModule[] {
+  if (!active.some((m) => m.before)) return active;
+  return [...active.filter((m) => !m.before), ...active.filter((m) => m.before)];
+}
+
+/**
  * The handler for `type` in this game, or undefined: a namespaced type goes to its (active)
  * module's `actions`; a base type to the base handler wrapped by every active module's override
  * (docs/EXPANSIONS.md §4; the first module listed is innermost).
@@ -35,7 +44,7 @@ function handlerFor(state: GameState, type: string): AnyHandler | undefined {
     if (!actions || !Object.hasOwn(actions, type)) return undefined;
     let h = actions[type as ExpansionActionType] as ExtHandler as AnyHandler;
     // Another module's wraps (a combination module), the first module listed innermost.
-    for (const x of active) {
+    for (const x of wrapOrder(active)) {
       const wrap = x.wraps?.[type as ExpansionActionType];
       if (wrap) {
         const next = h;
@@ -46,7 +55,7 @@ function handlerFor(state: GameState, type: string): AnyHandler | undefined {
   }
   if (!Object.hasOwn(HANDLERS, type)) return undefined;
   let h = HANDLERS[type as BaseActionType] as Handler<ActionType> as AnyHandler;
-  for (const m of activeModules(state)) {
+  for (const m of wrapOrder(activeModules(state))) {
     const wrap = m.overrides?.[type as BaseActionType] as
       ((d: GameState, a: Action, next: AnyHandler) => ActionResult) | undefined;
     if (wrap) {
