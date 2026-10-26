@@ -37,6 +37,7 @@ import {
   isVpCard,
   moveGood,
   phaseOf,
+  promptFor,
   stealRandom,
   type Commodity,
   type ProgressCard,
@@ -305,6 +306,31 @@ function bishopOnOasis(state: GameState, h: unknown): boolean {
 const plazaKnight = (state: GameState, v: unknown): boolean =>
   has(state, 'traders') && typeof v === 'string' && isCentreVertex(v as VertexId);
 
+/**
+ * A C&K vertex choice that would put a knight on a plaza: always for a knight's own move; for
+ * a forced placement (a displaced knight, the Deserter) only while another spot is offered —
+ * with plazas alone the knight is placed and then leaves the board (`afterAction`), as C&K
+ * removes a knight with nowhere to go. Other vertex choices never pick a plaza.
+ */
+function plazaPick(state: GameState, v: unknown): boolean {
+  if (!plazaKnight(state, v)) return false;
+  if (phaseOf(state).kind === 'ck/knight') return true;
+  const options = promptFor(state)?.options ?? [];
+  return options.some((c) => c.kind === 'vertex' && !isCentreVertex(c.id));
+}
+
+/** Knights left on plazas by a forced placement go back to their owner's supply. */
+function clearPlazas(draft: GameState): void {
+  if (!has(draft, 'traders')) return;
+  const knights = ckSlice(draft).knights;
+  for (const v of Object.keys(knights) as VertexId[]) {
+    const k = knights[v];
+    if (!k || !isCentreVertex(v)) continue;
+    Reflect.deleteProperty(knights, v);
+    log(draft, k.owner, `${pn(draft, k.owner)}'s knight had nowhere to stand and was removed`);
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Wraps of the composed modules' actions
 // ---------------------------------------------------------------------------------------------
@@ -384,7 +410,7 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
       ? fail('a knight cannot stand on a trade hex')
       : next(draft, action),
   'ck/pickVertex': (draft, action, next) =>
-    phaseOf(draft).kind === 'ck/knight' && plazaKnight(draft, action['vertex'])
+    plazaPick(draft, action['vertex'])
       ? fail('a knight cannot stand on a trade hex')
       : next(draft, action),
 
@@ -502,7 +528,7 @@ function filterLegal(state: GameState, actions: Action[]): Action[] {
       case 'ck/buildKnight':
         return !plazaKnight(state, x['vertex']);
       case 'ck/pickVertex':
-        return phaseOf(state).kind !== 'ck/knight' || !plazaKnight(state, x['vertex']);
+        return !plazaPick(state, x['vertex']);
       case 'ck/pickHex':
         return !bishopOnOasis(state, x['hex']);
       case 'ck/alchemist': {
@@ -603,6 +629,7 @@ export const tbckModule: ExpansionModule = {
       return undefined;
     },
     afterAction(draft) {
+      clearPlazas(draft);
       offerRansom(draft, tbckSlice(draft));
     },
     statsCategory: (_state, action) =>
