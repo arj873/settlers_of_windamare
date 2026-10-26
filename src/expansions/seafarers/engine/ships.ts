@@ -121,6 +121,8 @@ export function markClosedRoutes(draft: GameState): void {
   const s = seaSlice(draft);
   const g = graph(draft);
   const owners = new Set(Object.values(s.ships).map((x) => x.owner));
+  // Cloth for Catan: a route from a building to a village is closed too (§4.9).
+  const villages = new Set(Object.keys(s.cloth?.villages ?? {}));
   for (const p of owners) {
     const reach = (start: VertexId, without: EdgeId): Set<VertexId> => {
       const found = new Set<VertexId>();
@@ -129,7 +131,7 @@ export function markClosedRoutes(draft: GameState): void {
       const stack = [start];
       while (stack.length > 0) {
         const v = stack.pop() as VertexId;
-        if (ownBuilding(draft, v, p)) found.add(v);
+        if (ownBuilding(draft, v, p) || villages.has(v)) found.add(v);
         for (const o of g.edgesAt.get(v) ?? []) {
           if (o === without || s.ships[o]?.owner !== p) continue;
           const [a, b] = g.ends.get(o) as readonly [VertexId, VertexId];

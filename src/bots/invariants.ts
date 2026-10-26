@@ -451,7 +451,8 @@ function checkPhase(
   // Cards as the 7 rule counts them (expansions add oil, commodities ... via the handSize hook).
   const hand = (p: PlayerId) => (state.players[p] ? cardsInHand(state, p) : 0);
   const setupPhase = phase.kind === 'setup' || phase.kind === 'mapVeto';
-  if (setupPhase !== (state.turn.number === 0)) {
+  // An expansion phase may interrupt setup (Seafarers: a gold pick for a starting settlement).
+  if (!phase.kind.includes('/') && setupPhase !== (state.turn.number === 0)) {
     add('phase-actor', `phase ${phase.kind} with turn.number ${state.turn.number}`);
   }
   const actors = actingPlayers(state);
