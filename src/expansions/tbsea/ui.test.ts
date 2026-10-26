@@ -88,6 +88,16 @@ describe('T&B + Seafarers HUD', () => {
     return s;
   }
 
+  it('every expansion panel is a shrinking sec-ext section (the sidebar keeps Game Events)', () => {
+    show(main('tbsea/traders'));
+    const ext = [...root.querySelectorAll('.side-sec.sec-ext')].map((s) => s.className);
+    expect(ext).toHaveLength(3);
+    for (const id of ['tbsea', 'seafarers', 'tb']) {
+      expect(ext.some((c) => c.includes(`sec-ext-${id}`))).toBe(true);
+    }
+    expect(root.querySelector('.sec-log.sec-ext, .sec-bank.sec-ext')).toBeNull();
+  });
+
   it('shows the scenario’s pair rules and VP target', () => {
     const want: Record<string, string> = {
       'tbsea/traders': 'Wagons cross the sea',

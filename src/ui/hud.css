@@ -448,6 +448,25 @@
 .sec-log.is-collapsed {
   flex: none;
 }
+/*
+ * Expansion panels (any number of them) take their content height but shrink and scroll when
+ * the sidebar is full, so Game Events and the Bank keep their space. C&K and E&P give theirs
+ * a larger share (ck.css, ep.css).
+ */
+.side-sec.sec-ext:not(.is-collapsed) {
+  flex: 0 1 auto;
+  min-height: 84px;
+}
+.sec-ext .sec-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.hud-side:has(.sec-ext:not(.is-collapsed)) .sec-log:not(.is-collapsed) {
+  flex: 1 1 0;
+  min-height: 150px;
+}
 .sec-head {
   position: relative;
   display: flex;
