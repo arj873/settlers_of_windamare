@@ -4,6 +4,7 @@
  */
 import {
   emptyResources,
+  EVENT_INFO,
   getPlayer,
   RESOURCES,
   victoryPoints,
@@ -24,6 +25,7 @@ import {
   validateDraft,
   type TradeDraft,
 } from './composer';
+import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
@@ -101,6 +103,8 @@ export class Hud {
   private bankGive: Resource | null = null;
   private bankReceive: Resource | null = null;
   private yopFirst: Resource | null = null;
+  /** Event card "give" task: the recipient picked so far. */
+  private eventTo: PlayerId | null = null;
   private draft: TradeDraft = emptyDraft([]);
   private discardSel: ResourceCounts = emptyResources();
   /** Viewer the discard selection was made for (null outside the discard phase). */
@@ -236,6 +240,7 @@ export class Hud {
     if (this.dialog === 'monopoly' && !av.playMonopoly) this.dialog = null;
     if (this.dialog !== 'bank') this.bankGive = this.bankReceive = null;
     if (this.dialog !== 'yop') this.yopFirst = null;
+    if (state.phase.kind !== 'event') this.eventTo = null;
 
     // Fresh draft per turn / viewer; recipients default to everyone else.
     const others = state.players.filter((p) => p.id !== view.viewer).map((p) => p.id);
@@ -746,15 +751,18 @@ export class Hud {
     const fresh = key !== this.lastDice;
     this.lastDice = key;
     const total = diceTotal(d);
+    // Event Cards: the card's event is shown under the dice.
+    const event = state.lastEvent ? EVENT_INFO[state.lastEvent] : null;
     return h(
       'div',
       {
         class: `dice${fresh ? ' rolling' : ''}${total === 7 ? ' is-seven' : ''}`,
-        title: `Last roll: ${total}`,
+        title: event ? `Last card: ${total}, ${event.name}. ${event.text}` : `Last roll: ${total}`,
       },
       dieFace(d[0]),
       dieFace(d[1]),
       h('span', { class: 'dice-total' }, String(total)),
+      event && state.lastEvent !== 'none' && h('span', { class: 'dice-event' }, event.name),
     );
   }
 
@@ -824,6 +832,13 @@ export class Hud {
         return this.responderDialog(state, view, legal);
       return null;
     }
+    if (phase.kind === 'mapVeto' && ofType(legal, 'vetoMap').length > 0) {
+      return this.vetoDialog(state, legal);
+    }
+    if (phase.kind === 'event') {
+      const d = this.eventDialog(state, view, legal);
+      if (d) return d;
+    }
 
     switch (this.dialog) {
       case 'bank':
@@ -835,8 +850,213 @@ export class Hud {
       case 'monopoly':
         return this.monopolyDialog(legal);
       default:
-        return null;
+        return this.repairCard(legal);
     }
+  }
+
+  // --- V1 variant dialogs: map veto, event-card choices, road repair ----------
+
+  private vetoDialog(state: GameState, legal: Action[]) {
+    const phase = state.phase;
+    if (phase.kind !== 'mapVeto') return null;
+    const acts = ofType(legal, 'vetoMap');
+    return {
+      key: `veto-${phase.next}`,
+      title: 'Veto a map',
+      modal: true,
+      wide: true,
+      body: [
+        h(
+          'p',
+          { class: 'sub' },
+          'Players veto in turn until one map is left. Pick the board you least want to play.',
+        ),
+        h(
+          'div',
+          { class: 'veto-maps' },
+          ...phase.candidates.map((c, i) => {
+            const act = acts.find((a) => a.candidate === i);
+            const by = phase.vetoed[i];
+            return h(
+              'button',
+              {
+                class: `veto-map${by !== null && by !== undefined ? ' is-vetoed' : ''}`,
+                disabled: !act,
+                attrs: { 'data-k': `veto-${i}`, 'aria-label': `Veto map ${i + 1}` },
+                on: { click: () => act && this.send(act) },
+              },
+              boardPreviewSvg(state.settings.map, c.board),
+              h(
+                'span',
+                { class: 'veto-label' },
+                by !== null && by !== undefined
+                  ? `Map ${i + 1}: vetoed by ${getPlayer(state, by).name}`
+                  : `Veto map ${i + 1}`,
+              ),
+            );
+          }),
+        ),
+      ],
+    };
+  }
+
+  private eventDialog(state: GameState, view: HudView, legal: Action[]) {
+    const phase = state.phase;
+    if (phase.kind !== 'event') return null;
+    const task = phase.tasks.find((t) => t.player === view.viewer);
+    if (!task || task.kind === 'damageRoad') return null; // Earthquake: picked on the board
+    const info = EVENT_INFO[phase.event];
+    const base = { key: `event-${state.turn.number}-${view.viewer}`, modal: true };
+    const note = h('p', { class: 'sub' }, info.text);
+    if (task.kind === 'gain') {
+      const acts = ofType(legal, 'eventGain');
+      return {
+        ...base,
+        title: `${info.name}: take a resource`,
+        body: [
+          note,
+          this.resourcePick(
+            null,
+            (r) => acts.some((a) => a.resource === r),
+            (r) => {
+              const a = acts.find((x) => x.resource === r);
+              if (a) this.send(a);
+            },
+          ),
+        ],
+      };
+    }
+    if (task.kind === 'give') {
+      const acts = ofType(legal, 'eventGive');
+      const to =
+        task.targets.length === 1
+          ? task.targets[0]
+          : this.eventTo !== null && task.targets.includes(this.eventTo)
+            ? this.eventTo
+            : null;
+      return {
+        ...base,
+        title: `${info.name}: give a resource`,
+        body: [
+          note,
+          task.targets.length > 1 &&
+            h(
+              'div',
+              { class: 'victims' },
+              ...task.targets.map((id) => {
+                const p = getPlayer(state, id);
+                return h(
+                  'button',
+                  {
+                    class: `victim${to === id ? ' is-on' : ''}`,
+                    style: { '--pc': p.color },
+                    attrs: { 'aria-pressed': String(to === id) },
+                    on: {
+                      click: () => {
+                        this.eventTo = id;
+                        this.refresh();
+                      },
+                    },
+                  },
+                  avatar(p, view.bots?.[id] ?? false, 44),
+                  h('span', { class: 'victim-name' }, p.name),
+                );
+              }),
+            ),
+          to !== null && to !== undefined
+            ? h(
+                'div',
+                {},
+                h('p', { class: 'sub' }, `Give ${getPlayer(state, to).name} one of your cards:`),
+                this.resourcePick(
+                  null,
+                  (r) => acts.some((a) => a.to === to && a.resource === r),
+                  (r) => {
+                    const a = acts.find((x) => x.to === to && x.resource === r);
+                    if (a) this.send(a);
+                  },
+                ),
+              )
+            : h('p', { class: 'sub' }, 'Pick a player with fewer points first.'),
+        ],
+      };
+    }
+    // steal
+    const acts = ofType(legal, 'eventSteal');
+    const pass = acts.find((a) => a.victim === null);
+    return {
+      ...base,
+      title: `${info.name}: take a card from whom?`,
+      body: [
+        note,
+        h(
+          'div',
+          { class: 'victims' },
+          ...task.targets.map((id) => {
+            const p = getPlayer(state, id);
+            const act = acts.find((a) => a.victim === id);
+            return h(
+              'button',
+              {
+                class: 'victim',
+                style: { '--pc': p.color },
+                disabled: !act,
+                on: { click: () => act && this.send(act) },
+              },
+              avatar(p, view.bots?.[id] ?? false, 44),
+              h('span', { class: 'victim-name' }, p.name),
+              h(
+                'span',
+                { class: 'muted' },
+                `${RESOURCES.reduce((n, r) => n + p.resources[r], 0)} cards`,
+              ),
+            );
+          }),
+        ),
+        pass &&
+          h(
+            'div',
+            { class: 'dialog-actions' },
+            h(
+              'button',
+              { class: 'btn btn-ghost', on: { click: () => this.send(pass) } },
+              'Take nothing',
+            ),
+          ),
+      ],
+    };
+  }
+
+  /** Earthquake: a docked card offering the repair while the viewer has a damaged road. */
+  private repairCard(legal: Action[]) {
+    const act = ofType(legal, 'repairRoad')[0];
+    if (!act) return null;
+    return {
+      key: 'repair',
+      title: 'Damaged road',
+      modal: false,
+      side: true,
+      body: [
+        h(
+          'p',
+          { class: 'sub' },
+          'Earthquake: you cannot build roads, or settlements next to the damaged road, until it is repaired.',
+        ),
+        h(
+          'div',
+          { class: 'dialog-actions' },
+          h(
+            'button',
+            {
+              class: 'btn btn-primary',
+              attrs: { 'data-k': 'repair' },
+              on: { click: () => this.send(act) },
+            },
+            'Repair (1 brick, 1 lumber)',
+          ),
+        ),
+      ],
+    };
   }
 
   private closeButton(label = 'Close'): HTMLElement {

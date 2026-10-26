@@ -463,7 +463,8 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
 }
 
 /** What a plain board click means right now (non-build). T7 uses it to pick which targets to highlight. */
-export type BoardPrompt = 'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad';
+export type BoardPrompt =
+  'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | 'damageRoad';
 
 export function boardPrompt(view: HudView): BoardPrompt | null {
   for (const a of viewerLegal(view)) {
@@ -471,6 +472,7 @@ export function boardPrompt(view: HudView): BoardPrompt | null {
     if (a.type === 'placeSetupRoad') return 'setupRoad';
     if (a.type === 'moveRobber') return 'moveRobber';
     if (a.type === 'placeFreeRoad') return 'freeRoad';
+    if (a.type === 'eventDamageRoad') return 'damageRoad';
   }
   return null;
 }

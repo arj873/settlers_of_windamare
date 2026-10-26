@@ -278,6 +278,76 @@
   font-size: 18px;
 }
 
+/* variant cards (V1): selects, number fields, switch rows */
+.su-card-wide {
+  grid-column: 1 / -1;
+}
+.su-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-weight: 650;
+}
+.su-field > span {
+  font-size: 13px;
+}
+.su-card > .su-field:first-child > span {
+  font-size: inherit;
+}
+.su-select,
+.su-field .input {
+  width: 100%;
+}
+.su-select {
+  cursor: pointer;
+}
+.su-field-num .input {
+  font-variant-numeric: tabular-nums;
+}
+.su-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.su-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.su-switchrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 0;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.su-switchrow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.su-switchrow:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+.su-switch-title {
+  font-weight: 650;
+}
+.su-switchrow.is-on .su-switch {
+  background: var(--switch-on);
+  border-color: var(--accent);
+}
+.su-switchrow.is-on .su-switch i {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
 /* sliders */
 .su-range {
   --pct: 50%;
@@ -428,6 +498,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .su-rules {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 420px) {
+  .su-pair {
     grid-template-columns: minmax(0, 1fr);
   }
 }
