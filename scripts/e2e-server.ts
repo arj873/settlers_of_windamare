@@ -2,8 +2,9 @@
  * End-to-end check of the room server (M2): starts `wrangler dev` on a free port, creates a room
  * over HTTP, connects 3 WebSocket clients (host + 2 friends; the 4th seat is a server bot), plays
  * a 3-VP game to the end with random-bot clients, and drops + reconnects one player mid-game.
- * Then one game each of Cities & Knights, Seafarers (Fog Islands) and Explorers & Pirates
- * (Land Ho!): 2 clients + 2 server bots to the end, every view checked for masked secrets.
+ * Then one game each of Cities & Knights, Seafarers (Fog Islands), Explorers & Pirates (Land Ho!)
+ * and the E&P combinations (E&P + C&K, E&P + T&B): 2 clients + 2 server bots to the end, every
+ * view checked for masked secrets.
  *
  *   pnpm e2e:server            (builds dist/ first if it is missing)
  *
@@ -222,22 +223,45 @@ interface ExpansionGame {
 
 const opponents = (view: GameView) => view.players.filter((p) => p.id !== view.view.viewer);
 
+/** C&K: the progress stacks and the opponents' progress hands are face down. */
+function ckHidden(view: GameView): string | null {
+  const ck = view.ext['ck'] as {
+    players: { progress: string[] }[];
+    decks: Record<string, string[]>;
+  };
+  const decks = Object.values(ck.decks).flat();
+  if (new Set(decks).size > 1) return 'progress deck order is visible';
+  for (const p of opponents(view)) {
+    if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
+  }
+  return null;
+}
+
+/** E&P: unexplored hexes are face down. */
+function epHidden(view: GameView): string | null {
+  const ep = view.ext['ep'] as { hidden: Record<string, { terrain: string }> };
+  if (Object.values(ep.hidden).some((h) => h.terrain !== 'ep/hidden')) {
+    return 'unexplored hexes are visible';
+  }
+  return null;
+}
+
+/** T&B Fishermen: the fish pool and the opponents' fish tokens are face down. */
+function fishHidden(view: GameView): string | null {
+  const fish = (view.ext['tb'] as { fish?: { pool: number[]; hands: number[][] } }).fish;
+  if (!fish) return 'no fish slice';
+  if (new Set(fish.pool).size > 1) return 'the fish pool is visible';
+  for (const p of opponents(view)) {
+    if (new Set(fish.hands[p.id]).size > 1) return `${p.name}'s fish tokens`;
+  }
+  return null;
+}
+
 const EXPANSION_GAMES: ExpansionGame[] = [
   {
     label: 'Cities & Knights',
     config: { mode: 'ck', scenario: 'ck/classic', vpToWin: 6 },
-    hidden: (view) => {
-      const ck = view.ext['ck'] as {
-        players: { progress: string[] }[];
-        decks: Record<string, string[]>;
-      };
-      const decks = Object.values(ck.decks).flat();
-      if (new Set(decks).size > 1) return 'progress deck order is visible';
-      for (const p of opponents(view)) {
-        if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
-      }
-      return null;
-    },
+    hidden: ckHidden,
   },
   {
     label: 'Seafarers: The Fog Islands',
@@ -254,13 +278,17 @@ const EXPANSION_GAMES: ExpansionGame[] = [
   {
     label: 'Explorers & Pirates: Land Ho!',
     config: { mode: 'ep', scenario: 'ep/landHo', vpToWin: 5 },
-    hidden: (view) => {
-      const ep = view.ext['ep'] as { hidden: Record<string, { terrain: string }> };
-      if (Object.values(ep.hidden).some((h) => h.terrain !== 'ep/hidden')) {
-        return 'unexplored hexes are visible';
-      }
-      return null;
-    },
+    hidden: epHidden,
+  },
+  {
+    label: 'E&P + Cities & Knights: Pirate Lairs',
+    config: { mode: 'ep+ck', scenario: 'ep/pirateLairs', vpToWin: 7 },
+    hidden: (view) => ckHidden(view) ?? epHidden(view),
+  },
+  {
+    label: 'E&P + Traders & Barbarians: Fish for Catan',
+    config: { mode: 'ep+tb', scenario: 'ep/fish', vpToWin: 5 },
+    hidden: (view) => fishHidden(view) ?? epHidden(view),
   },
 ];
 
