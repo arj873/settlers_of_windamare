@@ -8,7 +8,6 @@
 import {
   applyAction,
   createGame,
-  creditIncrement,
   legalActions,
   restoreBanks,
   Rng,
@@ -24,6 +23,7 @@ import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import {
   actionForClick,
   boardActions,
+  gameConfigOf,
   highlightsFor,
   isStalled,
   nextBot,
@@ -34,6 +34,7 @@ import {
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
 import {
   IDLE_CLOCK,
+  bankAfterAction,
   clockView,
   flushBank,
   isExpired,
@@ -188,17 +189,7 @@ export class GameController {
   /** New game from the HUD's new-game screen. */
   newGame(cfg: NewGameConfig, extra: { vpToWin?: number } = {}): void {
     const seed = cfg.seed?.trim() || randomSeed();
-    const state = createGame({
-      seed,
-      players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
-      map: cfg.map,
-      vpToWin: extra.vpToWin ?? cfg.vpToWin,
-      discardLimit: cfg.discardLimit,
-      balancedDice: cfg.rules.balancedDice,
-      hideBankCards: cfg.rules.hideBankCards,
-      turnTimerSec: cfg.variants?.timer ? null : cfg.turnTimerSec,
-      ...cfg.variants,
-    });
+    const state = createGame(gameConfigOf(cfg, seed, extra.vpToWin));
     console.info(`New game: map=${state.settings.map} seed=${seed}`);
     // Randomize Turn Order moved the players: seat p holds config player seatOrder[p].
     const order = state.settings.seatOrder ?? cfg.players.map((_, i) => i);
@@ -273,13 +264,12 @@ export class GameController {
     if (timerOf(state.settings).kind === 'bank') {
       // Chess clock: bank the running time, credit the increment of a finished turn; the next
       // refresh puts whoever is on the clock now back on it from their bank.
-      this.banks = creditIncrement(
-        state.settings,
-        flushBank(this.clock, this.banks),
+      ({ clock: this.clock, banks: this.banks } = bankAfterAction(
+        this.clock,
+        this.banks,
         state,
         result.state,
-      );
-      this.clock = IDLE_CLOCK;
+      ));
     }
     this.current = result.state;
     return true;

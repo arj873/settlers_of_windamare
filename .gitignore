@@ -11,3 +11,5 @@ playtest/session.json
 playtest/dist/
 playtest/bugs/*
 !playtest/bugs/.gitkeep
+.wrangler/
+.dev.vars

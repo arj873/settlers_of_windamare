@@ -13,7 +13,14 @@
  *  - `specialBuild`  one special build step.
  * A new slot starts with the full time. Timeout moves are the minimum legal moves (`timeoutMove`).
  */
-import type { Action, Banks, GameState, PlayerId, Rng } from '../engine';
+import {
+  creditIncrement,
+  type Action,
+  type Banks,
+  type GameState,
+  type PlayerId,
+  type Rng,
+} from '../engine';
 import { obligated, type Seats } from './logic';
 
 export type SlotKind = 'turn' | 'discard' | 'trade' | 'specialBuild';
@@ -144,6 +151,23 @@ export function syncBankClock(
     },
     banks: flushed,
   };
+}
+
+/**
+ * Chess clock, after an action took the game from `prev` to `next`: bank the running time and
+ * credit the increment of a turn that just ended. The clock keeps its slot (so a timeout's pacing
+ * is not reset); its remaining time follows the (credited) bank. Call `syncBankClock` next.
+ */
+export function bankAfterAction(
+  clock: TurnClock,
+  banks: Banks,
+  prev: GameState,
+  next: GameState,
+): { clock: TurnClock; banks: Banks } {
+  const credited = creditIncrement(prev.settings, flushBank(clock, banks), prev, next);
+  const p = clock.player;
+  if (clock.key === null || p === null) return { clock, banks: credited };
+  return { clock: { ...clock, remainingMs: credited[p] ?? clock.remainingMs }, banks: credited };
 }
 
 export function tickClock(clock: TurnClock, dtMs: number): TurnClock {

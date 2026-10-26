@@ -11,9 +11,9 @@ Why:
 - Free, and static asset requests are "free and unlimited" ([Cloudflare billing docs](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)). No bandwidth cap to worry about.
 - No git remote needed. This worktree has none, so Git-based hosts need you to create a GitHub repo first.
 - Commercial use is allowed (Vercel Hobby forbids it, see below).
-- The multiplayer server can later live in the same Cloudflare project (Durable Objects, section 3). One account, one deploy command, same origin, no CORS.
+- The multiplayer server lives in the same Cloudflare project (Durable Objects, sections 3 and 6). One account, one deploy command, same origin, no CORS.
 
-Fallback if you would rather use GitHub: GitHub Pages (workflow included, section 1.3).
+Fallback if you would rather use GitHub: GitHub Pages (workflow included, section 1.3). Pages is static only: hotseat works there, online play does not.
 
 ### 1.1 Steps (about 10 minutes the first time, about 30 seconds per redeploy)
 
@@ -29,10 +29,11 @@ You do these. This agent did not run them (no accounts, no deploys).
    ```
    npx wrangler login
    ```
-4. Deploy (about 30 s). `wrangler.jsonc` in the repo root already points at `dist/` and enables SPA fallback:
+4. Deploy (about 30 s). `wrangler.jsonc` in the repo root points at `dist/` (SPA fallback) and at the room server (`src/server/worker.ts`, section 6). `wrangler` is a devDependency:
    ```
-   npx wrangler deploy
+   nice -n 19 pnpm deploy:cf
    ```
+   (`pnpm deploy:cf` = typecheck + build + `wrangler deploy`. Plain `pnpm deploy` is a different, built-in pnpm command.)
 5. Wrangler prints a URL like `https://catan-clone.<your-subdomain>.workers.dev`. Open it and play.
 
 Config already on this branch: `wrangler.jsonc` (assets dir `./dist`, `not_found_handling: single-page-application`, per the [Workers static assets docs](https://developers.cloudflare.com/workers/static-assets/)). Vite `base` stays `/`, so no change is needed for this path.
@@ -41,7 +42,7 @@ Config already on this branch: `wrangler.jsonc` (assets dir `./dist`, `not_found
 
 1. Buy or own a domain. Cloudflare Registrar sells at wholesale price; any registrar works.
 2. Dashboard: Workers & Pages, your Worker, Settings, Domains & Routes, Add, Custom domain. The domain's DNS must be on Cloudflare (free plan). HTTPS is automatic.
-3. Optional: auto-deploy on push by connecting a GitHub repo under Settings, Builds. Build command `pnpm build`, deploy command `npx wrangler deploy`.
+3. Optional: auto-deploy on push by connecting a GitHub repo (section 6.2).
 
 ### 1.3 Fallback: GitHub Pages
 
@@ -88,7 +89,7 @@ Your engine is pure deterministic TypeScript, so an authoritative server is the 
 
 **Best pairing: Cloudflare static assets + Durable Objects in one Worker.**
 
-- One `wrangler.jsonc`, add `main: "src/server/index.ts"`, a `durable_objects` binding, and `run_worker_first: ["/ws/*"]` so only WebSocket paths invoke Worker code. Everything else stays free static.
+- One `wrangler.jsonc` with `main: "src/server/worker.ts"`, a `durable_objects` binding (`ROOMS` → class `Room`, SQLite-backed) and `run_worker_first: ["/api/*", "/ws/*"]` so only API and WebSocket paths invoke Worker code. Everything else stays free static. Built in M2, see section 6.
 - Caveat from Cloudflare: when free request limits are exceeded, requests matching `run_worker_first` get HTTP 429 ([billing](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)). Keep the pattern narrow.
 - Capacity sanity check (my estimate, not a vendor figure): a 4-player game sending a few hundred messages is a handful of billed requests (20:1 ratio). 100k requests/day should cover hundreds of games per day.
 - Turn-based Catan tolerates a Render-style cold start badly (players stare at a spinner), which is another reason to prefer Durable Objects.
@@ -114,8 +115,56 @@ All inert until you act:
 
 | File                          | Effect                                                                      |
 | ----------------------------- | --------------------------------------------------------------------------- |
-| `wrangler.jsonc`              | Used only by `npx wrangler deploy`.                                         |
+| `wrangler.jsonc`              | Used by `wrangler dev` / `wrangler deploy` (static site + room server).     |
 | `.github/workflows/pages.yml` | `workflow_dispatch` only; needs Pages enabled with source "GitHub Actions". |
 | `vite.config.ts`              | `base: process.env.VITE_BASE ?? '/'`. Unset means `/`, same as before.      |
 
-No dependency was added (`wrangler` is run via `npx`). When the server work starts, add it as a devDependency.
+`wrangler` and `@cloudflare/workers-types` are devDependencies since M2 (`pnpm-workspace.yaml` allows the `workerd` install script).
+
+## 6. Multiplayer server (M2): deploy steps
+
+The room server ships in the same Worker as the static site. Nothing was deployed by the agents; you do these once you have the account. Design and local dev: `docs/MULTIPLAYER.md` §18.
+
+### 6.1 First deploy from your laptop (about 10 minutes)
+
+1. Create the Cloudflare account (section 1.1 step 1). The free plan is enough: Durable Objects on the free plan must be SQLite-backed, which `wrangler.jsonc` already declares (`migrations: new_sqlite_classes: ["Room"]`).
+2. Check it locally first (about 1 min):
+   ```
+   nice -n 19 pnpm e2e:server
+   ```
+   It must end with `e2e passed`.
+3. `npx wrangler login` (browser tab).
+4. `nice -n 19 pnpm deploy:cf`. The first deploy also applies the Durable Object migration `v1`.
+5. Open the printed `https://<name>.<subdomain>.workers.dev`, then check the API:
+   ```
+   curl -X POST https://<name>.<subdomain>.workers.dev/api/rooms
+   ```
+   Expect `{"roomId":"ABC234","hostToken":"…"}`.
+
+### 6.2 Connect the GitHub repo (auto-deploy on push, about 5 minutes)
+
+1. Push the repo to GitHub (private is fine for Workers Builds).
+2. Dashboard: Workers & Pages → the Worker `colonizers-of-windamere` → Settings → Build → Connect → pick the repo and the `main` branch.
+3. Build settings:
+   - Build command: `pnpm install --frozen-lockfile && pnpm build`
+   - Deploy command: `npx wrangler deploy`
+   - Root directory: `/`
+4. Push to `main`; the build log should end with the deployed URL. Preview builds for other branches are optional (Settings → Build → Branch control).
+
+The Worker name in `wrangler.jsonc` (`name`) must match the Worker you connect, or the build creates a second Worker. Dashboard menu names above are from memory, not checked against today's dashboard (**unverified**).
+
+### 6.3 Production hardening (optional, about 10 minutes)
+
+- **Custom domain** (section 1.2). Same origin for page and API, so nothing else changes. If the game page is ever served from another origin, add it to `ALLOWED_ORIGINS` in `wrangler.jsonc` `vars` (comma separated).
+- **Global rate limit**: the Worker's per-IP limits live in one isolate's memory (best effort). For a public link add a rule under your zone → Security → WAF → Rate limiting rules: path starts with `/api/rooms`, method `POST`, for example 10 requests per minute per IP, action Block. Needs the custom domain (zone); the free plan includes one rate-limiting rule (**unverified**, check the dashboard).
+- **Logs**: `observability.enabled` is on; Dashboard → the Worker → Logs shows server errors (`session error, rolling back` means a bug in GameSession; the room recovers from its last save).
+
+### 6.4 Free-plan budget (estimates, see section 3 for the vendor figures)
+
+- Each state change writes one snapshot (identical ones are skipped). A 4-player game with bots is roughly 1–2k writes, so 100k writes/day is about 50–100 games/day.
+- Each bot move is one alarm wake-up. Idle rooms hibernate (no duration billed); keep-alive `ping` frames are answered without waking the object.
+- Rooms expire 24 h after the last player left and delete their storage.
+
+### 6.5 Rollback
+
+Dashboard → the Worker → Deployments → pick an older version → Rollback. Room storage is not rolled back; `SessionSnapshot.version` (MULTIPLAYER.md §15) guards format changes.

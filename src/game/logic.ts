@@ -2,9 +2,24 @@
  * Pure controller decisions (no DOM, no timers): who views the screen, what the board
  * highlights, which legal action a board click means, and which bot moves next.
  */
-import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../engine';
+import type { Action, EdgeId, GameConfig, GameState, HexId, PlayerId, VertexId } from '../engine';
 import type { Highlights } from '../render';
-import type { Controller, PlaceMode } from '../ui';
+import type { Controller, NewGameConfig, PlaceMode } from '../ui';
+
+/** `createGame` config for a setup-screen config (shared with the online room, src/net). */
+export function gameConfigOf(cfg: NewGameConfig, seed: string, vpToWin = cfg.vpToWin): GameConfig {
+  return {
+    seed,
+    players: cfg.players.map((p) => ({ name: p.name, color: p.color })),
+    map: cfg.map,
+    vpToWin,
+    discardLimit: cfg.discardLimit,
+    balancedDice: cfg.rules.balancedDice,
+    hideBankCards: cfg.rules.hideBankCards,
+    turnTimerSec: cfg.variants?.timer ? null : cfg.turnTimerSec,
+    ...cfg.variants,
+  };
+}
 
 /** Seat controllers, indexed by PlayerId. */
 export type Seats = readonly Controller[];
