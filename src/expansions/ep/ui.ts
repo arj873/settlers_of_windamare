@@ -6,6 +6,7 @@
  * landing settlers, placing the pirate.
  */
 import type { Action, GameState, PlayerId, Resource } from '../../engine';
+import { RESOURCES } from '../../engine/constants';
 import { h, type Child } from '../../ui/dom';
 import type { HudDialog, HudExtension } from '../../ui/expansions';
 import { glyph, RESOURCE_LABEL } from '../../ui/icons';
@@ -14,9 +15,12 @@ import { playerStyle, resCardFace } from '../../ui/widgets';
 import { A } from './engine/actions';
 import { missionsOf, missionVp, tileHolder, totalMissionVp } from './engine/missions';
 import { crewsLeft, harborsLeft, mpLeft, settlersLeft, shipsLeft, shipsOf } from './engine/ships';
+import { goldOffer } from './engine/trade';
 import {
+  citiesInPlay,
   epSlice,
   GOLD_BUYS,
+  isHarborStep,
   ITEM,
   LIMIT,
   MISSION_NAME,
@@ -386,6 +390,80 @@ function supplyBlock(state: GameState, view: HudView, send: Send): HTMLElement |
   );
 }
 
+function select(opts: readonly (readonly [string, string])[]): HTMLSelectElement {
+  const el = h('select', { class: 'ep-select' });
+  for (const [value, label] of opts) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    el.append(o);
+  }
+  return el;
+}
+
+/**
+ * A one-line player offer form: "Offer [n] [good] for [n] [good] [Offer]". `goods` = [id, label];
+ * `make(give, giveN, want, wantN)` builds the action (null: not a valid offer).
+ */
+export function offerForm(
+  goods: readonly (readonly [string, string])[],
+  want0: string,
+  make: (give: string, giveN: number, want: string, wantN: number) => Action | null,
+  send: Send,
+): HTMLElement {
+  const counts = [1, 2, 3].map((n) => [String(n), String(n)] as const);
+  const giveN = select(counts);
+  const give = select(goods);
+  const wantN = select(counts);
+  const want = select(goods);
+  want.value = want0;
+  const go = h('button', { class: 'btn btn-sm' }, 'Offer');
+  go.addEventListener('click', () => {
+    const a = make(give.value, Number(giveN.value), want.value, Number(wantN.value));
+    if (a) send(a);
+  });
+  return h(
+    'div',
+    { class: 'ep-form' },
+    h('b', {}, 'Offer'),
+    giveN,
+    give,
+    h('span', {}, 'for'),
+    wantN,
+    want,
+    go,
+  );
+}
+
+/** Player offers with gold (`ep/offerTrade`; resource-only offers use the base trade dialog). */
+function goldOfferBlock(state: GameState, view: HudView, send: Send): HTMLElement | null {
+  if (mine(view, A.offerTrade).length === 0) return null;
+  const me = view.viewer;
+  const to = state.players.filter((p) => p.id !== me).map((p) => p.id);
+  const goods = [
+    ['gold', 'Gold'],
+    ...RESOURCES.map((r) => [r, RESOURCE_LABEL[r]] as const),
+  ] as const;
+  const make = (give: string, giveN: number, want: string, wantN: number): Action | null => {
+    if (give === want || (give !== 'gold' && want !== 'gold')) return null;
+    const side = (g: string, n: number, gold: string) =>
+      g === 'gold' ? { [gold]: n } : { [gold === 'giveGold' ? 'give' : 'want']: { [g]: n } };
+    return {
+      type: A.offerTrade,
+      player: me,
+      to,
+      ...side(give, giveN, 'giveGold'),
+      ...side(want, wantN, 'wantGold'),
+    } as unknown as Action;
+  };
+  return h(
+    'div',
+    { class: 'ep-supply' },
+    h('div', { class: 'ep-sub' }, 'Trade gold with players'),
+    offerForm(goods, 'gold', make, send),
+  );
+}
+
 // ---------------------------------------------------------------------------------------------
 // Dialogs and the module
 // ---------------------------------------------------------------------------------------------
@@ -458,7 +536,17 @@ export const epHud: HudExtension = {
     if (fleet) body.append(fleet);
     const supply = supplyBlock(state, view, send);
     if (supply) body.append(supply);
+    const offers = goldOfferBlock(state, view, send);
+    if (offers) body.append(offers);
     return { title: row?.name ?? 'Explorers & Pirates', body };
+  },
+
+  offerExtras(state, side) {
+    const g = goldOffer(state);
+    const n = g ? (side === 'give' ? g.give : g.want) : 0;
+    return n > 0
+      ? [h('span', { class: 'bundle-item' }, icon('gold', 22, undefined, 'Gold'), `×${n}`)]
+      : [];
   },
 
   buildCards: [
@@ -509,7 +597,7 @@ export const epHud: HudExtension = {
     const can = (t: string) => mine(view, t).length > 0;
     switch (state.phase.kind) {
       case 'setup':
-        if (state.phase.index < state.players.length && state.phase.step === 'settlement') {
+        if (isHarborStep(state, state.phase.index) && state.phase.step === 'settlement') {
           return 'Place your harbor settlement on a marked coastal corner';
         }
         return null;
@@ -556,5 +644,5 @@ export const epHud: HudExtension = {
   },
 
   impliedActions: [A.setupRoad, A.setupShip, A.placePirate, A.moveShip, A.selectShip, A.land],
-  hideBaseCards: ['city'],
+  hideBaseCards: (state) => (citiesInPlay(state) ? [] : ['city']),
 };

@@ -65,9 +65,18 @@ export function featuresOf(scenario: ScenarioId | null): readonly Feature[] {
   return out;
 }
 
+/**
+ * Combination modes that switch T&B features on for another expansion's scenarios:
+ * Explorers & Pirates + T&B (module `eptb`) plays the Fishermen on every E&P scenario.
+ */
+const MODE_FEATURES: Readonly<Record<string, readonly Feature[]>> = {
+  'ep+tb': ['fish'],
+};
+
 type S = Pick<GameState, 'settings'>;
 export const has = (state: S, f: Feature): boolean =>
-  featuresOf(state.settings.scenario).includes(f);
+  featuresOf(state.settings.scenario).includes(f) ||
+  (MODE_FEATURES[state.settings.mode]?.includes(f) ?? false);
 /** Catan for Two: two real players (and two neutral players in the slice). */
 export const isTwo = (state: Pick<GameState, 'players'>): boolean => state.players.length === 2;
 /** Gold coins are in play (Rivers, Barbarian Attack, Traders & Barbarians). */

@@ -60,6 +60,20 @@ export default tseslint.config(
     },
   },
   {
+    // Smart bots (B1) stay deterministic: their own Rng is the only randomness, no clock.
+    files: ['src/bots/smart/**/*.ts', 'src/expansions/*/strategy.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'Use the bot rng.' },
+        { object: 'Date', property: 'now', message: 'Bots must be deterministic.' },
+        { object: 'performance', property: 'now', message: 'Bots must be deterministic.' },
+      ],
+      'no-restricted-globals': ['error', { name: 'Date', message: 'Bots must be deterministic.' }],
+    },
+  },
+  {
     // Shared by the Worker and the browser: no DOM, no ambient time or randomness (time comes in
     // as `now`, secrets through SessionDeps), so GameSession stays deterministic and testable.
     files: ['src/net/**/*.ts'],

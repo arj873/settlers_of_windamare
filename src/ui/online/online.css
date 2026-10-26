@@ -291,6 +291,12 @@ button.ol-choice:hover {
   align-items: flex-end;
   gap: 6px;
 }
+.ol-seat-main .bot-level {
+  align-self: flex-start;
+  width: 108px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
 .ol-hint {
   font-size: 11.5px;
   color: var(--ink-dim);

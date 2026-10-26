@@ -463,6 +463,14 @@
 .su-seat .seg {
   margin-left: 0;
 }
+/* B1: bot difficulty (kept on human seats too, hidden, so the rows line up) */
+.su-seat .bot-level {
+  flex: none;
+  width: 96px;
+}
+.bot-level.is-hidden {
+  visibility: hidden;
+}
 
 .su-seat-x {
   flex: none;
@@ -575,6 +583,15 @@
   .su-swatches .swatch {
     width: 28px;
     height: 28px;
+  }
+  /* B1: the difficulty gets its own line under the swatches (rows wrap, no alignment needed) */
+  .su-seat .bot-level {
+    order: 4;
+    flex: 1 0 100%;
+    width: auto;
+  }
+  .su-seat .bot-level.is-hidden {
+    display: none;
   }
   .su-map-art {
     height: 76px;

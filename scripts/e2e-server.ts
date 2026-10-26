@@ -3,7 +3,8 @@
  * over HTTP, connects 3 WebSocket clients (host + 2 friends; the 4th seat is a server bot), plays
  * a 3-VP game to the end with random-bot clients, and drops + reconnects one player mid-game.
  * Then one game each of Cities & Knights, Seafarers (Fog Islands), T&B + Seafarers (Fishermen
- * on New Shores) and Explorers & Pirates (Land Ho!): 2 clients + 2 server bots to the end, every
+ * on New Shores), Explorers & Pirates (Land Ho!) and the E&P combinations (E&P + C&K, E&P + T&B):
+ * 2 clients + 2 server bots to the end, every
  * view checked for masked secrets.
  *
  *   pnpm e2e:server            (builds dist/ first if it is missing)
@@ -42,6 +43,25 @@ function freePort(): Promise<number> {
       );
     });
   });
+}
+
+/** The room server allows 5 new rooms per IP, then 1 a minute (SERVER_LIMITS.create). */
+const CREATE_REFILL_MS = 61_000;
+
+/**
+ * POST /api/rooms. On 429 (the per-IP create limit) wait for the bucket to refill and retry, as
+ * often as needed (every expansion game makes a room); any other non-201 fails the run.
+ */
+async function createRoom(base: string): Promise<CreateRoomResponse> {
+  for (;;) {
+    const res = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
+    if (res.status === 201) return (await res.json()) as CreateRoomResponse;
+    if (res.status !== 429) {
+      throw new Error(`POST /api/rooms -> ${res.status}: ${await res.text()}`);
+    }
+    console.log(`  ..  room create limit reached (429): waiting ${CREATE_REFILL_MS / 1000} s`);
+    await new Promise((r) => setTimeout(r, CREATE_REFILL_MS));
+  }
 }
 
 function check(ok: unknown, what: string): void {
@@ -225,29 +245,54 @@ interface ExpansionGame {
 
 const opponents = (view: GameView) => view.players.filter((p) => p.id !== view.view.viewer);
 
+/** C&K: the progress stacks and the opponents' progress hands are face down. */
+function ckHidden(view: GameView): string | null {
+  const ck = view.ext['ck'] as {
+    players: { progress: string[] }[];
+    decks: Record<string, string[]>;
+  };
+  const decks = Object.values(ck.decks).flat();
+  if (new Set(decks).size > 1) return 'progress deck order is visible';
+  // The Spy shows its player the victim's hand (ck/engine/mask.ts): that one is allowed.
+  const phase = view.phase as { kind: string; card?: string; victim?: number | null };
+  const spied =
+    phase.kind === 'ck/card' && phase.card === 'spy' && view.turn.current === view.view.viewer
+      ? phase.victim
+      : null;
+  for (const p of opponents(view)) {
+    if (p.id === spied) continue;
+    if (new Set(ck.players[p.id]?.progress).size > 1) {
+      return `${p.name}'s progress cards (phase ${phase.kind} ${phase.card ?? ''})`;
+    }
+  }
+  return null;
+}
+
+/** E&P: unexplored hexes are face down. */
+function epHidden(view: GameView): string | null {
+  const ep = view.ext['ep'] as { hidden: Record<string, { terrain: string }> };
+  if (Object.values(ep.hidden).some((h) => h.terrain !== 'ep/hidden')) {
+    return 'unexplored hexes are visible';
+  }
+  return null;
+}
+
+/** T&B Fishermen: the fish pool and the opponents' fish tokens are face down. */
+function fishHidden(view: GameView): string | null {
+  const fish = (view.ext['tb'] as { fish?: { pool: number[]; hands: number[][] } }).fish;
+  if (!fish) return 'no fish slice';
+  if (new Set(fish.pool).size > 1) return 'the fish pool is visible';
+  for (const p of opponents(view)) {
+    if (new Set(fish.hands[p.id]).size > 1) return `${p.name}'s fish tokens`;
+  }
+  return null;
+}
+
 const EXPANSION_GAMES: ExpansionGame[] = [
   {
     label: 'Cities & Knights',
     config: { mode: 'ck', scenario: 'ck/classic', vpToWin: 6 },
-    hidden: (view) => {
-      const ck = view.ext['ck'] as {
-        players: { progress: string[] }[];
-        decks: Record<string, string[]>;
-      };
-      const decks = Object.values(ck.decks).flat();
-      if (new Set(decks).size > 1) return 'progress deck order is visible';
-      // The Spy shows its player the victim's hand (ck/engine/mask.ts): that one is allowed.
-      const phase = view.phase as { kind: string; card?: string; victim?: number | null };
-      const spied =
-        phase.kind === 'ck/card' && phase.card === 'spy' && view.turn.current === view.view.viewer
-          ? phase.victim
-          : null;
-      for (const p of opponents(view)) {
-        if (p.id === spied) continue;
-        if (new Set(ck.players[p.id]?.progress).size > 1) return `${p.name}'s progress cards`;
-      }
-      return null;
-    },
+    hidden: ckHidden,
   },
   {
     label: 'Seafarers: The Fog Islands',
@@ -279,20 +324,23 @@ const EXPANSION_GAMES: ExpansionGame[] = [
   {
     label: 'Explorers & Pirates: Land Ho!',
     config: { mode: 'ep', scenario: 'ep/landHo', vpToWin: 5 },
-    hidden: (view) => {
-      const ep = view.ext['ep'] as { hidden: Record<string, { terrain: string }> };
-      if (Object.values(ep.hidden).some((h) => h.terrain !== 'ep/hidden')) {
-        return 'unexplored hexes are visible';
-      }
-      return null;
-    },
+    hidden: epHidden,
+  },
+  {
+    label: 'E&P + Cities & Knights: Pirate Lairs',
+    config: { mode: 'ep+ck', scenario: 'ep/pirateLairs', vpToWin: 7 },
+    hidden: (view) => ckHidden(view) ?? epHidden(view),
+  },
+  {
+    label: 'E&P + Traders & Barbarians: Fish for Catan',
+    config: { mode: 'ep+tb', scenario: 'ep/fish', vpToWin: 5 },
+    hidden: (view) => fishHidden(view) ?? epHidden(view),
   },
 ];
 
 async function playExpansionGame(base: string, game: ExpansionGame): Promise<void> {
   console.log(`\n${game.label} ...`);
-  const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
-  const { roomId, hostToken } = (await created.json()) as CreateRoomResponse;
+  const { roomId, hostToken } = await createRoom(base);
   const wsUrl = `${base.replace('http', 'ws')}${roomSocketPath(roomId)}`;
   const ann = new Client('Ann', wsUrl, hostToken);
   const bob = new Client('Bob', wsUrl, null);
@@ -385,9 +433,8 @@ async function main(): Promise<void> {
     });
     check(evil.status === 403, 'foreign Origin is refused (403)');
 
-    const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { origin: base } });
-    check(created.status === 201, 'POST /api/rooms -> 201');
-    const { roomId, hostToken } = (await created.json()) as CreateRoomResponse;
+    const { roomId, hostToken } = await createRoom(base);
+    check(true, 'POST /api/rooms -> 201');
     check(/^[2-9A-HJ-NP-Z]{6}$/.test(roomId), `room code ${roomId} is 6 unambiguous chars`);
 
     const info = (await (

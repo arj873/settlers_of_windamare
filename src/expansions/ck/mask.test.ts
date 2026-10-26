@@ -25,6 +25,7 @@ import {
 import { V, build, ckMain, giveCards, setGoods } from './engine/testkit';
 import { SEACK_MODE } from '../seack/engine';
 import { TBCK_MODE } from '../tbck/engine';
+import { EPCK_MODE } from '../epck/engine';
 
 const withSlice = (state: GameState, s: CkSlice): GameState => ({
   ...state,
@@ -130,6 +131,10 @@ describe('C&K online views: secrets in bot games', () => {
   it.each(['tb/fishermen', 'tb/rivers'])('T&B + C&K (%s): the C&K mask runs', (scenario) => {
     checkGame({ seed: 31, players: 4, mode: TBCK_MODE, scenario });
   });
+
+  it('E&P + C&K: the C&K mask runs (hands, commodities, stacks)', () => {
+    checkGame({ seed: 41, players: 4, mode: EPCK_MODE, scenario: 'ep/pirateLairs' }, 3000, 60);
+  }, 60_000);
 });
 
 describe('C&K online views: shape and reveals', () => {

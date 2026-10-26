@@ -2,6 +2,7 @@
 import { MAPS, modeById, scenarioById } from '../../engine';
 import type { MemberId, MemberInfo, RoomConfig, RoomInfo } from '../../net/protocol';
 import { ROOM_COLORS } from '../../net/protocol';
+import { DEFAULT_BOT_LEVEL, type BotLevel } from '../../bots/levels';
 import {
   colorName,
   MAX_PLAYERS,
@@ -27,6 +28,10 @@ export interface SeatView {
   canRemove: boolean;
   /** Colours the viewer may switch to (own seat only). */
   colors: string[];
+  /** B1: the bot that plays the seat when nobody does. */
+  botLevel: BotLevel;
+  /** Host, open seat: may pick the bot level. */
+  canSetLevel: boolean;
 }
 
 export interface LobbyView {
@@ -75,6 +80,8 @@ export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
       colors: isMine
         ? ROOM_COLORS.filter((c) => c === s.color || !room.seats.some((o) => o.color === c))
         : [],
+      botLevel: s.botLevel ?? DEFAULT_BOT_LEVEL,
+      canSetLevel: isHost && s.occupant === null,
     };
   });
   const seated = room.seats.some((s) => s.occupant !== null);

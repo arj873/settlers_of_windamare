@@ -3,6 +3,7 @@
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
 import { scenarioById } from '../../engine';
+import { botLevelSelect } from '../botLevel';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
@@ -292,7 +293,10 @@ export class SetupScreen {
           const s = scenarioById(id);
           if (!s) return null;
           const on = this.draft.scenario === id;
-          const players = clamp(n, s.players.min, s.players.max);
+          // The seats this mode allows on the scenario (E&P + C&K: 3-4 on 3-6 player scenarios).
+          const min = Math.max(s.players.min, mode.players.min);
+          const max = Math.min(s.players.max, mode.players.max);
+          const players = clamp(n, min, max);
           return h(
             'button',
             {
@@ -303,7 +307,7 @@ export class SetupScreen {
             },
             h('span', { class: 'su-map-art' }, mapPreviewSvg(s.mapFor(players))),
             h('span', { class: 'su-tile-title' }, s.name),
-            h('span', { class: 'su-tile-sub' }, `${s.players.min}–${s.players.max} players`),
+            h('span', { class: 'su-tile-sub' }, `${min}–${max} players`),
           );
         }),
       ),
@@ -891,6 +895,12 @@ export class SetupScreen {
                   c === 'human' ? 'Human' : 'Bot',
                 ),
               ),
+            ),
+            botLevelSelect(seat.botLevel, { seat: i, hidden: seat.controller !== 'bot' }, (level) =>
+              this.set({
+                ...this.draft,
+                seats: this.draft.seats.map((s, j) => (j === i ? { ...s, botLevel: level } : s)),
+              }),
             ),
             h(
               'button',

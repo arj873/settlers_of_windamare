@@ -3,7 +3,7 @@
  * commodities), knights, improvements, walls, progress card draws, the event die and the
  * barbarian attack, commodity production. docs/rules/cities-knights.md (CK-n).
  */
-import { PIECE_LIMITS, RESOURCES } from '../../../engine/constants';
+import { RESOURCES } from '../../../engine/constants';
 import { log, resumePhase } from '../../../engine/actions/common';
 import { startRobber } from '../../../engine/actions/robber';
 import { continueRoll } from '../../../engine/actions/turn';
@@ -870,7 +870,24 @@ export function finishDiscards(draft: GameState): void {
  * player then owns one more settlement and one city piece fewer.
  */
 export function pillageOverflow(state: GameState, p: PlayerId): number {
-  return Math.max(0, buildingsOf(state, p, 'settlement').length - PIECE_LIMITS.settlement);
+  return Math.max(0, buildingsOf(state, p, 'settlement').length - settlementPieces(state, p));
+}
+
+/** True while `settlementPieces` asks the pieceLimit chain without C&K's own adjustment. */
+let measuring = false;
+export const measuringPieces = (): boolean => measuring;
+
+/**
+ * Settlement pieces `p` owns before a pillage: the base 5 plus what other modules give (E&P + C&K:
+ * a harbor settlement hands its settlement piece back, so harbors are not settlement pieces).
+ */
+export function settlementPieces(state: GameState, p: PlayerId): number {
+  measuring = true;
+  try {
+    return pieceLimit(state, p, 'settlement');
+  } finally {
+    measuring = false;
+  }
 }
 
 export const roadsLeft = (state: GameState, p: PlayerId): number => piecesLeft(state, p).road;

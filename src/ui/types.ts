@@ -1,3 +1,4 @@
+import type { BotLevel } from '../bots/levels';
 import type {
   Action,
   ExpansionId,
@@ -19,6 +20,8 @@ export interface SeatConfig {
   /** CSS color string. */
   color: string;
   controller: Controller;
+  /** B1: the bot's difficulty on a 'bot' seat (absent = DEFAULT_BOT_LEVEL). */
+  botLevel?: BotLevel;
 }
 
 export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';

@@ -370,7 +370,7 @@ describe('settings v2', () => {
     const base = { seed: 1, players: players(4), map: 'baseRandom' as const };
     for (const bad of [
       { vpToWin: 2 },
-      { vpToWin: 21 },
+      { vpToWin: 26 },
       { vpToWin: 7.5 },
       { discardLimit: 4 },
       { discardLimit: 21 },
@@ -380,7 +380,7 @@ describe('settings v2', () => {
       expect(() => resolveSettings({ ...base, ...bad }), JSON.stringify(bad)).toThrow();
     }
     expect(() => resolveSettings({ ...base, map: 'nope' as MapId })).toThrow();
-    for (const ok of [{ vpToWin: 3 }, { vpToWin: 20 }, { discardLimit: 5 }, { discardLimit: 20 }]) {
+    for (const ok of [{ vpToWin: 3 }, { vpToWin: 25 }, { discardLimit: 5 }, { discardLimit: 20 }]) {
       expect(() => resolveSettings({ ...base, ...ok })).not.toThrow();
     }
   });
