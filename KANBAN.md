@@ -10,7 +10,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **T10** · Multi-size boards: per-map topology (Base / Base Random / 5-6P / 7-8P), generators + ports, up to 8 players, scaled bank & dev deck, new GameSettings fields · `s2-boards` 🟦 · deps: — · tab `s2-boards`
 - **T11** · New setup screen: Game Mode (Base), Map tiles, Rules (Balanced Dice, Hide Bank Cards), Advanced (Turn Timer, Players 3–8, Points to Win 3–20, Discard Limit 5–20), up to 8 seats · `s2-setup-ui` 🟩 · deps: — · tab `s2-setup-ui`
 - **T15** · Playwright playtest harness: session server, `pnpm pt <seat> <cmd>` CLI (wait/status/spots/click/shot/report), seat guard, PLAYBOOK.md · `s2-playtest` 🟦 · tab `s2-playtest`
-- **P1** · Playtest polish: roads touch without overlapping (joint discs for same owner), ore icon looks like ore · `s2-polish` 🟩 · deps: — · tab `s2-polish`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
@@ -82,3 +81,4 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **BUG** · Steal picker never opened with a single robbery victim (reported by you) · fixed by orchestrator · `89756af` · regression test added
 - **FIX** · Roads joined at vertices (your feedback) · orchestrator · `9c3fdd4`
 - **FIX** · Trade offers are a docked side card, not a blocking modal (your feedback) · orchestrator · `daf5e1a`
+- **P1** · Playtest polish: roads touch without overlapping (joint discs for same owner), ore icon looks like ore · `s2-polish` 🟩 · deps: — · merged
