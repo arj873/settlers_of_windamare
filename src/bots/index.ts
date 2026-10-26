@@ -102,6 +102,10 @@ export const uniformBot: Bot = createRandomBot({ mode: 'uniform' });
 /** `chooseAction(state, player, rng)`: the default bot. */
 export const chooseAction: Bot = randomBot;
 
+// Difficulty levels (B1): Easy = random (above), Normal / Hard = src/bots/smart. The bot of a
+// level: `botForLevel` in ./byLevel (not re-exported here: it builds bots at import time).
+export * from './levels';
+
 /**
  * Players who may submit an action right now (per the phase state machine):
  *  - discard:  every player who still owes cards, in any order

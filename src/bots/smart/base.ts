@@ -221,10 +221,15 @@ function yearOfPlenty(ctx: BotContext, picks: readonly [Resource, Resource]): nu
   const gain: ResourceCounts = addResources(addResources(ctx.hand, { [picks[0]]: 1 }), {
     [picks[1]]: 1,
   });
-  const t = ctx.target();
   const delta = ctx.handScore(gain) - ctx.handScore(ctx.hand);
-  // Hold it until it completes something (or the deck of uses is obvious late in the game).
-  if (t && ctx.distance(t.cost, gain) === 0 && ctx.distance(t.cost) > 0) return 60 + delta;
+  // Hold it until it completes something: the most valuable goal it completes.
+  let completes = 0;
+  for (const g of ctx.goals()) {
+    if (ctx.distance(g.cost, gain) === 0 && ctx.distance(g.cost) > 0) {
+      completes = Math.max(completes, g.value);
+    }
+  }
+  if (completes > 0) return 40 + 0.5 * completes + delta;
   return ctx.vp(ctx.player) >= ctx.vpToWin - 3 ? delta * 0.3 : -5;
 }
 

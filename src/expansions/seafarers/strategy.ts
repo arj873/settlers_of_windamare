@@ -22,8 +22,9 @@ import {
 import { VP, baseScore, conflict, trade, type BotContext, type BotGoal } from '../../bots/smart';
 import { areasAt } from './engine/effects';
 import { graph, hexKind, isShipEdge } from './engine/geometry';
+import { warships } from './engine/pirates';
 import { SHIP, nextToPirate, shipsLeft } from './engine/ships';
-import { rulesOf, seaSlice } from './engine';
+import { rulesOf, scenarioKey, seaSlice } from './engine';
 
 /** How far a ship plan looks (ships). */
 const SHIP_REACH = 6;
@@ -194,8 +195,33 @@ function bundle(x: unknown): ResourceBundle {
   return (x && typeof x === 'object' ? x : {}) as ResourceBundle;
 }
 
+/**
+ * The Pirate Islands (§4.10): the one ship line runs to the fortress (every legal ship extends
+ * it), Knights only turn ships into warships, and an attack pays when warships beat the die.
+ */
+function pirateIslandsScore(ctx: BotContext, action: Action): number | null {
+  const { state, player } = ctx;
+  const w = Math.min(6, warships(state, player));
+  switch (action.type) {
+    case 'seafarers/buildShip':
+      return 70 - conflict(ctx, 'seafarers/ship', shipCost(ctx));
+    case 'playKnight':
+      return state.phase.kind === 'main' && w < 6 ? 65 : -5;
+    case 'buyDevCard':
+      return (baseScore(ctx, action) ?? 0) + 30;
+    case 'seafarers/attackFortress':
+      // Win a chit when warships > die, lose two ships when <, one when =; the turn ends.
+      return (100 * (w - 1)) / 6 - (40 * (6 - w)) / 6;
+  }
+  return null;
+}
+
 export function seaScore(ctx: BotContext, action: Action): number | null {
   const a = action as Action & { edge?: EdgeId; hex?: HexId; victim?: PlayerId };
+  if (scenarioKey(ctx.state) === 'pirateIslands') {
+    const s = pirateIslandsScore(ctx, action);
+    if (s !== null) return s;
+  }
   switch (action.type) {
     case 'buildSettlement':
       if (action.type !== 'buildSettlement') return null;

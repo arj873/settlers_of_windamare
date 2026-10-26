@@ -5,6 +5,8 @@
  */
 import type { MemberId, RoomConfig, RoomInfo } from '../../net/protocol';
 import { LIMITS } from '../../net/protocol';
+import { BOT_LEVEL_LABELS, type BotLevel } from '../../bots/levels';
+import { botLevelSelect } from '../botLevel';
 import { append, h } from '../dom';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
@@ -17,6 +19,8 @@ export interface LobbyActions {
   takeSeat(seat: number): void;
   leaveSeat(): void;
   setColor(color: string): void;
+  /** Host (B1): difficulty of the bot on an open seat. */
+  setBotLevel(seat: number, level: BotLevel): void;
   configure(config: RoomConfig): void;
   start(): void;
   leave(): void;
@@ -299,7 +303,7 @@ export class LobbyScreen {
           'div',
           { class: 'ol-seat-sub' },
           s.name === null
-            ? 'Open — a bot plays it'
+            ? `Open — a ${BOT_LEVEL_LABELS[s.botLevel]} bot plays it`
             : s.isAway
               ? 'Disconnected — the seat is kept for a minute'
               : s.colorLabel,
@@ -321,6 +325,10 @@ export class LobbyScreen {
       h(
         'div',
         { class: 'ol-seat-actions' },
+        s.canSetLevel &&
+          botLevelSelect(s.botLevel, { seat: s.index, key: 'seat-level' }, (level) =>
+            a.setBotLevel(s.index, level),
+          ),
         s.canSit &&
           h(
             'button',

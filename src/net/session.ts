@@ -28,7 +28,9 @@ import {
   type PlayerId,
 } from '../engine';
 import type { Bot } from '../bots';
-import { BOT_OFFERS_PER_TURN, defaultBot, FAST_FACTOR } from '../game/controller';
+import { botForLevel } from '../bots/byLevel';
+import type { BotLevel } from '../bots/levels';
+import { BOT_OFFERS_PER_TURN, FAST_FACTOR } from '../game/controller';
 import { gameConfigOf, nextBot, type Seats } from '../game/logic';
 import {
   IDLE_CLOCK,
@@ -89,7 +91,8 @@ export interface SessionOptions {
   timeoutStepMs: number;
   /** The room expires this long after its last member disconnected. */
   idleExpiryMs: number;
-  bot: Bot;
+  /** One bot for every seat (tests); absent = each seat's level (SeatInfo.botLevel, B1). */
+  bot?: Bot;
 }
 
 export const DEFAULT_SESSION_OPTIONS: SessionOptions = {
@@ -97,7 +100,6 @@ export const DEFAULT_SESSION_OPTIONS: SessionOptions = {
   botDelayMs: 900,
   timeoutStepMs: 400,
   idleExpiryMs: 24 * 3600_000,
-  bot: defaultBot,
 };
 
 /** Safety cap on moves per call (bots with zero delay, timeouts). */
@@ -123,6 +125,8 @@ interface SeatRec {
   color: string;
   occupant: MemberId | null;
   status: SeatStatus;
+  /** Absent = DEFAULT_BOT_LEVEL (older snapshots too). */
+  botLevel?: BotLevel;
 }
 
 interface GameRec {
@@ -266,6 +270,7 @@ export class GameSession {
         color: s.color,
         occupant: s.occupant,
         status: s.status,
+        ...(s.botLevel === undefined ? {} : { botLevel: s.botLevel }),
       })),
       members: this.d.members.map((m) => ({
         id: m.id,
@@ -440,6 +445,8 @@ export class GameSession {
         return this.leaveSeat(m);
       case 'setColor':
         return this.setColor(m, msg.color);
+      case 'setBotLevel':
+        return this.setBotLevel(m, msg.seat, msg.level);
       case 'configure':
         return this.configure(m, msg.config);
       case 'kick':
@@ -566,6 +573,16 @@ export class GameSession {
       return ['color_taken', 'another seat has that colour'];
     }
     this.seatRec(seat).color = color;
+    this.roomDirty = true;
+    return null;
+  }
+
+  private setBotLevel(m: MemberRec, seat: PlayerId, level: BotLevel): Failure | null {
+    if (m.id !== this.d.host) return ['not_host', 'only the host can pick bot levels'];
+    if (this.d.phase !== 'lobby') return ['wrong_phase', 'the game has started'];
+    const s = this.d.seats[seat];
+    if (!s) return ['bad_message', 'no such seat'];
+    s.botLevel = level;
     this.roomDirty = true;
     return null;
   }
@@ -905,7 +922,8 @@ export class GameSession {
     const noOffers = own.filter((a) => a.type !== 'offerTrade');
     const options = used < BOT_OFFERS_PER_TURN || noOffers.length === 0 ? own : noOffers;
     const rng = new Rng(g.botRng);
-    const action = this.opts.bot(g.state, next.player, rng, options);
+    const bot = this.opts.bot ?? botForLevel(this.seatRec(next.player).botLevel);
+    const action = bot(g.state, next.player, rng, options);
     g.botRng = rng.state;
     // A bot without a move (or with a rejected one) would loop: stop until something changes.
     if (!action || this.apply(action) !== null) g.botDueAt = null;

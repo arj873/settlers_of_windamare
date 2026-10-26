@@ -345,7 +345,9 @@ export class BotContext {
     let best = 0;
     let second = 0;
     for (const g of goals) {
-      const v = g.value * 0.75 ** this.distance(g.cost, hand);
+      const d = this.distance(g.cost, hand);
+      // d = 0: affordable as it is, buildable right away.
+      const v = g.value * 0.75 ** d * (d === 0 ? 1.2 : 1);
       if (v > best) [best, second] = [v, best];
       else if (v > second) second = v;
     }

@@ -22,6 +22,8 @@ const STEERED = 25;
 const UNSCORED = 12;
 /** Share of decisions on which unscored module actions are considered. */
 const UNSCORED_SHARE = 0.4;
+/** Share of decisions on which a module's `steer` is asked (the random bot's progress bias). */
+const STEER_SHARE = 0.5;
 
 export const NORMAL_PARAMS: SmartParams = {
   noise: 0.12,
@@ -56,17 +58,27 @@ export function scoreOptions(
   const ctx = new BotContext(state, player, params, rng, extensions);
   let steered: Action | null | undefined;
   let offerUnscored: boolean | undefined;
+  // Like the random bot: a type first, then an action of that type (many variants of one type,
+  // e.g. "select ship N", must not flood the pick), and the module's steer on some decisions.
+  const typeDraw = new Map<string, number>();
   const fallback = (a: Action): number => {
     if (steered === undefined) {
       steered = null;
-      for (const x of extensions) {
-        steered = x.steer?.(state, player, options, rng) ?? null;
-        if (steered) break;
+      if (rng.float() < STEER_SHARE) {
+        for (const x of extensions) {
+          steered = x.steer?.(state, player, options, rng) ?? null;
+          if (steered) break;
+        }
       }
     }
     if (a === steered) return STEERED;
     offerUnscored ??= rng.float() < UNSCORED_SHARE;
-    return offerUnscored ? UNSCORED + 5 * rng.float() : -50 + rng.float();
+    let t = typeDraw.get(a.type);
+    if (t === undefined) {
+      t = rng.float();
+      typeDraw.set(a.type, t);
+    }
+    return (offerUnscored ? UNSCORED : -50) + 5 * t + 0.01 * rng.float();
   };
   return options.map((action) => {
     let score: number | null = null;

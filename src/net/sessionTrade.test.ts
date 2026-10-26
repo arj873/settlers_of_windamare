@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Action, GameState, PlayerId } from '../engine';
+import { defaultBot } from '../game/controller';
 import { DEFAULT_ROOM_CONFIG } from './protocol';
 import { GameSession } from './session';
 import { fakeDeps, LocalNet } from './testHarness';
@@ -15,6 +16,8 @@ function table(turnTimerSec: number | null = 120) {
   const { session, hostToken } = GameSession.create('room1', 1000, fakeDeps(), {
     graceMs: 60_000,
     botDelayMs: 500,
+    // The seeded answers below assume the random (Easy) bot in seat 3.
+    bot: defaultBot,
   });
   const net = new LocalNet(session, 1000);
   net.connect('ann');

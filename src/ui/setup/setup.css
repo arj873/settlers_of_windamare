@@ -463,6 +463,14 @@
 .su-seat .seg {
   margin-left: 0;
 }
+/* B1: bot difficulty (kept on human seats too, hidden, so the rows line up) */
+.su-seat .bot-level {
+  flex: none;
+  width: 96px;
+}
+.bot-level.is-hidden {
+  visibility: hidden;
+}
 
 .su-seat-x {
   flex: none;

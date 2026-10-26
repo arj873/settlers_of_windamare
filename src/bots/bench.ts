@@ -11,7 +11,8 @@
 import { pathToFileURL } from 'node:url';
 import { Rng } from '../engine';
 import type { Bot } from './index';
-import { BOT_LEVELS, botForLevel, isBotLevel, type BotLevel } from './levels';
+import { botForLevel } from './byLevel';
+import { BOT_LEVELS, isBotLevel, type BotLevel } from './levels';
 import { newGame, runGame, type ActionSource, type GameSetup } from './runner';
 
 export interface BenchArgs {
