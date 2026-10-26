@@ -107,7 +107,10 @@ export class LobbyScreen {
 
     this.element = h(
       'div',
-      { class: 'online-screen ol-lobby', attrs: { role: 'main', 'aria-label': 'Room lobby' } },
+      {
+        class: 'online-screen setup ol-lobby',
+        attrs: { role: 'main', 'aria-label': 'Room lobby' },
+      },
       h(
         'div',
         { class: 'su-scroll' },
@@ -296,7 +299,7 @@ export class LobbyScreen {
           'div',
           { class: 'ol-seat-sub' },
           s.name === null
-            ? 'Open seat — a bot plays unless someone sits down'
+            ? 'Open — a bot plays it'
             : s.isAway
               ? 'Disconnected — the seat is kept for a minute'
               : s.colorLabel,

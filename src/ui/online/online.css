@@ -5,7 +5,9 @@
  */
 
 /* ---- full-screen pages (home, lobby, notices) ------------------------ */
-.online-screen {
+/* They also carry `.setup`, so themes give them the setup screen's local ink. */
+.online-screen,
+.online-screen.setup {
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -64,7 +66,7 @@
   line-height: 1.1;
   letter-spacing: var(--display-tracking);
   text-transform: var(--display-case);
-  color: var(--plaque-ink);
+  color: var(--ink);
 }
 .ol-home-theme {
   position: fixed;
@@ -605,7 +607,10 @@ button.ol-choice:hover {
 .pp-away {
   display: inline-grid;
   place-items: center;
-  color: var(--bad);
+  padding: 2px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(20, 10, 5, 0.6);
 }
 .pp.is-away .avatar {
   filter: grayscale(0.7);

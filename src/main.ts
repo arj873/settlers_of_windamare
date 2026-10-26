@@ -15,7 +15,7 @@ import { NAME_KEY, parseRoomCode, tokenKey } from './net/transport';
 import { HomeScreen } from './ui/online/home';
 import { inviteUrl } from './ui/online/lobbyModel';
 import { OnlineApp } from './game/online/app';
-import { browserKeyStore, pickBackend, realClock } from './game/online/backend';
+import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
 import { measureHudInsets } from './game/layout';
@@ -128,6 +128,7 @@ async function boot() {
           hud,
           backend,
           store: browserKeyStore,
+          tokens: tokenStoreFor(backend.kind),
           clock: realClock,
           toast: showToast,
           onRender: fitBoard,
@@ -167,7 +168,7 @@ async function boot() {
     onCreate: async (name) => {
       const backend = await pickBackend(location.search);
       const room = await backend.api.create();
-      browserKeyStore.set(tokenKey(room.roomId), room.hostToken);
+      tokenStoreFor(backend.kind).set(tokenKey(room.roomId), room.hostToken);
       browserKeyStore.set(NAME_KEY, name);
       history.pushState(null, '', inviteUrl(location.href, room.roomId));
       online(room.roomId, (a) => {

@@ -42,6 +42,33 @@ export const browserKeyStore: KeyStore = {
   },
 };
 
+/** sessionStorage: per tab, survives a reload. */
+export const tabKeyStore: KeyStore = {
+  get(key) {
+    try {
+      return sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch {
+      /* not remembered */
+    }
+  },
+};
+
+/**
+ * Where reconnect tokens live. The dev server's rooms are shared by this browser's tabs, so each
+ * tab keeps its own token there (two tabs = two players); real rooms use localStorage (two tabs =
+ * the same player, the newer one takes over).
+ */
+export function tokenStoreFor(kind: Backend['kind']): KeyStore {
+  return kind === 'local' ? tabKeyStore : browserKeyStore;
+}
+
 /** One WebSocket per call. `onClose` fires once, also when the socket never opened. */
 export function webSocketConnect(url: string): Connect {
   return (h) => {

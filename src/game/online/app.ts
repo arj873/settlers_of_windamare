@@ -29,7 +29,10 @@ export interface OnlineEnv {
   board: BoardLike;
   hud: Pick<Hud, 'render' | 'on' | 'isCovered' | 'setTurnTimer' | 'setChat' | 'setSessionActions'>;
   backend: Backend;
+  /** The remembered nickname. */
   store: KeyStore;
+  /** Reconnect tokens (backend.ts tokenStoreFor). */
+  tokens: KeyStore;
   clock: Clock;
   toast: (message: string, kind: ToastKind) => void;
   onRender?: () => void;
@@ -89,8 +92,9 @@ export class OnlineApp {
       return;
     }
     const name = this.env.store.get(NAME_KEY) ?? '';
-    const known = this.env.store.get(tokenKey(this.roomId)) !== null;
-    if (name || known) {
+    // Back in a room this browser already joined (reload, reconnect): straight in. A new
+    // visitor confirms the (remembered) nickname first.
+    if (this.env.tokens.get(tokenKey(this.roomId)) !== null) {
       this.connect(name);
       return;
     }
@@ -120,7 +124,7 @@ export class OnlineApp {
       roomId: this.roomId,
       connect: env.backend.connect(this.roomId),
       clock: env.clock,
-      store: env.store,
+      store: env.tokens,
       ...(name ? { name } : {}),
       random: Math.random,
     });

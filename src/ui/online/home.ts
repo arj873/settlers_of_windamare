@@ -36,7 +36,7 @@ function logo(): HTMLElement {
 function shell(...children: Child[]): HTMLElement {
   return h(
     'div',
-    { class: 'online-screen ol-home' },
+    { class: 'online-screen setup ol-home' },
     h('div', { class: 'ol-home-card' }, logo(), ...children),
     h('div', { class: 'ol-home-theme' }, themePicker({ compact: true })),
   );

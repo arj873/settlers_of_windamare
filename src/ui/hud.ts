@@ -120,6 +120,7 @@ export class Hud {
   private unlockedViewer: PlayerId | null = null;
   private pieceSig = '';
   private lastDice = '';
+  private lastPillKey = '';
   private lastDialogKey = '';
   private lastLogLength = -1;
   private menuOpen = false;
@@ -471,12 +472,16 @@ export class Hud {
     const p = getPlayer(state, info.player);
     const timer = view.turnTimer;
     const low = timer ? Math.ceil(timer.remainingSec) <= TIMER_WARN_SEC : false;
+    // The pill is rebuilt on every render and timer tick: drop it in only when it says something new.
+    const pillKey = `${info.player}|${info.title}|${info.hint?.text ?? ''}`;
+    const fresh = pillKey !== this.lastPillKey;
+    this.lastPillKey = pillKey;
     return [
       h(
         'div',
         {
           class: `turn-pill${info.hint?.tone === 'action' ? ' is-action' : ''}${low ? ' is-timer-low' : ''}`,
-          style: playerStyle(p.color),
+          style: { ...playerStyle(p.color), ...(fresh ? {} : { animation: 'none' }) },
           attrs: { role: 'status' },
         },
         avatar(p, view.bots?.[info.player] ?? view.isBotTurn, 34),
