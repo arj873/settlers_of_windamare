@@ -1,4 +1,4 @@
-import type { Action, Layout, PlayerId } from '../engine';
+import type { Action, PlayerId } from '../engine';
 
 export type Controller = 'human' | 'bot';
 
@@ -9,11 +9,20 @@ export interface SeatConfig {
   controller: Controller;
 }
 
-/** Emitted by the new-game screen. T7 maps `players` to `createGame` and spawns bots for 'bot' seats. */
+export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';
+
+/** Emitted by the setup screen. The controller maps `players` to `createGame` and spawns bots for 'bot' seats. */
 export interface NewGameConfig {
-  /** 3–4 seats in turn order. */
+  mode: 'base';
+  map: MapId;
+  /** 3–8 seats in turn order. */
   players: SeatConfig[];
-  layout: Layout;
+  rules: { balancedDice: boolean; hideBankCards: boolean };
+  /** Seconds per turn; null = no timer. */
+  turnTimerSec: number | null;
+  vpToWin: number;
+  /** A player holding more than this many cards discards half on a 7. */
+  discardLimit: number;
   /** Absent = the controller picks one. */
   seed?: string;
 }

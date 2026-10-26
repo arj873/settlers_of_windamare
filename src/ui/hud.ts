@@ -14,22 +14,17 @@ import {
   type ResourceCounts,
 } from '../engine';
 import {
-  buildNewGameConfig,
-  defaultNewGame,
   discardAction,
   draftToAction,
   emptyDraft,
-  pickSeatColor,
-  resizeSeats,
-  SEAT_COLORS,
   stepDiscard,
   stepDraft,
   toggleRecipient,
   validateDiscard,
   validateDraft,
-  type NewGameDraft,
   type TradeDraft,
 } from './composer';
+import { SetupScreen } from './setup/screen';
 import { h, type Child } from './dom';
 import { dieFace, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
@@ -79,7 +74,7 @@ export class Hud {
   private yopFirst: Resource | null = null;
   private draft: TradeDraft = emptyDraft([]);
   private discardSel: ResourceCounts = emptyResources();
-  private newGame: NewGameDraft = defaultNewGame();
+  private setup: SetupScreen | null = null;
   private newGameOpen = false;
   /** The viewer who has been shown the screen (hotseat cover compares against this). */
   private unlockedViewer: PlayerId | null = null;
@@ -126,11 +121,14 @@ export class Hud {
   /** Open the new-game screen (also what the winner screen's button does). */
   showNewGame(): void {
     this.newGameOpen = true;
+    // A fresh screen each time: it reloads the remembered settings.
+    this.setup = null;
     this.refresh();
   }
 
   hideNewGame(): void {
     this.newGameOpen = false;
+    this.setup = null;
     this.refresh();
   }
 
@@ -203,7 +201,8 @@ export class Hud {
     const view = this.view;
 
     if (this.newGameOpen) {
-      r.overlay.replaceChildren(this.newGameScreen());
+      this.setup ??= this.newSetupScreen();
+      r.overlay.replaceChildren(this.setup.element);
       this.root.classList.add('is-covered');
       for (const k of ['players', 'hint', 'dice', 'log', 'bottom', 'dialog'] as const) {
         r[k].replaceChildren();
@@ -1130,169 +1129,18 @@ export class Hud {
     );
   }
 
-  private newGameScreen(): HTMLElement {
-    const draft = this.newGame;
-    const set = (d: NewGameDraft) => {
-      this.newGame = d;
-      this.refresh();
-    };
-    const seatRows = draft.seats.map((seat, i) =>
-      h(
-        'div',
-        { class: 'seat', style: { '--pc': seat.color } },
-        h('span', { class: 'seat-no' }, String(i + 1)),
-        h('input', {
-          class: 'input',
-          value: seat.name,
-          maxLength: 16,
-          placeholder: `Player ${i + 1}`,
-          attrs: { 'aria-label': `Seat ${i + 1} name` },
-          on: {
-            input: (e) => {
-              // No re-render while typing: it would steal focus.
-              const s = this.newGame.seats[i];
-              if (s) s.name = (e.target as HTMLInputElement).value;
-            },
-          },
-        }),
-        h(
-          'div',
-          { class: 'swatches' },
-          ...SEAT_COLORS.map((c) =>
-            h('button', {
-              class: `swatch${c.color === seat.color ? ' is-on' : ''}`,
-              title: c.name,
-              style: { '--sw': c.color },
-              attrs: { 'aria-label': `${c.name} for seat ${i + 1}` },
-              on: { click: () => set(pickSeatColor(draft, i, c.color)) },
-            }),
-          ),
-        ),
-        h(
-          'div',
-          { class: 'seg' },
-          ...(['human', 'bot'] as const).map((c) =>
-            h(
-              'button',
-              {
-                class: `seg-btn${seat.controller === c ? ' is-on' : ''}`,
-                on: {
-                  click: () => {
-                    const seats = draft.seats.map((s, j) =>
-                      j === i ? { ...s, controller: c } : s,
-                    );
-                    set({ ...draft, seats });
-                  },
-                },
-              },
-              c === 'human' ? 'Human' : 'Bot',
-            ),
-          ),
-        ),
-      ),
-    );
-
-    const seg = <T extends string | number>(
-      options: { value: T; label: string }[],
-      current: T,
-      onPick: (v: T) => void,
-    ) =>
-      h(
-        'div',
-        { class: 'seg' },
-        ...options.map((o) =>
-          h(
-            'button',
-            {
-              class: `seg-btn${o.value === current ? ' is-on' : ''}`,
-              on: { click: () => onPick(o.value) },
-            },
-            o.label,
-          ),
-        ),
-      );
-
-    return h(
-      'div',
-      { class: 'newgame' },
-      h(
-        'div',
-        { class: 'newgame-card' },
-        h('div', { class: 'logo' }, '⬡'),
-        h('h1', {}, 'New game'),
-        h('p', { class: 'muted' }, 'Build, trade and settle the island'),
-        h(
-          'div',
-          { class: 'field' },
-          h('label', {}, 'Players'),
-          seg(
-            [
-              { value: 3, label: '3' },
-              { value: 4, label: '4' },
-            ],
-            draft.seats.length,
-            (n) => set(resizeSeats(draft, n === 3 ? 3 : 4)),
-          ),
-        ),
-        h('div', { class: 'seats' }, ...seatRows),
-        h(
-          'div',
-          { class: 'field' },
-          h('label', {}, 'Board'),
-          seg(
-            [
-              { value: 'beginner' as const, label: 'Beginner' },
-              { value: 'random' as const, label: 'Random' },
-            ],
-            draft.layout,
-            (layout) => set({ ...draft, layout }),
-          ),
-        ),
-        h(
-          'div',
-          { class: 'field' },
-          h('label', {}, 'Seed'),
-          h('input', {
-            class: 'input',
-            value: draft.seed,
-            placeholder: 'optional',
-            maxLength: 32,
-            attrs: { 'aria-label': 'Seed' },
-            on: {
-              input: (e) => {
-                this.newGame.seed = (e.target as HTMLInputElement).value;
-              },
-            },
-          }),
-        ),
-        h(
-          'div',
-          { class: 'dialog-actions' },
-          this.state &&
-            h(
-              'button',
-              { class: 'btn btn-ghost', on: { click: () => this.hideNewGame() } },
-              'Back',
-            ),
-          h(
-            'button',
-            {
-              class: 'btn btn-primary btn-lg',
-              on: {
-                click: () => {
-                  this.newGameOpen = false;
-                  this.unlockedViewer = null;
-                  this.state = null;
-                  this.view = null;
-                  this.emit('newGame', buildNewGameConfig(this.newGame));
-                  this.refresh();
-                },
-              },
-            },
-            'Start game',
-          ),
-        ),
-      ),
-    );
+  private newSetupScreen(): SetupScreen {
+    return new SetupScreen({
+      onBack: this.state ? () => this.hideNewGame() : undefined,
+      onStart: (cfg) => {
+        this.newGameOpen = false;
+        this.setup = null;
+        this.unlockedViewer = null;
+        this.state = null;
+        this.view = null;
+        this.emit('newGame', cfg);
+        this.refresh();
+      },
+    });
   }
 }

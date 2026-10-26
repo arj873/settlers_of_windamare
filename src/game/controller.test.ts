@@ -138,12 +138,17 @@ describe('GameController: rendering and actions', () => {
   it('starts a game from the new-game config with the chosen seats', () => {
     const c = make();
     const cfg: NewGameConfig = {
+      mode: 'base',
+      map: 'base',
+      rules: { balancedDice: false, hideBankCards: false },
+      turnTimerSec: null,
+      vpToWin: 10,
+      discardLimit: 7,
       players: [
         { name: 'Ann', color: '#d64541', controller: 'human' },
         { name: 'Bot', color: '#3a7bd5', controller: 'bot' },
         { name: 'Cy', color: '#ecf0f1', controller: 'human' },
       ],
-      layout: 'beginner',
       seed: 'abc',
     };
     hud.emit('newGame', cfg);

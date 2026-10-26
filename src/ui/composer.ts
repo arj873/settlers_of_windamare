@@ -1,4 +1,4 @@
-/** Pure form logic: trade composer, discard picker, new-game config. No DOM. */
+/** Pure form logic: trade composer, discard picker. (New-game setup lives in ./setup.) No DOM. */
 import {
   emptyResources,
   RESOURCES,
@@ -10,7 +10,6 @@ import {
   type ResourceBundle,
   type ResourceCounts,
 } from '../engine';
-import type { Controller, NewGameConfig, SeatConfig } from './types';
 
 // ---------------------------------------------------------------------------
 // Player trade composer
@@ -129,83 +128,4 @@ export function validateDiscard(
 
 export function discardAction(player: PlayerId, selection: ResourceCounts): Action {
   return { type: 'discard', player, resources: toBundle(selection) };
-}
-
-// ---------------------------------------------------------------------------
-// New game
-// ---------------------------------------------------------------------------
-
-export const SEAT_COLORS: readonly { name: string; color: string }[] = [
-  { name: 'Red', color: '#d64541' },
-  { name: 'Blue', color: '#3a7bd5' },
-  { name: 'White', color: '#ecf0f1' },
-  { name: 'Orange', color: '#f39c12' },
-  { name: 'Green', color: '#3fae6a' },
-  { name: 'Purple', color: '#9b59b6' },
-];
-
-export interface SeatDraft {
-  name: string;
-  color: string;
-  controller: Controller;
-}
-
-export interface NewGameDraft {
-  seats: SeatDraft[];
-  layout: 'beginner' | 'random';
-  seed: string;
-}
-
-export function defaultNewGame(seatCount: 3 | 4 = 4): NewGameDraft {
-  const seats: SeatDraft[] = [];
-  for (let i = 0; i < seatCount; i++) {
-    const c = SEAT_COLORS[i];
-    seats.push({
-      name: i === 0 ? 'You' : c ? c.name : `Player ${i + 1}`,
-      color: c ? c.color : '#888',
-      controller: i === 0 ? 'human' : 'bot',
-    });
-  }
-  return { seats, layout: 'beginner', seed: '' };
-}
-
-/** Grow/shrink to `count` seats, keeping the existing ones and picking unused colors for new ones. */
-export function resizeSeats(draft: NewGameDraft, count: 3 | 4): NewGameDraft {
-  const seats = draft.seats.slice(0, count);
-  while (seats.length < count) {
-    const used = new Set(seats.map((s) => s.color));
-    const c = SEAT_COLORS.find((x) => !used.has(x.color)) ?? SEAT_COLORS[0];
-    seats.push({
-      name: c?.name ?? `Player ${seats.length + 1}`,
-      color: c?.color ?? '#888',
-      controller: 'bot',
-    });
-  }
-  return { ...draft, seats };
-}
-
-/** Give seat `index` the color; whoever had it gets the seat's old color (colors stay unique). */
-export function pickSeatColor(draft: NewGameDraft, index: number, color: string): NewGameDraft {
-  const seat = draft.seats[index];
-  if (!seat || seat.color === color) return draft;
-  const seats = draft.seats.map((s, i) => {
-    if (i === index) return { ...s, color };
-    if (s.color === color) return { ...s, color: seat.color };
-    return s;
-  });
-  return { ...draft, seats };
-}
-
-/** Trim names, fill blanks, make duplicates unique, drop an empty seed. */
-export function buildNewGameConfig(draft: NewGameDraft): NewGameConfig {
-  const taken = new Set<string>();
-  const players: SeatConfig[] = draft.seats.map((s, i) => {
-    const base = s.name.trim().slice(0, 16) || `Player ${i + 1}`;
-    let name = base;
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`;
-    taken.add(name.toLowerCase());
-    return { name, color: s.color, controller: s.controller };
-  });
-  const seed = draft.seed.trim();
-  return seed ? { players, layout: draft.layout, seed } : { players, layout: draft.layout };
 }
