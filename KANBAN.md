@@ -7,13 +7,12 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress
 
+- **T14** · Stage-2 integration: turn timer + auto-resolve, SBP hotseat flow, engine map previews, dice faces in log, disabled-button reasons, random starting player, harness check · `s2-integration` 🟦 · tab `s2-integration`
 - **T18** · AI playtest, 6 players (LIVE, headed window): 6 Haiku agents on Base 5-6P, seed pt6a, to 10 VP · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
-- **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · tab `s2-rules`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
 - **T16** · AI playtest: 3 Haiku agents play one hotseat game via the harness, file bugs to `playtest/bugs/`; orchestrator triages → fix agents · `s2-haiku-1..3` (Haiku) · deps: T15
-- **T14** · Controller (+ former T12 bits): turn timer + auto-resolve on timeout, special-build flow, map previews from engine data, save migration · `s2-integration` 🟦 · deps: T13, T17
 
 ## ✅ Ready
 
@@ -21,10 +20,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 1 polish (pick after playtest)
 
-- Disabled build buttons explain why on hover/tap (no legal spot / can't afford / no pieces left) (Haiku Seat2)
 - HUD log: detect new entries by last entry, not length (log is capped at 200) (from T8)
 - Spectator flag: hide hand + "you" tag in all-bot games (from T7)
-- Starting player: roll / shuffle seat order (official rule) (from T8)
 - In-game menu (new game / save / speed) + undo last human action (from T7)
 - Beginner start option: pre-place the rulebook starting pieces (from T8)
 
@@ -66,6 +63,9 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Delete dead speed-picker code in src/game (from T17)
 - Build cost on tap for touch screens (from T17)
 
+- Paired players' turns as an alternative to SBP (from T13)
+- Catan Event Cards variant on the dice deck (from T13)
+
 ## 🧊 Later — Stage 2+
 - Online multiplayer (Node + WebSocket, same engine)
 - Smarter AI (heuristic / MCTS)
@@ -95,3 +95,4 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **FIX** · Favicon 404 in console (Haiku playtest, 2 reports) · orchestrator · `b9a2eb4`
 - **BUG** · Discard dialog kept the previous player's picks in hotseat (Haiku Seat2+Seat5) · orchestrator · `239fd62` · regression test
 - **BUG** · Build card showed dev deck 34/25 on 5-6P (spotted by orchestrator while triaging) · `1909494`
+- **T13** · Rules: Special Building Phase (5+ players), discard limit, Balanced Dice, RULES.md 5–8P section, sims on every map size · `s2-rules` 🟦 · deps: T10 · merged `f4c609c` · 595 tests · 1200 sim games clean
