@@ -8,7 +8,15 @@ import { pieceLimit } from '../../../engine/expansions/hooks';
 import { playerName } from '../../../engine/rules/text';
 import { isResource } from '../../../engine/resources';
 import type { EdgeId, GameState, HexId, PlayerId, Terrain, VertexId } from '../../../engine/types';
-import { bordersFog, fogAtEnds, graph, isShipEdge, sidesOf } from './geometry';
+import {
+  bordersFog,
+  fogAtEnds,
+  graph,
+  isShipEdge,
+  shipEdges,
+  sidesOf,
+  touchesFog,
+} from './geometry';
 import { epBoard, T } from './maps';
 import {
   BASE_MP,
@@ -150,7 +158,8 @@ export function reachable(state: GameState, ship: Ship): Map<EdgeId, Reach> {
   const pirate = tributeHex(state, ship);
   const canPay = (s.gold[ship.owner] ?? 0) >= 1;
   const pirateSides = new Set(pirate ? sidesOf(state, pirate) : []);
-  const stops = (e: EdgeId) => fogAtEnds(state, e).length > 0;
+  const stops = (e: EdgeId) => touchesFog(state, e);
+  const routes = shipEdges(state);
   // BFS over (edge, paid): free paths first.
   const seen = new Map<string, number>();
   type Node = { e: EdgeId; paid: boolean; d: number };
@@ -165,7 +174,7 @@ export function reachable(state: GameState, ship: Ship): Map<EdgeId, Reach> {
       const ends = g.ends.get(node.e) ?? [];
       for (const v of ends) {
         for (const e of g.edgesAt.get(v) ?? []) {
-          if (e === node.e || !isShipEdge(state, e)) continue;
+          if (e === node.e || !routes.has(e)) continue;
           const paid = node.paid || pirateSides.has(node.e) || pirateSides.has(e);
           if (paid && !canPay) continue;
           const key = `${e}|${paid ? 1 : 0}`;

@@ -714,6 +714,11 @@ export const HANDLERS: Record<EpActionType, H> = {
         const s = epSlice(draft);
         pay(draft, a.player, costOf(draft, ITEM.ship) as ResourceCounts);
         if (replace !== undefined) {
+          // Its cargo goes back to the supply too (E5): fish hauls can be caught again.
+          const old = shipById(s, replace);
+          s.haulSupply += old?.cargo.filter((c) => c === 'fish').length ?? 0;
+          if (s.turn.active === replace) s.turn.active = null;
+          if (s.turn.selected === replace) s.turn.selected = null;
           s.ships = s.ships.filter((x) => x.id !== replace);
           log(
             draft,

@@ -60,6 +60,10 @@ const isWater = (k: HexKind) => k === 'sea' || k === 'frame';
  * not; edges inside the frame are not on the board.
  */
 export function isShipEdge(state: GameState, e: EdgeId): boolean {
+  return dynamicOf(state).shipEdges.has(e);
+}
+
+function computeShipEdge(state: GameState, e: EdgeId): boolean {
   const sides = graph(state).sides.get(e);
   if (!sides) return false;
   const inside = staticOf(state).inside;
@@ -70,6 +74,42 @@ export function isShipEdge(state: GameState, e: EdgeId): boolean {
     if (isWater(hexKind(state, h))) water = true;
   }
   return water && onBoard;
+}
+
+interface Dynamic {
+  shipEdges: ReadonlySet<EdgeId>;
+  /** Vertices at a corner of a face-down hex. */
+  fogVertices: ReadonlySet<VertexId>;
+}
+
+/**
+ * Sea routes and face-down corners of a board, cached per `board.hexes` object (exploring
+ * replaces it copy-on-write, so a new board gets new sets).
+ */
+const DYNAMIC = new WeakMap<object, Dynamic>();
+function dynamicOf(state: GameState): Dynamic {
+  let d = DYNAMIC.get(state.board.hexes);
+  if (!d) {
+    const g = graph(state);
+    const shipEdges = new Set(g.edges.filter((e) => computeShipEdge(state, e)));
+    const fogVertices = new Set<VertexId>();
+    for (const [h, tile] of Object.entries(state.board.hexes) as [HexId, { terrain: string }][]) {
+      if (terrainKind(tile.terrain as never) !== 'fog') continue;
+      for (const v of g.hexVertices.get(h) ?? []) fogVertices.add(v);
+    }
+    d = { shipEdges, fogVertices };
+    DYNAMIC.set(state.board.hexes, d);
+  }
+  return d;
+}
+
+/** Every sea route of the board. */
+export const shipEdges = (state: GameState): ReadonlySet<EdgeId> => dynamicOf(state).shipEdges;
+
+/** A ship with an end here must explore (an end at a face-down corner). */
+export function touchesFog(state: GameState, e: EdgeId): boolean {
+  const fog = dynamicOf(state).fogVertices;
+  return (graph(state).ends.get(e) ?? []).some((v) => fog.has(v));
 }
 
 /** Face-down hexes at a vertex. */
