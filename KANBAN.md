@@ -14,7 +14,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress — Stage 2
 
-- **T18** · AI playtest, 6 players (LIVE, headed window): game 2 on latest build (wood HUD + SBP), seed pt6b, fresh Haiku agents; game 1 (pt6a) ended at turn 32 on the old-build discard bug · tabs `pt6-game` + `pt6-seats-4-6` · bugs → `catan-wt/pt6/playtest/bugs/`
 
 ## 📋 Backlog — Stage 2 (setup screen + up to 8 players)
 
@@ -124,3 +123,4 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - **FIX** · Harness read VP from the old panel (Haiku Seat1, false positive) · orchestrator · `42a2fe8`
 - **P2** · Road junctions look clean for any mix of owners (your screenshot) · `s3-road-joints` 🟩 · merged
 - **H1** · Hosting research → docs/HOSTING.md (no deploys) · `s3-hosting` 🟩 · merged
+- **T18** · 6-player Haiku playtest · game 1 (pt6a): 3 real bugs found+fixed, ended turn 32 on old-build discard bug · game 2 (pt6b, wood HUD + SBP): **Seat6 won at turn 90**, no rules violations seen; found the camera-zoom blocker (BUG-B1)
