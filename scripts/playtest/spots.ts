@@ -11,6 +11,7 @@ import {
   type PlayerId,
   type VertexId,
 } from '../../src/engine';
+import { locationOf } from '../../src/game/logic';
 
 export interface Spot {
   /** 1-based number the agent types: `click-spot 3`. */
@@ -101,22 +102,21 @@ export function describeHex(state: GameState, h: HexId, viewer: PlayerId): strin
  * Vertex spots come best-first (most pips), so short lists of good options lead.
  */
 export function listSpots(state: GameState, targets: readonly Action[], viewer: PlayerId): Spot[] {
-  const pips = (a: Action) => ('vertex' in a ? vertexPips(state, a.vertex) : 0);
+  const pips = (a: Action) => {
+    const at = locationOf(a);
+    return at?.kind === 'vertex' ? vertexPips(state, at.id) : 0;
+  };
   const ordered = [...targets].sort((a, b) => pips(b) - pips(a));
   const spots: Spot[] = [];
   for (const a of ordered) {
     const n = spots.length + 1;
-    if ('vertex' in a) {
-      spots.push({
-        n,
-        id: a.vertex,
-        kind: 'vertex',
-        text: describeVertex(state, a.vertex, viewer),
-      });
-    } else if ('edge' in a) {
-      spots.push({ n, id: a.edge, kind: 'edge', text: describeEdge(state, a.edge, viewer) });
-    } else if ('hex' in a) {
-      spots.push({ n, id: a.hex, kind: 'hex', text: describeHex(state, a.hex, viewer) });
+    const at = locationOf(a);
+    if (at?.kind === 'vertex') {
+      spots.push({ n, id: at.id, kind: 'vertex', text: describeVertex(state, at.id, viewer) });
+    } else if (at?.kind === 'edge') {
+      spots.push({ n, id: at.id, kind: 'edge', text: describeEdge(state, at.id, viewer) });
+    } else if (at?.kind === 'hex') {
+      spots.push({ n, id: at.id, kind: 'hex', text: describeHex(state, at.id, viewer) });
     }
   }
   return spots;

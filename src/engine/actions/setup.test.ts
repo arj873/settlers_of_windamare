@@ -4,7 +4,7 @@ import { applyAction, legalActions } from '../engine';
 import { cornerVertex } from '../hex';
 import { freshGame, midGame, setupInProgressGame } from '../fixtures';
 import { Rng } from '../rng';
-import { emptyResources } from '../resources';
+import { emptyResources, isResource } from '../resources';
 import { buildingsOf, roadsOf } from '../selectors';
 import { TOPOLOGY, vertexEdges, vertexHexes, vertexNeighbors } from '../topology';
 import type { GameState, PlayerId, ResourceCounts, VertexId } from '../types';
@@ -28,7 +28,7 @@ function playSetup(n: 3 | 4, seed: number) {
       if (phase.index >= n) {
         for (const h of vertexHexes(TOPOLOGY, action.vertex)) {
           const t = s.board.hexes[h]!.terrain;
-          if (t !== 'desert') expected[action.player]![t] += 1;
+          if (isResource(t)) expected[action.player]![t] += 1;
         }
       }
     }
@@ -95,7 +95,7 @@ describe('placeSetupSettlement', () => {
     const gain = emptyResources();
     for (const h of vertexHexes(TOPOLOGY, v)) {
       const t = s.board.hexes[h]!.terrain;
-      if (t !== 'desert') gain[t] += 1;
+      if (isResource(t)) gain[t] += 1;
     }
     expect(RESOURCES.reduce((sum, r) => sum + gain[r], 0)).toBe(2);
     for (const r of RESOURCES) expect(s.players[2]!.resources[r]).toBe(before[r] + gain[r]);

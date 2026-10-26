@@ -12,6 +12,8 @@ src/bots/    bots + headless sim      imports engine only
 src/render/  PixiJS board view        imports engine (read-only)
 src/ui/      HTML/CSS overlay         imports engine (read-only)
 src/game/    controller               owns the current GameState; wires everything
+src/expansions/<id>/  one folder per expansion module: engine/ (engine rules apply), render.ts,
+             ui.ts, bots.ts — the framework contract is docs/EXPANSIONS.md (F1)
 ```
 
 Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, action) -> new state -> render/ui`.
@@ -58,11 +60,17 @@ The board is chosen at `createGame` as `settings.map: MapId` and never changes.
 | `base56`     | 30 hexes (3-4-5-6-5-4-3), random     | 3–6     | 30 / 22 / 80 / 109 / 11                   | 24   | 34       |
 | `base78`     | 37 hexes (4-5-6-7-6-5-4, our design) | 3–8     | 37 / 24 / 96 / 132 / 12                   | 29   | 43       |
 
-`MAPS[id]: MapDef` = `{ frame, minPlayers, maxPlayers, layout: 'beginner'|'random', terrain, tokens,
-harbors, bankPerResource, devDeck }`. A `FrameDef` = land row widths + harbor spots. Sources and
-design notes: `docs/RULES.md` §16. Helpers: `MAP_IDS, isMapId, mapOf(state), supplyOf(state)`
-(bank per resource + dev deck composition of the game's map), `defaultMapFor(players)`
-(3–4 → `baseRandom`, 5–6 → `base56`, 7–8 → `base78`).
+`MAPS[id]: StdMapDef` = `{ frame, minPlayers, maxPlayers, layout: 'beginner'|'random', terrain, tokens,
+harbors, bankPerResource, devDeck }` for the base ids (`BaseMapId`). A `RowsFrameDef` = land row
+widths + harbor spots. Sources and design notes: `docs/RULES.md` §16. Helpers (`maps.ts`):
+`MAP_IDS` (base), `isBaseMapId`, `defaultMapFor(players)` (3–4 → `baseRandom`, 5–6 → `base56`,
+7–8 → `base78`). Helpers over base **and expansion** maps (`mapLookup.ts`): `isMapId`, `mapById`,
+`mapOf(state)`, `supplyOf(state)` (bank per resource + dev deck of the game: map supply changed by
+expansion `supply` hooks).
+
+**Expansion maps (F1):** `MapId = BaseMapId | '<expansion>/<name>'`. A `CustomMapDef`
+(`layout: 'custom'`, `generate(rng, players)`) on a `HexListFrameDef` (any hex set + explicit sea
+and harbors). Board helpers `assembleBoard`, `dealTokens`. Details: `docs/EXPANSIONS.md` §6.
 
 **Topology** is derived from the frame, built once per frame and cached, **not stored in GameState**:
 
@@ -85,10 +93,15 @@ valid only for base-map games (fixtures, old tests, UI dev pages).
 | `hex[id]`           | `vertices` (6, clockwise from N), `edges` (6, clockwise from NE), `neighbors` (land) |
 | `vertex[id]`        | `hexes` (1–3 land), `edges` (2–3), `vertices` (2–3), `coastal`                       |
 | `edge[id]`          | `vertices` [2], `edges` (2–4), `hexes` (1–2 land), `coastal`                         |
+| `water[id]` (F1)    | + `vertices`, `edges`, `neighbors` (frame hexes), `playable` (listed sea, not ring)  |
+| `seas` (F1)         | on every vertex/edge info: adjacent water hexes                                      |
+| `seaVertices/Edges` | (F1) ids touching only water (`seaVertex` / `seaEdge` infos): ship routes            |
 
 Accessors take the topology first and return `[]` for unknown ids: `hexVertices(t, h), hexEdges,
 hexNeighbors, vertexHexes, vertexEdges, vertexNeighbors, edgeVertices, edgeNeighbors`.
-Validators for untrusted input: `isLandHex(t, id), isBoardVertex(t, id), isBoardEdge(t, id)`.
+Validators for untrusted input: `isLandHex(t, id), isBoardVertex(t, id), isBoardEdge(t, id)`,
+and (F1) `isWaterHex`, `isSeaEdge`, `vertexInfo` / `edgeInfo` (land or sea). Base frames' land
+fields, counts and orders are unchanged by the sea geometry.
 
 ## 4. GameState (`src/engine/types.ts`)
 
@@ -96,7 +109,7 @@ Plain JSON. `JSON.parse(JSON.stringify(s))` must equal `s`. Never mutate a state
 
 ```ts
 GameState {
-  schemaVersion: 4
+  schemaVersion: 5
   settings: GameSettings             // see below; fixed after createGame
   board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
@@ -112,8 +125,14 @@ GameState {
   log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
+  ext:     Record<ExpansionId, Json> // v5 (F1): one slice per active expansion; {} in base games
 }
 ```
+
+`Terrain` (F1) = `Resource | 'desert' | 'gold' | 'sea' | 'fog' | '<expansion>/<name>'`; only
+resource terrains produce in the core (`terrainKind` says land / sea / fog). `Action` and `Phase`
+also admit namespaced expansion members (`ExpansionAction`, `ExpansionPhase`); `BaseAction` /
+`BaseActionType` are the base ones. `Board.ext?` holds optional per-game expansion board data.
 
 **GameSettings v2** (validated by `createGame`, which throws on bad values):
 
@@ -128,12 +147,18 @@ GameState {
 | `hideBankCards`     | boolean              | false           | client-side only (UI hides bank counts); engine ignores it   |
 | `turnTimerSec`      | positive int \| null | null            | client-side only; engine ignores it (controller timer, §13b) |
 | `startingPlayer`    | PlayerId (v4, T14)   | drawn from seed | places first in setup, takes turn 1 (RULES.md 2.7)           |
+| `mode`              | ModeId (v5, F1)      | `'base'`        | setup preset of expansions + scenarios (EXPANSIONS.md §3)    |
+| `expansions`        | ExpansionId[] (v5)   | mode's          | active modules, registry order; `[]` = base                  |
+| `scenario`          | ScenarioId \| null   | mode's first    | picks the map per player count, default VP                   |
+| `options`           | per-expansion record | option defaults | every option of every active module                          |
 
 `startingPlayer` in the config is `PlayerId | 'random'` (default `'random'`): `randomStartingPlayer(seed, n)`
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
 before T14. `createGame` logs "Blue starts" right after "Game created …". Fixtures pin seat 0.
 
-**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v4 state from a v1, v2, v3 or v4 one, or null.
+**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v5 state from a v1–v5 one, or null.
+v4 → v5 (F1): `mode 'base', expansions [], scenario null, options {}`, `ext: {}`; a v5 save naming
+an unknown expansion / mode / scenario → null.
 v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new fields get their defaults
 (`specialBuildPhase: false`). v2 → v3 (T13): `diceDeck: []` (the next balanced roll shuffles).
 v3 → v4 (T14): `settings.startingPlayer: 0` (every older game started with seat 0). Log texts are
@@ -228,26 +253,35 @@ All files above live in `src/engine/actions/`. Each file's header comment lists 
 ```
 applyAction(state, action):
   phase gameOver?          → { ok:false, error:'game is over' }
-  unknown action.type?     → error
+  unknown action.type?     → error    ('<x>/...' only if module x is active)
   action.player not 0..n-1 → error
   draft = cloneState(state)                         // clone.ts, see below
-  result = HANDLERS[action.type](draft, action)     // handler mutates draft, returns ok(draft) | fail(msg)
-  if ok: updateAwards(draft, { roads: changesRoads(type) }) (rules/awards.ts)
+  result = handler(draft, action)                   // HANDLERS[type] wrapped by active modules' overrides,
+                                                    // or the module's own handler (EXPANSIONS.md §4)
+  if ok: afterAction hooks
+         updateAwards(draft, { roads: changesRoads(type) || module changesRoads }) (rules/awards.ts)
          checkVictory(draft) (rules/victory.ts)
          trim draft.log to the newest LOG_LIMIT entries
   return result
 ```
+
+Core rules call expansion hooks only through `src/engine/expansions/hooks.ts` (`costOf`,
+`pieceLimit`, `cardsInHand`, production, roll, 7, VP, trade ratio, road length, turn start/end,
+placement blockers; table in EXPANSIONS.md §5). With no active module every runner is a no-op.
 
 - **Pure:** the input state is never mutated (tested with a deep-frozen state).
 - **Structural sharing (`cloneState`)**: `board` and `settings` are shared between states, and so are
   log entries (the `log` array itself is copied). Everything else is copied. So handlers must
   **never mutate `board`, `settings` or an existing log entry** (append with `log()` only). A new
   GameState field must be copied in `clone.ts` (`clone.test.ts` fails otherwise). This replaced
-  `structuredClone`, which was ~85% of sim time.
+  `structuredClone`, which was ~85% of sim time. Expansion slices (`ext`) and expansion phases
+  are deep-copied (`cloneJson`, or the module's `cloneExt`); an expansion may replace
+  `draft.board` copy-on-write (fog reveal) but never mutate it.
 - **Longest Road** is recomputed only after actions that add a road or occupy a vertex
   (`changesRoads`: setup settlement/road, buildRoad, buildSettlement, placeFreeRoad). A new action
   that changes roads or building occupancy must be added there. Largest Army is always recomputed.
-- `legalActions(state, player?)` = concat of every area's `LegalGenerator`, optionally filtered by actor.
+- `legalActions(state, player?)` = concat of every area's `LegalGenerator`, then active modules'
+  `legal`, then their `filterLegal`, optionally filtered by actor.
   **Sound** (everything returned is accepted by applyAction — tested) and **complete**, except
   `offerTrade`, which is open-ended: return a bounded sample (e.g. 1-for-1 offers).
   Discard combos can be numerous (≤ ~1000) — acceptable.
@@ -278,7 +312,9 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 | `createGame.ts`        | `createGame({ seed, players: {name,color}[], map?, vpToWin?, discardLimit?, balancedDice?, specialBuildPhase?, hideBankCards?, turnTimerSec?, startingPlayer? })` → setup phase, starting player first. `layout?` still accepted (v1 compat, → `layoutToMap`). `resolveSettings(config)` validates without building a game. |
 | `rules/longestRoad.ts` | `longestRoadLength(s,p)`, `longestRoadLengths(s)` — longest trail, broken by opponent buildings (T3)                                                                                                                                                                                                                        |
 | `actions/trade.ts`     | `bankTradeRatio(s,p,resource)` → 2 / 3 / 4 (T3)                                                                                                                                                                                                                                                                             |
-| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill)                                                                                                                                                                                                     |
+| `actions/turn.ts`      | `specialBuildQueue(s)` → builders still to come in a `specialBuild` phase (as far as known now; T14, for the turn pill); `continueRoll(draft)`, `discardAmounts(s)` (F1)                                                                                                                                                    |
+| `expansions/*` (F1)    | registry (`listModes, modeById, scenarioById, expansionById, activeModules, isActive, mapDef`), hook values (`costOf, pieceLimit, terrainKind, expansionVictoryPoints`), `extSlice, cloneJson, NO_ROBBER, doubledToHexId`; `createGame.ts`: `resolveMode, defaultVpToWin, optionVpBonus`. See `docs/EXPANSIONS.md`.         |
+| `selectors.ts` (F1)    | `cardsInHand(s, p)` (resources + expansion cards, for the 7 rule and stealing); `piecesLeft` uses `pieceLimit`; VP selectors add expansion VP                                                                                                                                                                               |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -313,15 +349,16 @@ Each returns a fresh, internally consistent state on the beginner board (map `ba
 
 ## 11. Task ownership
 
-| Task               | Owns                                                                                                                                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1 foundation      | `types.ts, hex.ts, topology.ts, rng.ts, board.ts, constants.ts, resources.ts, selectors.ts, rules/placement.ts, createGame.ts, engine.ts, actions/index.ts, actions/common.ts, fixtures.ts`, tooling |
-| **T2 rules-core**  | `actions/setup.ts, actions/turn.ts` (incl. production), `actions/build.ts, actions/robber.ts, rules/victory.ts`; may add `rules/production.ts` etc.                                                  |
-| **T3 rules-trade** | `actions/trade.ts, actions/dev.ts, rules/awards.ts` (longest road, largest army); may add `rules/longestRoad.ts` etc.                                                                                |
-| **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                     |
-| **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                    |
-| T6 UI              | `src/ui/**`                                                                                                                                                                                          |
-| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                         |
+| Task               | Owns                                                                                                                                                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1 foundation      | `types.ts, hex.ts, topology.ts, rng.ts, board.ts, constants.ts, resources.ts, selectors.ts, rules/placement.ts, createGame.ts, engine.ts, actions/index.ts, actions/common.ts, fixtures.ts`, tooling           |
+| **T2 rules-core**  | `actions/setup.ts, actions/turn.ts` (incl. production), `actions/build.ts, actions/robber.ts, rules/victory.ts`; may add `rules/production.ts` etc.                                                            |
+| **T3 rules-trade** | `actions/trade.ts, actions/dev.ts, rules/awards.ts` (longest road, largest army); may add `rules/longestRoad.ts` etc.                                                                                          |
+| **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                               |
+| **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                              |
+| T6 UI              | `src/ui/**`                                                                                                                                                                                                    |
+| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                                   |
+| F1 framework       | `src/engine/expansions/**`, `src/engine/mapLookup.ts`, `src/{render,ui,bots}/expansions.ts`, `docs/EXPANSIONS.md`, `src/expansions/demo/**`; expansion agents own `src/expansions/<id>/**` (EXPANSIONS.md §13) |
 
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
 files (a selector, a constant) are fine — mention them in your report.
@@ -346,6 +383,9 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
+- Expansions (F1): active modules' `BoardDrawer`s (`render/expansions.ts`) paint their terrains and
+  draw layers in three slots (board / pieces / top), rebuilt when their `sig` changes. Highlights,
+  hover, clicks and `screenPos` also work on sea vertices/edges and water hexes.
 
 ## 13. UI contract (`src/ui`, T6)
 
@@ -356,8 +396,8 @@ hud.render(state, { viewer, legal, isBotTurn, bots?, turnTimer? }); // call afte
                                                               // bots: boolean[] by PlayerId (bot marker); turnTimer: { remainingSec, totalSec } | null (T14)
 hud.setBotSpeed({ value, presets, onChange } | null);         // bot-speed picker inside the HUD menu (main.ts wires it)
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
-hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode:'base', map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[3..8], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
-hud.on('placeMode', (m: 'road'|'settlement'|'city'|null) => …); // build button toggled: board shows targets, click -> buildX
+hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode, scenario?, options?, map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
+hud.on('placeMode', (m: PlaceMode|null) => …);                // 'road'|'settlement'|'city' or an expansion build card's '<id>/<x>'; board shows targets
 hud.showNewGame();                                            // open the new-game screen (also the winner screen's button)
 hud.isCovered();                                              // hotseat cover or new-game screen up (controller pauses the turn timer)
 hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders: redraws only the turn pill (T14)
@@ -372,6 +412,10 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   `pointer-events: none`, so the slot gets hover (`.why` bubble) and tap (opens it for 3.5 s). The
   reason is also in the button's `data-why` (playtest harness).
 
+- Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
+  build cards (namespaced place modes), dialogs for their phases and turn-pill hints. The setup
+  screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
+  modes; `wip`/`demo` too with `?modes=all`). See `docs/EXPANSIONS.md` §8.
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
 - Build buttons emit nothing but `placeMode`. HUD leaves the mode itself when pieces/turn/phase change or the build stops being legal (it emits `placeMode(null)`); Esc cancels.
 - Implied board clicks (setup placement, robber, free roads) have no HUD button: use `boardPrompt(view)` (`'setupSettlement' | 'setupRoad' | 'moveRobber' | 'freeRoad' | null`) to know what to highlight.
@@ -452,7 +496,8 @@ c.destroy();
   builders, and the timer gives each human step its own slot.
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
-  timer in s, also on fixtures), `?first=0` (starting seat). `window.catan` = `{ controller, board, hud }`.
+  timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
+  mode), `?modes=all` (setup screen also offers wip / demo modes). `window.catan` = `{ controller, board, hud }`.
 - Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`

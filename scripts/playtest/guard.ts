@@ -48,6 +48,8 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
         : `${nameOf(state, phase.offer.from)} offers you a trade: \`click Accept\` or \`click Reject\`.`;
     case 'specialBuild':
       return 'Special build step (5+ players): build or buy a dev card if you like (no trading, no dev cards), then `click Pass`.';
+    default:
+      return `Expansion step (${phase.kind}): use the dialog or \`spots\` / \`click-spot N\`.`;
   }
 }
 

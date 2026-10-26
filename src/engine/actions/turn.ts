@@ -16,22 +16,61 @@
  * passSpecialBuild (phase specialBuild, the builder): next builder, or the next turn as above.
  */
 import { DEV_CARD_TYPES } from '../constants';
+import {
+  hookAfterProduction,
+  hookDiscardLimit,
+  hookRollDice,
+  hookSevenPhase,
+  runOnEndTurn,
+  runOnRoll,
+  runOnStartTurn,
+} from '../expansions/hooks';
 import { produce } from '../rules/production';
 import { rollTwoDice } from '../rules/dice';
 import { describeBundle, playerName } from '../rules/text';
 import { emptyDevCards, totalResources } from '../resources';
-import { handSize } from '../selectors';
+import { cardsInHand } from '../selectors';
 import type { Action, GameState, PlayerId } from '../types';
 import { buildLegal } from './build';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 import { canBuyDevCard } from './dev';
 
-/** Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit). */
+/**
+ * Cards each player must discard on a 7 (half, rounded down, if holding > settings.discardLimit).
+ * Expansions change the count and the limit through the handSize / discardLimit hooks.
+ */
 export function discardAmounts(state: GameState): number[] {
   return state.players.map((p) => {
-    const n = handSize(p);
-    return n > state.settings.discardLimit ? Math.floor(n / 2) : 0;
+    const n = cardsInHand(state, p.id);
+    const limit = hookDiscardLimit(state, p.id, state.settings.discardLimit);
+    return n > limit ? Math.floor(n / 2) : 0;
   });
+}
+
+/**
+ * The rest of a roll after the dice are set and logged (and after any onRoll interrupt): a 7
+ * goes to discard / moveRobber (or an expansion's onSeven phase), anything else produces and goes
+ * to main (or an expansion's afterProduction phase). Expansions that interrupted the roll call
+ * this when their phase is done.
+ */
+export function continueRoll(draft: GameState): void {
+  const roll = draft.dice ? draft.dice[0] + draft.dice[1] : 0;
+  if (roll === 7) {
+    const pending = discardAmounts(draft);
+    draft.phase =
+      hookSevenPhase(draft, pending) ??
+      (pending.some((n) => n > 0)
+        ? { kind: 'discard', pending }
+        : { kind: 'moveRobber', resume: 'main' });
+    return;
+  }
+
+  produce(draft, roll).forEach((gain, p) => {
+    if (totalResources(gain) > 0) {
+      log(draft, p, `${playerName(draft, p)} received ${describeBundle(gain)}`);
+    }
+  });
+  draft.phase = hookAfterProduction(draft, roll) ?? { kind: 'main' };
 }
 
 /** In a specialBuild phase for `state.turn.current`: can they build or buy anything? */
@@ -81,6 +120,7 @@ function startTurn(draft: GameState, player: PlayerId): void {
     tradeOffers: 0,
   };
   draft.phase = { kind: 'preRoll' };
+  runOnStartTurn(draft, player);
 }
 
 export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild'> = {
@@ -88,7 +128,8 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
     if (draft.phase.kind !== 'preRoll') return fail('cannot roll now');
     if (!isCurrent(draft, action.player)) return fail('not your turn');
 
-    const { dice, reshuffled } = rollTwoDice(draft);
+    const custom = hookRollDice(draft);
+    const { dice, reshuffled } = custom ? { dice: custom, reshuffled: false } : rollTwoDice(draft);
     draft.dice = dice;
     const roll = dice[0] + dice[1];
     if (reshuffled) log(draft, null, 'The dice deck was shuffled');
@@ -98,20 +139,12 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
       `${playerName(draft, action.player)} rolled ${roll} (${dice[0]}+${dice[1]})`,
     );
 
-    if (roll === 7) {
-      const pending = discardAmounts(draft);
-      draft.phase = pending.some((n) => n > 0)
-        ? { kind: 'discard', pending }
-        : { kind: 'moveRobber', resume: 'main' };
+    const interrupt = runOnRoll(draft, roll);
+    if (interrupt) {
+      draft.phase = interrupt;
       return ok(draft);
     }
-
-    produce(draft, roll).forEach((gain, p) => {
-      if (totalResources(gain) > 0) {
-        log(draft, p, `${playerName(draft, p)} received ${describeBundle(gain)}`);
-      }
-    });
-    draft.phase = { kind: 'main' };
+    continueRoll(draft);
     return ok(draft);
   },
 
@@ -127,6 +160,7 @@ export const turnHandlers: HandlerMap<'rollDice' | 'endTurn' | 'passSpecialBuild
     log(draft, action.player, `${playerName(draft, action.player)} ended the turn`);
     draft.turn.devCardPlayed = false;
     draft.turn.tradeOffers = 0;
+    runOnEndTurn(draft, action.player);
     if (draft.settings.specialBuildPhase) {
       advanceSpecialBuild(draft, action.player, action.player);
     } else {

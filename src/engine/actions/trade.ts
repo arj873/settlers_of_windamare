@@ -17,6 +17,7 @@
  * legalActions note: offerTrade is open-ended; we return 1:1 offers to all other players.
  */
 import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../constants';
+import { hookTradeRatio } from '../expansions/hooks';
 import {
   addResources,
   hasResources,
@@ -39,11 +40,11 @@ import type {
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
 
 /** Bank trade ratio for giving `give`: 2 (matching port), 3 (generic port) or 4. */
+/** 2 / 3 / 4 from harbors, then changed by expansions (bankTradeRatio hook). */
 export function bankTradeRatio(state: GameState, player: PlayerId, give: Resource): number {
   const ports = portsOf(state, player);
-  if (ports.includes(give)) return 2;
-  if (ports.includes('generic')) return 3;
-  return 4;
+  const base = ports.includes(give) ? 2 : ports.includes('generic') ? 3 : 4;
+  return hookTradeRatio(state, player, give, base);
 }
 
 function canBankTrade(

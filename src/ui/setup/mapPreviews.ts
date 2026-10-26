@@ -9,11 +9,12 @@ import {
   parseHexId,
   Rng,
   topologyFor,
+  type CoreTerrain,
   type HexId,
+  type MapId,
   type PortKind,
   type Terrain,
 } from '../../engine';
-import type { MapId } from '../types';
 
 export interface PreviewHex {
   q: number;
@@ -56,14 +57,22 @@ export function previewHexes(map: MapId): PreviewHex[] {
   return previewBoard(map).land.map(({ q, r }) => ({ q, r }));
 }
 
-export const PREVIEW_COLORS: Record<Terrain, string> = {
+export const PREVIEW_COLORS: Record<CoreTerrain, string> = {
   brick: '#c4532d',
   lumber: '#3f8f46',
   wool: '#9bcf6a',
   grain: '#e8c547',
   ore: '#7f8fa0',
   desert: '#d9c48f',
+  gold: '#f0c419',
+  sea: '#2f7fbf',
+  fog: '#8a9099',
 };
+
+/** Preview colour of any terrain (namespaced ones without an entry are grey). */
+export function previewColor(t: Terrain): string {
+  return Object.hasOwn(PREVIEW_COLORS, t) ? PREVIEW_COLORS[t as CoreTerrain] : '#9a9a9a';
+}
 
 const SQRT3 = Math.sqrt(3);
 
@@ -122,7 +131,7 @@ export function mapPreviewSvg(map: MapId): SVGSVGElement {
     svg.append(
       el('polygon', {
         points: corners(c.x, c.y, 0.93),
-        fill: PREVIEW_COLORS[hx.terrain],
+        fill: previewColor(hx.terrain),
         stroke: 'rgba(8,18,30,0.55)',
         'stroke-width': '0.08',
       }),

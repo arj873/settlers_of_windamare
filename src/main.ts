@@ -30,7 +30,8 @@ import {
  * or `?map=base|baseRandom|base56|base78` (start at once), `?autoplay=4bots&speed=0` (all-bot
  * game, 3..8 bots), `?seats=hbbb`, `?vp=5`, `?timer=20` (turn timer, s), `?first=0` (starting
  * seat), `?speed=ms`, `?hl=vertices|edges|hexes` (highlight preview), `?names=A,B,C`, `?debug=1`
- * (playtest hook). Without any, the new-game / resume screen opens.
+ * (playtest hook), `?mode=demo` (an expansion mode, docs/EXPANSIONS.md), `?modes=all` (setup
+ * screen also offers wip / demo modes). Without any, the new-game / resume screen opens.
  */
 function devGame(params: DevParams): { state: GameState; seats: Controller[] } | null {
   const seatsFor = (n: number, fallback: Controller): Controller[] =>
@@ -47,18 +48,19 @@ function devGame(params: DevParams): { state: GameState; seats: Controller[] } |
     }
     showToast(`Unknown fixture "${params.fixture}"`, 'error');
   }
-  if (params.autoplay || params.seed !== null || params.layout || params.map) {
+  if (params.autoplay || params.seed !== null || params.layout || params.map || params.mode) {
     const n = params.autoplay ?? params.seats?.length ?? 4;
     const seed = params.seed ?? String(Date.now() % 1e9);
     const map = params.map ?? (params.layout ? layoutToMap(params.layout) : defaultMapFor(n));
-    console.info(`Windamere dev game: map=${map} seed=${seed}`);
+    console.info(`Windamere dev game: mode=${params.mode ?? 'base'} map=${map} seed=${seed}`);
     const names = params.names?.length === n ? params.names : null;
     let state: GameState;
     try {
       state = createGame({
         seed,
         players: PLAYER_COLORS.slice(0, n).map((p, i) => ({ ...p, name: names?.[i] ?? p.name })),
-        map,
+        // An expansion mode takes its map from its scenario unless ?map= names one of its maps.
+        ...(params.mode ? { mode: params.mode, ...(params.map ? { map } : {}) } : { map }),
         ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
         ...(params.timer === null ? {} : { turnTimerSec: params.timer }),
         ...(params.first === null || params.first >= n ? {} : { startingPlayer: params.first }),

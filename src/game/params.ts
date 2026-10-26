@@ -1,5 +1,5 @@
 /** Dev query parameters. */
-import { isMapId, type Layout, type MapId } from '../engine';
+import { isMapId, modeById, type Layout, type MapId } from '../engine';
 import type { Controller } from '../ui';
 
 export interface DevParams {
@@ -27,6 +27,8 @@ export interface DevParams {
   names: string[] | null;
   /** `?debug=1`: install the read-only `window.__catanDebug` hook (playtest harness). */
   debug: boolean;
+  /** `?mode=demo`: start an expansion mode at once (its first scenario; docs/EXPANSIONS.md). */
+  mode: string | null;
 }
 
 export function parseParams(search: string): DevParams {
@@ -61,5 +63,6 @@ export function parseParams(search: string): DevParams {
     hl: hl === 'vertices' || hl === 'edges' || hl === 'hexes' ? hl : null,
     names: names.length > 0 ? names : null,
     debug: p.get('debug') === '1',
+    mode: modeById(p.get('mode') ?? '') ? p.get('mode') : null,
   };
 }

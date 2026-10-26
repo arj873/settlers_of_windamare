@@ -29,7 +29,14 @@ export type ResourceCounts = Record<Resource, number>;
 export type ResourceBundle = Partial<ResourceCounts>;
 
 /** Terrain is named by what it produces. hills=brick, forest=lumber, pasture=wool, fields=grain, mountains=ore. */
-export type Terrain = Resource | 'desert';
+export type BaseTerrain = Resource | 'desert';
+/**
+ * Terrains the core knows (docs/EXPANSIONS.md §6): the base ones plus 'gold' (gold field; produces
+ * only through an expansion hook), 'sea' (a board hex revealed as sea) and 'fog' (undiscovered).
+ */
+export type CoreTerrain = BaseTerrain | 'gold' | 'sea' | 'fog';
+/** Any terrain: core, or namespaced by an expansion ('demo/oasis'). Only Resource terrains produce in the core. */
+export type Terrain = CoreTerrain | `${string}/${string}`;
 
 export type DevCardType = 'knight' | 'victoryPoint' | 'roadBuilding' | 'yearOfPlenty' | 'monopoly';
 export type DevCardCounts = Record<DevCardType, number>;
@@ -46,7 +53,7 @@ export interface HexTile {
   q: number;
   r: number;
   terrain: Terrain;
-  /** Number token 2..12 (never 7). null on the desert. */
+  /** Number token 2..12 (never 7). null on the desert (and on non-producing terrains). */
   token: number | null;
 }
 
@@ -68,7 +75,9 @@ export interface Port {
  * 'base' = 19-hex beginner layout, 'baseRandom' = 19-hex random, 'base56' = 30-hex 5-6 player
  * extension board (random), 'base78' = 37-hex 7-8 player board (random).
  */
-export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';
+export type BaseMapId = 'base' | 'baseRandom' | 'base56' | 'base78';
+/** A base map, or an expansion map namespaced by its module ('demo/oasis19'). */
+export type MapId = BaseMapId | `${string}/${string}`;
 
 /** @deprecated v1 board choice; 'beginner' = map 'base', 'random' = map 'baseRandom'. */
 export type Layout = 'beginner' | 'random';
@@ -78,6 +87,11 @@ export interface Board {
   hexes: Record<HexId, HexTile>;
   /** The harbors (9 / 11 / 12). */
   ports: Port[];
+  /**
+   * Optional per-game static board data of expansions (rivers, island ids ...), keyed by
+   * expansion id. JSON. Shared like the rest of the board (docs/EXPANSIONS.md §6).
+   */
+  ext?: Record<ExpansionId, unknown>;
 }
 
 export type BuildingKind = 'settlement' | 'city';
@@ -161,7 +175,17 @@ export type Phase =
    * skipped. After the last one, owner+1 starts their turn (preRoll). Nobody wins in this phase.
    */
   | { kind: 'specialBuild'; builder: PlayerId; owner: PlayerId }
-  | { kind: 'gameOver' };
+  | { kind: 'gameOver' }
+  | ExpansionPhase;
+
+/**
+ * A phase added by an expansion: kind '<expansionId>/<name>', any JSON payload. Deep-copied for
+ * action drafts. Who may act: the module's `actors(state)` (default: turn.current).
+ */
+export interface ExpansionPhase {
+  kind: `${string}/${string}`;
+  [key: string]: unknown;
+}
 
 export type PhaseKind = Phase['kind'];
 
@@ -185,6 +209,14 @@ export interface LogEntry {
   text: string;
 }
 
+/** Expansion module id = its folder in src/expansions (no '/'). See docs/EXPANSIONS.md. */
+export type ExpansionId = string;
+/** Setup-screen mode ('base', 'demo', 'seafarers', 'seafarers+ck' ...). */
+export type ModeId = string;
+/** Scenario id, namespaced by the expansion that defines it ('demo/oasis'). */
+export type ScenarioId = string;
+export type OptionValue = boolean | number | string;
+
 /** Settings (schema v2+). Fixed after createGame. */
 export interface GameSettings {
   seed: number | string;
@@ -206,10 +238,18 @@ export interface GameSettings {
    * createGame draws it from the seed unless the config fixes it (RULES.md 2.7).
    */
   startingPlayer: PlayerId;
+  /** Setup-screen mode (schema v5). 'base' for the base game. */
+  mode: ModeId;
+  /** Active expansion modules in registry order (schema v5). [] = base game. */
+  expansions: ExpansionId[];
+  /** Scenario of the mode, or null (base maps) (schema v5). */
+  scenario: ScenarioId | null;
+  /** Every option of every active expansion, defaults filled in (schema v5). */
+  options: Record<ExpansionId, Record<string, OptionValue>>;
 }
 
 export interface GameState {
-  schemaVersion: 4;
+  schemaVersion: 5;
   settings: GameSettings;
   board: Board;
   pieces: Pieces;
@@ -233,13 +273,18 @@ export interface GameState {
   /** Seeded RNG state (uint32). Only touch through `Rng` in rng.ts. */
   rng: number;
   winner: PlayerId | null;
+  /**
+   * Expansion state, one JSON slice per active expansion, keyed by its id (schema v5). Created by
+   * the module's `init`; read with `extSlice(state, id)`. `{}` in base games.
+   */
+  ext: Record<ExpansionId, unknown>;
 }
 
 // ---------------------------------------------------------------------------
 // Actions. Every action names the acting `player`; applyAction rejects actors who may not act.
 // ---------------------------------------------------------------------------
 
-export type Action =
+export type BaseAction =
   // setup.ts
   | { type: 'placeSetupSettlement'; player: PlayerId; vertex: VertexId }
   | { type: 'placeSetupRoad'; player: PlayerId; edge: EdgeId }
@@ -277,6 +322,23 @@ export type Action =
   | { type: 'cancelTrade'; player: PlayerId }
   | { type: 'confirmTrade'; player: PlayerId; partner: PlayerId };
 
+/**
+ * An action added by an expansion: type '<expansionId>/<name>', any JSON payload. Each module
+ * declares its precise union in its own folder. Board locations use the field names vertex /
+ * edge / hex (the controller highlights and clicks them).
+ */
+export interface ExpansionAction {
+  type: ExpansionActionType;
+  player: PlayerId;
+  vertex?: VertexId;
+  edge?: EdgeId;
+  hex?: HexId;
+  [key: string]: unknown;
+}
+export type ExpansionActionType = `${string}/${string}`;
+
+export type Action = BaseAction | ExpansionAction;
+export type BaseActionType = BaseAction['type'];
 export type ActionType = Action['type'];
 export type ActionOf<T extends ActionType> = Extract<Action, { type: T }>;
 

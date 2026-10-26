@@ -1,0 +1,19 @@
+/* Demo expansion HUD panel (F1 example: expansion CSS lives in its own folder, imported by ui.ts). */
+.demo-panel p {
+  margin: 0 0 6px;
+}
+.demo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.demo-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px;
+  border-left: 4px solid var(--pc, #888);
+}
+.demo-name {
+  font-weight: 600;
+}

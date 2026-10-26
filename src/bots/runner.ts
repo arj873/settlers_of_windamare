@@ -10,10 +10,14 @@ import {
   Rng,
   type Action,
   type ActionResult,
+  type ExpansionId,
   type GameState,
   type Layout,
   type MapId,
+  type ModeId,
+  type OptionValue,
   type PlayerId,
+  type ScenarioId,
 } from '../engine';
 import { actorsFor, createRandomBot, type Bot } from './index';
 import { checkInvariants, type Violation } from './invariants';
@@ -40,12 +44,22 @@ export interface GameSetup {
   specialBuildPhase?: boolean;
   /** Default false. */
   balancedDice?: boolean;
+  /** Expansion mode (docs/EXPANSIONS.md). Default 'base'. */
+  mode?: ModeId;
+  /** Variant modules on top of the mode. */
+  expansions?: ExpansionId[];
+  scenario?: ScenarioId;
+  options?: Record<ExpansionId, Record<string, OptionValue>>;
 }
 
 export function newGame(setup: GameSetup): GameState {
   return createGame({
     seed: setup.seed,
     players: PLAYER_COLORS.slice(0, setup.players),
+    ...(setup.mode === undefined ? {} : { mode: setup.mode }),
+    ...(setup.expansions === undefined ? {} : { expansions: setup.expansions }),
+    ...(setup.scenario === undefined ? {} : { scenario: setup.scenario }),
+    ...(setup.options === undefined ? {} : { options: setup.options }),
     ...(setup.map === undefined ? {} : { map: setup.map }),
     ...(setup.layout === undefined ? {} : { layout: setup.layout }),
     ...(setup.vpToWin === undefined ? {} : { vpToWin: setup.vpToWin }),

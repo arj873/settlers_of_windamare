@@ -1,10 +1,11 @@
 /**
  * OWNER: T2 (rules-core).
- * Phase main, or specialBuild for its builder (T13). Pay COSTS.* into the bank; respect piecesLeft().
+ * Phase main, or specialBuild for its builder (T13). Pay costOf(state, piece) (COSTS.* unless an expansion changes it) into the bank; respect piecesLeft().
  * buildCity returns the settlement piece to the supply (implicit: piecesLeft is derived).
  * Helpers: canPlaceRoad, canPlaceSettlement(.., { requireRoad: true }), canPlaceCity.
  */
-import { COSTS, RESOURCES } from '../constants';
+import { RESOURCES } from '../constants';
+import { costOf } from '../expansions/hooks';
 import { canPlaceCity, canPlaceRoad, canPlaceSettlement } from '../rules/placement';
 import { playerName } from '../rules/text';
 import { hasResources } from '../resources';
@@ -34,7 +35,7 @@ function buildPrecheck(state: GameState, player: PlayerId, piece: Piece): string
   if (!isBuildPhase(state)) return 'can only build in the main or special building phase';
   if (!isCurrent(state, player)) return 'not your turn';
   const hand = state.players[player]?.resources;
-  if (!hand || !hasResources(hand, COSTS[piece])) return `cannot afford a ${piece}`;
+  if (!hand || !hasResources(hand, costOf(state, piece))) return `cannot afford a ${piece}`;
   if (piecesLeft(state, player)[piece] <= 0) return `no ${PLURAL[piece]} left`;
   return null;
 }
@@ -49,7 +50,7 @@ function pay(draft: GameState, player: PlayerId, cost: ResourceCounts): void {
 }
 
 function built(draft: GameState, player: PlayerId, piece: Piece): ActionResult {
-  pay(draft, player, COSTS[piece]);
+  pay(draft, player, costOf(draft, piece));
   log(draft, player, `${playerName(draft, player)} built a ${piece}`);
   return ok(draft);
 }
