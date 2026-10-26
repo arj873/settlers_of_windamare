@@ -10,10 +10,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > You chose: invite link + nickname (no accounts), bots fill empty/disconnected seats, text chat, server-enforced turn timer, spectators, Cloudflare (Workers + Durable Objects).
 
-- **M4b** · 3 Haiku agents play one ONLINE game (room on wrangler dev, headed windows, seat 2 tests drop/reconnect) · `s4-haiku-1..3` (Haiku)
-- **UX2** · End-of-game **Game Statistics** (your Colonist screenshot): winner/turns/duration + tabs Overview · Dice · Resources · Activity · Dev Cards; engine stats slice, online-safe · `s4-game-stats` 🟦
-- **V2** · Optional **5+ player rule set** (settlersboard.com 5-6 FAQ, cross-checked with official rules): build phase may play 1 dev card, no robber on 2nd desert, 12 VP preset; + general **Map rules → Balance rules** (your mockup): Allow 6&8 touching / Allow 2&12 touching / Same numbers may touch / Same resources may touch, all off by default, all random maps, component-count audit · `s4-rules-56` 🟩
-- **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
+- **BUG-B3** · Online trade flow (from M4b Haiku online playtest): bots withdraw accepted trades; other humans never prompted for a human's offer; offers vanish without a log line · `s4-online-trade` 🟦
 
 ## 📋 Backlog — Stage 4
 
@@ -24,6 +21,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 > 🌿 All expansion code (F1, E1–E5, U1–U5, Q1–Q5, C1) merges into the **`expansions`** branch, not `main`. `expansions` merges to `main` only when stage 3 is done. Non-expansion work (theme, bug fixes, polish) still goes to `main`, and `main` is merged into `expansions` regularly.
 
+- **S1** · Sync `main` → `expansions` (24 conflicted files: V1/V2 variants, stats, online vs F1 hooks); then start E2 Seafarers + E3 C&K from the synced branch · `s3-exp-sync` 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -58,6 +56,9 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
+- (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
+- (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
 - (UX1) board sea tint per theme (`--board-sea` tokens) · "1 human + N bots" quick-fill
 - (M4b triage) harness `status` should show hand deltas with their log source (2 Haiku false positives: production misread as trade effects)
 - (M3) remove-seat-N protocol message + lobby kick button · unread badge on collapsed chat · CI job on `scripts/e2e/online.ts --remote` · reconnect banner vs toast overlap
@@ -123,6 +124,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **UX2** · Game Statistics at game over: Overview (VP breakdown + 8 awards), Dice (histogram vs expected), Resources (by type/source/loss), Activity (VP-over-turns chart), Dev Cards; engine `stats` slice, online-safe · `s4-game-stats` 🟦 · PR #12 → `main` · 1027 tests
+- **BUG-B2** · Board crisp at every zoom (text re-rasterised to zoom, renderer follows DPR) + fit the island not the sea (+18% on base78) · `s4-board-crisp` 🟦 · PR #11 → `main` · 987 tests
+- **V2** · Map **Balance rules** (4 Allow… toggles, all random maps) + optional **5+ player rule set** (dev card in build phase, no robber on 2nd desert, 12 VP) + component audit · `s4-rules-56` 🟩 · PR #10 → `main` · 981 tests
+- **M4b** · 3 Haiku agents played an online game to ~turn 87 (room on wrangler dev, headed); 5 reports → 2 false positives, 3 real trade-flow issues → BUG-B3 · `s4-haiku-1..3`
 - **UX1** · Seat × remove / + Add player; **GitHub Dark** + **Material Dark** themes (all screens incl. online + V1); 6P name-truncation fix · `s4-themes-seats` 🟩 · PR #9 → `main` · 921 tests
 - **M4a** · Online playtest harness (`pt:serve --online`, per-seat browser contexts vs wrangler dev, drop/reconnect/reload/chat) + GitHub Actions CI · `s4-mp-e2e` 🟩 · PR #8 → `main` · 917 tests
 - **V1** · Colonist-style settings: robber Normal/Friendly/None, Event Cards deck, chess clock presets (server-enforced online), randomize order, Second Settler, map Fixed/Random/Veto, setup placement · `s4-variants` 🟦 · PR #7 → `main` · 910 tests · ⚠️ your call later: Rush = auto-roll, Turbo = both setup settlements pay, presets Bullet 3m+5s / Blitz 5m+10s / Rapid 10m+15s

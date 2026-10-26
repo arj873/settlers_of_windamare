@@ -141,6 +141,9 @@ interface GameRec {
   offers: Record<string, number>;
   /** Chess clock (settings.timer) only: each player's bank in ms (engine clock.ts). */
   banks?: number[];
+  /** UX2: room clock at `start` and at game over (absent in older snapshots). */
+  startedAt?: number;
+  endedAt?: number;
 }
 
 /** Everything a room needs to survive a Durable Object restart. JSON-safe. */
@@ -649,6 +652,7 @@ export class GameSession {
       timeoutDueAt: null,
       timedOutKey: null,
       offers: {},
+      startedAt: this.now,
       ...(timerOf(state.settings).kind === 'bank'
         ? { banks: initialBanks(state.settings, state.players.length) }
         : {}),
@@ -818,6 +822,7 @@ export class GameSession {
     this.legalCache = null;
     this.gameDirty = true;
     if (g.state.phase.kind === 'gameOver') {
+      g.endedAt ??= this.now;
       g.clock = IDLE_CLOCK;
       g.botDueAt = null;
       g.timeoutDueAt = null;
@@ -947,6 +952,9 @@ export class GameSession {
       view: viewFor(g.state, seat ?? 'spectator'),
       legal: seat === null ? [] : this.legal().filter((a) => a.player === seat),
       timer,
+      ...(g.startedAt !== undefined && g.endedAt !== undefined
+        ? { durationMs: g.endedAt - g.startedAt }
+        : {}),
     };
   }
 

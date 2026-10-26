@@ -8,11 +8,13 @@
  */
 import {
   MAP_IDS,
+  MAP_RULE_KEYS,
   MAP_SELECTIONS,
   MAP_VETO_CANDIDATES,
   MAPS,
   RESOURCES,
   ROBBER_MODES,
+  RULES56_MIN_PLAYERS,
   SETUP_BUILDINGS,
   SETUP_RESTRICTIONS,
   TIMER_BANK_RANGE,
@@ -279,6 +281,8 @@ export type ServerMessage = V &
         /** The recipient's legal actions, computed by the server from the full state. */
         legal: Action[];
         timer: TimerInfo | null;
+        /** UX2: game over only — the room clock from start to the end (stats screen). */
+        durationMs?: number;
       }
     | { type: 'chat'; entry: ChatEntry }
     | { type: 'reaction'; member: MemberId; seat: PlayerId | null; reaction: Reaction }
@@ -464,6 +468,15 @@ export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
   if (variants?.secondSettler && seatCount < SECOND_SETTLER_MIN_PLAYERS) {
     throw new Invalid(`${vp}.secondSettler`, `needs ${SECOND_SETTLER_MIN_PLAYERS}+ seats`);
   }
+  if (variants?.rules56 && seatCount < RULES56_MIN_PLAYERS) {
+    throw new Invalid(`${vp}.rules56`, `needs ${RULES56_MIN_PLAYERS}+ seats`);
+  }
+  if (variants?.rules56 && variants.secondSettler) {
+    throw new Invalid(
+      `${vp}.rules56`,
+      'the 5+ rules use the special building phase: turn second settler off',
+    );
+  }
   return {
     mode: field(o, 'mode', oneOf(['base'] as const), path),
     map,
@@ -485,7 +498,19 @@ const VARIANT_FLAGS = [
   'turboMode',
   'secondSettler',
   'randomTurnOrder',
+  'rules56',
 ] as const;
+
+/** Map rules: strict keys, only `true` flags are kept (off = absent), so one canonical form. */
+const MAP_RULES: Check<NonNullable<NewGameVariants['mapRules']>> = (x, path) => {
+  const o = record(x, path);
+  onlyKeys(o, MAP_RULE_KEYS, path);
+  const out: NonNullable<NewGameVariants['mapRules']> = {};
+  for (const k of MAP_RULE_KEYS) {
+    if (optional(o, k, bool, path)) out[k] = true;
+  }
+  return out;
+};
 
 const SETUP_ROUND: Check<SetupRound> = (x, path) => {
   const o = record(x, path);
@@ -524,7 +549,11 @@ const TIMER: Check<TimerSettings> = (x, path) => {
  */
 export const parseVariants: Check<NewGameVariants> = (x, path) => {
   const o = record(x, path);
-  onlyKeys(o, [...VARIANT_FLAGS, 'robberMode', 'mapSelection', 'setupPlacement', 'timer'], path);
+  onlyKeys(
+    o,
+    [...VARIANT_FLAGS, 'robberMode', 'mapSelection', 'setupPlacement', 'timer', 'mapRules'],
+    path,
+  );
   const out: NewGameVariants = {};
   const robberMode = optional(o, 'robberMode', oneOf(ROBBER_MODES), path);
   if (robberMode !== undefined && robberMode !== 'normal') out.robberMode = robberMode;
@@ -544,6 +573,8 @@ export const parseVariants: Check<NewGameVariants> = (x, path) => {
   }
   const timer = optional(o, 'timer', TIMER, path);
   if (timer) out.timer = timer;
+  const mapRules = optional(o, 'mapRules', MAP_RULES, path);
+  if (mapRules && Object.keys(mapRules).length > 0) out.mapRules = mapRules;
   return out;
 };
 

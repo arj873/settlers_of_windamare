@@ -9,7 +9,14 @@ export * from './rng';
 export * from './resources';
 export * from './selectors';
 export * from './rules/placement';
-export { generateBoard, beginnerBoard, randomBoard, redNumbersSeparated } from './board';
+export {
+  generateBoard,
+  beginnerBoard,
+  randomBoard,
+  redNumbersSeparated,
+  mapRuleViolations,
+  type MapRuleViolations,
+} from './board';
 export * from './variants';
 export * from './clock';
 export { EVENT_CARDS, EVENT_INFO, facesFor, type EventCard } from './rules/events';
@@ -30,3 +37,4 @@ export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';
 export { bankTradeRatio } from './actions/trade';
 export { specialBuildQueue } from './actions/turn';
 export * from './view';
+export { DICE_TOTALS, GAIN_SOURCES, LOSS_SINKS, emptyStats, statsOf, sumCounts } from './stats';

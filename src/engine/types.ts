@@ -118,7 +118,7 @@ export interface Player {
 // ---------------------------------------------------------------------------
 
 /** Where to go after an interrupt (robber / road building) finishes. */
-export type ResumePhase = 'preRoll' | 'main';
+export type ResumePhase = 'preRoll' | 'main' | 'specialBuild';
 
 export type TradeResponse = 'pending' | 'accepted' | 'rejected';
 
@@ -200,6 +200,12 @@ export interface TurnState {
    * Absent otherwise.
    */
   secondSettlerOf?: PlayerId;
+  /**
+   * Special building phase: the player whose turn just ended, set for the whole phase so an
+   * interrupt (a Knight or Road Building played by the builder, `settings.rules56`) can resume
+   * into `specialBuild{builder, owner}`. Absent outside the phase; startTurn drops it.
+   */
+  specialOwner?: PlayerId;
 }
 
 export interface LogEntry {
@@ -231,6 +237,21 @@ export interface SetupRound {
 export interface SetupPlacement {
   first: SetupRound;
   second: SetupRound;
+}
+
+/**
+ * Map rules (random maps only): which neighbouring hexes may touch. Every flag is "allow", so
+ * absent/false = constrained. Only true flags are stored in settings (default = all constrained).
+ *  - allowRedTouch: 6 and 8 tokens on adjacent hexes (official rule: never)
+ *  - allowExtremeTouch: 2 and 12 tokens (any of them) on adjacent hexes
+ *  - allowSameNumberTouch: two identical tokens on adjacent hexes
+ *  - allowSameResourceTouch: two land hexes of the same resource side by side (deserts exempt)
+ */
+export interface MapRules {
+  allowRedTouch?: boolean;
+  allowExtremeTouch?: boolean;
+  allowSameNumberTouch?: boolean;
+  allowSameResourceTouch?: boolean;
 }
 
 /** 'fixed' = the chosen map; 'random' = a seeded pick among the maps that fit; 'veto' = vote. */
@@ -325,6 +346,13 @@ export interface GameSettings {
   secondSettler?: boolean;
   /** Chess-clock turn timer; wins over turnTimerSec (clock.ts). Client/server enforced. */
   timer?: TimerSettings;
+  /** Allowed adjacencies on random maps (only the `true` flags are present). RULES.md §19. */
+  mapRules?: MapRules;
+  /**
+   * Optional 5+ player rule set (RULES.md §20): the special build step may also play one
+   * development card, and the robber may never go to the second desert. 5+ players only.
+   */
+  rules56?: boolean;
 }
 
 export interface GameState {
@@ -359,6 +387,82 @@ export interface GameState {
   lastEvent?: EventKind | null;
   /** Event Cards (Earthquake): each player's damaged road, or null. Indexed by PlayerId. */
   damagedRoads?: (EdgeId | null)[];
+  // --- UX2 game statistics: optional (older saves start recording on their next action) ----
+  /**
+   * End-of-game statistics, kept up to date by applyAction (stats.ts). Immutable: a new object
+   * replaces it whenever it changes, so states share it (clone.ts). Secret until game over
+   * (viewFor drops it from mid-game views). Read it through `statsOf`.
+   */
+  stats?: GameStats;
+}
+
+// ---------------------------------------------------------------------------
+// Game statistics (UX2, stats.ts)
+// ---------------------------------------------------------------------------
+
+/** Where resource cards came from. 'other' must stay empty (an unclassified change; tested). */
+export type GainSource =
+  'production' | 'setup' | 'trade' | 'bank' | 'steal' | 'devCard' | 'event' | 'other';
+/**
+ * Where resource cards went: spent on pieces ('build') or dev cards ('buyDev'), given in player
+ * ('trade') or bank/port trades ('bank'), taken by a steal ('stolen'), discarded on a 7,
+ * taken by a Monopoly, given away in an event.
+ */
+export type LossSink =
+  'build' | 'buyDev' | 'trade' | 'bank' | 'stolen' | 'discard' | 'monopoly' | 'event' | 'other';
+
+export interface PlayerStats {
+  /** Resource cards gained, by source and type. */
+  gained: Record<GainSource, ResourceCounts>;
+  /** Resource cards lost, by sink and type. Σgained − Σlost = hand (when `complete`). */
+  lost: Record<LossSink, ResourceCounts>;
+  /** Production the robber blocked (what its hex would have paid; bank shortage ignored). */
+  blocked: ResourceCounts;
+  /**
+   * Expected production × 36 over this player's rolls-so-far (each roll adds Σ pips × yield of
+   * their buildings' unblocked hexes). Luck = production − expected36 / 36.
+   */
+  expected36: number;
+  /** Totals this player rolled: index = total − 2 (2..12). Event cards count their number. */
+  rolls: number[];
+  /** Pieces placed (setup and free roads included). */
+  built: { road: number; settlement: number; city: number };
+  /** Of `built.road`: roads from Road Building. */
+  freeRoads: number;
+  devBought: DevCardCounts;
+  /** Cards played; `victoryPoint` stays 0 (VP cards are revealed, never played). */
+  devPlayed: DevCardCounts;
+  /** Player trade offers made. */
+  offersMade: number;
+  /** Own offers that went through (confirmTrade). */
+  tradesAsOfferer: number;
+  /** Others' offers this player completed as the partner. */
+  tradesAsPartner: number;
+  /** 4:1 trades with the bank. */
+  bankTrades: number;
+  /** 3:1 and 2:1 harbor trades. */
+  portTrades: number;
+  robberMoves: number;
+  /** Cards stolen (robber and event steals). */
+  steals: number;
+  /** Times a card was stolen from this player. */
+  robbed: number;
+  /** Times this player had to discard on a 7. */
+  discards: number;
+}
+
+export interface GameStats {
+  /** True when recording began at createGame (false: an older save; counts start at fromTurn). */
+  complete: boolean;
+  /** turn.number when recording began. */
+  fromTurn: number;
+  players: PlayerStats[];
+  /** Event Cards drawn, by event (V1 eventCards games). */
+  events: Partial<Record<EventKind, number>>;
+  /** Everyone's VP (hidden VP cards included) at the end of each turn; turn 0 = after setup. */
+  vpHistory: { turn: number; vp: number[] }[];
+  /** Award holder changes, oldest first (player null = nobody holds it any more). */
+  awardHistory: { turn: number; award: 'longestRoad' | 'largestArmy'; player: PlayerId | null }[];
 }
 
 // ---------------------------------------------------------------------------

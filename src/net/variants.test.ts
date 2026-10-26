@@ -88,6 +88,52 @@ describe('parseRoomConfig: variants', () => {
     expect(parseRoomConfig(DEFAULT_ROOM_CONFIG, 'c')).toEqual(DEFAULT_ROOM_CONFIG);
   });
 
+  it('accepts the 5+ rule set and map rules; only true flags survive', () => {
+    const base = { map: 'base56', seatCount: 5, vpToWin: 12 } as const;
+    expect(
+      parseRoomConfig(
+        cfg(
+          {
+            rules56: true,
+            mapRules: {
+              allowRedTouch: true,
+              allowExtremeTouch: false,
+              allowSameResourceTouch: true,
+            },
+          },
+          base,
+        ),
+        'c',
+      ).variants,
+    ).toEqual({ rules56: true, mapRules: { allowRedTouch: true, allowSameResourceTouch: true } });
+    // all map rules off is the default: dropped; rules56 false likewise
+    expect(
+      parseRoomConfig(cfg({ rules56: false, mapRules: { allowRedTouch: false } }, base), 'c')
+        .variants,
+    ).toEqual({});
+    // map rules are fine at any seat count and on every map
+    expect(
+      parseRoomConfig(cfg({ mapRules: { allowSameNumberTouch: true } }, { seatCount: 3 }), 'c')
+        .variants,
+    ).toEqual({ mapRules: { allowSameNumberTouch: true } });
+  });
+
+  it.each([
+    ['rules56 with 4 seats', { rules56: true }, { seatCount: 4 }],
+    [
+      'rules56 + second settler',
+      { rules56: true, secondSettler: true },
+      { map: 'base56', seatCount: 5 },
+    ],
+    ['unknown map rule', { mapRules: { allowEverything: true } }, {}],
+    ['map rule type', { mapRules: { allowRedTouch: 'yes' } }, {}],
+    ['map rules not an object', { mapRules: true }, {}],
+  ] as const)('rejects %s', (_label, variants, patch) => {
+    expect(() => parseRoomConfig(cfg(variants, patch as Partial<RoomConfig>), 'c')).toThrow(
+      Invalid,
+    );
+  });
+
   it('accepts a custom clock within the ranges', () => {
     const timer = { preset: 'custom', bankSec: 300, incrementSec: 0 };
     expect(parseRoomConfig(cfg({ timer }, { turnTimerSec: null }), 'c').variants?.timer).toEqual(

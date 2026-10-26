@@ -23,11 +23,12 @@ import { DEV_CARD_TYPES } from '../constants';
 import { rollTwoDice } from '../rules/dice';
 import { playerName } from '../rules/text';
 import { emptyDevCards } from '../resources';
+import { recordRoll } from '../stats';
 import type { Action, GameState, PlayerId } from '../types';
 import { eventCardsOn } from '../variants';
 import { buildLegal } from './build';
 import { type HandlerMap, type LegalGenerator, fail, isCurrent, log, ok } from './common';
-import { canBuyDevCard } from './dev';
+import { canBuyDevCard, devLegal } from './dev';
 import { payProduction, resolveEventRoll } from './events';
 import { discardAmounts, resolveSeven } from './robber';
 
@@ -40,6 +41,7 @@ export { discardAmounts };
 export function rollFor(draft: GameState, player: PlayerId): void {
   if (eventCardsOn(draft.settings)) {
     resolveEventRoll(draft, player);
+    recordRoll(draft, player);
     return;
   }
   const { dice, reshuffled } = rollTwoDice(draft);
@@ -47,6 +49,7 @@ export function rollFor(draft: GameState, player: PlayerId): void {
   const roll = dice[0] + dice[1];
   if (reshuffled) log(draft, null, 'The dice deck was shuffled');
   log(draft, player, `${playerName(draft, player)} rolled ${roll} (${dice[0]}+${dice[1]})`);
+  recordRoll(draft, player);
   if (roll === 7) {
     resolveSeven(draft);
     return;
@@ -68,7 +71,12 @@ export function secondSettlerFor(state: GameState, owner: PlayerId): PlayerId {
 
 /** In a specialBuild phase for `state.turn.current`: can they build or buy anything? */
 function canSpecialBuild(state: GameState): boolean {
-  return canBuyDevCard(state, state.turn.current) === null || buildLegal(state).length > 0;
+  return (
+    canBuyDevCard(state, state.turn.current) === null ||
+    buildLegal(state).length > 0 ||
+    // 5+ rule set: a playable development card is also something to do in the step.
+    devLegal(state).some((a) => a.type !== 'buyDevCard')
+  );
 }
 
 /**
@@ -83,7 +91,7 @@ export function specialBuildQueue(state: GameState): PlayerId[] {
   for (let b = (phase.builder + 1) % n; b !== phase.owner; b = (b + 1) % n) {
     const view: GameState = {
       ...state,
-      turn: { ...state.turn, current: b },
+      turn: { ...state.turn, current: b, devCardPlayed: false },
       phase: { kind: 'specialBuild', builder: b, owner: phase.owner },
     };
     if (canSpecialBuild(view)) out.push(b);
@@ -97,8 +105,16 @@ export function specialBuildQueue(state: GameState): PlayerId[] {
  */
 function advanceSpecialBuild(draft: GameState, owner: PlayerId, from: PlayerId): void {
   const n = draft.players.length;
+  // A card bought in the step (5+ rule set) becomes playable for the builder's own turn.
+  const leaving = draft.players[from];
+  if (leaving) {
+    for (const t of DEV_CARD_TYPES) leaving.devCards[t] += leaving.newDevCards[t];
+    leaving.newDevCards = emptyDevCards();
+  }
   for (let b = (from + 1) % n; b !== owner; b = (b + 1) % n) {
     draft.turn.current = b;
+    draft.turn.devCardPlayed = false;
+    draft.turn.specialOwner = owner;
     draft.phase = { kind: 'specialBuild', builder: b, owner };
     if (canSpecialBuild(draft)) return;
   }

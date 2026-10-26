@@ -14,8 +14,9 @@
  * settings.seatOrder (the seating is visible at the table anyway).
  *  - rng                                          -> 0
  *  - settings.seed and the seed in the "Game created" log line -> HIDDEN_SEED / removed
- * Once the game is over every hand and dev card is revealed (final scores show VP cards);
- * decks, rng and seed stay hidden.
+ *  - stats (UX2: stolen card types, dev cards bought, hidden VP over time) -> absent
+ * Once the game is over every hand and dev card is revealed (final scores show VP cards), and
+ * so are the stats; decks, rng and seed stay hidden.
  *
  * Pure and deterministic. The view shares unchanged parts (board, pieces, log entries...) with
  * `state`: treat it as read-only. Never pass a view to applyAction / legalActions.
@@ -82,8 +83,10 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
   if (seat !== null && !state.players[seat]) throw new Error(`no player ${seat}`);
   const revealAll = state.phase.kind === 'gameOver';
   const masked = state.players.map((p) => !revealAll && p.id !== seat);
+  const { stats, ...rest } = state;
   return {
-    ...state,
+    ...rest,
+    ...(revealAll && stats ? { stats } : {}),
     settings: { ...state.settings, seed: HIDDEN_SEED },
     players: state.players.map((p, i) =>
       masked[i]

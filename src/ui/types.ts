@@ -1,5 +1,6 @@
 import type {
   Action,
+  MapRules,
   MapSelection,
   PlayerId,
   RobberMode,
@@ -46,6 +47,10 @@ export interface NewGameVariants {
   randomTurnOrder?: boolean;
   mapSelection?: MapSelection;
   setupPlacement?: SetupPlacement;
+  /** Adjacencies random maps may have (only `true` flags are set). */
+  mapRules?: MapRules;
+  /** The optional 5+ player rule set (5+ seats only). */
+  rules56?: boolean;
   /** Chess clock (replaces `turnTimerSec`, which is then null). */
   timer?: TimerSettings;
 }
@@ -69,6 +74,11 @@ export interface HudView {
   spectator?: boolean;
   /** Online (M3): seats whose player is disconnected (indexed by PlayerId). */
   away?: readonly boolean[];
+  /**
+   * UX2: wall-clock length of the finished game in ms (hotseat controller / online room clock),
+   * shown on the stats screen; null or absent = unknown.
+   */
+  gameDurationMs?: number | null;
 }
 
 /** Online play (M3): what the menu and the winner screen offer instead of "New game". */

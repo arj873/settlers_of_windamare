@@ -123,10 +123,39 @@ GameState {
   eventDeck?:    number[]            // undrawn event cards (ids into EVENT_CARDS), pop()
   lastEvent?:    EventKind | null    // event of the last card drawn
   damagedRoads?: (EdgeId | null)[]   // Earthquake: each player's damaged road
+  // UX2: present from createGame on (older saves: absent until their next action, no schema bump)
+  stats?:        GameStats           // end-of-game statistics, see "Game statistics" below
 }
 ```
 
+**Game statistics (UX2, `stats.ts`).** `GameStats = { complete, fromTurn, players: PlayerStats[],
+events, vpHistory: {turn, vp[]}[], awardHistory: {turn, award, player}[] }`. `PlayerStats` has
+`gained: Record<GainSource, ResourceCounts>` (production, setup, trade, bank, steal, devCard,
+event, other) and `lost: Record<LossSink, ResourceCounts>` (build, buyDev, trade, bank, stolen,
+discard, monopoly, event, other), `blocked` (what the robber's hex would have paid), `expected36`
+(expected production ×36 over all rolls; luck = production − expected36/36), `rolls[11]` (totals
+2..12 this player rolled), `built`, `freeRoads`, `devBought`, `devPlayed`, `offersMade`,
+`tradesAsOfferer`, `tradesAsPartner`, `bankTrades` (4:1), `portTrades`, `robberMoves`, `steals`,
+`robbed`, `discards`.
+
+- **Immutable**: every change builds a new GameStats sharing the unchanged parts; `cloneState`
+  shares `stats` like `board`. Never mutate it.
+- Two hooks inside handlers: `recordRoll` (turn.ts `rollFor`: dice / event card, expected
+  production) and `recordProduction` (`produce`: paid production, blocked cards). Everything else
+  is `recordAction(prev, next, action)` in `applyAction` (after `checkVictory`): each hand change
+  production did not explain is classified by action type, so **Σ gained − Σ lost = hand** holds
+  by construction (sim invariant `stats`; `other` must stay 0). A new action that moves resources
+  needs a case in `gainSource` / `lossSink`.
+- `statsOf(state)` reads with defaults (`complete: false`, `fromTurn` = now for older saves).
+  Hand-built fixtures have no stats.
+- Secret until game over: `viewFor` drops `stats` from mid-game views (stolen card types, dev
+  cards bought, hidden VP history) and passes it unchanged at game over.
+
 `TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5).
+`TurnState` also has an optional `secondSettlerOf?: PlayerId` (Second Settler step, §5) and
+`specialOwner?: PlayerId` (V2: the owner during a special build phase, so a card played there with
+`rules56` can resume into `specialBuild{builder, owner}`; `ResumePhase` is now
+`'preRoll' | 'main' | 'specialBuild'`, resolved by `resumePhase()` in `actions/common.ts`).
 
 **GameSettings v2** (validated by `createGame`, which throws on bad values):
 
@@ -146,17 +175,19 @@ GameState {
 only when they differ from it (so default settings and old saves are unchanged; no schema bump).
 Read them only through `variants.ts` / `clock.ts` accessors. Rules and sources: RULES.md §18.
 
-| Field            | Type                                           | Engine                                                                    |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
-| `robberMode`     | `'normal' \| 'friendly' \| 'none'`             | `robberTargets`, `isRobberProtected`, `startRobber`, production           |
-| `eventCards`     | `true`                                         | rolls draw from `eventDeck`; `event` phase; not with `balancedDice`       |
-| `setupPlacement` | `{ first, second: { building, restriction } }` | setup building kind (`settlement`/`city`), `normal`/`anyVertex`           |
-| `seatOrder`      | `number[]` (config index per seat)             | Randomize Turn Order (config `randomTurnOrder: true`); seat 0 starts      |
-| `mapSelection`   | `'random' \| 'veto'`                           | `randomMapFor` / `mapVeto` phase before setup                             |
-| `rushMode`       | `true`                                         | `beginTurn` rolls automatically (no `preRoll`)                            |
-| `turboMode`      | `true`                                         | both setup rounds pay starting resources                                  |
-| `secondSettler`  | `true`                                         | paired players' turn (4+ players, excludes `specialBuildPhase`)           |
-| `timer`          | `{ preset, bankSec, incrementSec }`            | chess clock, client/server enforced (`clock.ts`); excludes `turnTimerSec` |
+| Field            | Type                                                                                                        | Engine                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `robberMode`     | `'normal' \| 'friendly' \| 'none'`                                                                          | `robberTargets`, `isRobberProtected`, `startRobber`, production                                                                           |
+| `eventCards`     | `true`                                                                                                      | rolls draw from `eventDeck`; `event` phase; not with `balancedDice`                                                                       |
+| `setupPlacement` | `{ first, second: { building, restriction } }`                                                              | setup building kind (`settlement`/`city`), `normal`/`anyVertex`                                                                           |
+| `seatOrder`      | `number[]` (config index per seat)                                                                          | Randomize Turn Order (config `randomTurnOrder: true`); seat 0 starts                                                                      |
+| `mapSelection`   | `'random' \| 'veto'`                                                                                        | `randomMapFor` / `mapVeto` phase before setup                                                                                             |
+| `rushMode`       | `true`                                                                                                      | `beginTurn` rolls automatically (no `preRoll`)                                                                                            |
+| `turboMode`      | `true`                                                                                                      | both setup rounds pay starting resources                                                                                                  |
+| `secondSettler`  | `true`                                                                                                      | paired players' turn (4+ players, excludes `specialBuildPhase`)                                                                           |
+| `timer`          | `{ preset, bankSec, incrementSec }`                                                                         | chess clock, client/server enforced (`clock.ts`); excludes `turnTimerSec`                                                                 |
+| `mapRules`       | `{ allowRedTouch?, allowExtremeTouch?, allowSameNumberTouch?, allowSameResourceTouch? }` (only `true` kept) | `randomBoard` constraints on random maps, RULES.md §19 (V2)                                                                               |
+| `rules56`        | `true`                                                                                                      | 5+ player rule set (5+ players, no `secondSettler`): a dev card in the special build step, no robber on the 2nd desert; RULES.md §20 (V2) |
 
 `startingPlayer` in the config is `PlayerId | 'random'` (default `'random'`): `randomStartingPlayer(seed, n)`
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
@@ -290,13 +321,14 @@ applyAction(state, action):
   result = HANDLERS[action.type](draft, action)     // handler mutates draft, returns ok(draft) | fail(msg)
   if ok: updateAwards(draft, { roads: changesRoads(type) }) (rules/awards.ts)
          checkVictory(draft) (rules/victory.ts)
+         recordAction(state, draft, action) (stats.ts, UX2)
          trim draft.log to the newest LOG_LIMIT entries
   return result
 ```
 
 - **Pure:** the input state is never mutated (tested with a deep-frozen state).
-- **Structural sharing (`cloneState`)**: `board` and `settings` are shared between states, and so are
-  log entries (the `log` array itself is copied). Everything else is copied. So handlers must
+- **Structural sharing (`cloneState`)**: `board`, `settings` and `stats` (UX2, immutable) are shared
+  between states, and so are log entries (the `log` array itself is copied). Everything else is copied. So handlers must
   **never mutate `board`, `settings` or an existing log entry** (append with `log()` only). A new
   GameState field must be copied in `clone.ts` (`clone.test.ts` fails otherwise). This replaced
   `structuredClone`, which was ~85% of sim time. Map-veto candidate boards are shared like `board`;
@@ -342,6 +374,7 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 | `rules/events.ts` (V1) | `EVENT_CARDS` (36), `EVENT_INFO` (names, texts), `facesFor`, `drawEventCard`                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `actions/veto.ts` (V1) | `MAP_VETO_CANDIDATES` (3), `vetoOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`, `HIDDEN_EVENT_CARD` (V1: the event deck order is masked; veto candidates, event tasks, `lastEvent`, `damagedRoads` and `seatOrder` are public)                                                           |
+| `stats.ts` (UX2)       | `statsOf`, `emptyStats`, `sumCounts`, `GAIN_SOURCES`, `LOSS_SINKS`, `DICE_TOTALS` (exported); `recordRoll`, `recordProduction`, `recordAction` (engine-internal hooks) — §4 "Game statistics"                                                                                                                                                                                                                                                                                                                                      |
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
@@ -414,6 +447,10 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
   manual camera: a _pressed_ drag past `TAP_SLOP` (6 px), a wheel, a two-pointer pinch. A mouse press is always a
   single pointer (a missed release is dropped, and a move with no button held is a hover, never a drag). Inset
   changes leave a manual camera alone; a real size change, double-click, `fit()` or the "Fit board" button refit.
+- The fit frames `fitBounds(topo)` (land hexes + harbor badges); the sea backdrop/frame (`boardBounds`) may run
+  under the HUD and only bounds the pan clamp. Board `Text` is re-rasterized at `textResolution(pxPerUnit, dpr)`
+  150 ms after the zoom settles (no minified/magnified glyph bitmaps); the view keeps `renderer.resolution` equal to
+  `devicePixelRatio` (browser zoom, monitor change). `view.textResolution()` reports the current text resolution.
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
@@ -494,6 +531,17 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   return `'damageRoad'`.
 - Bank counts hide when `settings.hideBankCards` (or `settings.rules.hideBankCards`) is true; read
   defensively since the engine may not have the field yet.
+- Game statistics (UX2, `src/ui/stats/`): the winner card has a "Game stats" button (only when
+  the state carries `stats`). The panel (`statsPanel`, stateless; the HUD keeps tab, picked player
+  and collapsed flag, reset when a game is in progress) shows "Game Statistics", Winner + colour
+  dot, Turns (`turn.number`), Duration h:mm (`HudView.gameDurationMs`, — when unknown), a collapse
+  chevron (collapsed = a bar at the bottom, no scrim, the board pans) and tabs Overview (standings
+  with VP breakdown, awards), Dice (histogram vs fair-dice expectation, rolls/sevens per player,
+  event cards drawn), Resources (totals per player, by type and source for a picked player),
+  Activity (VP-over-turns SVG line chart with hover tooltip, builds/trades/robber table), Dev
+  Cards (bought/played, Largest Army and Longest Road history). Pure derivations in
+  `stats/model.ts`; theme tokens only (player colours for series). Footer: "Results" (back to the
+  winner card) + New game / session actions. Works on a game-over `GameView` (online).
 
 ## 13b. Game controller (`src/game`, T7)
 
@@ -519,7 +567,11 @@ c.destroy();
   `BOT_OFFERS_PER_TURN` (1) offers in a turn. The random bot confirms an accepted own offer with a
   random accepter (it withdraws only while nobody has accepted). Nobody able to act → error toast
   - state on console.
-- Autosave: `localStorage['catan:save:v1']` = `{ version, state, seats, viewer, botRng, banks? }`, every
+- Game duration (UX2): `start` notes the wall clock (`ControllerOptions.wallClock`, default
+  `Date.now`); at game over the controller fixes `durationMs` and passes it as
+  `HudView.gameDurationMs`. Saved as `SavedSession.playedMs` (time played so far); `resume` shifts
+  the start by it, so time between sessions does not count. Older saves: unknown (null).
+- Autosave: `localStorage['catan:save:v1']` = `{ version, state, seats, viewer, botRng, banks?, playedMs? }`, every
   access in try/catch. `state` goes through `upgradeState`, so stage-1 (schema v1) saves still load.
   On load an unfinished save offers Resume / New game. Dev sessions (`?fixture`, `?seed`,
   `?layout`, `?map`, `?autoplay`) never autosave.
