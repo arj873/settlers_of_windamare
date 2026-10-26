@@ -3,7 +3,7 @@
  * expansion registry, see registry.ts).
  */
 import { hookSupply } from './expansions/hooks';
-import { mapDef } from './expansions/registry';
+import { activeModules, mapDef } from './expansions/registry';
 import type { Supply } from './expansions/types';
 import { MAPS, isBaseMapId, type MapDef } from './maps';
 import type { GameSettings, GameState, MapId } from './types';
@@ -36,4 +36,21 @@ export function supplyOf(state: { settings: Pick<GameSettings, 'map' | 'expansio
   const m = mapOf(state);
   const base: Supply = { bankPerResource: m.bankPerResource, devDeck: m.devDeck };
   return hookSupply(state as Pick<GameState, 'settings'>, base);
+}
+
+/**
+ * The development deck as the HUD counts it: `left` undrawn cards, `total` in the game (the
+ * supply's dev deck plus every module's `extraDevCards` hook). Works on full states and views.
+ */
+export function devDeckCounts(state: GameState): { left: number; total: number } {
+  const deck = supplyOf(state).devDeck;
+  let left = state.devDeck.length;
+  let total = Object.values(deck).reduce((n, k) => n + k, 0);
+  for (const m of activeModules(state)) {
+    const extra = m.hooks?.extraDevCards?.(state);
+    if (!extra) continue;
+    left += extra.deck;
+    total += extra.total;
+  }
+  return { left, total };
 }

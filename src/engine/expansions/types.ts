@@ -277,6 +277,12 @@ export interface ExpansionHooks {
    */
   wins?(state: GameState, player: PlayerId): boolean | undefined;
   /**
+   * additive. Development cards the module keeps outside `devDeck` (T&B Swift Journeys):
+   * `deck` = undrawn now, `total` = in the game. The HUD's deck counter adds them (`devDeckCounts`).
+   * A view may fold them into `devDeck` (its mask then reports `deck` 0); `total` stays.
+   */
+  extraDevCards?(state: GameState): { deck: number; total: number } | undefined;
+  /**
    * chained. Online views (`viewFor`, engine/view.ts): hide this module's secrets from `viewer`.
    * `view` is the view so far (base secrets and earlier modules' secrets already masked), `state`
    * the full state. Return `view` with your secrets replaced by placeholders of the same shape,

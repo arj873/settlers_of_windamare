@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createGame,
   devCardCount,
+  devDeckCounts,
   HIDDEN_DEV_CARD,
   legalActions,
   viewFor,
@@ -17,6 +18,7 @@ import {
   type Viewer,
 } from '../../engine';
 import { Hud } from '../../ui/hud';
+import { availability, bankView, buildCards } from '../../ui/model';
 import { canary, canaryNumber, expectNoLeak, sampleStates, type Plant } from '../maskTestkit';
 import {
   SC_BA,
@@ -240,6 +242,37 @@ describe('T&B online views: shape and reveals', () => {
     for (const viewer of viewersOf(s)) {
       expect(JSON.stringify(viewFor(other, viewer))).toBe(JSON.stringify(viewFor(s, viewer)));
     }
+  });
+});
+
+describe('dev deck counter with Swift Journeys (extraDevCards)', () => {
+  it('counts the 3 Swift Journeys, hotseat and online alike', () => {
+    const s = main(SC_TRADERS);
+    const base = s.devDeck.length;
+    expect(tbSlice(s).traders?.swift.deck).toBe(3);
+    // Hotseat (full state): the base deck plus the undrawn Swift Journeys, out of all of them.
+    expect(devDeckCounts(s)).toEqual({ left: base + 3, total: base + 3 });
+    expect(bankView(s).devDeck).toBe(base + 3);
+    const card = buildCards(s, 0, availability(legalActions(s, 0))).find((c) => c.kind === 'dev');
+    expect(card).toMatchObject({ left: base + 3, total: base + 3 });
+    // Every online view reads the same (the mask folds them into devDeck; total unchanged).
+    for (const viewer of viewersOf(s)) {
+      const v = viewFor(s, viewer);
+      expect(devDeckCounts(v)).toEqual(devDeckCounts(s));
+      expect(bankView(v).devDeck).toBe(base + 3);
+    }
+    // One Swift Journey drawn and one base card drawn: 2 fewer left, the total stays.
+    tbSlice(s).traders!.swift.deck = 2;
+    s.devDeck.pop();
+    expect(devDeckCounts(s)).toEqual({ left: base + 1, total: base + 3 });
+    expect(devDeckCounts(viewFor(s, 1))).toEqual(devDeckCounts(s));
+  });
+
+  it('adds nothing in the other scenarios or without a dev deck (T&B + C&K)', () => {
+    const fish = main(SC_FISH);
+    expect(devDeckCounts(fish).total).toBe(fish.devDeck.length);
+    const tbck = createGame({ seed: 3, players: seats(4), mode: 'tb+ck', scenario: SC_TRADERS });
+    expect(devDeckCounts(tbck)).toEqual({ left: 0, total: 0 });
   });
 });
 

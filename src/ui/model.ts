@@ -9,7 +9,7 @@ import {
   canPlaceRoad,
   canPlaceSettlement,
   COSTS,
-  DEV_CARD_TYPES,
+  devDeckCounts,
   devCardCount,
   EVENT_INFO,
   getPlayer,
@@ -19,7 +19,6 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
-  supplyOf,
   topologyOf,
   RESOURCES,
   victoryPoints,
@@ -253,7 +252,7 @@ export function bankView(state: GameState): BankView {
       resource,
       count: hidden ? null : state.bank[resource],
     })),
-    devDeck: state.devDeck.length,
+    devDeck: devDeckCounts(state).left,
   };
 }
 
@@ -271,12 +270,12 @@ export interface BuildCard {
 /** The build bar: dev card, road, settlement, city with what is left of each. */
 export function buildCards(state: GameState, viewer: PlayerId, av: Availability): BuildCard[] {
   const left = piecesLeft(state, viewer);
-  const deck = supplyOf(state).devDeck; // depends on the map (25 base, 34 for 5-6P, ...)
-  const deckTotal = DEV_CARD_TYPES.reduce((n, t) => n + deck[t], 0);
+  // Depends on the map (25 base, 34 for 5-6P, ...) and on modules' extra cards (Swift Journeys).
+  const deck = devDeckCounts(state);
   // No development deck in this game (an expansion's supply, e.g. C&K): no Buy card button.
   const dev: BuildCard[] =
-    deckTotal > 0
-      ? [{ kind: 'dev', left: state.devDeck.length, total: deckTotal, enabled: av.buyDevCard }]
+    deck.total > 0
+      ? [{ kind: 'dev', left: deck.left, total: deck.total, enabled: av.buyDevCard }]
       : [];
   return [
     ...dev,

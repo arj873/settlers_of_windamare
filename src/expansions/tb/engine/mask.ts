@@ -29,7 +29,7 @@
 import type { DevCardType, GameState, HexId } from '../../../engine/types';
 import { addPublicCounts, hiddenFrom, type Viewer } from '../../../engine/viewer';
 import { supplyOf } from '../../../engine/mapLookup';
-import { TB, tbSlice, type BaCard, type Commodity, type TbSlice } from './state';
+import { SWIFT_JOURNEYS, TB, tbSlice, type BaCard, type Commodity, type TbSlice } from './state';
 
 /** Placeholder of every hidden fish token (pool and opponents' hands); only lengths count. */
 export const HIDDEN_FISH = 0;
@@ -44,6 +44,18 @@ const HIDDEN_DEV_CARD: DevCardType = 'knight';
 function hasDevDeck(state: GameState): boolean {
   const deck = supplyOf(state).devDeck;
   return Object.values(deck).some((n) => n > 0);
+}
+
+/**
+ * The `extraDevCards` hook: Swift Journeys are dev cards kept out of `devDeck`, so the HUD's deck
+ * counter adds them (all 3 to the total; the undrawn ones to what is left). Only in games with a
+ * dev deck (with C&K they never come into play). On a view the undrawn ones are already folded
+ * into `devDeck` (below) and `swift.deck` is 0, so the counter reads the same for every viewer.
+ */
+export function swiftDevCards(state: GameState): { deck: number; total: number } | undefined {
+  const t = tbSlice(state).traders;
+  if (!t || !hasDevDeck(state)) return undefined;
+  return { deck: t.swift.deck, total: SWIFT_JOURNEYS };
 }
 
 /** `view` with the T&B secrets above masked (same shape; inputs untouched). */

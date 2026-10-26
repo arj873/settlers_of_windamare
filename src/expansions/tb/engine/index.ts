@@ -103,7 +103,7 @@ import {
   useFish,
 } from './fish';
 import { TB_MAPS } from './maps';
-import { tbMaskFor } from './mask';
+import { swiftDevCards, tbMaskFor } from './mask';
 import {
   bridgeBlocker,
   edgeOnRiver,
@@ -990,6 +990,8 @@ export const tbModule: ExpansionModule = {
   },
 
   hooks: {
+    extraDevCards: swiftDevCards,
+
     setupBuilding: (state, index) =>
       (has(state, 'ba') || has(state, 'traders')) && index >= state.players.length
         ? 'city'

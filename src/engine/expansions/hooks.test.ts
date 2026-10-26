@@ -8,7 +8,7 @@ import { applyAction, legalActions } from '../engine';
 import { composeOrder, createGame } from '../createGame';
 import { midGame } from '../fixtures';
 import { cornerVertex, sideEdge } from '../hex';
-import { supplyOf } from '../mapLookup';
+import { devDeckCounts, supplyOf } from '../mapLookup';
 import { emptyResources } from '../resources';
 import { actingPlayers, cardsInHand, piecesLeft, victoryPoints } from '../selectors';
 import { continueRoll, discardAmounts } from '../actions/turn';
@@ -553,6 +553,19 @@ describe('V1/V2 variants through the hooks (main x expansions merge)', () => {
     const s = { ...withTst(emptyBoardGame()), phase: { kind: 'main' as const } };
     const after = run({ ...s, stats: emptyStats(4) }, { type: 'tst/freeRoad', player: 0 });
     expect(statsOf(after).players[0]?.built.road).toBe(1);
+  });
+});
+
+describe('extraDevCards (deck counter)', () => {
+  it('adds module dev cards to devDeckCounts; base games count the deck alone', () => {
+    const base = midGame();
+    const supply = Object.values(supplyOf(base).devDeck).reduce((n, k) => n + k, 0);
+    expect(devDeckCounts(base)).toEqual({ left: base.devDeck.length, total: supply });
+    hooks.extraDevCards = () => ({ deck: 2, total: 3 });
+    const s = withTst(base);
+    expect(devDeckCounts(s)).toEqual({ left: base.devDeck.length + 2, total: supply + 3 });
+    hooks.extraDevCards = () => undefined;
+    expect(devDeckCounts(s)).toEqual(devDeckCounts(base));
   });
 });
 
