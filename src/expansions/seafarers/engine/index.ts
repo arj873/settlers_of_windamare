@@ -55,6 +55,7 @@ import {
   wonderMarks,
 } from './features';
 import { graph } from './geometry';
+import { seaMaskFor } from './mask';
 import {
   mapKeyOf,
   prepared,
@@ -585,6 +586,8 @@ export const seafarersModule: ExpansionModule = {
     },
 
     wins: seaWins,
+
+    maskFor: seaMaskFor,
   },
 };
 
