@@ -27,6 +27,7 @@ import {
   drawResourceIcon,
   drawRobber,
   drawRoad,
+  drawRoadJoint,
   drawSettlement,
   drawTerrainMotif,
   hexPoints,
@@ -108,6 +109,7 @@ export class BoardView {
   private readonly landLayer = new Container();
   private readonly portLayer = new Container();
   private readonly tokenLayer = new Container();
+  private readonly jointLayer = new Container();
   private readonly roadLayer = new Container();
   private readonly buildingLayer = new Container();
   private readonly robberLayer = new Container();
@@ -140,6 +142,7 @@ export class BoardView {
       this.landLayer,
       this.portLayer,
       this.tokenLayer,
+      this.jointLayer,
       this.roadLayer,
       this.buildingLayer,
       this.robberLayer,
@@ -446,6 +449,41 @@ export class BoardView {
     return new Color(css).toNumber();
   }
 
+  /** Round joints where >= 2 roads of one owner meet on a vertex without a building. */
+  private wantRoadJoints(
+    state: GameState,
+    wanted: Map<string, { sig: string; make: () => Container; layer: Container }>,
+  ) {
+    for (const v of Object.values(TOPOLOGY.vertex)) {
+      if (state.pieces.buildings[v.id]) continue;
+      const roads = v.edges.flatMap((e) => {
+        const owner = state.pieces.roads[e];
+        const other = TOPOLOGY.edge[e]?.vertices.find((w) => w !== v.id);
+        const o = other ? TOPOLOGY.vertex[other] : undefined;
+        if (owner === undefined || !o) return [];
+        const len = Math.hypot(o.x - v.x, o.y - v.y);
+        return [{ owner, dir: [(o.x - v.x) / len, (o.y - v.y) / len] as [number, number] }];
+      });
+      const mine = roads.find((r) => roads.filter((q) => q.owner === r.owner).length >= 2);
+      if (!mine) continue;
+      const foreign = roads.find((r) => r.owner !== mine.owner);
+      const color = this.colorOf(state, mine.owner);
+      const away = foreign?.dir;
+      wanted.set(`joint:${v.id}`, {
+        sig: `joint:${color}:${away ?? ''}`,
+        layer: this.jointLayer,
+        make: () => {
+          const c = new Container();
+          c.position.set(...pt(v));
+          const g = new Graphics();
+          drawRoadJoint(g, 0, 0, color, away);
+          c.addChild(g);
+          return c;
+        },
+      });
+    }
+  }
+
   private syncPieces(state: GameState) {
     const wanted = new Map<string, { sig: string; make: () => Container; layer: Container }>();
 
@@ -472,6 +510,8 @@ export class BoardView {
         },
       });
     }
+
+    this.wantRoadJoints(state, wanted);
 
     for (const [id, b] of Object.entries(state.pieces.buildings) as [
       VertexId,
