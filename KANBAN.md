@@ -12,7 +12,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - **M4b** · 3 Haiku agents play one ONLINE game (room on wrangler dev, headed windows, seat 2 tests drop/reconnect) · `s4-haiku-1..3` (Haiku)
 - **UX2** · End-of-game **Game Statistics** (your Colonist screenshot): winner/turns/duration + tabs Overview · Dice · Resources · Activity · Dev Cards; engine stats slice, online-safe · `s4-game-stats` 🟦
-- **V2** · Optional **5+ player rule set** (settlersboard.com 5-6 FAQ, cross-checked with official rules): build phase may play 1 dev card, no robber on 2nd desert, number-balance toggles (6/8, 2/12, identical), 12 VP preset, component-count audit · `s4-rules-56` 🟩
+- **V2** · Optional **5+ player rule set** (settlersboard.com 5-6 FAQ, cross-checked with official rules): build phase may play 1 dev card, no robber on 2nd desert, 12 VP preset; + general **Map rules → Balance rules** (your mockup): Allow 6&8 touching / Allow 2&12 touching / Same numbers may touch / Same resources may touch, all off by default, all random maps, component-count audit · `s4-rules-56` 🟩
 - **BUG-B2** · 🔴 board blurry when zoomed out + under-fits (only ~half the free area at 1918×938, base78) · `s4-board-crisp` 🟦
 - **UX1** · Seats: × remove per seat + "Add player" button (you: "I can't add or remove players") · new themes **GitHub Dark** + **Material Dark** · `s4-themes-seats` 🟩 · built (781 tests) → theming new M3/V1 screens + 6P name truncation
 
