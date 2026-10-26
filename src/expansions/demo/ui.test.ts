@@ -40,8 +40,11 @@ describe('setup screen', () => {
     screen.element.querySelector<HTMLButtonElement>(`[data-k="${k}"]`);
 
   it('hides demo / wip modes unless asked; base stays first', () => {
-    expect(visibleModes().map((m) => m.id)).toEqual(['base']);
-    expect(visibleModes(true).map((m) => m.id)).toEqual(['base', DEMO]);
+    // (Other expansions register modes too: only the demo's visibility is this test's business.)
+    expect(visibleModes().map((m) => m.id)[0]).toBe('base');
+    expect(visibleModes().map((m) => m.id)).not.toContain(DEMO);
+    expect(visibleModes(true).map((m) => m.id)[0]).toBe('base');
+    expect(visibleModes(true).map((m) => m.id)).toContain(DEMO);
     expect(q(make(false), `mode-${DEMO}`)).toBeNull();
     expect(q(make(true), `mode-${DEMO}`)).not.toBeNull();
   });

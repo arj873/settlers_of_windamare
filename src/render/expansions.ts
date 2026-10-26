@@ -5,7 +5,9 @@
  * calls the drawers of the expansions active in the shown game.
  */
 import type { Container, Graphics } from 'pixi.js';
+import { cropDrawer } from '../expansions/crop/render';
 import { demoDrawer } from '../expansions/demo/render';
+import { oilDrawer } from '../expansions/oil/render';
 import type { ExpansionId, GameState, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 
@@ -40,6 +42,8 @@ export interface BoardDrawer {
 
 export const BOARD_DRAWERS: readonly BoardDrawer[] = [
   demoDrawer,
+  oilDrawer,
+  cropDrawer,
   // new modules go here, one per line
 ];
 

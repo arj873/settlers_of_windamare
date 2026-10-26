@@ -260,7 +260,7 @@ applyAction(state, action):
                                                     // or the module's own handler (EXPANSIONS.md §4)
   if ok: afterAction hooks
          updateAwards(draft, { roads: changesRoads(type) || module changesRoads }) (rules/awards.ts)
-         checkVictory(draft) (rules/victory.ts)
+         checkVictory(draft) (rules/victory.ts; a module's `deferVictory` hook can switch it off)
          trim draft.log to the newest LOG_LIMIT entries
   return result
 ```

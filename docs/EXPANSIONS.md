@@ -120,7 +120,7 @@ interface ExpansionModule {
   conflicts?;
   variant?;
   players?: { min; max };
-  terrains?: Record<'<id>/<t>', { kind: 'land' | 'sea' | 'fog'; name }>;
+  terrains?: Record<'<id>/<t>', { kind: 'land' | 'sea' | 'fog'; name; color? }>; // color: setup thumbnail
   maps?: MapDef[];
   scenarios?: ScenarioDef[];
   modes?: ModeDef[];
@@ -190,6 +190,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `onEndTurn(draft, p)`                     | `endTurn`, before SBP / next turn              | additive                    | upkeep, lair resolution, disaster phase                        |
 | `onStartTurn(draft, p)`                   | every turn start (incl. after SBP)             | additive                    | reset per-turn flags (ship moved, fast gold used)              |
 | `afterAction(draft, action)`              | `applyAction`, before awards                   | additive                    | fog reveal, island VP, closed-route marking                    |
+| `deferVictory(state)`                     | `checkVictory`                                 | additive OR                 | Oil Springs: the win is declared at the end of the turn        |
 
 Terrains: `terrainKind(t)` → `'land'` (resources, desert, gold, unknown), `'sea'`, `'fog'`, or your
 module's declared kind. Settlements need a vertex touching a land hex; roads need an edge
@@ -264,7 +265,7 @@ for `gold`, `sea`, `fog`; other terrains without a painter are grey.
 ```ts
 interface HudExtension {
   id;
-  panel?(state, view): { title; body: HTMLElement } | null; // sidebar section (Bank ... Players)
+  panel?(state, view, send): { title; body: HTMLElement } | null; // sidebar section (Bank ... Players); send(action) for its buttons
   buildCards?: {
     mode: '<id>/<x>';
     label;

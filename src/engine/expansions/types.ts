@@ -33,6 +33,8 @@ export interface TerrainInfo {
   kind: 'land' | 'sea' | 'fog';
   /** Display name (HUD, previews). */
   name: string;
+  /** Colour of the hex in the setup screen's map thumbnails ('#rrggbb'); default grey. */
+  color?: string;
 }
 
 export interface Supply {
@@ -185,6 +187,12 @@ export interface ExpansionHooks {
   onStartTurn?(draft: GameState, player: PlayerId): void;
   /** additive. After every successful action's handler, before awards and victory. */
   afterAction?(draft: GameState, action: Action): void;
+  /**
+   * additive OR. `true` = the core victory check (VP target on your own turn) does nothing in this
+   * state; the module declares winners itself, usually from `afterAction` (Oil Springs: the win is
+   * checked at the end of the turn, after the disaster phase).
+   */
+  deferVictory?(state: GameState): boolean;
 }
 
 export interface ExpansionModule {
