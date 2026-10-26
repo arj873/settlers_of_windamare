@@ -7,6 +7,7 @@ import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
 import {
+  addSeat,
   buildConfig,
   clamp,
   DISCARD_MAX,
@@ -20,6 +21,7 @@ import {
   mapDisabledReason,
   pickSeatColor,
   rangeLabel,
+  removeSeat,
   saveSetup,
   SEAT_COLORS,
   SEED_MAX,
@@ -497,8 +499,30 @@ export class SetupScreen {
                 ),
               ),
             ),
+            h(
+              'button',
+              {
+                class: 'su-seat-x',
+                disabled: d.seats.length <= MIN_PLAYERS,
+                title: d.seats.length <= MIN_PLAYERS ? `At least ${MIN_PLAYERS} players` : 'Remove',
+                attrs: { 'aria-label': `Remove seat ${i + 1}`, 'data-k': `remove-${i}` },
+                on: { click: () => this.set(removeSeat(this.draft, i)) },
+              },
+              '×',
+            ),
           ),
         ),
+      ),
+      h(
+        'button',
+        {
+          class: 'btn su-add-seat',
+          disabled: d.seats.length >= MAX_PLAYERS,
+          title: d.seats.length >= MAX_PLAYERS ? `At most ${MAX_PLAYERS} players` : undefined,
+          attrs: { 'data-k': 'add-seat' },
+          on: { click: () => this.set(addSeat(this.draft)) },
+        },
+        '+ Add player',
       ),
     );
   }

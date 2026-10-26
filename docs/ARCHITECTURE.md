@@ -398,7 +398,12 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
 - Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`; `?click=Menu` opens the menu, `?theme=`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
-- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood. Every colour,
+- Setup seats (UX1): each seat row has a × (`removeSeat(draft, index)`, removes that seat, disabled at
+  `MIN_PLAYERS`) and "+ Add player" under the list (`addSeat(draft)`, human, disabled at `MAX_PLAYERS`);
+  both keep colours unique, auto-switch the map like the Players stepper and re-render it.
+- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood, GitHub Dark
+  (`githubdark.css`, flat 6px, system font) and Material Dark (`materialdark.css`, MD3 tonal
+  surfaces, Roboto via `@fontsource/roboto`). Screenshots: `docs/design/themes/`. Every colour,
   material, font and shadow is a CSS custom property; `wood.css` is the `:root` base and each
   theme overrides it under `:root[data-theme='…']` on `<html>`. `initTheme(location.search)` picks
   `?theme=` > saved pick (`localStorage['catan.theme']`, try/catch) > `DEFAULT_THEME`;

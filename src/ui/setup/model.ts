@@ -141,6 +141,24 @@ export function setPlayerCount(draft: SetupDraft, count: number): SetupDraft {
   return { ...draft, seats, map };
 }
 
+/** Append one seat (human by default, first unused colour). No-op at MAX_PLAYERS; the map auto-switches. */
+export function addSeat(draft: SetupDraft, controller: Controller = 'human'): SetupDraft {
+  if (draft.seats.length >= MAX_PLAYERS) return draft;
+  const grown = setPlayerCount(draft, draft.seats.length + 1);
+  const last = grown.seats.length - 1;
+  return { ...grown, seats: grown.seats.map((s, i) => (i === last ? { ...s, controller } : s)) };
+}
+
+/**
+ * Remove exactly seat `index` (not the last one). No-op at MIN_PLAYERS or for a bad index. Remaining
+ * seats keep their names, colours and controllers, so colours stay unique; the map is kept (it still fits).
+ */
+export function removeSeat(draft: SetupDraft, index: number): SetupDraft {
+  if (draft.seats.length <= MIN_PLAYERS || !Number.isInteger(index)) return draft;
+  if (index < 0 || index >= draft.seats.length) return draft;
+  return { ...draft, seats: draft.seats.filter((_, i) => i !== index) };
+}
+
 /** Pick a map and clamp the player count into its range. */
 export function setMap(draft: SetupDraft, id: MapId): SetupDraft {
   const m = mapInfo(id);
