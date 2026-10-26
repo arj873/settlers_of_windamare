@@ -28,6 +28,10 @@ geometry over `seaEdges`, copy-on-write board changes (fog, placed harbours), se
 vertex, land and sea alike) and the ship / pirate / gold / fog / sea painters
 (`src/render/seaArt.ts`), but has its own pieces: ships that sail a distance and carry cargo.
 
+Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tbck` (mode
+`tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
+pair's rules (§11).
+
 ---
 
 ## 1. Vocabulary
@@ -132,6 +136,7 @@ interface ExpansionModule {
   name;
   requires?;
   conflicts?;
+  before?: ExpansionId[]; // composition order: run (and wrap) before these modules (§11)
   variant?;
   players?: { min; max };
   terrains?: Record<'<id>/<t>', { kind: 'land' | 'sea' | 'fog'; name; color? }>; // color: setup thumbnail
@@ -144,6 +149,7 @@ interface ExpansionModule {
   cloneExt?(slice): unknown; // faster copy than cloneJson (hot paths)
   actions?: Record<'<id>/<name>', ExtHandler>; // your action types
   overrides?: { [baseType]?: (draft, action, next) => ActionResult };
+  wraps?: { ['<other>/<x>']?: (draft, action, next) => ActionResult }; // another module's actions
   legal?: LegalGenerator; // extra legal actions, any phase
   filterLegal?(state, actions): Action[]; // drop / replace legal actions
   changesRoads?: ['<id>/...']; // your actions that change road lengths / occupancy
@@ -153,8 +159,9 @@ interface ExpansionModule {
 ```
 
 - **Dispatch** (`engine.ts`): a type `x/...` goes to module `x`'s `actions` (rejected if `x` is not
-  active). A base type goes to the base handler wrapped by every active module's override, first
-  module innermost. Then `afterAction` hooks → awards → victory → log trim.
+  active), wrapped by every active module's `wraps[type]`. A base type goes to the base handler
+  wrapped by every active module's override, first module innermost; modules with `before` wrap
+  outermost (they see the action first). Then `afterAction` hooks → awards → victory → log trim.
 - **Legal**: base generators, then each module's `legal`, then each `filterLegal` in order, then
   the actor filter. **Soundness is the rule:** whatever a handler/override rejects must not be
   generated (filter it). Copy the demo's soundness test.
@@ -202,6 +209,7 @@ Pure functions; `draft` ones mutate only the draft. They run for active modules 
 | `victoryPoints(state, p)`                       | `publicVictoryPoints`, `victoryPoints`                                        | additive                    | `{ public, hidden?, parts? }`: islands, metropolis, defender, missions; `parts` = named shares for the stats screen (`expansionVictoryParts`)                                                                                                                    |
 | `statsCategory(state, action, p)`               | `recordAction` (stats.ts), any action                                         | first-wins                  | `{ gain?, loss? }`: which GainSource / LossSink a hand change counts as; default 'other' for module actions, the base classification for base ones (a missing side keeps it). C&K knights = build; Seafarers gold = production, the fleet at `rollDice` = stolen |
 | `bankTradeRatio(state, p, r, base)`             | `bankTradeRatio`                                                              | chained                     | C&K trading house / merchant, Oil Springs                                                                                                                                                                                                                        |
+| `routeEdges(state, p)`                          | C&K knight routes (`ck/engine/routes.ts`)                                     | additive                    | Seafarers + C&K: the player's ships carry knights (C1)                                                                                                                                                                                                           |
 | `roadLength(state, p, base)`                    | Longest Road award                                                            | chained                     | Seafarers longest trade route                                                                                                                                                                                                                                    |
 | `armySize(state, p, base)`                      | Largest Army award (base = knights played)                                    | chained                     | Pirate Islands: no award (0)                                                                                                                                                                                                                                     |
 | `onEndTurn(draft, p)`                           | `endTurn`, before SBP / next turn                                             | additive                    | upkeep, lair resolution, disaster phase                                                                                                                                                                                                                          |
@@ -407,23 +415,38 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 
 ## 11. Combinations
 
-Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C), so:
+Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
+engine status per rule in `docs/rules/combos.md`):
 
-- **A combination is a mode** listing its expansions and only the suitable scenarios, e.g.
-  `{ id: 'seafarers+ck', expansions: ['seafarers', 'ck'], scenarios: ['seafarers/newShores',
-'seafarers/throughTheDesert'], vpBonus: 2 }`, `{ id: 'ep+ck', ..., vpBonus: 5 }`, T&B + C&K per
-  scenario with `scenarioVp`. The later of the two modules declares it (or a tiny `combo` module
-  that `requires` both). Anything not listed as a mode cannot be started.
+| Mode           | Module  | Composes          | Scenarios (VP)                                                                  |
+| -------------- | ------- | ----------------- | ------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack` | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players      |
+| `tb+ck`        | `tbck`  | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6 |
+
+How a combination is built:
+
+- **A combination is a mode of a small combo module** (`src/expansions/<pair>/`) that `requires`
+  both expansions and declares one mode listing exactly the suitable scenarios, with `vpBonus` or
+  per-scenario `scenarioVp`. The two expansion modules run unchanged. Anything not listed as a
+  mode cannot be started; `validate` refuses other scenarios.
+- **Composition order is explicit:** the combo declares `before: [a, b]`, so its hooks, `legal` and
+  `filterLegal` run first and its overrides / wraps are outermost. Where both modules define a
+  first-wins hook (`afterProduction`, `onSeven`, `rollDice`), the combo's hook calls theirs in
+  the order the rules want and returns the result (seack: C&K commodities → Seafarers gold →
+  Aqueduct; tbck: C&K → fish). Its mode test asserts `settings.expansions` (`[seack, ck,
+seafarers]`).
+- **Pair rules** are the combo's own actions (`seack/chasePirate`, `tbck/chaseBarbarian`), `wraps`
+  of the composed modules' actions (`seafarers/pickShip`, `tb/bid`, `ck/pickEdge`), base
+  `overrides`, `filterLegal`, and hooks such as `routeEdges` (ships carry knights).
 - **Officially impossible** pairs go in `conflicts`: `ep` declares `conflicts: ['seafarers']`.
-  Oil Springs / Crop Trust combine with nothing but the base (and Oil Springs 5-6): they ship one
-  mode each and need no conflicts.
+  Oil Springs / Crop Trust combine with nothing but the base (and Oil Springs 5-6).
 - Write modules so they compose: use the helpers (`costOf`, `pieceLimit`, `cardsInHand`,
-  `isVertexOpen`, `victoryPoints`) instead of constants, never assume you are the only module,
-  read another module's state only through its exported selectors (`requires` it), and keep hook
-  results additive where the rules allow (combo rules such as "C&K knights may cross on ships"
-  then become small branches in the combo mode, `isActive(state, 'seafarers')`).
-- Hook order = registry order. If two modules define the same first-wins hook (both `rollDice`),
-  the combo mode must say who wins (usually the module listed first in the registry).
+  `isVertexOpen`, `victoryPoints`) instead of constants, never assume you are the only module
+  (invariants: check your own VP hook, not `expansionVictoryPoints`), and read another module's
+  state only through its exported selectors (`requires` it).
+- **Known limit:** T&B switches its features on by its own scenario ids and Seafarers its rules
+  by its own scenario ids, so a T&B scenario on a Seafarers map (T&B + Seafarers, the 2025 sheets)
+  needs a seam in one of them first (`docs/rules/combos.md` §3).
 
 ## 12. Coverage of the rules docs' framework needs
 
@@ -445,7 +468,8 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
 | No robber, harbour settlements, missions, per-scenario VP (E&P)           | `NO_ROBBER`, slice flag on a settlement piece, `victoryPoints`, scenario `vpToWin` — **done (E5, `ep`)**     |
 | Ships that sail a distance and carry cargo, exploring, pirate ships (E&P) | own pieces in the slice over the shared `seaGraph`, `fog`-kind terrains, copy-on-write board — **done (E5)** |
 | E&P 5-6 paired players' turn                                              | core Second Settler step, `ScenarioDef.pairedTurns56` — **done (E5)**                                        |
-| Combination matrix, VP increments                                         | modes only, `conflicts`, `vpBonus`, `scenarioVp`                                                             |
+| Combination matrix, VP increments                                         | modes only, `conflicts`, `vpBonus`, `scenarioVp` — **done for Seafarers + C&K, T&B + C&K (C1)**              |
+| Combination rules on top of two modules                                   | combo module: `requires`, `before` (order), `wraps`, `routeEdges` (C1)                                       |
 
 **Known gaps (framework follow-ups, not blocking the first modes):**
 
@@ -460,17 +484,13 @@ Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` par
   and stack orders, oil is public anyway). Online play is base-only for now; a module masking
   hook is needed before an expansion with secrets goes online.
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
+- **Combinations (C1):** Seafarers + C&K and T&B + C&K are built (§11). Not built: T&B +
+  Seafarers (the 2025 sheets need T&B features on Seafarers scenarios: a seam in `tb` or
+  `seafarers`), Barbarian Attack + C&K, Catan for Two + C&K, the T&B × T&B sheets (T6). Details in `docs/rules/combos.md` §3.
 - **E&P combinations for card E5b** (official, not built yet): E&P + C&K (2025 sheet: city first,
   harbor second, +5 VP, knights stay on their island, Fast Gold with commodities) and E&P + T&B
   (event cards for the numbers, Fishermen variant with fish tokens). Player trades with gold
   (E&P §3.3) would need an `ep/offerTrade` like C&K's commodity offers.
-- **T&B combinations for card C1** (official, per scenario, not built yet): T&B + Seafarers
-  (rulebook "in theory" for every variant/scenario; FAQ 6, 19-20, 53, 58, 65: ships next to
-  camels, pirate is friendly, ships on dotted lines, wagons onto ships) and T&B + C&K (FAQ 3-5,
-  43, 62-64: only the 2 production dice re-roll 2/12, Aqueduct with fish, gold not for 3:1/4:1,
-  diplomat and knights vs barbarians). The 2025 T&B × T&B sheets are T6 rulesets
-  (docs/rules/traders-barbarians.md §8.1); the `tb` feature design (`featuresOf`) can host them as
-  extra scenarios switching on two features.
 
 ## 13. File ownership for parallel expansion agents
 

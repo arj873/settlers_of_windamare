@@ -64,6 +64,11 @@ export type ExtHandler = {
   bivarianceHack(draft: GameState, action: ExpansionAction): ActionResult;
 }['bivarianceHack'];
 
+/** Wraps another module's action handler (`ExpansionModule.wraps`). */
+export type ExtWrap = {
+  bivarianceHack(draft: GameState, action: ExpansionAction, next: ExtHandler): ActionResult;
+}['bivarianceHack'];
+
 /** Wraps a base handler. Call `next(draft, action)` to run the base rule (or the previous wrapper). */
 export type Override<K extends BaseActionType> = (
   draft: GameState,
@@ -243,6 +248,11 @@ export interface ExpansionHooks {
   ): { gain?: GainSource; loss?: LossSink } | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
+  /**
+   * additive. Module pieces on edges that carry `player`'s route for pieces that travel along
+   * roads (C&K knights): Seafarers + C&K, the player's ships. Roads are always included.
+   */
+  routeEdges?(state: GameState, player: PlayerId): readonly EdgeId[];
   /** chained. Length for Longest Road (Seafarers: trade route). */
   roadLength?(state: GameState, player: PlayerId, base: number): number;
   /** chained. Army size for Largest Army, base = knights played (Pirate Islands: no award, 0). */
@@ -276,6 +286,11 @@ export interface ExpansionModule {
   /** Officially impossible together (E&P vs Seafarers). Symmetric: either side may declare it. */
   conflicts?: readonly ExpansionId[];
   /**
+   * Composition order: this module's hooks, overrides and legal run before these modules' (a
+   * combination module that arbitrates their first-wins hooks). Default: registry order.
+   */
+  before?: readonly ExpansionId[];
+  /**
    * A small rules variant (friendly robber, house rules) that may be added on top of any mode
    * via `config.expansions`. Non-variant modules only come in through a mode.
    */
@@ -303,6 +318,11 @@ export interface ExpansionModule {
   actions?: Readonly<Record<ExpansionActionType, ExtHandler>>;
   /** Wrappers around base action handlers. Pair every rejection with filterLegal. */
   overrides?: { readonly [K in BaseActionType]?: Override<K> };
+  /**
+   * Wrappers around ANOTHER active module's actions (a combination module adding its rules to
+   * `seafarers/pickShip`). Same order as `overrides`: the first module listed is innermost.
+   */
+  wraps?: Readonly<Record<ExpansionActionType, ExtWrap>>;
   /** Extra legal actions (any phase). Must be sound. */
   legal?: LegalGenerator;
   /** Drop / replace legal actions (runs after every generator, in settings order). */

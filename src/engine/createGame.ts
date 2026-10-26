@@ -134,6 +134,20 @@ export interface ResolvedMode {
   modules: readonly ExpansionModule[];
 }
 
+/**
+ * Registry order, except that a module with `before` moves in front of the first module it
+ * names (a combination module runs its hooks before the modules it composes).
+ */
+export function composeOrder(modules: readonly ExpansionModule[]): ExpansionModule[] {
+  const out = modules.filter((m) => !m.before?.some((id) => modules.some((x) => x.id === id)));
+  for (const m of modules) {
+    if (out.includes(m)) continue;
+    const at = out.findIndex((x) => m.before?.includes(x.id));
+    out.splice(at < 0 ? out.length : at, 0, m);
+  }
+  return out;
+}
+
 export function resolveMode(config: GameConfig): ResolvedMode {
   const mode = modeById(config.mode ?? 'base');
   if (!mode) throw new Error(`unknown mode ${String(config.mode)}`);
@@ -153,7 +167,7 @@ export function resolveMode(config: GameConfig): ResolvedMode {
     }
     add(id, 'config');
   }
-  const modules = allModules().filter((m) => ids.has(m.id));
+  const modules = composeOrder(allModules().filter((m) => ids.has(m.id)));
   for (const a of modules) {
     for (const b of modules) {
       if (a.conflicts?.includes(b.id)) throw new Error(`${a.id} cannot be combined with ${b.id}`);

@@ -1017,8 +1017,8 @@ implemented.
 | Combination                                | Status | Note                                                                                                                                                                                         |
 | ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | T&B × T&B scenario sheets (§8.1, T6 2025)  | —      | T6 rulesets (wagon board, Merchant Trains); our scenarios are T5. The feature design (`featuresOf`) lets a combo scenario switch on two features; the sheet changes would be per-pair rules. |
-| With Cities & Knights (FAQ 3-5, 43, 62-64) | —      | Candidate for card C1 (needs the per-scenario combo modes, `scenarioVp`).                                                                                                                    |
-| With Seafarers (FAQ 6, 19-20, 53, 58, 65)  | —      | Card C1 (Seafarers is on a sibling branch).                                                                                                                                                  |
+| With Cities & Knights (FAQ 3-5, 43, 62-64) | OK     | Mode `tb+ck` (module `tbck`), 2025 sheets; BA and Catan for Two not built (docs/rules/combos.md).                                                                                            |
+| With Seafarers (FAQ 6, 19-20, 53, 58, 65)  | —      | Not built; sheet texts and the missing seam in docs/rules/combos.md §3.                                                                                                                      |
 
 ### 11.4 Known gaps
 

@@ -11,6 +11,8 @@ import { ckHud } from '../expansions/ck/ui';
 import { seafarersHud } from '../expansions/seafarers/ui';
 import { tbHud } from '../expansions/tb/ui';
 import { epHud } from '../expansions/ep/ui';
+import { seackHud } from '../expansions/seack/ui';
+import { tbckHud } from '../expansions/tbck/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -86,6 +88,8 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   seafarersHud,
   tbHud,
   epHud,
+  seackHud,
+  tbckHud,
   // new modules go here, one per line
 ];
 

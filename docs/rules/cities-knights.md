@@ -1001,7 +1001,7 @@ silent or unclear (see §10); — = not implemented.
 | §5 victory          | OK       | 13 VP (scenario target); VP from metropolises, Defender cards, Printer / Constitution, merchant (`victoryPoints` hook, named parts for the stats screen); no Largest Army, no development cards (`supply` hook).                                                                                                          |
 | §2.5 options        | OK / —   | Easy start (option `easyStart`: first two own turns, no event die, a rolled 7 is rolled again) and Knight-errant (`knightErrant`) OK. Nasty variant —.                                                                                                                                                                    |
 | §8.1 5-6            | OK       | `base56` board, 18 commodities, special build phase: builds, knights (recruit; activate / promote from the knight dialog), walls, improvements; no cards, trades or knight actions. Paired players (`secondSettler`) works too.                                                                                           |
-| §8.2 Seafarers      | —        | Combination waits for Seafarers (card C1).                                                                                                                                                                                                                                                                                |
+| §8.2 Seafarers      | OK       | Mode `seafarers+ck` (module `seack`); T&B + C&K: mode `tb+ck` (`tbck`). See docs/rules/combos.md.                                                                                                                                                                                                                         |
 
 ### 11.2 Variants (docs/RULES.md §18-20)
 
@@ -1021,7 +1021,7 @@ silent or unclear (see §10); — = not implemented.
   slices yet: progress hands and stack orders would leak; a masking hook is needed first.
 - Statistics count resources only: commodities, progress cards and knights have no statistics of
   their own (C&K resource changes are classified, not "Other").
-- Nasty (commit knights) variant, the C&K + Seafarers combination.
+- Nasty (commit knights) variant.
 
 ## Appendix A: card name map (5th → 6th)
 

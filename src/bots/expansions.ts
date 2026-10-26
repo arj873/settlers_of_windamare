@@ -10,6 +10,8 @@ import { ckBots } from '../expansions/ck/bots';
 import { seafarersBots } from '../expansions/seafarers/bots';
 import { tbBots } from '../expansions/tb/bots';
 import { epBots } from '../expansions/ep/bots';
+import { seackBots } from '../expansions/seack/bots';
+import { tbckBots } from '../expansions/tbck/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 
@@ -36,6 +38,8 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   seafarersBots,
   tbBots,
   epBots,
+  seackBots,
+  tbckBots,
   // new modules go here, one per line
 ];
 
