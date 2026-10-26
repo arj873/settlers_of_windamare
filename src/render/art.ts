@@ -536,13 +536,12 @@ export function shade(color: number, amount: number): number {
 
 const ROAD_W = px(0.17); // outline width
 const ROAD_FILL_W = px(0.115);
-/** Distance from a vertex where two road strips at 120° stop overlapping: w / (2 tan 60°). */
-const ROAD_INSET = (ROAD_W / (2 * SQRT3)) * 1.02;
+/** Radius of the junction peg: covers the butt-cap corners (at ROAD_W / 2) of roads ending at its centre. */
+const JOINT_R = (ROAD_W / 2) * 1.2;
 
 /**
- * Road along a segment (design px). Butt caps, stopped just short of each vertex so roads meeting
- * there touch without overlapping; `drawRoadJoint` fills the gap between same-owner roads, and
- * buildings (higher layer) cover the vertex.
+ * Road along a segment (design px). Butt caps running to the vertex centres; the joint peg
+ * (`drawRoadJoint`, layered above roads) or a building covers every end.
  */
 export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
   const dx = b[0] - a[0];
@@ -550,10 +549,10 @@ export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
   const len = Math.hypot(dx, dy);
   const ux = dx / len;
   const uy = dy / len;
-  const x0 = a[0] + ux * ROAD_INSET;
-  const y0 = a[1] + uy * ROAD_INSET;
-  const x1 = b[0] - ux * ROAD_INSET;
-  const y1 = b[1] - uy * ROAD_INSET;
+  const x0 = a[0];
+  const y0 = a[1];
+  const x1 = b[0];
+  const y1 = b[1];
   g.moveTo(x0 + 1.5, y0 + 2.5)
     .lineTo(x1 + 1.5, y1 + 2.5)
     .stroke({ width: ROAD_W, color: 0x000000, alpha: 0.28, cap: 'butt' });
@@ -567,23 +566,19 @@ export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
 }
 
 /**
- * Round joint disc at a vertex (x, y) where two or more roads of one owner meet, drawn in the
- * road style. Must be layered BELOW the roads. `away` is the unit direction of a differently
- * owned road at the same vertex: the disc is then cut to the half facing away from it so it
- * never pokes into that road.
+ * Junction peg at a building-free vertex (x, y). Must be layered ABOVE roads and below
+ * buildings. With `color` (a dead end, one road) it is a rounded road end in that colour;
+ * without it (2+ roads, any owners) it is a neutral wooden peg.
  */
-export function drawRoadJoint(g: Graphics, x: number, y: number, color: number, away?: Pt) {
-  const disc = (cx: number, cy: number, r: number) => {
-    if (!away) return g.circle(cx, cy, r);
-    const a0 = Math.atan2(away[1], away[0]) + Math.PI / 2;
-    return g
-      .moveTo(cx, cy)
-      .arc(cx, cy, r, a0, a0 + Math.PI)
-      .closePath();
-  };
-  disc(x + 1.5, y + 2.5, ROAD_W / 2).fill({ color: 0x000000, alpha: 0.28 });
-  disc(x, y, ROAD_W / 2).fill(INK);
-  disc(x, y, ROAD_FILL_W / 2).fill(color);
+export function drawRoadJoint(g: Graphics, x: number, y: number, color?: number) {
+  g.circle(x + 1.5, y + 2.5, JOINT_R).fill({ color: 0x000000, alpha: 0.28 });
+  g.circle(x, y, JOINT_R).fill(INK);
+  if (color !== undefined) {
+    g.circle(x, y, ROAD_FILL_W / 2).fill(color);
+    return;
+  }
+  g.circle(x, y, JOINT_R - 2).fill(0xc9a56a);
+  g.circle(x - 0.8, y - 1, JOINT_R * 0.45).fill({ color: 0xe6cc9a, alpha: 0.8 });
 }
 
 export function drawSettlement(g: Graphics, x: number, y: number, color: number) {
