@@ -57,6 +57,7 @@ function pickByType(options: readonly Action[], rng: Rng): Action {
 
 /**
  * Random bot (see PickMode), with an optional bias away from `endTurn` / `passSpecialBuild`.
+ * A bot whose trade offer was accepted confirms with a random accepter instead of withdrawing.
  * Uses the bot's own `rng`. In a special build step its options are the builds, buyDevCard and
  * passSpecialBuild, so with byType it passes with probability 1/(number of types) per decision;
  * every build spends cards, so a step always ends.
@@ -73,6 +74,10 @@ export function createRandomBot(options: RandomBotOptions = {}): Bot {
     const all = legal ?? legalActions(state, player);
     const options = all.filter((a) => a.player === player);
     if (options.length === 0) return null;
+    // An own offer someone accepted: trade with one of them (never withdraw on an accepter).
+    // Withdrawing stays possible while nobody has accepted yet.
+    const confirms = options.filter((a) => a.type === 'confirmTrade');
+    if (confirms.length > 0) return rng.pick(confirms);
     // Only consume randomness for the bias when it is enabled, so bias 0 is a plain pick.
     if (bias > 0 && rng.float() < bias) {
       const progress = options.filter((a) => !avoid.includes(a.type));
