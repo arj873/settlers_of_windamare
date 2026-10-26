@@ -1,0 +1,260 @@
+/*
+ * Parlour: a games-room table. Claret wool felt with stitched edges, polished brass rims and
+ * nameplates, ivory enamel buttons and glossy enamel player tokens. Fraunces for the titles.
+ */
+:root[data-theme='parlour'] {
+  --page-bg: radial-gradient(ellipse at 42% 50%, #173a52 0%, #0d2233 60%, #07131d 100%);
+  /* Brass rim round the board. */
+  --board-frame: #c49a45;
+  --board-frame-dark: #5d430f;
+  --board-frame-light: #f3d991;
+
+  --font-ui: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
+  --font-log: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'Figtree', system-ui, sans-serif;
+  --display-weight: 650;
+  --display-tracking: 0.01em;
+
+  --ink: #f8eddb;
+  --ink-dim: #dcc2a6;
+  --ink-dark: #2d1206;
+  --ink-strong: #fffaf0;
+  --log-ink: #f1e3cb;
+  --raised-ink: #4a1621;
+  --text-shadow: none;
+  --good: #9fe39a;
+  --bad: #ffa08e;
+
+  /* Felt: a faint twill over a deep claret. */
+  --surface:
+    repeating-linear-gradient(45deg, rgba(255, 220, 220, 0.025) 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at 30% 0%, rgba(255, 170, 170, 0.1), transparent 60%),
+    linear-gradient(180deg, #5e1f2c, #4a1621);
+  --surface-raised: linear-gradient(180deg, #fffaf0 0%, #f4ead6 55%, #e6d6b6 100%);
+  --surface-sunken: rgba(20, 3, 8, 0.32);
+  --surface-pop: #3a1019;
+  --surface-flat: #4f1824;
+  --edge: #b8913f;
+  --line: rgba(240, 210, 160, 0.2);
+  --hover: rgba(240, 210, 160, 0.1);
+  --panel-shadow:
+    inset 0 0 0 1px rgba(80, 50, 10, 0.9), inset 0 0 0 2px rgba(255, 228, 165, 0.25),
+    inset 0 0 30px rgba(0, 0, 0, 0.35), 0 8px 22px rgba(0, 0, 0, 0.5);
+  --side-shadow:
+    inset 1px 0 0 rgba(80, 50, 10, 0.9), inset 0 0 40px rgba(0, 0, 0, 0.35),
+    -6px 0 18px rgba(0, 0, 0, 0.4);
+  --btn-shadow:
+    inset 0 1px 0 #fff, inset 0 -2px 0 rgba(120, 80, 40, 0.16), 0 2px 0 #7a5a22,
+    0 3px 6px rgba(0, 0, 0, 0.35);
+  --sunken-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+  --sec-sep: 3px solid #a8822f;
+  --sec-sep-shadow: inset 0 1px 0 rgba(255, 232, 170, 0.35), inset 0 -1px 0 rgba(60, 35, 5, 0.6);
+  --tint-base: #3f121c;
+  --scrim: rgba(12, 5, 9, 0.55);
+  --scrim-deep: rgba(8, 3, 6, 0.9);
+  --radius: 12px;
+  --btn-radius: 9px;
+
+  --accent: #e0b458;
+  --accent-2: #f3d58e;
+  --accent-glow: rgba(224, 180, 88, 0.55);
+  --accent-ink: #2d1206;
+  --primary-bg: linear-gradient(180deg, #f9e09a 0%, #e4b85c 45%, #c4943a 55%, #dcae58 100%);
+  --primary-ink: #2d1206;
+  --primary-text-shadow: 0 1px 0 rgba(255, 245, 210, 0.6);
+  --ghost-bg: rgba(20, 3, 8, 0.3);
+  --warn: #ff6b55;
+  --warn-glow: rgba(255, 107, 85, 0.6);
+  --danger-bg: #b3261e;
+
+  /* Brass nameplates with rivets. */
+  --plaque-bg: linear-gradient(180deg, #f6dc98 0%, #d8ad55 46%, #bb8c38 54%, #dcb468 100%);
+  --plaque-ink: #3a1a08;
+  --plaque-border: 1.5px solid #6e4f17;
+  --plaque-radius: 7px;
+  --plaque-shadow:
+    inset 0 1px 0 rgba(255, 250, 220, 0.85), inset 0 -1px 0 rgba(90, 60, 10, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  --plaque-text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6);
+  --plaque-stud: radial-gradient(circle at 40% 35%, #fff3c4, #a07a2a 60%, #5d430f);
+
+  --log-bg: rgba(18, 3, 7, 0.35);
+  --log-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 230, 170, 0.15);
+  --log-dim: rgba(240, 215, 170, 0.7);
+  --log-rule: rgba(240, 215, 170, 0.2);
+  --scroll-thumb: rgba(240, 215, 170, 0.35);
+  --pname-mix: white;
+  --pname-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+
+  --badge-bg: #2a0d14;
+  --badge-ink: #f8eddb;
+  --badge-ring: #e0b458;
+  --tag-bg: rgba(30, 4, 10, 0.55);
+  --tag-ink: #fff;
+  --new-bg: #2f8a46;
+  --award-bg: #f3d58e;
+
+  --card-edge: #2a0d14;
+  --card-inner: rgba(240, 205, 130, 0.75);
+  --card-stack-1: #efe3c9;
+  --card-stack-2: #ddcca8;
+  --card-shadow: 0 3px 5px rgba(0, 0, 0, 0.45);
+  --card-ico-bg: radial-gradient(circle, rgba(255, 250, 238, 0.92) 58%, rgba(255, 250, 238, 0) 70%);
+  --card-radius: 0.12;
+  --rf-brick: linear-gradient(160deg, #e0714a, #a83a22);
+  --rf-lumber: linear-gradient(160deg, #4fa65a, #1f6a32);
+  --rf-wool: linear-gradient(160deg, #bde37d, #6fae3d);
+  --rf-grain: linear-gradient(160deg, #ffd95e, #e0a21f);
+  --rf-ore: linear-gradient(160deg, #c7d1dc, #6f7f91);
+  --df-back: linear-gradient(160deg, #6a2333, #3d0f1a);
+  --df-face: linear-gradient(170deg, #fffaf0, #eadbbb);
+  --slot-bg:
+    linear-gradient(180deg, rgba(255, 230, 170, 0.07), transparent 40%), rgba(18, 3, 7, 0.35);
+  --slot-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 230, 170, 0.18);
+
+  --die-bg: linear-gradient(145deg, #fffdf7, #ece2cf);
+  --die-edge: #6e4f17;
+  --die-pip: #5a1a28;
+  --die-seven: #c0392b;
+  --die-shadow: 0 3px 0 #b6a383, 0 5px 9px rgba(0, 0, 0, 0.45);
+  --die-radius: 11px;
+
+  --pp-shade: #2a0d14;
+  --pp-gloss: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.08) 46%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.16)
+  );
+  --pp-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.45);
+  --avatar-ring: #e0b458;
+  --pill-shade: #2a0d14;
+  --pill-ring: inset 0 0 0 1.5px rgba(255, 230, 170, 0.45);
+  --timer-track: #ece0c6;
+  --timer-low-track: #f3d0c6;
+  --timer-low-fill: #ff8f7a;
+
+  --setup-bg:
+    radial-gradient(ellipse at 50% 40%, transparent 50%, rgba(10, 0, 4, 0.45)),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 190, 170, 0.12), transparent 55%), var(--surface);
+  --tile-bg: rgba(24, 4, 10, 0.4);
+  --tile-on-bg: linear-gradient(180deg, rgba(224, 180, 88, 0.2), rgba(224, 180, 88, 0.06));
+  --tile-shadow: inset 0 1px 0 rgba(255, 230, 170, 0.08);
+  --tile-hover-edge: rgba(224, 180, 88, 0.6);
+  --map-sea: radial-gradient(circle at 50% 50%, #1f5476, #10304a);
+  --switch-off: rgba(0, 0, 0, 0.4);
+  --switch-on: rgba(224, 180, 88, 0.35);
+  --range-track: rgba(255, 240, 210, 0.18);
+  --range-thumb: #fffaf0;
+  --step-bg: linear-gradient(180deg, #fffaf0, #e9dbbd);
+  --step-hover: #fffaf0;
+  --swatch-on: #f3d58e;
+
+  --toast-bg: #3a1019;
+  --toast-ink: #f8eddb;
+  --toast-edge: rgba(224, 180, 88, 0.7);
+  --toast-error-edge: #ff7a6b;
+  --toast-error-ink: #ffd0c9;
+  --resume-bg: var(--setup-bg);
+  --resume-ink: #f8eddb;
+  --resume-dim: #dcc2a6;
+}
+
+/* Stitching just inside every felt panel. */
+[data-theme='parlour'] .wood,
+[data-theme='parlour'] .hud-side,
+[data-theme='parlour'] .dialog,
+[data-theme='parlour'] .hud-controls:not(:empty),
+[data-theme='parlour'] .winner-card,
+[data-theme='parlour'] .su-footer {
+  outline: 1.5px dashed rgba(240, 205, 150, 0.32);
+  outline-offset: -7px;
+}
+[data-theme='parlour'] .hud-side {
+  outline-offset: -6px;
+}
+[data-theme='parlour'] .plaque {
+  padding: 2px 28px 3px;
+}
+[data-theme='parlour'] .plaque::before,
+[data-theme='parlour'] .plaque::after {
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  box-shadow:
+    0 0 0 1px rgba(60, 35, 5, 0.6),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.4);
+}
+[data-theme='parlour'] .sec-toggle {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-color: #6e4f17;
+}
+
+/* Player names: lighter tint for contrast on felt. */
+[data-theme='parlour'] .pname {
+  color: color-mix(in srgb, var(--pc) 62%, #fff);
+}
+/* Enamel tokens: brass bezel round the avatar, brass rim round the bar. */
+[data-theme='parlour'] .avatar {
+  border-color: #6e4f17;
+  box-shadow:
+    0 0 0 2px #e0b458,
+    0 0 0 3px #6e4f17,
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+[data-theme='parlour'] .pp {
+  border-color: #c9a24f;
+}
+[data-theme='parlour'] .turn-pill {
+  border-color: #c9a24f;
+}
+/* Big titles sit on felt, not on a nameplate. */
+[data-theme='parlour'] .cover h1,
+[data-theme='parlour'] .winner h1,
+[data-theme='parlour'] .su-head h1 {
+  color: var(--accent-2);
+}
+[data-theme='parlour'] .turn-title {
+  font-size: 17px;
+}
+
+/* Brass coins on the card stacks. */
+[data-theme='parlour'] .count-badge,
+[data-theme='parlour'] .vp-badge {
+  background: radial-gradient(circle at 40% 30%, #4a1621, #2a0d14 70%);
+}
+[data-theme='parlour'] .bcard {
+  border-color: #6e4f17;
+}
+[data-theme='parlour'] .btn-roll.is-ready,
+[data-theme='parlour'] .btn-end.is-ready,
+[data-theme='parlour'] .btn-primary,
+[data-theme='parlour'] .seg-btn.is-on {
+  border-color: #6e4f17;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 230, 0.9),
+    0 2px 0 #6e4f17,
+    0 3px 8px rgba(0, 0, 0, 0.4);
+}
+[data-theme='parlour'] .btn-ghost {
+  color: var(--ink);
+  border-color: rgba(224, 180, 88, 0.6);
+}
+[data-theme='parlour'] .menu-btn {
+  border-color: #6e4f17;
+}
+
+/* Glyph inks: claret card backs with brass trim. */
+[data-theme='parlour'] .g-devBack rect:first-child,
+[data-theme='parlour'] .g-devCards rect:first-child {
+  fill: #5a1a28;
+}
+[data-theme='parlour'] .g-devBack rect:nth-child(2),
+[data-theme='parlour'] .g-devCards rect:nth-child(2) {
+  stroke: #e0b458;
+}

@@ -374,6 +374,7 @@ view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
 view.setInsets({ top, right, bottom, left });  // px covered by HUD panels; the fitted board avoids them
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
+setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 ```
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
@@ -421,10 +422,18 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
 - `offerTrade` is open-ended, so the composer builds its own action; the HUD enables the Trade button when any `offerTrade` is in `legal`.
 - Discard is submitted as one `discard` action with exactly `pending[viewer]` cards; the dialog opens when a `discard` for the viewer is in `legal`.
 - Hotseat: when `view.viewer` differs from the previously shown viewer a "Pass to <name>" cover hides everything until clicked. Keep `viewer` fixed during bot turns; change it only when a different human should see the screen. After `newGame` the HUD forgets the old viewer.
-- Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+- Dev page: `ui-dev.html` (`pnpm dev`, open `/ui-dev.html#<fixture>`; `?viewer=2&click=Bank`; `?click=Menu` opens the menu, `?theme=`) with hand-built legal lists (`src/ui/devLegal.ts`, not the engine's).
+- Themes (`src/ui/theme`, D1): Sunfired (default), Chartroom, Parlour, Wood. Every colour,
+  material, font and shadow is a CSS custom property; `wood.css` is the `:root` base and each
+  theme overrides it under `:root[data-theme='…']` on `<html>`. `initTheme(location.search)` picks
+  `?theme=` > saved pick (`localStorage['catan.theme']`, try/catch) > `DEFAULT_THEME`;
+  `setTheme(name)` applies, saves and calls `onThemeChange` listeners. `themePicker()` is in the
+  HUD menu and (compact) the setup footer. `boardFrameColors()` reads `--board-frame*` for the Pixi
+  frame (main.ts → `setFrameColors` + `board.retheme()`); the board canvas is transparent and the
+  page background is `--page-bg`. Tokens must not reference per-element vars (`--pc`, `--rc`).
 - Layout (T17, wooden theme): right sidebar `.hud-side` (Game Events / Bank / Players, collapsible;
   360px, 300px under 1280px, a drawer under 720px), menu top-left (`.hud-menu`: New game, Bot speed,
-  Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
+  Theme, Rules), turn pill top-centre (`.hud-turn`, replaces the old hint banner; `.hint` keeps the hint
   text), hand + Trade/Bank + build bar bottom-left (`.hud-bottom`), dice + Roll dice / End turn
   bottom-right (`.hud-controls`). `game/layout.ts` measures these for `BoardView.setInsets`; a docked
   trade offer card (`.scrim.is-side .dialog`, above the hand) becomes a left inset.

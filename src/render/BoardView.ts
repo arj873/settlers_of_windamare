@@ -158,8 +158,8 @@ export class BoardView {
       this.portLayer,
       this.tokenLayer,
       this.extBoardLayer,
-      this.jointLayer,
       this.roadLayer,
+      this.jointLayer,
       this.buildingLayer,
       this.extPiecesLayer,
       this.robberLayer,
@@ -260,6 +260,11 @@ export class BoardView {
     const p = unitToScreen(this.viewport.view, info);
     const r = this.app.canvas.getBoundingClientRect();
     return { x: p.x + r.left, y: p.y + r.top };
+  }
+
+  /** Redraw the sea and frame after `setFrameColors` (a UI theme change). */
+  retheme(): void {
+    this.buildSea();
   }
 
   destroy(): void {
@@ -502,34 +507,27 @@ export class BoardView {
     return new Color(css).toNumber();
   }
 
-  /** Round joints where >= 2 roads of one owner meet on a vertex without a building. */
+  /** Pegs on building-free vertices with roads: neutral at junctions (2+), rounded end at dead ends. */
   private wantRoadJoints(
     state: GameState,
     wanted: Map<string, { sig: string; make: () => Container; layer: Container }>,
   ) {
     for (const v of Object.values(this.topo.vertex)) {
       if (state.pieces.buildings[v.id]) continue;
-      const roads = v.edges.flatMap((e) => {
+      const owners = v.edges.flatMap((e) => {
         const owner = state.pieces.roads[e];
-        const other = this.topo.edge[e]?.vertices.find((w) => w !== v.id);
-        const o = other ? this.topo.vertex[other] : undefined;
-        if (owner === undefined || !o) return [];
-        const len = Math.hypot(o.x - v.x, o.y - v.y);
-        return [{ owner, dir: [(o.x - v.x) / len, (o.y - v.y) / len] as [number, number] }];
+        return owner === undefined ? [] : [owner];
       });
-      const mine = roads.find((r) => roads.filter((q) => q.owner === r.owner).length >= 2);
-      if (!mine) continue;
-      const foreign = roads.find((r) => r.owner !== mine.owner);
-      const color = this.colorOf(state, mine.owner);
-      const away = foreign?.dir;
+      if (owners.length === 0) continue;
+      const color = owners.length === 1 ? this.colorOf(state, owners[0] as PlayerId) : undefined;
       wanted.set(`joint:${v.id}`, {
-        sig: `joint:${color}:${away ?? ''}`,
+        sig: `joint:${color ?? 'peg'}`,
         layer: this.jointLayer,
         make: () => {
           const c = new Container();
           c.position.set(...pt(v));
           const g = new Graphics();
-          drawRoadJoint(g, 0, 0, color, away);
+          drawRoadJoint(g, 0, 0, color);
           c.addChild(g);
           return c;
         },

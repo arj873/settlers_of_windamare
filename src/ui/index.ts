@@ -10,3 +10,12 @@ export type {
   SeatConfig,
 } from './types';
 export { boardPrompt, type BoardPrompt } from './model';
+export {
+  boardFrameColors,
+  currentTheme,
+  initTheme,
+  onThemeChange,
+  setTheme,
+  THEMES,
+  type ThemeName,
+} from './theme';

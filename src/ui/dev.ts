@@ -10,7 +10,9 @@ import {
 } from '../engine/fixtures';
 import type { GameState } from '../engine';
 import { fakeLegal } from './devLegal';
-import { Hud, type PlaceMode } from './index';
+import { Hud, initTheme, type PlaceMode } from './index';
+
+initTheme(location.search);
 
 const FIXTURES: Record<string, () => GameState> = {
   'fresh (setup)': () => freshGame(4),
@@ -74,6 +76,15 @@ hud.on('action', (a) => console.info('[hud] action', JSON.stringify(a)));
 hud.on('newGame', (cfg) => console.info('[hud] newGame', JSON.stringify(cfg)));
 hud.on('placeMode', (m: PlaceMode | null) => console.info('[hud] placeMode', m));
 newGameBtn.addEventListener('click', () => hud.showNewGame());
+hud.setBotSpeed({
+  value: 500,
+  presets: [
+    { label: 'Slow', ms: 1200 },
+    { label: 'Normal', ms: 500 },
+    { label: 'Fast', ms: 150 },
+  ],
+  onChange: (ms) => console.info('[hud] bot speed', ms),
+});
 
 let state: GameState = midGame();
 
@@ -109,9 +120,12 @@ bot.addEventListener('change', draw);
 const wanted = decodeURIComponent(location.hash.slice(1));
 if (wanted in FIXTURES) pickFixture.value = wanted;
 else pickFixture.value = 'mid game (main)';
-// ?click=Bank,Trade presses buttons by label (handy for screenshots of dialogs).
+// ?click=Bank,Trade presses buttons by label or aria-label (handy for screenshots of dialogs;
+// ?click=Menu opens the HUD menu).
 function clickByLabel(label: string): void {
-  const btn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes(label));
+  const btn = [...document.querySelectorAll('button')].find(
+    (b) => b.getAttribute('aria-label') === label || b.textContent?.includes(label),
+  );
   btn?.click();
 }
 const viewerParam = new URLSearchParams(location.search).get('viewer');

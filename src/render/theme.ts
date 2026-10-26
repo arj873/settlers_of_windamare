@@ -62,6 +62,13 @@ export const SEA = {
   frameLight: 0xa57a4c,
 };
 
+/** Recolour the board frame (the UI theme calls this, then `BoardView.retheme()`). */
+export function setFrameColors(c: Pick<typeof SEA, 'frame' | 'frameDark' | 'frameLight'>): void {
+  SEA.frame = c.frame;
+  SEA.frameDark = c.frameDark;
+  SEA.frameLight = c.frameLight;
+}
+
 export const BEACH = 0xf0dfae;
 export const INK = 0x1c1c24;
 

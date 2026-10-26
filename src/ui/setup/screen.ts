@@ -4,6 +4,7 @@
  */
 import { scenarioById } from '../../engine';
 import { h, type Child } from '../dom';
+import { themePicker } from '../theme';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
 import {
@@ -111,6 +112,7 @@ export class SetupScreen {
           'div',
           { class: 'su-footer-in' },
           this.summary,
+          themePicker({ compact: true }),
           opts.onBack &&
             h(
               'button',
@@ -177,7 +179,12 @@ export class SetupScreen {
         'header',
         { class: 'su-head' },
         h('span', { class: 'su-logo' }, icon('logo', 38)),
-        h('div', {}, h('h1', {}, 'New game'), h('p', { class: 'muted' }, 'Set up your island')),
+        h(
+          'div',
+          {},
+          h('h1', {}, 'New game'),
+          h('p', { class: 'muted' }, 'Colonizers of Windamere'),
+        ),
       ),
       this.modeSection(),
       this.mapSection(),

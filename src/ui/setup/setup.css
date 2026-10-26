@@ -1,13 +1,11 @@
-/* New-game setup screen. Reuses the HUD tokens (.catan-hud vars) and shared .btn/.input/.swatch/.seg. */
+/* New-game setup screen. Reuses the theme tokens (src/ui/theme) and shared .btn/.input/.swatch/.seg. */
 .setup {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255, 214, 150, 0.16), transparent 55%),
-    linear-gradient(180deg, rgba(20, 9, 2, 0.35), rgba(20, 9, 2, 0.6)), var(--wood-bg);
+  background: var(--setup-bg);
   animation: fade 0.25s ease;
 }
 .su-scroll {
@@ -32,10 +30,13 @@
 .su-head h1 {
   font-size: 32px;
   line-height: 1.05;
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-case);
+  color: var(--plaque-ink);
 }
 .su-logo {
-  color: var(--gold);
-  filter: drop-shadow(0 0 14px rgba(242, 184, 75, 0.55));
+  color: var(--accent);
+  filter: drop-shadow(0 0 14px var(--accent-glow));
   display: grid;
 }
 .su-ico {
@@ -75,9 +76,9 @@
   gap: 2px;
   padding: 12px 14px;
   border-radius: var(--radius);
-  background: var(--panel);
+  background: var(--tile-bg);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: var(--tile-shadow);
   transition:
     transform 0.12s ease,
     border-color 0.18s ease,
@@ -85,22 +86,21 @@
 }
 .su-tile:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--tile-hover-edge);
 }
 .su-tile:focus-visible,
 .su-step:focus-visible,
 .su-range:focus-visible,
 .su-more summary:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .su-tile.is-on {
-  border-color: var(--gold);
-  background:
-    linear-gradient(180deg, rgba(242, 184, 75, 0.2), rgba(242, 184, 75, 0.08)), var(--panel);
+  border-color: var(--accent);
+  background: var(--tile-on-bg), var(--tile-bg);
   box-shadow:
-    var(--shadow),
-    0 0 18px rgba(242, 184, 75, 0.22);
+    var(--tile-shadow),
+    0 0 18px color-mix(in srgb, var(--accent-glow) 40%, transparent);
 }
 .su-tile:disabled {
   opacity: 0.5;
@@ -132,8 +132,8 @@
   border-radius: 50%;
   font-size: 11px;
   font-weight: 800;
-  color: #2b1d02;
-  background: var(--gold);
+  color: var(--accent-ink);
+  background: var(--accent);
 }
 .su-rule.is-on::after {
   display: none;
@@ -151,8 +151,8 @@
   place-items: center;
   height: 112px;
   margin-bottom: 8px;
-  border-radius: 8px;
-  background: radial-gradient(circle at 50% 50%, #1d5a86, #12395a);
+  border-radius: var(--btn-radius);
+  background: var(--map-sea);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 .map-preview {
@@ -172,7 +172,7 @@
   color: var(--ink);
 }
 .su-rule .su-ico {
-  color: var(--gold-2);
+  color: var(--accent-2);
 }
 .su-rule-text {
   display: flex;
@@ -187,7 +187,7 @@
   height: 22px;
   padding: 2px;
   border-radius: 99px;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--switch-off);
   border: 1px solid var(--line);
   transition: background 0.18s ease;
 }
@@ -202,12 +202,12 @@
     background 0.18s ease;
 }
 .su-rule.is-on .su-switch {
-  background: rgba(242, 184, 75, 0.35);
-  border-color: var(--gold);
+  background: var(--switch-on);
+  border-color: var(--accent);
 }
 .su-rule.is-on .su-switch i {
   transform: translateX(16px);
-  background: var(--gold);
+  background: var(--accent);
 }
 
 /* advanced */
@@ -222,9 +222,9 @@
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--radius);
-  background: var(--panel);
+  background: var(--tile-bg);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: var(--tile-shadow);
 }
 .su-card-title {
   display: flex;
@@ -245,17 +245,18 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1;
-  color: var(--ink);
+  color: var(--raised-ink);
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: var(--panel-2);
+  background: var(--step-bg);
+  box-shadow: var(--btn-shadow);
   transition:
     background 0.15s ease,
     transform 0.1s ease;
 }
 .su-step:hover:not(:disabled) {
-  background: var(--wood-4);
+  background: var(--step-hover);
 }
 .su-step:active:not(:disabled) {
   transform: translateY(1px);
@@ -269,7 +270,7 @@
   text-align: center;
   font-size: 22px;
   font-weight: 700;
-  color: var(--gold-2);
+  color: var(--accent-2);
   font-variant-numeric: tabular-nums;
 }
 .su-value-sm {
@@ -291,17 +292,17 @@
 .su-range::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--gold) var(--pct), rgba(255, 255, 255, 0.14) var(--pct));
+  background: linear-gradient(90deg, var(--accent) var(--pct), var(--range-track) var(--pct));
 }
 .su-range::-moz-range-track {
   height: 6px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--range-track);
 }
 .su-range::-moz-range-progress {
   height: 6px;
   border-radius: 99px;
-  background: var(--gold);
+  background: var(--accent);
 }
 .su-range::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -309,16 +310,16 @@
   height: 20px;
   margin-top: -7px;
   border-radius: 50%;
-  background: #ffe6ae;
-  border: 2px solid var(--gold);
+  background: var(--range-thumb);
+  border: 2px solid var(--accent);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 .su-range::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffe6ae;
-  border: 2px solid var(--gold);
+  background: var(--range-thumb);
+  border: 2px solid var(--accent);
 }
 .su-range-ends {
   display: flex;
@@ -365,7 +366,7 @@
   gap: 12px;
   padding: 8px 12px;
   border-radius: var(--radius);
-  background: var(--panel);
+  background: var(--tile-bg);
   border: 1px solid var(--line);
   border-left: 5px solid var(--pc);
   transition: border-color 0.2s ease;
@@ -397,9 +398,8 @@
 .su-footer {
   flex: none;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--line);
-  background: var(--wood-bg);
-  border-top: 2px solid var(--wood-0);
+  background: var(--surface);
+  border-top: 2px solid var(--edge);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
 }
 .su-footer-in {
