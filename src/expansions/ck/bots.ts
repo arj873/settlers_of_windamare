@@ -145,9 +145,12 @@ function check(state: GameState): Violation[] {
   if (!isCount(s.barbarian) || s.barbarian >= BARBARIAN_STEPS)
     bad(`barbarian position ${s.barbarian}`);
   if (!isCount(s.attacks)) bad(`attacks ${s.attacks}`);
+  // (On C&K's own boards; other modules' maps start the robber elsewhere: their combination
+  // module checks it, e.g. seack.)
   if (
     s.attacks === 0 &&
     hasRobber(state.settings) &&
+    String(state.settings.scenario).startsWith(`${CK}/`) &&
     state.board.hexes[state.robber]?.terrain !== 'desert'
   ) {
     bad('the robber moved before the first barbarian attack');

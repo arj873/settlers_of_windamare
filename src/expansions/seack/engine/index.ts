@@ -34,6 +34,7 @@ import { SEAFARERS, seafarersModule, seaSlice, type GoldPhase } from '../../seaf
 import { pirateTargets, robberMoveOk } from '../../seafarers/engine/actions';
 import { graph } from '../../seafarers/engine/geometry';
 import { shipsOf } from '../../seafarers/engine/ships';
+import { diplomatFilter, diplomatLegal, diplomatWraps } from './diplomat';
 
 export const SEACK = 'seack';
 export const SEACK_MODE = 'seafarers+ck';
@@ -48,6 +49,8 @@ export interface SeackSlice {
   v: 1;
   /** Which piece the current moveRobber phase may move (a knight chased it), or null = either. */
   chase: 'robber' | 'pirate' | null;
+  /** Where the robber and the pirate stood when the game began (they sleep until the first attack). */
+  start: { robber: HexId; pirate: HexId | null } | null;
 }
 
 export type SeackAction = { type: 'seack/chasePirate'; player: PlayerId };
@@ -119,6 +122,7 @@ const chasePirate: ExtHandler = (draft, action) => {
 // ---------------------------------------------------------------------------------------------
 
 const wraps: Record<`${string}/${string}`, ExtWrap> = {
+  ...diplomatWraps,
   'seafarers/pickShip': (draft, action, next) => {
     const e = action['edge'];
     if (typeof e === 'string') {
@@ -218,6 +222,7 @@ function legal(state: GameState): Action[] {
       }
     }
   }
+  diplomatLegal(state, out);
   return out;
 }
 
@@ -225,11 +230,13 @@ function filterLegal(state: GameState, actions: Action[]): Action[] {
   const chase = seackSlice(state).chase;
   const seen = new Set<string>();
   return actions.filter((a) => {
-    if (a.type === 'ck/selectKnight') {
-      // The wrap above may add a selection ck already offers.
-      const key = String((a as { vertex?: string }).vertex);
+    if (a.type === 'ck/selectKnight' || a.type === 'ck/pickEdge') {
+      // Our legal may add a selection / an edge C&K already offers.
+      const x = a as { vertex?: string; edge?: string };
+      const key = `${a.type}:${String(x.vertex ?? x.edge)}`;
       if (seen.has(key)) return false;
       seen.add(key);
+      if (!diplomatFilter(state, a)) return false;
     }
     if (a.type === 'ck/pickHex' && bishopHexBanned(state, a.player, (a as { hex?: unknown }).hex)) {
       return false;
@@ -272,7 +279,7 @@ export const seackModule: ExpansionModule = {
   },
 
   init(draft) {
-    const slice: SeackSlice = { v: 1, chase: null };
+    const slice: SeackSlice = { v: 1, chase: null, start: null };
     draft.ext[SEACK] = slice;
   },
   cloneExt: (slice) => cloneJson(slice),
@@ -296,6 +303,8 @@ export const seackModule: ExpansionModule = {
 
     afterAction(draft, action) {
       const s = seackSlice(draft);
+      // The Seafarers map is final after createGame (its init runs after ours): note the start.
+      s.start ??= { robber: draft.robber, pirate: seaSlice(draft).pirate };
       if (action.type === 'ck/chaseRobber') s.chase = 'robber';
       else if (draft.phase.kind !== 'moveRobber') s.chase = null;
       // A gold pick may empty the bank before the Aqueduct: nothing left to take.

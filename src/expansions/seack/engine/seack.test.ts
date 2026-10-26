@@ -17,6 +17,7 @@ import { touchesLand } from '../../../engine/rules/placement';
 import { tradeRouteLength } from '../../seafarers/engine/ships';
 import { E, H, V, players, ship } from '../../seafarers/engine/testkit';
 import { SEACK, SEACK_MODE, seackSlice } from '.';
+import { isOpenShip, openShips } from './diplomat';
 
 const TIP = V(2, 8, 'SE'); // (2,8) | sea (3,9) | sea (2,10)
 const TIP_W = V(2, 8, 'SW'); // (2,8) | sea (1,9) | sea (2,10)
@@ -97,7 +98,7 @@ describe('the mode', () => {
   it('composes seack, ck and seafarers in that order (seack arbitrates first-wins hooks)', () => {
     const s = game();
     expect(s.settings.expansions).toEqual([SEACK, 'ck', 'seafarers']);
-    expect(s.ext[SEACK]).toEqual({ v: 1, chase: null });
+    expect(s.ext[SEACK]).toEqual({ v: 1, chase: null, start: null });
   });
 
   it('offers only the suitable scenarios, at their VP target + 2 (C2.1, C2.2)', () => {
@@ -292,6 +293,56 @@ describe('knights and ships (C2.3, C2.5-C2.7)', () => {
     const t = run(s, { type: 'ck/play', player: 0, card: 'roadBuilding' } as Action);
     expect(t.phase.kind).toBe('roadBuilding');
     expect(legalOf(t, 'seafarers/placeFreeShip').length).toBeGreaterThan(0);
+  });
+});
+
+describe('the Diplomat with ships (C2.3)', () => {
+  /** Player 1 holds the Diplomat; player 0 a settlement on TIP_W and ships out to sea. */
+  function diplomat(): GameState {
+    const s = main();
+    s.pieces.buildings[TIP_W] = { owner: 0, kind: 'settlement' };
+    ship(s, 0, COAST_S, ...seaPath(s).edges);
+    giveCards(s, 0, 'diplomat' as ProgressCard);
+    return s;
+  }
+  const last = (s: GameState) => seaPath(s).edges.at(-1) as EdgeId;
+
+  it("is playable for an open ship alone and removes an opponent's open ship", () => {
+    const s = diplomat();
+    // Hand the ships to player 1: player 0 plays the card against them.
+    for (const e of Object.keys(seaSlice(s).ships) as EdgeId[]) seaSlice(s).ships[e] = { owner: 1 };
+    s.pieces.buildings[TIP_W] = { owner: 1, kind: 'settlement' };
+    expect(isOpenShip(s, last(s))).toBe(true);
+    expect(isOpenShip(s, COAST_S)).toBe(false);
+    let t = run(s, { type: 'ck/play', player: 0, card: 'diplomat' } as Action);
+    const edges = legalOf(t, 'ck/pickEdge').map((a) => (a as { edge?: EdgeId }).edge);
+    expect(edges).toEqual([last(s)]);
+    t = run(t, { type: 'ck/pickEdge', player: 0, edge: last(s) } as Action);
+    expect(seaSlice(t).ships[last(s)]).toBeUndefined();
+    expect(t.phase.kind).toBe('main');
+  });
+
+  it('re-places an own open ship as a ship, or takes it back with Done', () => {
+    const s = diplomat();
+    let t = run(s, { type: 'ck/play', player: 0, card: 'diplomat' } as Action);
+    t = run(t, { type: 'ck/pickEdge', player: 0, edge: last(s) } as Action);
+    const spots = legalOf(t, 'ck/pickEdge').map((a) => (a as { edge?: EdgeId }).edge as EdgeId);
+    expect(spots.length).toBeGreaterThan(0);
+    expect(spots).not.toContain(last(s));
+    for (const e of spots) expect(isShipEdge(t, e)).toBe(true);
+    const moved = run(t, { type: 'ck/pickEdge', player: 0, edge: spots[0] } as Action);
+    expect(seaSlice(moved).ships[last(s)]).toBeUndefined();
+    expect(seaSlice(moved).ships[spots[0] as EdgeId]?.owner).toBe(0);
+    const gone = run(t, { type: 'ck/done', player: 0 } as Action);
+    expect(seaSlice(gone).ships[last(s)]).toBeUndefined();
+    expect(gone.phase.kind).toBe('main');
+  });
+
+  it('a ship on a closed route is never open', () => {
+    const s = diplomat();
+    const ships = seaSlice(s).ships;
+    for (const e of Object.keys(ships) as EdgeId[]) ships[e] = { owner: 0, closed: true };
+    expect(openShips(s)).toEqual([]);
   });
 });
 

@@ -28,6 +28,13 @@ function check(state: GameState): Violation[] {
   if (chase !== null && chase !== 'robber' && chase !== 'pirate') bad(`chase ${String(chase)}`);
   if (chase !== null && state.phase.kind !== 'moveRobber') bad(`chase ${chase} outside moveRobber`);
 
+  // The robber and the pirate sleep until the first barbarian attack (C2.10).
+  const start = seackSlice(state).start;
+  if (start && ckSlice(state).attacks === 0) {
+    if (state.robber !== start.robber) bad('the robber moved before the first attack');
+    if (seaSlice(state).pirate !== start.pirate) bad('the pirate moved before the first attack');
+  }
+
   const t = topologyOf(state);
   const ships = seaSlice(state).ships;
   const knights = ckSlice(state).knights;

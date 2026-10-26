@@ -1,0 +1,27 @@
+/* Seafarers + C&K HUD (classes are prefixed seack-). Colours come from the theme tokens. */
+.seack-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.seack-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.seack-fact {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.seack-fact.is-asleep {
+  border-left-color: var(--ink-dim);
+}
+.seack-fact.is-awake {
+  border-left-color: var(--accent);
+}
+.seack-chase {
+  margin-top: 4px;
+}
