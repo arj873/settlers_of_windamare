@@ -22,9 +22,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 - Stage 3 shipped: F1, E1–E5, C1, X1 squash-merged into `expansions`, then `expansions` → `main` in one squash PR. All 9 modes on the setup screen and online. 1916 tests.
 
-## 🏃 In Progress — Stage 5: extras (from `main`, PRs → `main`)
+## ✅ Stage 5 extras done (E5b, C2, B1)
 
-- **C2** · T&B + Seafarers combined mode (2025 sheets, FAQ 6/19-20/53/58/65); then T&B × T&B sheets if time · `s5-tbsea` (Opus) 🟦
 
 ## 🏃 In Progress — Stage 2
 
@@ -63,6 +62,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - (UX2) live mid-game stats for your own seat · Export stats (JSON/PNG) · `?fixture=finishedGame` dev param · event-card timeline
 - (B2) MIN_ZOOM 0.55 → ~0.8 · bigger token pips · cropped/rounded sea frame on big boards
 - (V2) per-rule 5+ sub-switches · E56 lettered token spiral · stats row for dev cards played in build phase · repeatable setup-screenshot script
+- (C2) T&B + Seafarers on the other Seafarers scenarios · six non-Fishing T&B × T&B sheets · "2 also on this 12" board marker · 3P small-island layouts
 - (E5b) E&P + C&K at 5-6P (ruling for C&K actions in the paired turn) · rename Bishop → Taxation (2025 C&K) · one fish panel in ep+tb · verify island 2 vs 10 on a physical copy
 - (B1) bot strategies for T&B, E&P, Oil, Crop · Seafarers edge for Hard · bots that build their own trade offers · in-game bot level change · per-level stats line
 - (X1) deck colour on opponents' face-down C&K progress cards · lint check that client code never runs the engine on a masked view
@@ -132,6 +132,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **C2** · T&B + Seafarers (`tb+seafarers`: 5 T&B scenarios on New Shores, sea wagons, friendly pirate, FAQ rulings) + T&B × T&B Fishing pairs (`tb+tb`); `playsAs`/`basedOn` seam, `ModeDef.hideOptions`, stacked expansion panels shrink + scroll · `s5-tbsea` 🟦 · PR #23 (squashed) → `main` · 2121 tests
 - **E5b** · E&P combos: `ep+ck` (2025 sheet: city first, harbor second, +5 VP, island knights, Fast Gold + commodities), `ep+tb` (fishing grounds, lake, fish uses, event-card numbers), `ep/offerTrade` gold trades; VP cap 25; e2e waits out the room-create limit · `s5-epcombos` 🟦 · PR #22 (squashed) → `main` · 2050 tests
 - **B1** · Smarter bots: Easy (random, unchanged) / Normal / Hard heuristic bot in `src/bots/smart`; C&K + Seafarers strategies via `BotExtension.score/goals`; per-seat picker in setup + online lobby (`setBotLevel`); Normal 100% vs 3 Easy, Hard 33% vs 3 Normal (base) · `s5-bots` 🟦 · PR #21 (squashed) → `main` · 1968 tests
 - **X1** · Expansions online: registry-checked `configure`, move guard by action type, `maskFor` hook in `viewFor` (C&K, Seafarers, T&B, E&P masks + marker-planting leak tests), `extraDevCards` hook (T&B deck 25/25), lobby reuses setup mode tiles, `pt:serve --mode/--scenario`; e2e base/C&K/Seafarers/E&P games to a win on wrangler dev · `s3-online` 🟦 · PR #19 (squashed) → `expansions` · 1916 tests
