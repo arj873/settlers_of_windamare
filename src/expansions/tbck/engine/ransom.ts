@@ -139,7 +139,6 @@ export function ransomLegal(
   const ph = isRansom(state);
   const city = ph?.queue[0];
   if (!city) return [];
-  const out = [{ type: 'tbck/ransom' as const, player: city.owner, pay: false }];
-  if (goldOf(state, city.owner) >= RANSOM_GOLD) out.push({ ...out[0]!, pay: true });
-  return out;
+  const answer = (pay: boolean) => ({ type: 'tbck/ransom' as const, player: city.owner, pay });
+  return goldOf(state, city.owner) >= RANSOM_GOLD ? [answer(false), answer(true)] : [answer(false)];
 }
