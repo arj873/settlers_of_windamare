@@ -13,7 +13,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 4
 
-- **M4** · Multi-browser e2e tests + Haiku remote playtest (each agent its own browser) · deps: M2, M3
 - **M5** · Go live on Cloudflare (needs your account) · deps: M4
 
 ## ✅ Stage 3 complete — merged to `main` (expansions as game modes; you chose: framework → small → big, max parallel, Starfarers skipped)
@@ -34,11 +33,7 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 📋 Backlog — Stage 3 (after F1, in parallel)
 
-- **F2** · T&B trade-hex plaza IDs (centre vertex + spoke edges) · deps: F1
-- **F3** · setupRounds / setup-order hook (Cloth for Catan, E&P) · deps: F1
 - **F4** · HUD bank ratios from engine hooks; reusable "pick N resources" dialog (demo mode is already hidden in prod: `?modes=all` only)
-- **E4** · Traders & Barbarians engine, all scenarios + Catan for Two (+5-6P) · 🟦
-- **U1–U5** · Render + HUD per expansion · 🟩
 - **Q1–Q5** · Haiku playtest per expansion
 
 ## ✅ Ready
