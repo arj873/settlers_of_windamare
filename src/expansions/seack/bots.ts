@@ -14,7 +14,7 @@ import {
   type PlayerId,
   type VertexId,
 } from '../../engine';
-import { ckSlice } from '../ck/engine';
+import { BARBARIAN_STEPS, barbarianStrength, ckSlice, defenderStrength } from '../ck/engine';
 import { seaSlice } from '../seafarers/engine';
 import { graph } from '../seafarers/engine/geometry';
 import { SEACK, seackSlice } from './engine';
@@ -57,14 +57,19 @@ function check(state: GameState): Violation[] {
 
 /** Builds that score, in the order a greedy player would take them. */
 const SCORING = ['buildCity', 'buildSettlement', 'ck/improve'] as const;
+/** Defence when the barbarians are close and Catan is weaker than them. */
+const DEFENCE = ['ck/activateKnight', 'ck/buildKnight', 'ck/promoteKnight'] as const;
 
 function steer(
-  _state: GameState,
+  state: GameState,
   _player: PlayerId,
   options: readonly Action[],
   rng: { pick<T>(xs: readonly T[]): T },
 ): Action | null {
-  for (const type of SCORING) {
+  const ck = ckSlice(state);
+  const weak =
+    ck.barbarian >= BARBARIAN_STEPS - 3 && defenderStrength(state) <= barbarianStrength(state);
+  for (const type of weak ? [...DEFENCE, ...SCORING] : SCORING) {
     const xs = options.filter((a) => a.type === type);
     if (xs.length > 0) return rng.pick(xs);
   }
