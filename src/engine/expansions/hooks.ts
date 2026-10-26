@@ -18,6 +18,7 @@ import type {
   Terrain,
   VertexId,
 } from '../types';
+import type { Viewer } from '../viewer';
 import { activeModules, expansionById } from './registry';
 import { namespaceOf } from './ext';
 import type { ProductionContext, SetupOrder, Supply, VictoryPointPart } from './types';
@@ -292,6 +293,16 @@ export function expansionActors(state: GameState): PlayerId[] | undefined {
     if (a !== undefined) return a;
   }
   return undefined;
+}
+
+/** Online views: every active module's `maskFor`, chained in settings order (engine/view.ts). */
+export function hookMaskFor(view: GameState, viewer: Viewer, state: GameState): GameState {
+  let out = view;
+  for (const m of activeModules(state)) {
+    const f = m.hooks?.maskFor;
+    if (f) out = f(out, viewer, state);
+  }
+  return out;
 }
 
 /** Does a successful `type` action of a module change road lengths / vertex occupancy? */

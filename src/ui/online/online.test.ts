@@ -2,13 +2,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { viewFor } from '../../engine';
 import { discardGame, midGame } from '../../engine/fixtures';
-import { DEFAULT_ROOM_CONFIG, type RoomInfo } from '../../net/protocol';
+import { DEFAULT_ROOM_CONFIG, roomConfigError, type RoomInfo } from '../../net/protocol';
 import { Hud } from '../hud';
 import { ChatPanel } from './chat';
 import { configOf, draftOf, RoomConfigPanel, withSeatCount } from './configPanel';
 import { HomeScreen } from './home';
 import { LobbyScreen, type LobbyActions } from './lobby';
-import { configSummary, inviteUrl, lobbyView } from './lobbyModel';
+import { configSummary, inviteUrl, lobbyView, seatRange } from './lobbyModel';
 
 const COLORS = ['#d64541', '#3a7bd5', '#ecf0f1', '#f39c12'];
 
@@ -92,6 +92,50 @@ describe('config bridge (wrapped setup screen)', () => {
     expect(configOf(draftOf(cfg))).toEqual(cfg);
     const rules = { ...cfg, rules: { balancedDice: true, hideBankCards: true } };
     expect(configOf(draftOf(rules))).toEqual(rules);
+  });
+
+  it('round-trips expansion modes, scenarios, options and variants', () => {
+    const ck = {
+      ...DEFAULT_ROOM_CONFIG,
+      mode: 'ck',
+      scenario: 'ck/starter',
+      options: { ck: { easyStart: true, knightErrant: false } },
+      vpToWin: 13,
+    };
+    expect(configOf(draftOf(ck))).toEqual(ck);
+    const sea = {
+      ...DEFAULT_ROOM_CONFIG,
+      mode: 'seafarers',
+      scenario: 'seafarers/fogIslands',
+      // The (unused) base map follows the seat count, like on the setup screen.
+      map: 'base56' as const,
+      seatCount: 5,
+      vpToWin: 12,
+      options: configOf(draftOf({ ...DEFAULT_ROOM_CONFIG, mode: 'seafarers' })).options,
+    };
+    expect(configOf(draftOf(sea))).toEqual(sea);
+    const variants = {
+      ...DEFAULT_ROOM_CONFIG,
+      turnTimerSec: null,
+      variants: {
+        robberMode: 'friendly' as const,
+        eventCards: true,
+        rushMode: true,
+        mapRules: { allowRedTouch: true },
+        timer: { preset: 'custom' as const, bankSec: 600, incrementSec: 5 },
+      },
+    };
+    expect(configOf(draftOf(variants))).toEqual(variants);
+    // Every round-tripped config passes the server's checks.
+    for (const c of [ck, sea, variants]) expect(roomConfigError(configOf(draftOf(c)))).toBeNull();
+  });
+
+  it('expansion seat ranges and summary come from the mode and scenario', () => {
+    expect(seatRange({ ...DEFAULT_ROOM_CONFIG, mode: 'ck' })).toEqual({ min: 3, max: 6 });
+    expect(seatRange(DEFAULT_ROOM_CONFIG)).toEqual({ min: 3, max: 8 });
+    const sea = { ...DEFAULT_ROOM_CONFIG, mode: 'seafarers', scenario: 'seafarers/fogIslands' };
+    expect(configSummary(sea)).toMatch(/^Seafarers: The Fog Islands · 4 seats/);
+    expect(withSeatCount({ ...DEFAULT_ROOM_CONFIG, mode: 'ck' }, 9).seatCount).toBe(6);
   });
 
   it('a 5th seat switches to the 5-6 player map, like the setup screen', () => {

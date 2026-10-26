@@ -3,7 +3,8 @@
  *   `pnpm pt:serve [--seats 3..8] [--map base|baseRandom|base56|base78] [--seed S] [--vp N]
  *    [--timer SEC] [--headed]`                       hotseat: ONE page, all seats
  *   `pnpm pt:serve --online --seats N [--bots B] [--map M] [--timer SEC] [--vp N] [--headed]
- *    [--remote URL]`                                online: one browser context per human seat
+ *    [--remote URL] [--mode ck|seafarers|tb|ep|... [--scenario fogIslands]]`
+ *                                                    online: one browser context per human seat
  *
  * Hotseat: builds the app, serves it with `vite preview`, opens ONE Chromium page with an
  * all-human game (Seat1..SeatN, `?debug=1`). Online: starts or reuses `pnpm dev:server` (wrangler

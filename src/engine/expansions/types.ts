@@ -31,6 +31,7 @@ import type {
   ScenarioId,
   VertexId,
 } from '../types';
+import type { Viewer } from '../viewer';
 
 /** How the core paid a production roll (the `production` hook's `ctx`). */
 export interface ProductionContext {
@@ -275,6 +276,23 @@ export interface ExpansionHooks {
    * captured fortress too; Wonders a completed wonder or the highest one). undefined = default.
    */
   wins?(state: GameState, player: PlayerId): boolean | undefined;
+  /**
+   * additive. Development cards the module keeps outside `devDeck` (T&B Swift Journeys):
+   * `deck` = undrawn now, `total` = in the game. The HUD's deck counter adds them (`devDeckCounts`).
+   * A view may fold them into `devDeck` (its mask then reports `deck` 0); `total` stays.
+   */
+  extraDevCards?(state: GameState): { deck: number; total: number } | undefined;
+  /**
+   * chained. Online views (`viewFor`, engine/view.ts): hide this module's secrets from `viewer`.
+   * `view` is the view so far (base secrets and earlier modules' secrets already masked), `state`
+   * the full state. Return `view` with your secrets replaced by placeholders of the same shape,
+   * keeping what is public (a face-down stack keeps its length, a hand its size). Use
+   * `hiddenFrom` (engine/viewer.ts) for per-player secrets; cards a player holds outside the
+   * base hands go into the public counts with `addPublicCounts`. Keep the view's `view` field
+   * (spread `view`). Never mutate either argument; share unchanged parts. Not called in base
+   * games.
+   */
+  maskFor?(view: GameState, viewer: Viewer, state: GameState): GameState;
 }
 
 export interface ExpansionModule {

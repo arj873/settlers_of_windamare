@@ -313,6 +313,11 @@ export interface CkSlice {
   turns: number[];
   /** Commodity parts of the open player trade offer (base `trade` phase), or null. */
   trade: { give: CommodityCounts; want: CommodityCounts } | null;
+  /**
+   * Online views only (mask.ts): commodity cards per player, the public total of the per-type
+   * split the view hides. Absent in full states; read it through `commodityCount`.
+   */
+  commodityCounts?: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +449,15 @@ export function ckPlayer(state: Pick<GameState, 'ext'>, p: PlayerId): CkPlayer {
 
 export const commodityTotal = (c: CommodityBundle): number =>
   COMMODITIES.reduce((n, k) => n + (c[k] ?? 0), 0);
+
+/**
+ * Commodity cards in `p`'s hand (public). Works on full states and on online views, where other
+ * seats' per-type split is zeroed (UI code: use this, not `commodities`).
+ */
+export function commodityCount(state: Pick<GameState, 'ext'>, p: PlayerId): number {
+  const s = ckSlice(state);
+  return s.commodityCounts?.[p] ?? commodityTotal(s.players[p]?.commodities ?? {});
+}
 
 /** Knights of `player` (vertex + knight), any order. */
 export function knightsOf(state: Pick<GameState, 'ext'>, player: PlayerId): [VertexId, Knight][] {

@@ -27,6 +27,7 @@ import type { Action, GameState, Phase, PlayerId, VertexId } from '../../../engi
 import { playBlocker, startCard } from './cards';
 import { ckLegal } from './legal';
 import { CK_STARTER19 } from './maps';
+import { ckMaskFor } from './mask';
 import { answer, choiceOf, promptFor } from './prompts';
 import {
   ACTIVATE_COST,
@@ -109,6 +110,7 @@ export * from './cards';
 export * from './prompts';
 export * from './trade';
 export { ckLegal } from './legal';
+export { HIDDEN_PROGRESS_CARD, ckMaskFor } from './mask';
 
 const pn = playerName;
 const asCk = (a: { type: string }) => a as unknown as CkAction;
@@ -735,5 +737,7 @@ export const ckModule: ExpansionModule = {
     },
 
     statsCategory,
+
+    maskFor: ckMaskFor,
   },
 };

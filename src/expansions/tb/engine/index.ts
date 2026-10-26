@@ -11,9 +11,10 @@
  * `blocksRoute` (neutral pieces, bridge sites, trade-hex sea sides, conquered hexes),
  * `victoryPoints`, `bankTradeRatio` (conquered harbours), `roadLength` (camels, neutrals, no
  * Longest Road in T&B), `supply` (BA deck), `onStartTurn` / `onEndTurn`, `afterAction`
- * (Harbormaster, Catan for Two's second roll), `statsCategory`. Overrides add gold, tokens,
- * neutral builds and barbarian landings to the base builds, and the end-of-turn steps (knights
- * and expulsion, the caravan vote, the wagon move) to endTurn.
+ * (Harbormaster, Catan for Two's second roll), `statsCategory`, `maskFor` (online views,
+ * mask.ts). Overrides add gold, tokens, neutral builds and barbarian landings to the base
+ * builds, and the end-of-turn steps (knights and expulsion, the caravan vote, the wagon move)
+ * to endTurn.
  */
 import { COSTS, RESOURCES } from '../../../engine/constants';
 import { fail, log, ok, resumePhase, isCurrent } from '../../../engine/actions/common';
@@ -102,6 +103,7 @@ import {
   useFish,
 } from './fish';
 import { TB_MAPS } from './maps';
+import { swiftDevCards, tbMaskFor } from './mask';
 import {
   bridgeBlocker,
   edgeOnRiver,
@@ -988,6 +990,8 @@ export const tbModule: ExpansionModule = {
   },
 
   hooks: {
+    extraDevCards: swiftDevCards,
+
     setupBuilding: (state, index) =>
       (has(state, 'ba') || has(state, 'traders')) && index >= state.players.length
         ? 'city'
@@ -1149,6 +1153,8 @@ export const tbModule: ExpansionModule = {
     },
 
     statsCategory: (_state, action, p) => statsCategory(action as Action, p),
+
+    maskFor: tbMaskFor,
   },
 };
 

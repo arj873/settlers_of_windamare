@@ -155,16 +155,20 @@ const fishProgress: ExtHandler = (draft, action) => {
   const err = fishProgressBlocker(draft, action.player, card);
   if (err) return fail(err);
   const c = card as ProgressCard;
-  const deck = ckSlice(draft).decks[stackOf(draft, c) as Track];
+  const track = stackOf(draft, c) as Track;
+  const deck = ckSlice(draft).decks[track];
   deck.splice(deck.lastIndexOf(c), 1);
   const paid = payFish(draft, action.player, 'devCard');
   const pl = ckSlice(draft).players[action.player];
   if (isVpCard(c)) pl?.vpCards.push(c);
   else pl?.progress.push(c);
+  // The card joins a secret hand (online views): only a VP card, laid out at once, is named.
   log(
     draft,
     action.player,
-    `${pn(draft, action.player)} paid ${paid} fish for the ${CARD_NAMES[c]}${isVpCard(c) ? ' (1 victory point)' : ''}`,
+    isVpCard(c)
+      ? `${pn(draft, action.player)} paid ${paid} fish for the ${CARD_NAMES[c]} (1 victory point)`
+      : `${pn(draft, action.player)} paid ${paid} fish for a ${track} progress card`,
   );
   return ok(draft);
 };

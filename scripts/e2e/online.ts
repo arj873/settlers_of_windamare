@@ -261,6 +261,57 @@ async function main() {
     check(true, 'closed tab shows the away icon');
     await shot(ann, '7-bob-away');
 
+    // Expansion room (X1): the host picks Cities & Knights with the setup screen's mode tile;
+    // Ann + Dan play against two bots; the C&K HUD renders from the masked views.
+    const host = await open(REMOTE ? base : `${base}?server=local`);
+    await host.fill('[data-k="nickname"]', 'Ann');
+    await host.click('[data-k="create"]');
+    await host.waitForSelector('.ol-lobby');
+    await host.click('.ol-config [data-k="mode-ck"]');
+    await host.waitForFunction(`${clientExpr}.room.config.mode === 'ck'`);
+    check(true, 'host picked Cities & Knights in the lobby (setup screen mode tile)');
+    const dan = await open(await host.inputValue('[data-k="invite"]'));
+    await dan.fill('[data-k="nickname"]', 'Dan');
+    await dan.click('[data-k="join"]');
+    await dan.waitForSelector('.ol-lobby');
+    check(
+      (await dan.textContent('.ol-lobby'))?.includes('Cities & Knights'),
+      'guest sees the C&K setup',
+    );
+    await host.click('[data-k="sit-0"]');
+    await dan.waitForSelector('[data-k="sit-1"]');
+    await dan.click('[data-k="sit-1"]');
+    await host.waitForFunction(() =>
+      document.querySelector('.ol-seat[data-seat="1"]')?.textContent?.includes('Dan'),
+    );
+    await shot(host, '8-lobby-ck');
+    await host.click('[data-k="lobby-start"]');
+    await host.waitForSelector('.hud-side .sec-chat');
+    await dan.waitForSelector('.hud-side .sec-chat');
+    check(
+      (await host.evaluate(`${clientExpr}.game.view.settings.mode`)) === 'ck',
+      'C&K game started online',
+    );
+    for (let i = 0; i < 400; i++) {
+      const turn = (await host.evaluate(`${clientExpr}.game.view.turn.number`)) as number;
+      if (turn >= 4) break;
+      for (const p of [host, dan]) {
+        await p.evaluate(
+          `(() => { const c = ${clientExpr}; const l = c.game && c.game.legal; if (l && l.length) c.intent(l.find(a => !/offerTrade$|cancel$/.test(a.type)) || l[0]); })()`,
+        );
+      }
+      await host.waitForTimeout(120);
+    }
+    const ckTurn = (await host.evaluate(`${clientExpr}.game.view.turn.number`)) as number;
+    check(ckTurn >= 4, `C&K game reached turn ${ckTurn}`);
+    const leak = (await dan.evaluate(
+      `(() => { const v = ${clientExpr}.game.view; const ck = v.ext.ck; return v.players.filter(p => p.id !== v.view.viewer).some(p => new Set(ck.players[p.id].progress).size > 1 || Object.values(ck.players[p.id].commodities).some(n => n > 0)); })()`,
+    )) as boolean;
+    check(!leak, "Dan's view hides Ann's progress cards and commodities");
+    check(await host.$('.ck-stat, .ck-die'), 'C&K HUD panel renders');
+    await shot(host, '9-game-ck-ann');
+    await shot(dan, '9-game-ck-dan');
+
     check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);
     console.log(`\nAll checks passed. Screenshots in ${OUT}`);
   } finally {

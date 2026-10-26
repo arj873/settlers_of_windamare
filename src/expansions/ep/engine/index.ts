@@ -56,6 +56,7 @@ import {
   type Content,
   type MapKey,
 } from './maps';
+import { maskEp } from './mask';
 import { missionsOf, missionVp, newTrack, totalMissionVp, vpParts } from './missions';
 import { harborsOf } from './ships';
 import {
@@ -400,6 +401,9 @@ export const epModule: ExpansionModule = {
     onStartTurn(draft) {
       epSlice(draft).turn = freshTurn();
     },
+
+    // Online views: face-down hexes, disc and lair token stacks (engine/mask.ts).
+    maskFor: maskEp,
 
     // No winner during the setup's fleet step (tiny VP targets).
     deferVictory: (state) => state.phase.kind === 'ep/setupFleet',
