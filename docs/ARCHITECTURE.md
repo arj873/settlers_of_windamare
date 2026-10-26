@@ -414,6 +414,10 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
   manual camera: a _pressed_ drag past `TAP_SLOP` (6 px), a wheel, a two-pointer pinch. A mouse press is always a
   single pointer (a missed release is dropped, and a move with no button held is a hover, never a drag). Inset
   changes leave a manual camera alone; a real size change, double-click, `fit()` or the "Fit board" button refit.
+- The fit frames `fitBounds(topo)` (land hexes + harbor badges); the sea backdrop/frame (`boardBounds`) may run
+  under the HUD and only bounds the pan clamp. Board `Text` is re-rasterized at `textResolution(pxPerUnit, dpr)`
+  150 ms after the zoom settles (no minified/magnified glyph bitmaps); the view keeps `renderer.resolution` equal to
+  `devicePixelRatio` (browser zoom, monitor change). `view.textResolution()` reports the current text resolution.
 - The view draws the board of `topologyOf(state)`; a state on another frame rebuilds the sea and refits (`Viewport.setBounds`). Big boards get a plain backdrop for now (T12 makes them pretty).
 - Pure math (fit/zoom/hit-test, unit space) is in `render/geometry.ts`, unit-tested. `pick`, `hexAt`, `boardBounds`, `backdropRadius` take an optional topology (default: the 19-hex one). Dev: `?fixture=midGame`, `?hl=vertices|edges|hexes`.
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
