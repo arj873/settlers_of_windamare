@@ -422,14 +422,17 @@ export function shade(color: number, amount: number): number {
   return (mix((color >> 16) & 255) << 16) | (mix((color >> 8) & 255) << 8) | mix(color & 255);
 }
 
-/** Road along a segment (design px), shortened at both ends so it sits between buildings. */
+/**
+ * Road along a segment (design px). The inset is smaller than the round cap's radius, so roads
+ * meeting at a vertex join up visually; buildings are drawn on a higher layer and cover the joint.
+ */
 export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len = Math.hypot(dx, dy);
   const ux = dx / len;
   const uy = dy / len;
-  const inset = px(0.17);
+  const inset = px(0.03);
   const x0 = a[0] + ux * inset;
   const y0 = a[1] + uy * inset;
   const x1 = b[0] - ux * inset;
