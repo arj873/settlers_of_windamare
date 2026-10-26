@@ -387,7 +387,20 @@ function steerBa(
   return null;
 }
 
+/** Rivers: get out of the Poor Settler's -2 (sell for gold), and build bridges for gold. */
+function steerRivers(state: GameState, p: PlayerId, options: readonly Action[]): Action | null {
+  const bridge = options.find((a) => a.type === 'tb/buildBridge');
+  if (bridge) return bridge;
+  const gold = (state.ext[TB] as TbSlice).gold;
+  const poor = (gold[p] ?? 0) === Math.min(...gold);
+  return poor ? (options.find((a) => a.type === 'tb/sellForGold') ?? null) : null;
+}
+
 function steer(state: GameState, p: PlayerId, options: readonly Action[], rng: Rng): Action | null {
+  if (has(state, 'rivers')) {
+    const a = steerRivers(state, p, options);
+    if (a) return a;
+  }
   if (has(state, 'traders')) return steerWagon(state, p, options);
   if (has(state, 'ba')) return steerBa(state, p, options, rng);
   return null;
