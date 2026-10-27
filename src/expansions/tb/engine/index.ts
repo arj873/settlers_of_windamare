@@ -93,7 +93,7 @@ import {
   takeBank,
   updateHarbormaster,
 } from './common';
-import { isConqueredBuilding } from './conquest';
+import { isConqueredBuilding, isConqueredHex } from './conquest';
 import {
   fishBlocker,
   fishLegal,
@@ -133,12 +133,14 @@ import {
   asTb,
   baOf,
   caravansOf,
+  extraNumbers,
   featuresOf,
   fishOf,
   harbormasterOn,
   has,
   isTwo,
   robberless,
+  sheetRules,
   tbBoard,
   tbSlice,
   tradersOf,
@@ -314,8 +316,9 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
     draft.pieces.roads[a.edge] = a.player;
     const s = tbSlice(draft);
     if (s.rivers) s.rivers.bridges[a.edge] = a.player;
-    addGold(draft, a.player, BRIDGE_GOLD);
-    log(draft, a.player, `${pn(draft, a.player)} built a bridge (+${BRIDGE_GOLD} gold)`);
+    const gold = sheetRules(draft).bridgeGold ?? BRIDGE_GOLD;
+    addGold(draft, a.player, gold);
+    log(draft, a.player, `${pn(draft, a.player)} built a bridge (+${gold} gold)`);
     if (isTwo(draft)) {
       const next = neutralFollowUp(draft, 'road', draft.phase, true);
       if (next) draft.phase = asPhase(next);
@@ -677,6 +680,8 @@ function init(draft: GameState, rng: Rng): void {
     slice.traders = initTraders(draft, rng);
     slice.gold = startGold(n);
   }
+  const gold = sheetRules(draft).startGold;
+  if (gold !== undefined) slice.gold = draft.players.map(() => gold);
   if (n === 2) slice.two = initTwo();
   draft.ext[TB] = slice;
 }
@@ -691,8 +696,9 @@ function secondRoll(draft: GameState): void {
 }
 
 /** Gold, tokens and fish for a new settlement on `v` (setup or built). */
-function settled(draft: GameState, p: PlayerId, v: VertexId): void {
-  if (has(draft, 'rivers') && vertexOnRiver(draft, v)) {
+function settled(draft: GameState, p: PlayerId, v: VertexId, setup: boolean): void {
+  const riverGold = setup || !sheetRules(draft).riverGoldSetupOnly;
+  if (has(draft, 'rivers') && riverGold && vertexOnRiver(draft, v)) {
     addGold(draft, p, 1);
     log(draft, p, `${pn(draft, p)} got 1 gold (river)`);
   }
@@ -881,7 +887,7 @@ export const tbModule: ExpansionModule = {
       const index = draft.phase.kind === 'setup' ? draft.phase.index : 0;
       const r = next(draft, action);
       if (!r.ok) return r;
-      settled(draft, action.player, action.vertex);
+      settled(draft, action.player, action.vertex, true);
       if (index >= draft.players.length) {
         if (has(draft, 'fish')) setupFish(draft, action.player, action.vertex);
         if (has(draft, 'traders')) tradersOf(draft).wagons[action.player] = action.vertex;
@@ -910,7 +916,7 @@ export const tbModule: ExpansionModule = {
     buildSettlement: (draft, action, next) => {
       const r = next(draft, action);
       if (!r.ok) return r;
-      settled(draft, action.player, action.vertex);
+      settled(draft, action.player, action.vertex, false);
       if (has(draft, 'caravans')) noteBuilt(draft, action.player);
       if (has(draft, 'ba')) landBarbarians(draft);
       neutralAfter(draft, 'settlement');
@@ -1010,7 +1016,8 @@ export const tbModule: ExpansionModule = {
         : undefined,
 
     rollDice(draft) {
-      const reroll212 = has(draft, 'traders');
+      // T&B re-rolls a 2 or 12 when no hex carries them (5-6 and the sheets with those discs: no).
+      const reroll212 = has(draft, 'traders') && !carries212(draft);
       const two = tbSlice(draft).two;
       const avoid = two && two.rolls === 1 ? two.firstRoll : null;
       if (!reroll212 && avoid === null) return undefined;
@@ -1046,17 +1053,16 @@ export const tbModule: ExpansionModule = {
     },
 
     production(state, roll, owed, ctx) {
-      // Rivers (and Fishing + Caravans): the 12 hex produces on a 2 as well.
-      if (roll === 2 && tbBoard(state).twoOnTwelve) {
-        const h = tbBoard(state).twoOnTwelve ?? null;
-        const tile = h ? state.board.hexes[h] : undefined;
-        if (h && tile && h !== ctx.blocked && isResource(tile.terrain)) {
-          const r = tile.terrain;
-          for (const v of hexVertices(topologyOf(state), h)) {
-            const b = state.pieces.buildings[v];
-            const hand = b && owed[b.owner];
-            if (hand) hand[r] += b.kind === 'city' ? ctx.cityYield : 1;
-          }
+      // Rivers (and Fishing + Caravans): the 12 hex produces on a 2 as well; a sheet's alsoOn.
+      for (const { hex: h, number } of extraNumbers(state)) {
+        const tile = state.board.hexes[h];
+        if (number !== roll || !tile || h === ctx.blocked || isConqueredHex(state, h)) continue;
+        if (!isResource(tile.terrain)) continue;
+        const r = tile.terrain;
+        for (const v of hexVertices(topologyOf(state), h)) {
+          const b = state.pieces.buildings[v];
+          const hand = b && owed[b.owner];
+          if (hand) hand[r] += b.kind === 'city' ? ctx.cityYield : 1;
         }
       }
       if (has(state, 'ba')) conqueredProduction(state, roll, owed, ctx.cityYield);
@@ -1172,9 +1178,9 @@ export const tbModule: ExpansionModule = {
   },
 };
 
-/** After a 7 without a robber: BA steals from any player, T&B moves a barbarian. */
+/** After a 7 without a robber: BA steals from any player (BA + T&B too), T&B moves a barbarian. */
 function sevenPhase(draft: GameState): Phase {
-  if (has(draft, 'traders')) {
+  if (has(draft, 'traders') && !has(draft, 'ba')) {
     return asPhase({ kind: 'tb/barbarian', from: null, steal: true, resume: 'main' });
   }
   const p = draft.turn.current;
@@ -1183,6 +1189,11 @@ function sevenPhase(draft: GameState): Phase {
     .filter((o) => o !== p && handTotal(draft, o) > 0);
   return candidates.length > 0 ? { kind: 'steal', candidates, resume: 'main' } : { kind: 'main' };
 }
+
+/** A hex carries a 2 or a 12 (token or extra number). */
+const carries212 = (state: GameState): boolean =>
+  Object.values(state.board.hexes).some((h) => h.token === 2 || h.token === 12) ||
+  extraNumbers(state).some((x) => x.number === 2 || x.number === 12);
 
 /** buyDevCard draws a Swift Journey (by its share of the remaining cards). */
 function drawsSwiftFor(draft: GameState, p: PlayerId): boolean {

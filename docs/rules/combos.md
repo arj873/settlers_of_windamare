@@ -227,7 +227,86 @@ fishing grounds. 3-4 players. Tests: `src/expansions/tbpair/engine/tbpair.test.t
 | Fishing + Merchant Trains (our Caravans): 12 VP; the lake replaces a forest next to the watering hole; the 12 shares the 2's hex | OK, ours | The lake on a forest beside the oasis (red numbers never move: its number takes the 2's hex); `twoOnTwelve` now works outside Rivers too.            |
 
 Our T&B is the 5th edition: the boards are T&B's T5 boards, the sheets are written for T6 (same
-counts where it matters). The other six T&B × T&B sheets are listed in §3.
+counts where it matters). The other six T&B × T&B sheets: §2d.
+
+## 2d. T&B scenario pairs: the six sheets without Fishing — module `tbpair`, mode `tb+tb`
+
+Card C4. The six other 2025 sheets, read 2026-10-26 (one page each, two with a board diagram;
+under https://www.catan.com/sites/default/files/2025-07/: `Barbarian Attack w TradersnBarbarians.pdf`,
+`Merchant Trains w Barbarian Attack.pdf`, `Merchant Trains w Traders&Barbarians.pdf`,
+`RiversOfCatan w BarbarianAttack.pdf`, `Rivers of Catan w Merchant Trains.pdf`,
+`Rivers of Catan w TradersnBarbarians.pdf`). Same seam as §2c: each scenario plays as its two T&B
+scenarios (`playsAs`). Boards: `tbpair/engine/sheets.ts`. Rule changes T&B's features read sit on
+the board (`board.ext.tb.rules`, `TbSheetRules`); the rest is the module's. 3-4 players (the sheets
+are for the 3-4 box). Merchant Trains = our Caravans (camels), the watering hole = our oasis, "Poor
+Catanian" = our Poor Settler. Tests: `tbpair/engine/sheets.test.ts`, `tbpair/mask.test.ts`,
+`tbpair/ui.test.ts`; soundness for every scenario in `tbpair.test.ts`.
+
+**What the sheets say (our words).** Barbarian Attack + T&B (14 VP): the BA board; the 3 trade
+hexes and the 9 X markers in their places, BA's castle in its place; without 1 forest, 1 pasture
+and the desert; coast 2 hills, 1 forest, 2 pastures, 2 fields, 1 mountain; inner 1 hill, 1 forest,
+1 pasture, 2 fields, 2 mountains; the discs as shown, the castle trade hex takes the 12, the
+glassworks the 2 [img: every other disc is BA's; the quarry, on BA's desert spot, has none]; no
+Longest Route, Largest Army or robber; BA's development cards (not T&B's); one barbarian on the
+castle trade hex and one on the glassworks, no others. A barbarian placed on a coastal hex is also
+tied to one of the hex's edges or interior paths, one barbarian a path; when all are taken it goes
+to the centre; the two start barbarians stand at the centres. A conquered trade hex: disc face
+down, no more barbarians, no production; deliveries and pick-ups go on. Treason: the 2 barbarians
+may go to any unconquered hex, inland too, each tied to a path. A 2 or 12: no re-roll, a barbarian
+on the coastal hex with that number. A 7: no production, discards, no barbarian moves, steal 1
+random card from another player. A drive-off puts the barbarian on any unconquered hex, by a path.
+Merchant Trains + BA (12): the BA board, the watering hole instead of the desert (on the coast,
+so 2 start locations); barbarians do not affect the wagons. Merchant Trains + T&B (15): without 1
+hill, 1 forest, 1 pasture and the desert; trade hexes and X markers in place; the watering hole in
+the centre; the rest random; every disc, on the trade hexes too, none on the watering hole; no
+Longest Route, no robber; trade hexes produce (quarry brick, glassworks lumber/"wood", castle
+wool); barbarians do not affect the wagons. Rivers + BA (12): without 2 hills, 1 forest, 2
+pastures, 2 mountains and the desert; castle and river tiles as shown; coast 1 hill, 2 forests, 2
+pastures, 2 fields; inner 1 forest, 2 fields, 1 mountain; discs and start barbarians as shown
+[img: BA's discs, the swamps none, the 2 beside the 12; barbarians on the 2/12 hex and the 11];
+no negative VP for the Poor Catanian; the 2/12 hex produces and takes a barbarian on either
+number. Rivers + Merchant Trains (12): without 2 hills, 2 pastures, 1 field, 2 mountains and the
+desert; rivers as in Rivers of Catan; the watering hole in the centre; the 2 and 12 set aside,
+the rest dealt skipping the swamps, then the 2 on one 3 hex and the 12 on the other (both
+numbers produce); wagons may stand on bridge sites, bridge or not, and treat bridges as roads.
+Rivers + T&B (13): without 2 hills, 1 forest, 3 pastures, 1 field, 2 mountains and the desert;
+trade hexes and X markers in place, the river tiles not touching each other; the 2 set aside, the
+rest dealt (on the trade hexes too, not the swamps), the 2 on the 12 hex; 3 gold each plus set-up
+gold (a settlement or city on a river pays 1 gold only during set-up; a road on a river 1 gold);
+trade hexes produce as above; a bridge pays 2 gold; no negative VP for the Poor Catanian; a wagon
+across a river: 3 MP without a bridge, 1 over your bridge, 1 + 2 gold to the owner over
+another's.
+
+| Rule (sheet)                                                                                         | Status   | Engine                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BA + T&B: board, pools, discs (castle 12, glassworks 2, quarry none), BA castle                      | OK       | `sheets.ts` `baTraders` on the T&B frame (plazas): T&B's BA numbers, the trade hexes on BA's 12, 2 and desert spots.                                                                    |
+| BA + T&B: no Longest Route / Largest Army / robber; BA's deck only                                   | OK       | T&B: no road length, no robber, BA's `supply`; no Swift Journey with Barbarian Attack (`initTraders`).                                                                                  |
+| BA + T&B: start barbarians at the centre of the castle trade hex and the glassworks; no X barbarians | OK       | `rules.baStart`; `rules.barbarianPaths`: T&B's wagon barbarians start empty, BA's slice gets `paths`.                                                                                   |
+| BA + T&B: a barbarian on a hex is tied to one of its paths (one a path; the centre when full)        | OK, ours | `BaSlice.paths` (path → hex); a path barbarian is T&B's (`barbarianEdges`: +2 MP, drive-offs). Paths of a hex = its 6 sides + its spokes. The current player picks (`tbpair/landPath`). |
+| BA + T&B: a 2 or 12: no re-roll, a barbarian on that coastal hex                                     | OK       | T&B re-rolls 2 / 12 only when no hex carries them; `onRoll` lands the barbarian, the path is picked, then the roll goes on (`continueRoll`).                                            |
+| BA + T&B: a 7: discards, steal from another player, no barbarian moves                               | OK       | T&B's `sevenPhase`: Barbarian Attack's steal wins over T&B's barbarian move.                                                                                                            |
+| BA + T&B: drive-off → any unconquered hex, by a path                                                 | OK       | `tbpair/moveBarbarian` (from the wrapped `tb/driveOff`): hex, then path; back to the wagon move.                                                                                        |
+| BA + T&B: Treason → any unconquered hex, by a path                                                   | OK, ours | Wrapped `tb/buyCard`: pick a barbarian (by its path or a hex centre), a hex, a path; T&B's Q11 (two different destinations, not the source), and two different barbarians.              |
+| BA + T&B: Intrigue (not on the sheet)                                                                | OK, ours | Pick the barbarian taken (its path is free again).                                                                                                                                      |
+| BA + T&B: conquered trade hex: no production; deliveries go on                                       | OK       | The production hook skips conquered trade hexes; plazas never check conquest. Battles and Treason reach inland hexes (`barbarianHexes`).                                                |
+| BA + T&B: knights and the wagon both at the end of the turn                                          | OK, ours | Either order: from the wagon move to the knights and back (`tb/startKnights` / `tb/startWagon` wrapped); a wagon move once left is over.                                                |
+| Trade hexes produce (MT + T&B, Rivers + T&B; BA + T&B castle / glassworks)                           | OK       | `production` hook: quarry brick, glassworks lumber, castle wool (city 2), on their token and any extra number.                                                                          |
+| MT + BA: oasis on BA's desert, 2 starts; barbarians never stop a camel                               | OK       | `caravansBa`: the oasis's arrows that lead onto land; `camelOptions` never looked at barbarians. Oasis left out of BA's coast.                                                          |
+| MT + T&B: oasis in the centre, every disc (trade hexes too), no robber / Longest Route               | OK       | `caravansTraders`; with discs for 2 and 12 on the board T&B does not re-roll them.                                                                                                      |
+| Rivers + BA: the diagram (castle, rivers, discs), 2/12 hex, start barbarians on 2/12 and 11          | OK       | `riversBa`: T6's two rivers as drawn (mouths at the swamps' sea sides: ours), `twoOnTwelve`, `rules.baStart`.                                                                           |
+| Rivers + BA: the 2/12 hex produces and takes barbarians on both                                      | OK       | `hexHasNumber` in BA's landing; conquered, it pays nothing on the extra number either.                                                                                                  |
+| Rivers + BA, Rivers + T&B: no Poor Settler penalty                                                   | OK       | `rules.noPoorVp`.                                                                                                                                                                       |
+| Rivers + MT: the 2 and the 12 on the two 3 hexes                                                     | OK       | `board.ext.tb.alsoOn`; drawn as a small second disc (also Rivers' 2 on the 12).                                                                                                         |
+| Rivers + MT: camels on bridge sites, bridges as roads                                                | OK       | Camels never looked at bridge sites; a bridge is a road piece (camel-doubled road length).                                                                                              |
+| Rivers + T&B: rivers apart                                                                           | OK, ours | T&B's two rivers in their fixed places (apart, off the trade hexes); the sheet places them freely.                                                                                      |
+| Rivers + T&B: 3 gold; river settlement gold only in set-up; road gold; bridges 2                     | OK       | `rules.startGold`, `riverGoldSetupOnly`, `bridgeGold`.                                                                                                                                  |
+| Rivers + T&B: a wagon across a river 3 MP / 1 own bridge / 1 + 2 gold                                | OK       | `rules.riverCrossing` in `stepCost` / `tollGold`.                                                                                                                                       |
+
+T&B seams (small, additive): `TbBoard.alsoOn` / `rules`, `extraNumbers` / `hexHasNumber` /
+`sheetRules` / `barbarianEdges` (state.ts), `BaSlice.paths`, `barbarianHexes` and an exported
+`setBarbarians` (ba.ts), `tollGold` (traders.ts), the map helpers exported from maps.ts, the
+`extraNumbers` render layer. One behaviour change outside the sheets: T&B 5-6 (37 hexes, the 2 and
+12 on the board) no longer re-rolls them, as §2.6 of traders-barbarians.md says.
 
 ## 3. Not built (listed for follow-up cards)
 
@@ -235,7 +314,6 @@ counts where it matters). The other six T&B × T&B sheets are listed in §3.
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Fishing on Catan + other Seafarers scenarios          | Built on New Shores (§2b). Sheet set-ups for the rest: Four Islands 4/8 and 6/10 on the small islands, 5 and 9 on the big ones; Fog, Desert (3p lake on the 2-field, 2 joins the 12 pasture; 4p lake on the 11-hill, 11 joins the 2 hill), Forgotten Tribe (lake on the 12-field; the robber only on the large island), Cloth (3 + 3 grounds; 2 fish move the pirate only with a route to a small-island village), Wonders, New World (grounds placed like the harbours); not Pirate Islands. The seam exists (`playsAs`, `basedOn`); each needs its map (a lake hex, grounds with a water hex). |
 | T&B / Rivers / BA / Merchant Trains + other Seafarers | Built on New Shores (§2b). Left: T&B on Through the Desert; Rivers on Fog Islands, Through the Desert, Forgotten Tribe, New World; Merchant Trains and Barbarian Attack on several (§2b list). Set-ups are diagrams.                                                                                                                                                                                                                                                                                                                                                                             |
-| T&B × T&B, the six non-Fishing sheets                 | The four Fishing pairs are built (§2c). Left: Barbarian Attack + T&B (14), Merchant Trains + BA / + T&B (12 / 15), Rivers + BA / + Merchant Trains / + T&B (12 / 12 / 13): T6 boards (watering hole, commodity hexes that produce, barbarians tied to hex paths) and per-pair rules (traders-barbarians.md §8.1).                                                                                                                                                                                                                                                                                |
 | Explorers & Pirates + C&K / + T&B                     | Built (E5b): §7 and §8. E&P + Seafarers is officially impossible (`conflicts`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Barbarian Attack + C&K, Catan for Two + C&K           | Built (C5): §10 and §11.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | E&P + C&K at 5-6 players                              | No official text (§12): refused.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -288,6 +366,20 @@ failures, 0 errors, 0 stalls, 0 capped; average turns of a finished game in brac
 | `tb+tb` Fishing + Traders & Barbarians | 300 (198)         | 50 (165)         |
 | `tb+tb` Fishing + Barbarian Attack     | 300 (360)         | 50 (365)         |
 | `tb+tb` Fishing + Caravans             | 300 (276)         | 50 (274)         |
+
+C4, the six other `tb+tb` sheets (same flags). Every run: 0 invariant failures, 0 errors, 0
+stalls, 0 capped. Spot runs after the T&B seams (20 games each, all clean): `tb` Traders &
+Barbarians 6p and Barbarian Attack 4p, `tb+seafarers` Barbarian Attack, `tb+tb` Fishing + BA,
+`tb+ck` Traders & Barbarians.
+
+| Mode / scenario                                 | 4p (300) finished | 3p (50) finished |
+| ----------------------------------------------- | ----------------- | ---------------- |
+| `tb+tb` Barbarian Attack + Traders & Barbarians | 300 (285)         | 50 (225)         |
+| `tb+tb` Caravans + Barbarian Attack             | 300 (341)         | 50 (333)         |
+| `tb+tb` Caravans + Traders & Barbarians         | 300 (264)         | 50 (219)         |
+| `tb+tb` Rivers + Barbarian Attack               | 300 (332)         | 50 (339)         |
+| `tb+tb` Rivers + Caravans                       | 300 (319)         | 50 (341)         |
+| `tb+tb` Rivers + Traders & Barbarians           | 300 (218)         | 50 (188)         |
 
 The first C2 runs found Rivers stalls (Road Building with only bridge-site ship spots) and a
 Barbarian Attack award lag (a Treason conquest cut the trade route without a recompute); both fixed

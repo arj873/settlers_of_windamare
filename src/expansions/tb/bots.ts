@@ -53,6 +53,7 @@ import {
   stepCost,
   tradersOf,
   robberless,
+  sheetRules,
   tbBoard,
   type TbSlice,
 } from './engine';
@@ -165,7 +166,16 @@ function check(state: GameState): Violation[] {
     if (Object.values(b.onHex).some((k) => k < 1 || k > 3))
       bad('a hex with more than 3 barbarians');
     const coast = new Set(tbBoard(state).coast ?? []);
-    if (Object.keys(b.onHex).some((h) => !coast.has(h as never))) bad('barbarians off the coast');
+    const anyHex = sheetRules(state).barbarianPaths === true;
+    if (!anyHex && Object.keys(b.onHex).some((h) => !coast.has(h as never))) {
+      bad('barbarians off the coast');
+    }
+    // BA + T&B: each barbarian by a path stands on one of that hex's paths, at most one a path.
+    const byPath = Object.entries(b.paths ?? {});
+    for (const [e, h] of byPath) {
+      const own = byPath.filter(([, x]) => x === h).length;
+      if (!paths.has(e as never) || own > (b.onHex[h] ?? 0)) bad(`a barbarian by ${e} (${h})`);
+    }
     for (let p = 0; p < n; p++) {
       if (Object.values(b.knights).filter((o) => o === p).length > KNIGHTS_PER_PLAYER)
         bad('too many knights', p);
@@ -178,7 +188,11 @@ function check(state: GameState): Violation[] {
   if (has(state, 'traders')) {
     const tr = s.traders;
     if (!tr) return [...out, { code: 'expansion', message: 'tb: no traders slice' }];
-    if (new Set(tr.barbarians).size !== 3 || !tr.barbarians.every((e) => paths.has(e))) {
+    const wagonBarbarians = sheetRules(state).barbarianPaths ? 0 : 3;
+    if (
+      new Set(tr.barbarians).size !== wagonBarbarians ||
+      !tr.barbarians.every((e) => paths.has(e))
+    ) {
       bad(`barbarians on ${tr.barbarians.join(' ')}`);
     }
     tr.level.forEach((l, p) => {
