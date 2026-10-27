@@ -49,6 +49,8 @@ import {
   harbormasterOn,
   harbourPoints,
   has,
+  baCardsInPlay,
+  prisonersPerVp,
   isTwo,
   knightsLeft,
   tbSlice,
@@ -255,15 +257,18 @@ function playerCells(state: GameState, view: HudView, p: PlayerId): Child[] {
     );
   }
   if (s.ba) {
-    cells.push(stat('prisoner', String(s.ba.prisoners[p] ?? 0), 'Prisoners (2 = 1 VP)'));
-    cells.push(
-      h(
-        'span',
-        { class: 'tb-stat', title: 'Knights in the supply' },
-        glyph('knight', 15),
-        h('b', {}, `${knightsLeft(state, p)}/${KNIGHTS_PER_PLAYER}`),
-      ),
-    );
+    const per = prisonersPerVp(state);
+    cells.push(stat('prisoner', String(s.ba.prisoners[p] ?? 0), `Prisoners (${per} = 1 VP)`));
+    // BA + C&K uses C&K's knights (its own panel) instead of BA's knights and cards.
+    if (baCardsInPlay(state))
+      cells.push(
+        h(
+          'span',
+          { class: 'tb-stat', title: 'Knights in the supply' },
+          glyph('knight', 15),
+          h('b', {}, `${knightsLeft(state, p)}/${KNIGHTS_PER_PLAYER}`),
+        ),
+      );
   }
   if (s.traders) {
     const level = s.traders.level[p] ?? 1;
@@ -895,7 +900,7 @@ export const tbHud: HudExtension = {
       label: 'Move knights',
       actionType: 'tb/startKnights',
       glyph: 'knight',
-      available: (state) => has(state, 'ba'),
+      available: baCardsInPlay,
     },
   ],
 

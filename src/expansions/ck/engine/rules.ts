@@ -51,6 +51,7 @@ import {
   redDieDraws,
   MAX_KNIGHT_CANCELS,
   phaseOf,
+  shipSails,
   type CkPhase,
   type Commodity,
   type CommodityBundle,
@@ -656,6 +657,7 @@ export function eventDieStep(draft: GameState): Phase | undefined {
   s.event = face;
   log(draft, draft.turn.current, `The event die shows ${FACE_TEXT[face]}`);
   if (face === 'ship') {
+    if (!shipSails(draft)) return undefined;
     s.barbarian += 1;
     if (s.barbarian >= BARBARIAN_STEPS) return attack(draft);
     log(draft, null, `The barbarians sail closer (${s.barbarian}/${BARBARIAN_STEPS})`);

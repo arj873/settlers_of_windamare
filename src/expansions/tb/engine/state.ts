@@ -73,7 +73,17 @@ const MODE_FEATURES: Readonly<Record<string, readonly Feature[]>> = {
   'ep+tb': ['fish'],
 };
 
+/** Prisoners per VP in Barbarian Attack: 2, or what a combination mode prints (BA + C&K: 3). */
+const MODE_PRISONERS_PER_VP: Readonly<Record<string, number>> = {
+  'ba+ck': 3,
+};
+
 type S = Pick<GameState, 'settings'>;
+export const prisonersPerVp = (state: S): number => MODE_PRISONERS_PER_VP[state.settings.mode] ?? 2;
+/** Combination modes without BA's own knights and development cards (BA + C&K: C&K's knights). */
+const NO_BA_CARDS_MODES: readonly string[] = ['ba+ck'];
+export const baCardsInPlay = (state: S): boolean =>
+  has(state, 'ba') && !NO_BA_CARDS_MODES.includes(state.settings.mode);
 export const has = (state: S, f: Feature): boolean =>
   featuresOf(state.settings.scenario).includes(f) ||
   (MODE_FEATURES[state.settings.mode]?.includes(f) ?? false);
@@ -306,6 +316,8 @@ export interface BaSlice {
   discard: BaCard[];
   /** Edges of knights that moved this turn (where they stopped). */
   moved: EdgeId[];
+  /** Buildings that are never conquered (BA + C&K: cities with a metropolis). */
+  safe?: VertexId[];
 }
 
 export interface TradersSlice {

@@ -5,7 +5,7 @@
  * Other modules may add edges to a player's route (`routeEdges` hook: Seafarers + C&K ships);
  * the walk then also crosses sea vertices, where a knight can stand but never be recruited.
  */
-import { extraRouteEdges, terrainKind } from '../../../engine/expansions/hooks';
+import { blocksRoute, extraRouteEdges, terrainKind } from '../../../engine/expansions/hooks';
 import { touchesLand } from '../../../engine/rules/placement';
 import {
   edgeInfo,
@@ -17,17 +17,28 @@ import {
 import type { EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { ckSlice } from './state';
 
-/** Does a piece of someone other than `player` stand on `v` (building or knight)? */
+/** No seat: other modules' pieces that block every player's route (`blocksRoute`). */
+const NOBODY = -1 as PlayerId;
+
+/**
+ * Does a piece of someone other than `player` stand on `v` (building or knight, or another
+ * module's route blocker: Catan for Two's neutral settlements)?
+ */
 export function foreignPieceAt(state: GameState, v: VertexId, player: PlayerId): boolean {
   const b = state.pieces.buildings[v];
   if (b && b.owner !== player) return true;
   const k = ckSlice(state).knights[v];
-  return k !== undefined && k.owner !== player;
+  if (k !== undefined) return k.owner !== player;
+  return b === undefined && blocksRoute(state, v, player);
 }
 
-/** Is `v` empty (no building, no knight)? */
+/** Is `v` empty (no building, no knight, no other module's piece: a neutral settlement)? */
 export function isEmptyVertex(state: GameState, v: VertexId): boolean {
-  return state.pieces.buildings[v] === undefined && ckSlice(state).knights[v] === undefined;
+  return (
+    state.pieces.buildings[v] === undefined &&
+    ckSlice(state).knights[v] === undefined &&
+    !blocksRoute(state, v, NOBODY)
+  );
 }
 
 /** `player`'s route edges at each vertex: roads, plus other modules' route pieces (ships). */

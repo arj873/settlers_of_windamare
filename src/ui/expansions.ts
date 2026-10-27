@@ -17,6 +17,7 @@ import { tbseaHud } from '../expansions/tbsea/ui';
 import { tbpairHud } from '../expansions/tbpair/ui';
 import { epckHud } from '../expansions/epck/ui';
 import { eptbHud } from '../expansions/eptb/ui';
+import { backHud } from '../expansions/back/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -102,6 +103,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   tbpairHud,
   epckHud,
   eptbHud,
+  backHud,
   // new modules go here, one per line
 ];
 
