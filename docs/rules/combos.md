@@ -594,10 +594,24 @@ runs, without it, averaged 838 turns: knights recruited and traded in at once).
 
 `pnpm sim --mode <mode> --scenario <s> --players <n> --games <g> --bias 0.5 --max-steps 20000`:
 
-SIMS_TABLE
+Final code, every run: **0 invariant failures, 0 errors, 0 stalls** (finished / games, average
+turns of a finished game; "capped" = unfinished at the step cap, random bots at 13 VP):
 
-The first runs found one bug, fixed with a test: Medicine was playable when every settlement of
-the player was conquered (a stall: no target left).
+| Mode / scenario                  | Players | Games | Finished (capped) | Avg turns |
+| -------------------------------- | ------- | ----- | ----------------- | --------- |
+| `ba+ck` Barbarian Attack         | 4       | 300   | 300               | 362       |
+| `ba+ck` Barbarian Attack         | 3       | 50    | 50                | 379       |
+| `ba+ck` Barbarian Attack         | 5       | 50    | 50                | 245       |
+| `ba+ck` Barbarian Attack         | 6       | 50    | 50                | 228       |
+| `ba+ck` with Event Cards         | 4       | 20    | 20                | 288       |
+| `ba+ck` with balanced dice       | 4       | 20    | 20                | 268       |
+| `two+ck` Catan for Two (2 seats) | 2       | 300   | 294 (6)           | 586       |
+| `two+ck` with Event Cards        | 2       | 20    | 20                | 553       |
+
+The runs found two bugs, both fixed with a test: Medicine was playable when every settlement of
+the player was conquered (a stall: no target left); and in any Catan for Two game T&B's neutral
+road after a Road Building road could take the card's last spot, leaving Road Building with
+nothing to place (sim seed 72; T&B now ends the card then, `two.test.ts`).
 
 Online: `e2e:server` plays one `ba+ck` and one `two+ck` game over the room server (2 clients; 2
 server bots in `ba+ck`), every view checked for masked C&K hands; `src/net/sessionExpansions.test.ts`
