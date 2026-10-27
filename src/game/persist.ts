@@ -5,6 +5,8 @@ import type { Controller } from '../ui';
 
 export const SAVE_KEY = 'catan:save:v1';
 export const SPEED_KEY = 'catan:botSpeed';
+/** "Confirm before building" (issue #28): 1 = on (the default), 0 = off. */
+export const CONFIRM_BUILD_KEY = 'catan:confirmBuild';
 
 /** The subset of `Storage` we use (tests pass a Map-backed fake). */
 export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
