@@ -102,6 +102,17 @@ describe('the scenarios', () => {
     expect(seaSlice(game('tbsea/fishermenWonders')).wonders).toBeDefined();
   });
 
+  it('every board builds, whatever the seed (regressions: Rivers + Tribe 9, New World "7")', () => {
+    const seeds: (number | string)[] = [9, 26, 60, '7', '135'];
+    for (let i = 0; i < 60; i++) seeds.push(i, `s${i}`);
+    for (const pair of SEA_PAIRS) {
+      for (const n of [3, 4]) {
+        for (const seed of seeds)
+          expect(() => game(pair.id, n, { seed }), `${pair.id} ${seed}`).not.toThrow();
+      }
+    }
+  });
+
   it('are for 3-4 players', () => {
     expect(() => game('tbsea/fishermenFour', 5)).toThrow(/players/);
     expect(() => game('tbsea/riversTribe', 2)).toThrow(/players/);

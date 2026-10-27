@@ -232,14 +232,15 @@ function placeGrounds(
   const placed: Notch[] = [];
   const out: FishingGround[] = [];
   for (const slot of slots) {
-    const free = notches.filter(
-      (n) =>
-        slot.allow(n) &&
-        n.vertices.every((v) => !used.has(v)) &&
-        !placed.some((p) => p.hex === n.hex),
-    );
-    const clear = free.filter((n) => n.vertices.every((v) => !harbour.has(v)));
-    const pool = clear.length > 0 || strict ? clear : free;
+    const free = notches.filter((n) => slot.allow(n) && n.vertices.every((v) => !used.has(v)));
+    const clear = (n: Notch) => n.vertices.every((v) => !harbour.has(v));
+    const alone = (n: Notch) => !placed.some((p) => p.hex === n.hex);
+    // Away from harbours and other grounds' water hexes first, then relaxing (a crowded New
+    // World coast: a shared water hex, a harbour corner only as the last resort).
+    const tiers = strict
+      ? [free.filter((n) => clear(n) && alone(n)), free.filter(clear), free]
+      : [free.filter((n) => clear(n) && alone(n)), free.filter(alone), free];
+    const pool = tiers.find((t) => t.length > 0) ?? [];
     if (pool.length === 0) throw new Error(`no place for the fishing ground ${slot.number}`);
     const dist = (n: Notch) =>
       Math.min(Infinity, ...placed.map((p) => Math.hypot(p.x - n.x, p.y - n.y)));
@@ -373,10 +374,13 @@ function placeRivers(
   spread: boolean,
 ): { rivers: River[]; terrains: Map<HexId, Terrain> } {
   const layouts = RIVERS_19.rivers;
-  const r1 = rng.pick(riverSpots(area, layouts[0]?.length ?? 4, mouthOk));
-  const second = riverSpots(area, layouts[1]?.length ?? 3, mouthOk).filter(
-    (r) => !touches(r1.hexes, r.hexes),
+  const shorts = riverSpots(area, layouts[1]?.length ?? 3, mouthOk);
+  // Only a first river that leaves room for the second (the Tribe's island is narrow).
+  const firsts = riverSpots(area, layouts[0]?.length ?? 4, mouthOk).filter((a) =>
+    shorts.some((b) => !touches(a.hexes, b.hexes)),
   );
+  const r1 = rng.pick(firsts);
+  const second = shorts.filter((r) => !touches(r1.hexes, r.hexes));
   const d = (r: River) => {
     const a = parseHexId(r1.hexes[0] as HexId);
     const b = parseHexId(r.hexes[0] as HexId);
