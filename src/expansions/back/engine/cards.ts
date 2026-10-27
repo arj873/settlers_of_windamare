@@ -6,6 +6,7 @@
  * Medicine's city counts as a city built (barbarians land).
  */
 import { log, ok, fail } from '../../../engine/actions/common';
+import { stealSecret } from '../../../engine/rules/text';
 import { terrainKind } from '../../../engine/expansions/hooks';
 import { buildingsOf, cardsInHand } from '../../../engine/selectors';
 import { topologyOf } from '../../../engine/topology';
@@ -188,8 +189,14 @@ export function cardAction(draft: GameState, a: Record<string, unknown> & Action
       const h = a['hex'] as HexId;
       const victims = typeof h === 'string' ? taxVictims(draft, p, h) : [];
       if (victims.length === 0) return fail('nobody to rob there');
-      for (const q of victims) stealRandom(draft, p, q);
-      log(draft, p, `${pn(draft, p)} taxed ${victims.map((q) => pn(draft, q)).join(', ')}`);
+      const taken = victims.map((q) => [q, stealRandom(draft, p, q)] as const);
+      // #32: the tax collector reads every card taken, each victim their own.
+      const named = (q: PlayerId, card: string | null) =>
+        card === null ? pn(draft, q) : `${pn(draft, q)} (1 ${card})`;
+      log(draft, p, `${pn(draft, p)} taxed ${victims.map((q) => pn(draft, q)).join(', ')}`, [
+        { to: [p], text: `${pn(draft, p)} taxed ${taken.map(([q, c]) => named(q, c)).join(', ')}` },
+        ...taken.flatMap(([q, card]) => stealSecret(draft, p, q, [card], ' (Taxation)')),
+      ]);
       return main(draft);
     }
     case 'back/deserterPlayer': {

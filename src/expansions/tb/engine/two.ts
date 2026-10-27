@@ -11,6 +11,7 @@
  */
 import { RESOURCES } from '../../../engine/constants';
 import { isCurrent, log } from '../../../engine/actions/common';
+import { stealSecret } from '../../../engine/rules/text';
 import { edgeBlocked } from '../../../engine/expansions/hooks';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
 import { edgeTouchesLand, isVertexOpen, touchesLand } from '../../../engine/rules/placement';
@@ -275,9 +276,14 @@ export function forcedTradeBlocker(state: GameState, p: PlayerId): string | null
 /** Take 2 random cards (as many as there are), then give 2 back (forcedGive). */
 export function forcedTrade(draft: GameState, p: PlayerId): number {
   payTokens(draft, p);
-  let taken = 0;
-  for (let i = 0; i < 2; i++) if (stealResource(draft, p, 1 - p) !== null) taken += 1;
-  log(draft, p, `${pn(draft, p)} forced a trade: took ${taken} card${taken > 1 ? 's' : ''}`);
+  const cards = [stealResource(draft, p, 1 - p), stealResource(draft, p, 1 - p)];
+  const taken = cards.filter((c) => c !== null).length;
+  log(
+    draft,
+    p,
+    `${pn(draft, p)} forced a trade: took ${taken} card${taken > 1 ? 's' : ''}`,
+    stealSecret(draft, p, 1 - p, cards, ' (forced trade)'),
+  );
   return Math.min(2, handTotal(draft, p));
 }
 

@@ -4,7 +4,7 @@ import { applyAction, createGame, hexVertices, legalActions, topologyOf } from '
 import type { Action, GameState, HexId, VertexId } from '../engine';
 import { rngForRoll } from '../engine/actions/testkit';
 import { fieldsHexes } from '../expansions/crop/engine';
-import { nextBot, obligated, pickViewer, type Seats } from './logic';
+import { autoSteal, nextBot, obligated, pickViewer, type Seats } from './logic';
 
 /** Crop Trust: P0 rolls a 6; P1 has a settlement on the 6 fields hex and P0 does not: P1 harvests. */
 function harvestByOther(): { s: GameState; legal: Action[] } {
@@ -56,5 +56,34 @@ describe('multi-actor expansion phases', () => {
       phase: { kind: 'crop/replant', species: 'rice', left: 1, used: [] } as const,
     };
     expect(obligated(own as unknown as GameState)).toEqual([]);
+  });
+});
+
+describe('autoSteal (#34)', () => {
+  const steal = (victim: number): Action => ({ type: 'steal', player: 1, victim });
+  it('returns the only steal of the viewer', () => {
+    expect(autoSteal([steal(2)], 1)).toEqual(steal(2));
+    // Other players' actions do not count.
+    expect(autoSteal([steal(2), { type: 'endTurn', player: 0 }], 1)).toEqual(steal(2));
+  });
+  it('asks when there is a real choice or no steal', () => {
+    expect(autoSteal([steal(2), steal(3)], 1)).toBeNull();
+    expect(autoSteal([steal(2)], 2)).toBeNull();
+    expect(autoSteal([steal(2)], null)).toBeNull();
+    expect(autoSteal([{ type: 'eventSteal', player: 1, victim: null }], 1)).toBeNull();
+    expect(
+      autoSteal(
+        [
+          { type: 'eventSteal', player: 1, victim: 2 },
+          { type: 'eventSteal', player: 1, victim: null },
+        ],
+        1,
+      ),
+    ).toBeNull();
+    expect(autoSteal([{ type: 'endTurn', player: 1 }], 1)).toBeNull();
+  });
+  it('covers module steals with a victim', () => {
+    const a = { type: 'ep/pirateSteal', player: 1, victim: 0 } as unknown as Action;
+    expect(autoSteal([a], 1)).toBe(a);
   });
 });

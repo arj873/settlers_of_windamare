@@ -114,7 +114,8 @@ CLI, same loop below. What is different:
 - **Rolled 7, too many cards:** a "Discard N cards" dialog. `set <resource> <n>` until it
   says "Discarding N of N", then `click Discard`.
 - **Robber:** `spots` -> `click-spot N` (pick a hex with an opponent, not yours). Then
-  "Steal from whom?": `click SeatN`.
+  "Steal from whom?": `click SeatN` (no dialog when only one player can be robbed: the game
+  robs them at once).
 - **Dev cards:** in `Buttons` as `[Knight ×1]` etc. Cards bought this turn work next turn.
   `click Knight` -> robber as above. `click Road Building` -> `spots`/`click-spot` twice.
   `click Year of Plenty` -> click two resources. `click Monopoly` -> click one resource.

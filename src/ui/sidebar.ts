@@ -56,9 +56,12 @@ function rowColor(state: GameState, player: PlayerId | null): Record<string, str
   return color ? { '--pc': color } : {};
 }
 
-/** The Game Events list, grouped per turn; newest at the bottom. */
-export function logList(state: GameState): HTMLElement {
-  const groups = groupLog(state.log, state.players);
+/**
+ * The Game Events list, grouped per turn; newest at the bottom. `viewer` reads the private texts
+ * meant for them (#32: "You stole 1 wool from Blue"), marked with a lock.
+ */
+export function logList(state: GameState, viewer: PlayerId | null = null): HTMLElement {
+  const groups = groupLog(state.log, state.players, viewer);
   let lastRoll = -1;
   state.log.forEach((e, i) => {
     if (/ rolled \d+( \(\d\+\d\))?$/.test(e.text)) lastRoll = i;
@@ -92,8 +95,11 @@ export function logList(state: GameState): HTMLElement {
           return h(
             'div',
             {
-              class: `log-row${item.player === null ? ' is-system' : ''}`,
+              class: `log-row${item.player === null ? ' is-system' : ''}${item.secret ? ' is-secret' : ''}`,
               style: rowColor(state, item.player),
+              ...(item.secret
+                ? { attrs: { title: 'Only you and the other player see this' } }
+                : {}),
             },
             ...item.tokens.map((t) => tokenNode(state, t, dice)),
           );

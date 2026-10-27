@@ -325,6 +325,7 @@ interface BoardDrawer {
   id;
   terrain?: Record<'<id>/<t>', (g: Graphics, cx, cy, S) => void>;   // fill + motif of one hex (px)
   layers?: { key; z: 'board' | 'pieces' | 'top'; sig(state): string; draw(state, ctx): Container }[];
+  sites?(state): [key, { at: VertexId | EdgeId | HexId; owner; kind }][];  // #33: your pieces, for "just built" marks
 }
 DrawContext { topo, S, colorOf(owner), pt(point), art }   // art = base painters (drawRoad, drawSettlement, ...)
 ```
@@ -334,6 +335,10 @@ slots: `board` (above number tokens, below roads), `pieces` (above buildings), `
 robber). A layer is rebuilt only when `sig(state)` changes. Highlights, hover and clicks work on
 any id the topology knows, sea vertices/edges and water hexes included. Core palette entries exist
 for `gold`, `sea`, `fog`; other terrains without a painter are grey.
+`sites` (optional, #33) lists the module's pieces with a key unique across modules (prefix it with
+your id); a key that appears, or whose `owner` / `kind` changes, gets the same fading ring in the
+owner's colour as a new base building or road. Seafarers (ships) and C&K (knights by level, city
+walls) implement it.
 
 ## 8. HUD and setup extension (`src/ui/expansions.ts`)
 
