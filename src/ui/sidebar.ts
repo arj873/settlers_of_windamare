@@ -149,6 +149,7 @@ function playerBar(
     {
       class: `pp${p.isCurrent ? ' is-current' : ''}${you ? ' is-you' : ''}${p.isActing && !p.isCurrent ? ' is-acting' : ''}${away ? ' is-away' : ''}`,
       style: playerStyle(p.color),
+      attrs: { 'data-player': String(p.id) },
     },
     avatar(
       p,

@@ -581,9 +581,16 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other
   place that shows a price.
 
+- Production animation (#29, `ui/production/`): after a roll, cards fly (DOM, Web Animations)
+  from each producing hex to the player's row (your own: your hand), then a "+2 grain" badge
+  pops on the row. `plan.ts` (pure, tested) reads the public log ("received" / "caught" / gold
+  "took" lines after "rolled N"), so it works on online views and every module. A new roll cancels
+  the running one; rolls < 900 ms apart (fast bots) and the menu's Animations off / reduced
+  motion show badges only. `Hud.setHexLocator(id => board.screenPos(id))`; the board draws nothing for it.
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
-  hand bar (`handCards`) and items in the trade offer rows (`offerExtras`). The setup
+  hand bar (`handCards`), items in the trade offer rows (`offerExtras`) and card art for the
+  production animation (`cardFace`). The setup
   screen's expansion chips (U7: chip set -> mode, `ExpansionModule.icon`), scenario tiles
   (grouped by mode when one chip set stands for several) and option tiles come from the engine
   registry (`ready` modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's

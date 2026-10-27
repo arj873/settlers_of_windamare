@@ -139,6 +139,8 @@ async function boot() {
     },
   });
   const spots = { prompt, confirmBuild: () => confirmOn };
+  // Production cards (issue #29) fly from the hexes: hotseat and online share the HUD.
+  hud.setHexLocator((id) => board.screenPos(id));
 
   const fitBoard = () => {
     const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);

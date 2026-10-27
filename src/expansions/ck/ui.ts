@@ -946,6 +946,8 @@ export const ckHud: HudExtension = {
   id: CK,
   sounds: ckSounds,
 
+  cardFace: (kind, w) => (isCommodity(kind) ? commodityFace(kind, w) : null),
+
   panel(state, view, send) {
     // Barbarian Attack + C&K has no barbarian ship (its barbarians land on the coast).
     const body = h(
@@ -1051,6 +1053,7 @@ export const ckHud: HudExtension = {
         {
           class: `hcard rcard ck-hc${n === 0 ? ' is-zero' : n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}`,
           title: `${COMMODITY_LABEL[c]}: ${n}`,
+          attrs: { 'data-card': c },
         },
         commodityFace(c, 46),
         h('span', { class: 'count-badge' }, String(n)),
