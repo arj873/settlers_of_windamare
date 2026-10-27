@@ -9,6 +9,7 @@ import { createGame, legalActions, type Action, type GameState } from '../../eng
 import { hexEdges, topologyOf } from '../../engine/topology';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { giveCards, players, setGoods } from '../ck/engine/testkit';
@@ -23,7 +24,7 @@ describe('Barbarian Attack + C&K setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${BACK_MODE}`)?.click();
+    expect(pickMode(screen.element, BACK_MODE)).toBe(true);
     expect(screen.state.mode).toBe(BACK_MODE);
     expect(q(screen, `scenario-${SC_BA}`)).not.toBeNull();
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 6 });

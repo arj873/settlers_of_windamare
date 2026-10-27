@@ -74,6 +74,12 @@ builds on both.
 - **Lobby**: default config `DEFAULT_ROOM_CONFIG` (`baseRandom`, 4 seats, 90 s timer, 10 VP,
   discard limit 7). Seats are created with the palette colours in order. Seat count follows
   `config.seatCount` (map range is validated); shrinking unseats the members in removed seats.
+- **Auto-seat (L1)**: when a member gets their first nickname (in `hello` or `setName`) while the
+  room is in the lobby, the server seats them in the first seat a bot holds (so the host lands in
+  seat 1). If every seat has a human, it adds a seat (`grownConfig`: the base game moves to the
+  5-6 / 7-8 board like the lobby's Add bot, up to 8; expansion modes stop at their scenario's
+  maximum, `roomSeatRange`) and posts "Added seat N for <name>". At that cap they watch. It
+  happens once: someone who stands up (or renames) stays where they are.
 - **Start** (host): needs at least one seated member. Seats → `NewGameConfig` (stage-2 setup
   config, `src/ui/types.ts`): seated members play under their nickname, open seats become
   `"<Colour> Bot"`; names are made unique. Seed from `deps.seed()`; `gameConfigOf(cfg, seed)`
@@ -106,7 +112,8 @@ bot plays for someone, so they can reclaim. `SeatInfo.botLevel` (B1, optional, a
 that plays the seat whenever no human does; the host sets it in the lobby (`setBotLevel`), it
 moves with its seat under Randomize Turn Order.
 
-- Joining after the start makes you a spectator. Taking over an open bot seat mid-game is not
+- Joining in the lobby seats you (auto-seat, §2) unless the table is at its cap. Joining after
+  the start makes you a spectator. Taking over an open bot seat mid-game is not
   supported (the engine's player names are fixed; see §17).
 - **Host succession**: when the host has been disconnected for `graceMs` (or was never
   connected) and someone else is connected, the longest-present connected member (seated first)

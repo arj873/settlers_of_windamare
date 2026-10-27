@@ -6,6 +6,7 @@ import { Hud } from '../../ui/hud';
 import { modeById } from '../../engine/expansions/registry';
 import { DEFAULT_ROOM_CONFIG, parseClientMessage, PROTOCOL_VERSION } from '../../net/protocol';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { modeOptions, playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { fishOf } from '../tb/engine/state';
@@ -21,7 +22,7 @@ describe('T&B + Seafarers setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${TBSEA_MODE}`)?.click();
+    expect(pickMode(screen.element, TBSEA_MODE)).toBe(true);
     expect(screen.state.mode).toBe(TBSEA_MODE);
     for (const p of PAIRS) expect(q(screen, `scenario-${p.id}`), p.id).not.toBeNull();
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 4 });
@@ -35,12 +36,12 @@ describe('options the mode hides (ModeDef.hideOptions)', () => {
   it('no variable set-up: hidden on the setup screen and refused online; Seafarers keeps it', () => {
     const screen = new SetupScreen({ onStart: () => {}, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-seafarers')?.click();
+    expect(pickMode(screen.element, 'seafarers')).toBe(true);
     expect(screen.element.querySelector('[data-k="opt-seafarers-layout"]')).not.toBeNull();
     expect(modeOptions(modeById('seafarers')!).map((o) => `${o.ext}.${o.def.key}`)).toContain(
       'seafarers.layout',
     );
-    q(screen, `mode-${TBSEA_MODE}`)?.click();
+    expect(pickMode(screen.element, TBSEA_MODE)).toBe(true);
     expect(screen.element.querySelector('[data-k="opt-seafarers-layout"]')).toBeNull();
     const offered = modeOptions(modeById(TBSEA_MODE)!).map((o) => `${o.ext}.${o.def.key}`);
     expect(offered).toEqual(['tb.harbormaster']);
