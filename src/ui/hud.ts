@@ -30,6 +30,7 @@ import {
 import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
+import { costLabel, costTip, missingCards } from './costView';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
@@ -112,6 +113,8 @@ const SECTION_TITLE: Record<'log' | 'bank' | 'players' | 'chat', string> = {
 
 /** How long a tapped "why is this disabled" bubble stays open. */
 const WHY_MS = 3500;
+/** A touch held this long on a build button opens its cost tooltip instead of clicking (#35). */
+const LONG_PRESS_MS = 450;
 
 /** Regions emptied while a full-screen cover is up. */
 const GAME_REGIONS = ['menu', 'turn', 'side', 'drawer', 'bottom', 'controls', 'dialog'] as const;
@@ -162,7 +165,11 @@ export class Hud {
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
   private chatSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
-  private whyKind: BuildKind | null = null;
+  /** Build slot whose tooltip a tap / long-press opened (BuildKind or an expansion mode). */
+  private whyKind: string | null = null;
+  /** A touch long-press is pending on a build button (#35); fired = swallow its click. */
+  private pressTimer: ReturnType<typeof setTimeout> | null = null;
+  private pressFired = false;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
   private onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
@@ -326,8 +333,57 @@ export class Hud {
     if (this.view) this.refresh();
   }
 
-  /** Tap on a disabled build button: show its reason for a few seconds. */
-  private showWhy(kind: BuildKind): void {
+  /**
+   * A build bar slot with its cost tooltip (#35): hover shows it; on touch, a tap on a disabled
+   * button or a long-press on an enabled one opens it for a few seconds. A disabled button gets
+   * no pointer events (CSS), so the slot takes them.
+   */
+  private buildSlot(key: string, button: HTMLElement, tip: HTMLElement, blocked: boolean) {
+    const cancel = () => {
+      if (this.pressTimer !== null) clearTimeout(this.pressTimer);
+      this.pressTimer = null;
+    };
+    return h(
+      'span',
+      {
+        class: `bslot${blocked ? ' is-blocked' : ''}${this.whyKind === key ? ' is-why' : ''}`,
+        on: blocked
+          ? { click: () => this.showWhy(key) }
+          : {
+              pointerdown: (e: Event) => {
+                cancel();
+                this.pressFired = false;
+                if ((e as PointerEvent).pointerType !== 'touch') return;
+                this.pressTimer = setTimeout(() => {
+                  this.pressTimer = null;
+                  this.pressFired = true;
+                  this.showWhy(key);
+                }, LONG_PRESS_MS);
+              },
+              pointerup: cancel,
+              pointercancel: cancel,
+              pointerleave: cancel,
+              contextmenu: (e: Event) => e.preventDefault(),
+            },
+      },
+      button,
+      tip,
+    );
+  }
+
+  /** A build button's click, skipped right after a long-press opened its tooltip. */
+  private unlessLongPress(fn: () => void): () => void {
+    return () => {
+      if (this.pressFired) {
+        this.pressFired = false;
+        return;
+      }
+      fn();
+    };
+  }
+
+  /** Tap on a disabled build button (or long-press): show its tooltip for a few seconds. */
+  private showWhy(kind: string): void {
     if (this.whyTimer !== null) clearTimeout(this.whyTimer);
     this.whyKind = this.whyKind === kind ? null : kind;
     this.whyTimer = this.whyKind
@@ -824,6 +880,7 @@ export class Hud {
     );
 
     const toggleMode = (m: PlaceMode) => () => this.setPlaceMode(this.placeMode === m ? null : m);
+    const myHand = me.resources;
     const build = h(
       'div',
       { class: 'build-bar wood', style: playerStyle(me.color) },
@@ -842,14 +899,17 @@ export class Hud {
               ...(why.length > 0
                 ? { attrs: { 'data-why': why.map((w) => w.text).join('; '), ...actionsAttr } }
                 : {
-                    title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
-                    attrs: actionsAttr,
+                    attrs: {
+                      'aria-label': `${BUILD_LABEL[c.kind]}, cost ${costText(c.kind)}`,
+                      ...actionsAttr,
+                    },
                   }),
               on: {
-                click:
+                click: this.unlessLongPress(
                   c.kind === 'dev'
                     ? () => this.send({ type: 'buyDevCard', player: view.viewer })
                     : toggleMode(c.kind),
+                ),
               },
             },
             h(
@@ -867,36 +927,14 @@ export class Hud {
               ),
             ),
           );
-          if (why.length === 0) return h('span', { class: 'bslot' }, button);
-          // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
-          return h(
-            'span',
-            {
-              class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
-              on: { click: () => this.showWhy(c.kind) },
-            },
-            button,
-            h(
-              'span',
-              { class: 'why', attrs: { role: 'tooltip' } },
-              h('b', {}, BUILD_LABEL[c.kind]),
-              ...why.map((w) =>
-                h(
-                  'span',
-                  { class: 'why-line' },
-                  w.text,
-                  w.missing &&
-                    h(
-                      'span',
-                      { class: 'why-cards' },
-                      ...Object.entries(w.missing).flatMap(([r, n]) =>
-                        Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
-                      ),
-                    ),
-                ),
-              ),
-            ),
+          // #35: the cost tooltip (hover, long-press); the "Missing …" line comes from costTip.
+          const tip = costTip(
+            BUILD_LABEL[c.kind],
+            BUILD_COST[c.kind],
+            myHand,
+            why.filter((w) => !w.missing).map((w) => h('span', { class: 'why-line' }, w.text)),
           );
+          return this.buildSlot(c.kind, button, tip, why.length > 0);
         }),
     );
 
@@ -910,32 +948,35 @@ export class Hud {
         const cost = costOf(state, c.costItem ?? c.mode);
         const left = c.left?.(state, view.viewer);
         const total = c.total?.(state, view.viewer);
-        const hand = state.players[view.viewer]?.resources;
-        const short =
-          cost && hand
-            ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
-            : [];
+        const missing = cost ? missingCards(cost, myHand) : {};
+        const blocker = over ? null : (c.blocker?.(state, view.viewer) ?? null);
         const reasons = [
-          short.length > 0 ? `Missing ${short.join(', ')}` : null,
-          over ? null : (c.blocker?.(state, view.viewer) ?? null),
+          Object.keys(missing).length > 0 ? `Missing ${costLabel(missing)}` : null,
+          blocker,
         ].filter((x): x is string => x !== null);
         const why = reasons.length > 0 ? reasons.join('; ') : 'Not possible right now';
+        const tip = costTip(c.label, cost ?? null, myHand, [
+          !enabled && blocker === null && reasons.length === 0
+            ? h('span', { class: 'why-line' }, why)
+            : null,
+          blocker === null ? null : h('span', { class: 'why-line' }, blocker),
+        ]);
         build.append(
-          h(
-            'span',
-            { class: 'bslot' },
+          this.buildSlot(
+            c.mode,
             h(
               'button',
               {
                 class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
                 disabled: !enabled,
-                title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
                 // data-actions: what the card's place mode submits on the board (playtest CLI).
                 attrs: {
                   'data-actions': [c.actionType, ...(c.alsoActions ?? [])].join(' '),
-                  ...(enabled ? {} : { 'data-why': why }),
+                  ...(enabled
+                    ? { 'aria-label': `${c.label}${cost ? `, cost ${describeCost(cost)}` : ''}` }
+                    : { 'data-why': why }),
                 },
-                on: { click: toggleMode(c.mode) },
+                on: { click: this.unlessLongPress(toggleMode(c.mode)) },
               },
               h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),
               h('span', { class: 'bcard-label' }, c.label),
@@ -949,6 +990,8 @@ export class Hud {
                   ),
                 ),
             ),
+            tip,
+            !enabled,
           ),
         );
       }

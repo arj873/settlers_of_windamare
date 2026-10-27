@@ -196,7 +196,7 @@ describe('T&B HUD', () => {
 
   it('build cards show only in their scenario; a module place mode names its card in the pill', () => {
     const cards = () =>
-      [...root.querySelectorAll('.ext-card')].map((b) => b.getAttribute('title') ?? '');
+      [...root.querySelectorAll('.ext-card .bcard-label')].map((b) => b.textContent ?? '');
     show(main(SC_RIVERS));
     expect(cards().map((t) => t.split(' ')[0])).toEqual(['Bridge']);
     show(main(SC_FISH));

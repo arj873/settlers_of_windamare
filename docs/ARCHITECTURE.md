@@ -559,6 +559,13 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   brick" (+ card faces), no legal spot. Each button sits in a `.bslot`; a disabled one has
   `pointer-events: none`, so the slot gets hover (`.why` bubble) and tap (opens it for 3.5 s). The
   reason is also in the button's `data-why` (playtest harness).
+- Cost tooltips (#35): every build-bar slot (base and expansion cards, prices from `BUILD_COST` /
+  `costOf`) has a `.why.cost-tip` bubble: title, the cost as card faces (cards the hand lacks
+  dimmed, `.is-missing`), "You have the cards" or "Missing …", then the block reasons. Hover
+  opens it; on touch a tap on a disabled card or a 450 ms long-press on an enabled one (the
+  click that ends the press is swallowed). The cost pieces are the shared component
+  `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other
+  place that shows a price.
 
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the

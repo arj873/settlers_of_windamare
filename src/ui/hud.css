@@ -1138,7 +1138,8 @@
   display: flex;
 }
 @media (hover: hover) {
-  .bslot.is-blocked:hover .why {
+  /* #35: every build card shows its cost (and why it is disabled) on hover. */
+  .bslot:hover .why {
     display: flex;
   }
 }

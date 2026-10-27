@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { legalActions, type Action } from '../engine';
 import { discardGame, midGame, moveRobberGame, tradeOfferGame } from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
@@ -327,10 +327,44 @@ describe('Hud', () => {
     (slot as HTMLElement).click();
     const open = root.querySelector('.bslot.is-why .why')!;
     expect(open.textContent).toContain('Missing 1 brick');
-    expect(open.querySelectorAll('.why-cards > .card-face[aria-label="Brick"]')).toHaveLength(1);
-    // Enabled buttons have no reason and keep the cost tooltip.
-    expect(byText('City')!.closest('.bslot')!.classList.contains('is-blocked')).toBe(false);
-    expect(byText('City')!.title).toMatch(/cost/);
+    expect(open.querySelectorAll('.cost-have .card-face[aria-label="Brick"]')).toHaveLength(1);
+    // #35: the cost as card faces, the missing brick marked.
+    const cost = open.querySelector('.cost-line .cost-cards')!;
+    expect(cost.getAttribute('aria-label')).toBe('Cost: 1 brick, 1 lumber');
+    expect(
+      [...cost.querySelectorAll('.is-missing')].map((c) => c.getAttribute('aria-label')),
+    ).toEqual(['Brick']);
+    // Enabled buttons have no reason, but the same cost tooltip.
+    const city = byText('City')!.closest('.bslot')!;
+    expect(city.classList.contains('is-blocked')).toBe(false);
+    const tip = city.querySelector('.why.cost-tip')!;
+    expect(tip.querySelector('.cost-cards')!.getAttribute('aria-label')).toBe(
+      'Cost: 2 grain, 3 ore',
+    );
+    expect(tip.textContent).toContain('You have the cards');
+    expect(tip.querySelector('.is-missing')).toBeNull();
+  });
+
+  it('a long-press on an enabled build button opens its cost tooltip instead of clicking (#35)', () => {
+    vi.useFakeTimers();
+    try {
+      const s = midGame(); // Blue can build a city
+      const modes: unknown[] = [];
+      hud.on('placeMode', (m) => modes.push(m));
+      hud.render(s, { viewer: 1, legal: legalActions(s, 1), isBotTurn: false });
+      const slot = byText('City')!.closest('.bslot')!;
+      const press = new Event('pointerdown') as Event & { pointerType: string };
+      Object.defineProperty(press, 'pointerType', { value: 'touch' });
+      slot.dispatchEvent(press);
+      vi.advanceTimersByTime(500);
+      expect(root.querySelector('.bslot.is-why .cost-tip b')!.textContent).toBe('City');
+      byText('City')!.click(); // the click that ends the long-press
+      expect(modes).toEqual([]);
+      byText('City')!.click(); // a normal tap still works
+      expect(modes).toEqual(['city']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('turn timer: updates the pill in place and warns in the last 10 s', () => {

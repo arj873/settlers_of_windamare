@@ -1,0 +1,36 @@
+/* Cost cards (#35, costView.ts): a price as resource card faces; missing cards dimmed. */
+.cost-cards {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  vertical-align: middle;
+}
+.cost-cards > .card-face.is-missing {
+  opacity: 0.38;
+  outline: 2px solid var(--bad);
+  outline-offset: 1px;
+}
+.cost-tip {
+  min-width: 140px;
+}
+.cost-tip .cost-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cost-tip .cost-head {
+  color: var(--ink-dim);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cost-tip .cost-have {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--good);
+}
+.cost-tip .cost-have.is-short {
+  color: var(--bad);
+}

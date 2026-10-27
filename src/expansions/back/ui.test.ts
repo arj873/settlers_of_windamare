@@ -74,6 +74,15 @@ describe('Barbarian Attack + C&K HUD', () => {
     const labels = cards.map((b) => b.querySelector('.bcard-label')?.textContent ?? '');
     expect(labels).toEqual(['Knight', 'Activate', 'Promote', 'Knight actions', 'City wall']);
     expect(cards[0]?.disabled).toBe(false);
+    // #35: each card's slot carries the cost tooltip (from the module's cost data).
+    const tip = cards[0]!.closest('.bslot')!.querySelector('.cost-tip')!;
+    expect(tip.querySelector('b')?.textContent).toBe('Knight');
+    expect(tip.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
+      'Cost: 1 wool, 1 ore',
+    );
+    expect(tip.textContent).toContain('You have the cards');
+    const wall = cards[4]!.closest('.bslot')!.querySelector('.cost-tip')!;
+    expect(wall.querySelector('.cost-have')?.classList.contains('is-short')).toBe(true);
   });
 
   it('Treason asks for the opponent in a dialog', () => {
