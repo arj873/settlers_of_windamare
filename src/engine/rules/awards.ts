@@ -7,7 +7,7 @@
  */
 import { LARGEST_ARMY_MIN, LONGEST_ROAD_MIN } from '../constants';
 import { log } from '../actions/common';
-import { hookArmySize } from '../expansions/hooks';
+import { hookArmySize, longestRoadName } from '../expansions/hooks';
 import type { ActionType, GameState, PlayerId } from '../types';
 import { longestRoadLengths } from './longestRoad';
 
@@ -61,8 +61,9 @@ export function updateAwards(draft: GameState, opts: { roads?: boolean } = {}): 
   if (road !== draft.awards.longestRoad) {
     const prev = draft.awards.longestRoad;
     draft.awards.longestRoad = road;
-    if (road !== null) log(draft, road, `${name(road)} took Longest Road`);
-    else if (prev !== null) log(draft, prev, `${name(prev)} lost Longest Road; nobody holds it`);
+    const card = longestRoadName(draft);
+    if (road !== null) log(draft, road, `${name(road)} took ${card}`);
+    else if (prev !== null) log(draft, prev, `${name(prev)} lost ${card}; nobody holds it`);
   }
 
   // Knights never decrease, so Largest Army only ever moves to a strictly larger army.

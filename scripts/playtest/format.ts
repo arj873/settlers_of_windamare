@@ -5,6 +5,7 @@ import {
   handCount,
   piecesLeft,
   publicVictoryPoints,
+  longestRoadName,
   RESOURCES,
   victoryPoints,
   type Action,
@@ -186,7 +187,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   lines.push(`Others: ${others.join(' | ')}`);
   const award = (p: PlayerId | null) => (p === null ? 'nobody' : (state.players[p]?.name ?? p));
   lines.push(
-    `Longest Road: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
+    `${longestRoadName(state)}: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
   );
 
   if (ui.timer) {

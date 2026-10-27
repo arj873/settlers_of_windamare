@@ -23,6 +23,7 @@ import {
   topologyOf,
   MAX_TRADE_OFFERS_PER_TURN,
   RESOURCES,
+  routeName,
   victoryPoints,
   visibleSpecialBuildQueue,
   type Action,
@@ -354,7 +355,7 @@ export function blockReasons(state: GameState, viewer: PlayerId, card: BuildCard
           ? 'No settlement to upgrade'
           : kind === 'road'
             ? 'No free edge next to your roads or buildings'
-            : 'No legal spot (needs your road, no building next to it)',
+            : `No legal spot (needs your ${routeName(state)}, no building next to it)`,
     });
   }
   return out.length > 0 ? out : [{ text: 'Not possible right now' }];
