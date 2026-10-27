@@ -40,7 +40,11 @@ import {
   KNIGHT_STEPS_GRAIN,
   PRISONER_CONSOLATION_GOLD,
   TREASON_GOLD,
+  baCardsInPlay,
   baOf,
+  prisonersPerVp,
+  hexHasNumber,
+  sheetRules,
   tbBoard,
   type BaCard,
   type BaSlice,
@@ -50,9 +54,11 @@ import {
 
 export function initBa(state: GameState, rng: Rng): BaSlice {
   const coast = tbBoard(state).coast ?? [];
+  const rules = sheetRules(state);
   const onHex: Record<HexId, number> = {};
-  // One barbarian on a coastal "2" and one on a coastal "12".
-  for (const n of [2, 12]) {
+  // One barbarian on a coastal "2" and one on a coastal "12" (a sheet may name the hexes).
+  for (const h of rules.baStart ?? []) onHex[h] = 1;
+  for (const n of rules.baStart ? [] : [2, 12]) {
     const h = coast.find((x) => state.board.hexes[x]?.token === n);
     if (h) onHex[h] = 1;
   }
@@ -62,20 +68,40 @@ export function initBa(state: GameState, rng: Rng): BaSlice {
     supply: total - Object.keys(onHex).length,
     prisoners: state.players.map(() => 0),
     knights: {},
-    deck: rng.shuffle(BA_DECK.flatMap(([c, k]) => Array<BaCard>(k).fill(c))),
+    // BA + C&K: no BA development cards (C&K's knights instead).
+    deck: baCardsInPlay(state)
+      ? rng.shuffle(BA_DECK.flatMap(([c, k]) => Array<BaCard>(k).fill(c)))
+      : [],
     discard: [],
     moved: [],
+    ...(rules.barbarianPaths ? { paths: {} } : {}),
   };
 }
 
 const coastOf = (state: GameState): HexId[] => tbBoard(state).coast ?? [];
 export const barbariansOn = (state: GameState, h: HexId): number => baOf(state).onHex[h] ?? 0;
 
-function setBarbarians(draft: GameState, h: HexId, n: number): void {
+/**
+ * Hexes that may hold barbarians in check order: the coast, then (BA + T&B, where Treason and a
+ * drive-off reach any hex) the other hexes holding some.
+ */
+export function barbarianHexes(state: GameState): HexId[] {
+  const coast = coastOf(state);
+  const inland = (Object.keys(baOf(state).onHex) as HexId[]).filter((h) => !coast.includes(h));
+  return inland.length === 0 ? coast : [...coast, ...inland];
+}
+
+/** Set the barbarians on `h` (BA + T&B: none left there, none by its paths). */
+export function setBarbarians(draft: GameState, h: HexId, n: number): void {
   const s = baOf(draft);
   const was = s.onHex[h] ?? 0;
   if (n > 0) s.onHex[h] = n;
   else Reflect.deleteProperty(s.onHex, h);
+  if (n <= 0 && s.paths) {
+    for (const [e, at] of Object.entries(s.paths) as [EdgeId, HexId][]) {
+      if (at === h) Reflect.deleteProperty(s.paths, e);
+    }
+  }
   const name = draft.board.hexes[h]?.token ?? '?';
   if (was < CONQUER_AT && n >= CONQUER_AT)
     log(draft, null, `The barbarians conquered the ${name} hex`);
@@ -96,7 +122,7 @@ export function landBarbarians(draft: GameState): void {
     for (let tries = 0; tries < 200 && (n === 7 || used.includes(n)); tries++) n = rollTwo(draft);
     if (n === 7 || used.includes(n)) break;
     used.push(n);
-    const hexes = coast.filter((h) => draft.board.hexes[h]?.token === n);
+    const hexes = coast.filter((h) => hexHasNumber(draft, h, n));
     let landed = 0;
     for (const h of hexes) {
       const k = s.onHex[h] ?? 0;
@@ -138,7 +164,7 @@ export function knightSpots(state: GameState, card: 'knighthood' | 'swiftKnight'
 }
 
 /** Edge distance (steps between land edges sharing a vertex) from `from`, up to `max`. */
-function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId, number> {
+export function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId, number> {
   const t = topologyOf(state);
   const dist = new Map<EdgeId, number>([[from, 0]]);
   let frontier = [from];
@@ -208,8 +234,14 @@ export function moveKnight(draft: GameState, from: EdgeId, to: EdgeId): void {
 const family = (e: EdgeId): string => e.slice(e.lastIndexOf(',') + 1);
 const FAMILY_OF_DIE = ['SE', 'NE', 'E'] as const;
 
+/** Roll the knight-loss die: does an edge belong to the orientation family it picked? */
+export function rollLossFamily(draft: GameState): (e: EdgeId) => boolean {
+  const fam = FAMILY_OF_DIE[rollDie(draft) % 3] as string;
+  return (e) => family(e) === fam;
+}
+
 /** Players ranked by die rolls, ties re-rolled among the tied (highest first). */
-function rankByDice(draft: GameState, players: PlayerId[]): PlayerId[] {
+export function rankByDice(draft: GameState, players: PlayerId[]): PlayerId[] {
   if (players.length <= 1) return players;
   const rolls = new Map(players.map((p) => [p, rollDie(draft)]));
   const values = [...new Set(rolls.values())].sort((a, b) => b - a);
@@ -263,9 +295,9 @@ function battle(draft: GameState, h: HexId): void {
   }
   setBarbarians(draft, h, 0);
   // Knight losses: one die picks an orientation; involved knights on it go home (3 gold each).
-  const fam = FAMILY_OF_DIE[rollDie(draft) % 3] as string;
+  const lost = rollLossFamily(draft);
   for (const e of edges) {
-    if (family(e) !== fam) continue;
+    if (!lost(e)) continue;
     const o = s.knights[e] as PlayerId;
     Reflect.deleteProperty(s.knights, e);
     addGold(draft, o, KNIGHT_LOSS_GOLD);
@@ -275,7 +307,7 @@ function battle(draft: GameState, h: HexId): void {
 
 /** Every coastal hex in check order: a victory where knights outnumber the barbarians. */
 export function expelBarbarians(draft: GameState): void {
-  for (const h of coastOf(draft)) battle(draft, h);
+  for (const h of barbarianHexes(draft)) battle(draft, h);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +345,7 @@ const CARD_NAME: Readonly<Record<BaCard, string>> = {
 };
 
 export const treasonSources = (state: GameState, used: readonly HexId[]): HexId[] =>
-  coastOf(state).filter((h) => barbariansOn(state, h) > 0 && !used.includes(h));
+  barbarianHexes(state).filter((h) => barbariansOn(state, h) > 0 && !used.includes(h));
 
 export function treasonDests(
   state: GameState,
@@ -420,7 +452,7 @@ export function conqueredProduction(
   cityYield: number,
 ): void {
   const t = topologyOf(state);
-  for (const h of coastOf(state)) {
+  for (const h of barbarianHexes(state)) {
     const tile = state.board.hexes[h];
     if (!tile || tile.token !== roll || !isConqueredHex(state, h)) continue;
     const r = tile.terrain;
@@ -438,10 +470,10 @@ export const vertexNextToConquered = (state: GameState, v: VertexId): boolean =>
 export const edgeNextToConquered = (state: GameState, e: EdgeId): boolean =>
   (topologyOf(state).edge[e]?.hexes ?? []).some((h) => isConqueredHex(state, h));
 
-/** Prisoners (1 VP per 2) and conquered buildings (worth nothing: -1 / -2). */
+/** Prisoners (1 VP per 2; BA + C&K: per 3) and conquered buildings (worth nothing: -1 / -2). */
 export function baVictoryParts(state: GameState, p: PlayerId): { label: string; vp: number }[] {
   const out: { label: string; vp: number }[] = [];
-  const prisoners = Math.floor((baOf(state).prisoners[p] ?? 0) / 2);
+  const prisoners = Math.floor((baOf(state).prisoners[p] ?? 0) / prisonersPerVp(state));
   if (prisoners > 0) out.push({ label: 'Prisoners', vp: prisoners });
   let lost = 0;
   for (const [v, b] of Object.entries(state.pieces.buildings) as [

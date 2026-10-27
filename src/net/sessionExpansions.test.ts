@@ -44,6 +44,8 @@ function playUntil(net: LocalNet, until: () => boolean, maxSteps = 3000): void {
       const legal = legalOf(net, conn).filter((a) => !/offerTrade$/.test(a.type));
       const pick = legal[i % 3 === 0 ? legal.length - 1 : 0] ?? legalOf(net, conn)[0]!;
       net.send(conn, { type: 'intent', action: pick, seq: net.last(conn, 'game')!.seq });
+      // Time passes between moves (10 intents a second; a 2-seat game has no bots to wait for).
+      net.advance(100);
     } else {
       net.advance(500);
     }
@@ -59,6 +61,8 @@ describe('GameSession: expansion modes online', () => {
     { mode: 'seafarers+ck', scenario: 'seafarers/newShores' },
     { mode: 'ep+ck', scenario: 'ep/pirateLairs', vpToWin: 17 },
     { mode: 'ep+tb', scenario: 'ep/fish' },
+    { mode: 'ba+ck', scenario: 'tb/barbarianAttack' },
+    { mode: 'two+ck', scenario: 'tb/variants', seatCount: 2 },
   ])('$mode $scenario: humans and bots play; each seat gets its own view', (patch) => {
     const { net, session } = started(patch);
     expect(session.state!.settings.mode).toBe(patch.mode);
@@ -67,7 +71,8 @@ describe('GameSession: expansion modes online', () => {
       const s = session.state!;
       return s.turn.number >= 10 || session.phase !== 'playing';
     });
-    expect(session.state!.turn.number >= 10 || session.phase === 'over').toBe(true);
+    const at = `${session.phase} turn ${session.state!.turn.number} ${session.state!.phase.kind}`;
+    expect(session.state!.turn.number >= 10 || session.phase === 'over', at).toBe(true);
     for (const conn of ['host', 'bob', 'spec']) {
       expect(net.messages(conn, 'error')).toEqual([]);
       const games = net.messages(conn, 'game');
@@ -78,7 +83,9 @@ describe('GameSession: expansion modes online', () => {
       expect(last.view).toEqual(JSON.parse(JSON.stringify(viewFor(session.state!, seat))));
       for (const g of games) for (const a of g.legal) types.add(a.type);
     }
-    expect([...types].some((t) => t.startsWith(`${patch.mode.split('+')[0]}/`))).toBe(true);
+    // An expansion's own move was offered (the combination modes: one of the composed ones).
+    const ids = session.state!.settings.expansions;
+    expect([...types].some((t) => ids.some((id) => t.startsWith(`${id}/`)))).toBe(true);
   });
 
   it('refuses unknown modes / scenarios and settings createGame would refuse', () => {

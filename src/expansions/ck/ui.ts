@@ -52,6 +52,7 @@ import {
   promptFor,
   redDieDraws,
   wallsOf,
+  shipSails,
   type Choice,
   type CkAction,
   type Commodity,
@@ -822,7 +823,12 @@ export const ckHud: HudExtension = {
   id: CK,
 
   panel(state, view, send) {
-    const body = h('div', { class: 'ck-panel' }, barbarianTrack(state));
+    // Barbarian Attack + C&K has no barbarian ship (its barbarians land on the coast).
+    const body = h(
+      'div',
+      { class: 'ck-panel' },
+      ...(shipSails(state) ? [barbarianTrack(state)] : []),
+    );
     if (!view.spectator && state.players[view.viewer]) {
       body.append(trackRows(state, view, send));
       const extra = [
@@ -853,6 +859,8 @@ export const ckHud: HudExtension = {
       actionType: 'ck/buildKnight',
       glyph: 'knight',
       costItem: KNIGHT_ITEM,
+      // Barbarian Attack + C&K: knights stand on paths (that module's own cards).
+      available: shipSails,
       left: (state, p) => knightsInSupply(state, p, 1),
       total: () => KNIGHTS_PER_LEVEL,
     },
@@ -863,6 +871,7 @@ export const ckHud: HudExtension = {
       actionType: 'ck/selectKnight',
       glyph: 'knight',
       costItem: 'ck/none',
+      available: shipSails,
     },
     {
       mode: 'ck/wall',

@@ -114,7 +114,13 @@ function expansionActions(): Action[] {
   for (const m of listModes().filter((x) => x.id !== 'base')) {
     for (const scenario of m.scenarios.length ? m.scenarios : [undefined]) {
       runGame({
-        initial: newGame({ seed: `p-${m.id}`, players: 4, mode: m.id, scenario }),
+        // 4 seats, or what the mode allows (Catan for Two + C&K: 2).
+        initial: newGame({
+          seed: `p-${m.id}`,
+          players: Math.min(Math.max(4, m.players?.min ?? 4), m.players?.max ?? 4),
+          mode: m.id,
+          scenario,
+        }),
         maxSteps: 200,
         bot: createRandomBot({ progressBias: 0.5 }),
         onStep: ({ step, state }) => {

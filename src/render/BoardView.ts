@@ -39,7 +39,7 @@ import {
   shade,
 } from './art';
 import * as art from './art';
-import { drawersFor, terrainPainter, type DrawContext } from './expansions';
+import { drawersFor, terrainPainter, tokenPlace, type DrawContext } from './expansions';
 import {
   HEX_SIZE as S,
   backdropRadius,
@@ -562,7 +562,9 @@ export class BoardView {
       if (!tile || !info || tile.token === null) continue;
       const hot = tile.token === 6 || tile.token === 8;
       const c = new Container();
-      c.position.set(info.x * S, info.y * S);
+      const at = tokenPlace(state, id);
+      c.position.set((info.x + (at?.dx ?? 0)) * S, (info.y + (at?.dy ?? 0)) * S);
+      if (at) c.scale.set(at.scale);
       const g = new Graphics();
       const R = 0.36 * S;
       g.circle(1.5, 3, R).fill({ color: 0x000000, alpha: 0.32 });

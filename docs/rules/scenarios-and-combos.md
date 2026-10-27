@@ -664,7 +664,7 @@ commodities. "Chase away the robber": an active knight adjacent to a barbarian m
 free edge (steal 1 random resource/commodity if on a road); the knight deactivates. **Win 15 VP.**
 Per-scenario (all use "Except where noted, both rules apply"):
 
-- **Barbarian Attack + C&K:** do not use the C&K sea frame/barbarian ship or the scenario's knights
+- **Barbarian Attack + C&K** (sheet read in full for C5, engine status: combos.md §10): do not use the C&K sea frame/barbarian ship or the scenario's knights
   and dev cards. The 3 dice: a ship on the event die places a barbarian on the coastal hex
   matching the production roll (max 3 per hex; not on a 7). Walls conquer as normal; a metropolis
   city is not conquered but stops producing (still 4 VP) and blocks its track improvement. Each
@@ -673,7 +673,7 @@ Per-scenario (all use "Except where noted, both rules apply"):
   displace within 3 paths. Combat uses knight strength; losses downgrade; each lost knight pays 3 gold;
   3 prisoners = 1 VP. Special progress cards (Intrigue, Invention, Merchant, Taxation, Treason).
   **Win 13 VP.**
-- **CATAN for Two + C&K:** two full roll+production phases per turn; recruiting/promoting a knight
+- **CATAN for Two + C&K** (sheet read in full for C5, combos.md §11): two full roll+production phases per turn; recruiting/promoting a knight
   also recruits/promotes a neutral knight (never mighty); neutral knights can't be activated; trade
   tokens can be gained by removing a knight (1/2/3 tokens by level); forced trade splits in two
   versions (resource-only; or resource+commodity at double cost). **Win 13 VP.**

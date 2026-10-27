@@ -500,7 +500,8 @@ function cloneExt(slice: unknown): CkSlice {
 export const ckModule: ExpansionModule = {
   id: CK,
   name: 'Cities & Knights',
-  players: { min: 3, max: 6 },
+  // 2: Catan for Two + C&K (module `twock`); C&K's own mode and scenarios stay 3-6.
+  players: { min: 2, max: 6 },
   maps: [CK_STARTER19],
   scenarios: [
     {

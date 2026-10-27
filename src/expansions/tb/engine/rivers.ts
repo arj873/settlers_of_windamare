@@ -20,6 +20,7 @@ import {
   POOR_VP,
   WEALTHY_VP,
   bridgesOf,
+  sheetRules,
   tbBoard,
   tbSlice,
 } from './state';
@@ -83,7 +84,10 @@ export function riversLegal(state: GameState): Action[] {
     .map((edge) => ({ type: 'tb/buildBridge', player: p, edge }) as unknown as Action);
 }
 
-/** Wealthiest Settler (+1, strictly the most gold) and Poor Settler (-2, tied for the least). */
+/**
+ * Wealthiest Settler (+1, strictly the most gold) and Poor Settler (-2, tied for the least; no VP
+ * lost on the Rivers + BA and Rivers + T&B sheets, `rules.noPoorVp`).
+ */
 export function riversVictoryParts(state: GameState, p: PlayerId): { label: string; vp: number }[] {
   const gold = state.players.map((x) => goldOf(state, x.id));
   const max = Math.max(...gold);
@@ -93,6 +97,6 @@ export function riversVictoryParts(state: GameState, p: PlayerId): { label: stri
   if (mine === max && gold.filter((g) => g === max).length === 1) {
     out.push({ label: 'Wealthiest Settler', vp: WEALTHY_VP });
   }
-  if (mine === min) out.push({ label: 'Poor Settler', vp: POOR_VP });
+  if (mine === min && !sheetRules(state).noPoorVp) out.push({ label: 'Poor Settler', vp: POOR_VP });
   return out;
 }
