@@ -9,7 +9,7 @@ import { edgeVertices, topologyOf, vertexEdges } from '../../../engine/topology'
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { ckSlice, displaceTargets, type KnightLevel } from '../../ck/engine';
 import { bad, giveCards, legalOf, ok, rngFor, setGoods } from '../../ck/engine/testkit';
-import { SC_BASE, twoOf } from '../../tb/engine';
+import { NEUTRAL_NAMES, SC_BASE, twoOf } from '../../tb/engine';
 import { TWOCK, TWOCK_MODE, goodsTradePrice, neutralKnightSpots, neutralOwner } from '.';
 
 const players = (n: number) =>
@@ -220,6 +220,28 @@ describe('neutral knights', () => {
     const done = ok(moved, options[0]!);
     expect(Object.values(ckSlice(done).knights).some((x) => x.owner === n)).toBe(true);
     expect(done.phase.kind).toBe('main');
+  });
+
+  it('the log names a displaced neutral knight by its neutral player', () => {
+    const s = main();
+    const t = topologyOf(s);
+    const b = farVertex(s);
+    const [eA, eC] = vertexEdges(t, b) as EdgeId[];
+    const a = other(s, eA!, b);
+    s.pieces.roads[eA!] = 0;
+    knight(s, 0, a, 2, true);
+    const n = neutralOwner(s, 0);
+    knight(s, n, b, 1);
+    // One road: the neutral knight's only retreat, taken at once.
+    twoOf(s).neutrals[0].roads.push(eC!);
+    const sel = ok(s, act({ type: 'ck/selectKnight', player: 0, vertex: a }));
+    const moved = ok(sel, act({ type: 'ck/pickVertex', player: 0, vertex: b }));
+    expect(moved.phase.kind).toBe('main');
+    const lines = moved.log.slice(-2).map((e) => e.text);
+    expect(lines).toEqual([
+      `P0's knight displaced a knight of ${NEUTRAL_NAMES[0]}`,
+      `${NEUTRAL_NAMES[0]}'s knight retreated`,
+    ]);
   });
 
   it('knights are never recruited on a neutral settlement', () => {

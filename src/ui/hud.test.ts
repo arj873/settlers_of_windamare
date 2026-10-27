@@ -218,6 +218,21 @@ describe('Hud', () => {
     expect(cfg?.map).toBe('baseRandom');
   });
 
+  it('tells the CSS how many hand cards, separators and build cards to fit', () => {
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
+    const hand = root.querySelector<HTMLElement>('.hand')!;
+    const build = root.querySelector<HTMLElement>('.build-bar')!;
+    expect(hand.style.getPropertyValue('--hand-n')).toBe(
+      String(hand.querySelectorAll(':scope > .hcard').length),
+    );
+    expect(Number(hand.style.getPropertyValue('--hand-n'))).toBeGreaterThanOrEqual(5);
+    expect(hand.style.getPropertyValue('--hand-seps')).toBe(
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
+    expect(build.style.getPropertyValue('--build-n')).toBe(String(build.childElementCount));
+  });
+
   it('build bar shows pieces and dev cards left', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });

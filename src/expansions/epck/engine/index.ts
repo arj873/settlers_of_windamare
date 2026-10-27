@@ -319,7 +319,16 @@ const offerTrade: ExtHandler = (draft, action) => {
   ckSlice(draft).trade = { give: comPart(give), want: comPart(want) };
   epSlice(draft).trade = { give: give.gold ?? 0, want: want.gold ?? 0 };
   draft.turn.tradeOffers += 1;
-  log(draft, action.player, `${pn(draft, action.player)} offers a trade with commodities or gold`);
+  const describe = (b: ItemBundle) =>
+    (Object.entries(b) as [Item, number][])
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${n} ${k}`)
+      .join(', ');
+  log(
+    draft,
+    action.player,
+    `${pn(draft, action.player)} offers ${describe(give)} for ${describe(want)}`,
+  );
   return ok(draft);
 };
 

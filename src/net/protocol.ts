@@ -335,8 +335,11 @@ export type Parsed<T> = { ok: true; msg: T } | { ok: false; code: ErrorCode; mes
 const PLAYER_ID = int(0, 7);
 const COORD = '-?\\d{1,2}';
 const HEX = str(16, { pattern: new RegExp(`^h:${COORD},${COORD}$`) }) as Check<HexId>;
-const VERTEX = str(16, { pattern: new RegExp(`^v:${COORD},${COORD},(N|S)$`) }) as Check<VertexId>;
-const EDGE = str(16, { pattern: new RegExp(`^e:${COORD},${COORD},(NE|E|SE)$`) }) as Check<EdgeId>;
+// `C` vertices / `C<corner>` edges: T&B plaza centres and their spokes (F2, engine/types.ts).
+const VERTEX = str(16, { pattern: new RegExp(`^v:${COORD},${COORD},(N|S|C)$`) }) as Check<VertexId>;
+const EDGE = str(16, {
+  pattern: new RegExp(`^e:${COORD},${COORD},(NE|E|SE|C(N|NE|SE|S|SW|NW))$`),
+}) as Check<EdgeId>;
 const RESOURCE = oneOf(RESOURCES);
 
 const BUNDLE: Check<ResourceBundle> = (x, path) => {

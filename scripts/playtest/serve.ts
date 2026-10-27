@@ -48,7 +48,7 @@ import {
   spotKey,
   type Spot,
 } from './spots';
-import { matchChoice, parseFlags, slugify } from './text';
+import { matchChoice, matchControl, parseFlags, slugify } from './text';
 
 const SEVERITIES = ['blocker', 'major', 'minor', 'visual'] as const;
 const OUT_DIR = join(PLAYTEST_DIR, 'dist');
@@ -492,28 +492,25 @@ const commands: Record<string, Handler> = {
     const snap = await guarded(seat, 'act');
     if (typeof snap === 'string') return refuse(snap);
     const controls = snap.ui.controls;
-    const enabled = controls.filter((c) => c.enabled);
-    const m = matchChoice(
-      query,
-      enabled.map((c) => c.label),
-      (i) => enabled[i]?.inDialog === true,
-    );
+    // All buttons first: a better-matching disabled button is refused, never swapped for a
+    // looser enabled match ("Ship" must not press "Move ship").
+    const m = matchControl(query, controls);
     if (m.kind === 'many') {
-      const list = m.indices.map((i) => `[${enabled[i]?.label}]`).join(' ');
+      const list = m.indices.map((i) => `[${controls[i]?.label}]`).join(' ');
       return refuse(`"${query}" matches several buttons: ${list}. Use the full label.`);
     }
-    if (m.kind === 'none') {
-      const off = matchChoice(
-        query,
-        controls.filter((c) => !c.enabled).map((c) => c.label),
+    if (m.kind === 'disabled') {
+      const why = controls[m.index]?.why;
+      return refuse(
+        `[${controls[m.index]?.label}] is disabled right now${why ? ` (${why})` : ''}. ${listButtons(snap)}`,
       );
-      if (off.kind !== 'none')
-        return refuse(`That button is disabled right now. ${listButtons(snap)}`);
+    }
+    if (m.kind === 'none') {
       const stale = snap.state ? staleTradeHint(snap.state, query) : null;
       if (stale) return refuse(`${stale} ${listButtons(snap)}`);
       return refuse(`No button matches "${query}". ${listButtons(snap)}`);
     }
-    const c = enabled[m.index];
+    const c = controls[m.index];
     if (!c) return refuse('internal: match out of range');
     const err = await pressControl(seat, snap, c);
     if (err) return refuse(err);
@@ -564,6 +561,47 @@ const commands: Record<string, Handler> = {
     }
     const after = snap.ui.steppers.find((x) => x.label === label);
     return { out: await afterAction(first, seat, `${label} = ${after?.value ?? '?'}`) };
+  },
+
+  async choose(seat, args) {
+    const line = args.join(' ');
+    const eq = line.lastIndexOf('=');
+    const query = eq < 0 ? '' : line.slice(0, eq).trim();
+    const want = eq < 0 ? '' : line.slice(eq + 1).trim();
+    if (!query || !want) {
+      return refuse('Usage: `choose <dropdown> = <option>`, e.g. `choose Bank: give = Grain`.');
+    }
+    const snap = await guarded(seat, 'act');
+    if (typeof snap === 'string') return refuse(snap);
+    const drops = snap.ui.dropdowns ?? [];
+    if (drops.length === 0) return refuse('No dropdowns are showing. Run `status`.');
+    const m = matchChoice(
+      query,
+      drops.map((d) => d.label),
+    );
+    const names = drops.map((d) => d.label).join(', ');
+    if (m.kind === 'many') {
+      return refuse(
+        `"${query}" matches several: ${m.indices.map((i) => drops[i]?.label).join(', ')}.`,
+      );
+    }
+    if (m.kind === 'none') return refuse(`No dropdown "${query}". Dropdowns: ${names}.`);
+    const d = drops[m.index];
+    if (!d) return refuse('internal: match out of range');
+    if (!d.enabled) return refuse(`[${d.label}] is disabled right now.`);
+    const o = matchChoice(want, d.options);
+    if (o.kind !== 'one') {
+      return refuse(
+        `[${d.label}] has no single option "${want}". Options: ${d.options.join(' | ')}.`,
+      );
+    }
+    const label = d.options[o.index] as string;
+    try {
+      await ctxOf(seat).page.selectOption(`[data-pt="${d.id}"]`, { label }, { timeout: 5000 });
+    } catch {
+      return refuse(`[${d.label}] is gone: the screen changed. Run \`status\`.`);
+    }
+    return { out: await afterAction(snap, seat, `${d.label} = ${label}`) };
   },
 
   async pass(seat) {
@@ -803,7 +841,7 @@ async function screenshot(
   const { page } = ctxOf(seat);
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${base}.png`);
-  // Render on demand (headless): draw the current board first.
+  // Draw the current board first (headless: harmless, the board already draws on change).
   await page.evaluate('window.__pt && window.__pt.render()');
   if (mode === 'board') {
     await page.evaluate(`document.getElementById('ui').style.visibility = 'hidden'`);
@@ -845,8 +883,8 @@ async function newSeatCtx(browser: Browser): Promise<SeatCtx> {
   // Same page size headed or not, so screenshots and click positions match what a watcher sees.
   const context = await browser.newContext({ viewport: VIEWPORT });
   await context.addInitScript({ path: join(REPO_ROOT, 'scripts', 'playtest', 'inpage.js') });
-  // Headless has no GPU: drawing the board every frame in software starves the page (and the
-  // machine, with several sessions). Watchers of a headed window keep the smooth board.
+  // Headless has no GPU: a pulsing highlight is drawn in software every frame and starves the
+  // page (and the machine, with several sessions). Watchers of a headed window keep the motion.
   if (!headed) await context.addInitScript('window.__pt.renderOnDemand()');
   const page = await context.newPage();
   const ctx: SeatCtx = { page, context, consoleLog: [], dropped: false };

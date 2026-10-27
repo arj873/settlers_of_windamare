@@ -87,6 +87,19 @@ describe('Seafarers HUD', () => {
     expect(card?.disabled).toBe(false);
   });
 
+  it('Seafarers words: settlements need a road or ship; Longest Trade Route', () => {
+    const s = coastGame();
+    show(s);
+    const settlement = [...root.querySelectorAll<HTMLButtonElement>('.bcard')].find(
+      (b) => b.querySelector('.bcard-label')?.textContent === 'Settlement',
+    );
+    expect(settlement?.dataset['why']).toMatch(/needs your road or ship,/);
+    s.awards.longestRoad = 0;
+    show(s);
+    expect(root.querySelector('[aria-label="Longest Trade Route"]')).not.toBeNull();
+    expect(root.querySelector('[aria-label="Longest Road"]')).toBeNull();
+  });
+
   it('Ship mode highlights the ship spots; a click builds there', () => {
     const s = coastGame();
     const spots = boardActions(legalActions(s), 0, 'seafarers/ship');

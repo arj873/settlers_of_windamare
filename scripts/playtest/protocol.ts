@@ -57,6 +57,17 @@ export interface Control {
   actions?: string[] | null;
 }
 
+/** A dropdown (`<select>`), e.g. the C&K panel's "Bank: give". Set with `choose`. */
+export interface Dropdown {
+  id: string;
+  /** Its aria-label, else its row / section name and position ("Oil 2"). */
+  label: string;
+  /** The text of the chosen option. */
+  value: string;
+  options: string[];
+  enabled: boolean;
+}
+
 /** A − value + stepper (discard / trade composer). */
 export interface Stepper {
   label: string;
@@ -84,6 +95,7 @@ export interface UiScan {
   dialogText: string[];
   controls: Control[];
   steppers: Stepper[];
+  dropdowns?: Dropdown[];
   toasts: string[];
   /** Resource counts shown in the HUD hand (lowercase resource -> count); null if hidden. */
   hand: Record<string, number> | null;

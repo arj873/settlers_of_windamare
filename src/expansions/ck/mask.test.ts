@@ -6,7 +6,15 @@
  * the hands but not the stacks; the log names no secret card; the HUD renders a masked view.
  */
 import { describe, expect, it } from 'vitest';
-import { legalActions, viewFor, type Action, type GameState, type PlayerId } from '../../engine';
+import {
+  cardsInHand,
+  handCount,
+  legalActions,
+  viewFor,
+  type Action,
+  type GameState,
+  type PlayerId,
+} from '../../engine';
 import { Hud } from '../../ui/hud';
 import { canary, canaryNumber, expectNoLeak, sampleStates, type Plant } from '../maskTestkit';
 import type { GameSetup } from '../../bots/runner';
@@ -186,6 +194,17 @@ describe('C&K online views: shape and reveals', () => {
     expect(ckSlice(viewFor(s, 1)).players[1]).toEqual(full.players[1]);
     expect(JSON.stringify(s)).toBe(before); // input untouched
     expect(ckSlice(s).commodityCounts).toBeUndefined();
+  });
+
+  it('hand counts (players panel, steal dialog) include commodities, also on a view', () => {
+    const s = hands();
+    // Seat 1 holds 3 cloth + 2 ore: 5 cards toward the 7 rule (CK §3.6), resources or not.
+    expect(handCount(s, 1)).toBe(5);
+    expect(cardsInHand(s, 1)).toBe(5);
+    for (const viewer of [0, 1, 2, 'spectator'] as const) {
+      expect(handCount(viewFor(s, viewer), 1)).toBe(5);
+      expect(handCount(viewFor(s, viewer), 0)).toBe(3);
+    }
   });
 
   it('Spy: the spy player sees the victim’s progress cards, nobody else does', () => {

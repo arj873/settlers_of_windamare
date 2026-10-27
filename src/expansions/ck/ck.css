@@ -293,6 +293,9 @@
 .ck-cf-coin {
   background: linear-gradient(160deg, #f4dc7a, #b58a1e);
 }
+.ck-cf-any {
+  background: linear-gradient(90deg, #e3d4a6 0 33%, #c26a9c 33% 67%, #d9b44a 67%);
+}
 .ck-pf {
   flex-direction: column;
   align-content: center;

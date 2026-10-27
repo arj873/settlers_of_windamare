@@ -1,5 +1,5 @@
 /** The right sidebar's contents: Game Events (log), Bank and Players. Pure DOM builders. */
-import type { GameState, PlayerId } from '../engine';
+import { longestRoadName, type GameState, type PlayerId } from '../engine';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL } from './icons';
 import { groupLog, type LogToken } from './log';
@@ -42,7 +42,11 @@ function tokenNode(
     case 'robber':
       return glyph('robber', 18, 'the robber');
     case 'award':
-      return glyph(t.award, 17, AWARD_LABEL[t.award]);
+      return glyph(
+        t.award,
+        17,
+        t.award === 'longestRoad' ? longestRoadName(state) : AWARD_LABEL[t.award],
+      );
   }
 }
 
@@ -127,7 +131,12 @@ function stat(icon: Child, value: number | string, title: string, cls = ''): HTM
   return h('span', { class: `pstat${cls}`, title }, icon, h('span', {}, String(value)));
 }
 
-function playerBar(p: PlayerSummary, viewer: PlayerId, away: boolean): HTMLElement {
+function playerBar(
+  p: PlayerSummary,
+  viewer: PlayerId,
+  away: boolean,
+  roadCard: string,
+): HTMLElement {
   const you = p.id === viewer;
   return h(
     'div',
@@ -171,7 +180,7 @@ function playerBar(p: PlayerSummary, viewer: PlayerId, away: boolean): HTMLEleme
       h(
         'div',
         { class: 'pp-stats' },
-        stat(glyph('cards', 15), p.cards, 'Resource cards in hand', p.cards > 7 ? ' is-warn' : ''),
+        stat(glyph('cards', 15), p.cards, 'Cards in hand', p.cards > 7 ? ' is-warn' : ''),
         stat(glyph('devCards', 15), p.devCards, 'Development cards'),
         stat(
           glyph('knight', 15),
@@ -182,7 +191,7 @@ function playerBar(p: PlayerSummary, viewer: PlayerId, away: boolean): HTMLEleme
         stat(
           glyph('road', 15),
           p.roadLength,
-          p.longestRoad ? 'Longest road — holds Longest Road (+2 VP)' : 'Longest road',
+          p.longestRoad ? `Longest road — holds ${roadCard} (+2 VP)` : 'Longest road',
           p.longestRoad ? ' is-award' : '',
         ),
       ),
@@ -190,7 +199,7 @@ function playerBar(p: PlayerSummary, viewer: PlayerId, away: boolean): HTMLEleme
     h(
       'div',
       { class: 'pp-awards' },
-      p.longestRoad && glyph('longestRoad', 20, 'Longest Road'),
+      p.longestRoad && glyph('longestRoad', 20, roadCard),
       p.largestArmy && glyph('largestArmy', 20, 'Largest Army'),
     ),
   );
@@ -202,6 +211,8 @@ export function playersList(state: GameState, view: HudView): HTMLElement {
   return h(
     'div',
     { class: `hud-players${list.length > 4 ? ' is-compact' : ''}` },
-    ...list.map((p) => playerBar(p, view.viewer, view.away?.[p.id] === true)),
+    ...list.map((p) =>
+      playerBar(p, view.viewer, view.away?.[p.id] === true, longestRoadName(state)),
+    ),
   );
 }

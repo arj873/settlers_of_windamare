@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { cloneState } from '../../../engine/clone';
 import { createGame } from '../../../engine/createGame';
+import { longestRoadName, routeName } from '../../../engine/expansions/hooks';
 import { RESOURCES } from '../../../engine/constants';
 import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../../../engine/types';
 import { ckSlice, merchantHexes, moveTargets, type ProgressCard } from '../../ck/engine';
@@ -95,6 +96,12 @@ function seaPath(s: GameState): { edges: EdgeId[]; end: VertexId } {
 }
 
 describe('the mode', () => {
+  it('uses the Seafarers words: Longest Trade Route, road or ship', () => {
+    const s = game();
+    expect(longestRoadName(s)).toBe('Longest Trade Route');
+    expect(routeName(s)).toBe('road or ship');
+  });
+
   it('composes seack, ck and seafarers in that order (seack arbitrates first-wins hooks)', () => {
     const s = game();
     expect(s.settings.expansions).toEqual([SEACK, 'ck', 'seafarers']);

@@ -130,10 +130,26 @@ describe('T&B HUD', () => {
   it('gold buys a card: the resource buttons send tb/buyResource', () => {
     const s = main(SC_TRADERS);
     show(s);
-    const buy = root.querySelector<HTMLButtonElement>('.tb-act .tb-resbtn[aria-label="Ore"]');
+    const buy = root.querySelector<HTMLButtonElement>(
+      '.tb-act .tb-resbtn[aria-label="Buy 1 Ore for 2 gold"]',
+    );
     expect(buy).not.toBeNull();
     buy?.click();
     expect(actions.at(-1)).toEqual({ type: 'tb/buyResource', player: 0, resource: 'ore' });
+  });
+
+  it('buy and sell buttons for one resource have different names', () => {
+    const s = main(SC_TRADERS);
+    s.players[0]!.resources.brick = 5;
+    show(s);
+    const names = [...root.querySelectorAll('.tb-act .tb-resbtn')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    const brick = names.filter((n) => n?.includes('Brick'));
+    expect(brick).toEqual([
+      'Buy 1 Brick for 2 gold',
+      expect.stringMatching(/^Sell \d Brick for 1 gold$/),
+    ]);
   });
 
   it('Fishermen: own fish values are shown, others only as a count; fish actions', () => {

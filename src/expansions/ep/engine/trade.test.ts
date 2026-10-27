@@ -25,6 +25,7 @@ describe('player trades with gold (§3.3, M6 p. 5)', () => {
     expect(s.players[1]?.resources.ore).toBe(1);
     expect(s.phase.kind).toBe('main');
     expect(epSlice(s).trade ?? null).toBeNull();
+    expect(s.log.at(-1)?.text).toMatch(/ traded 2 gold to .+ for 1 ore$/);
   });
 
   it('resources for gold, mixed with resources on the wanted side', () => {
@@ -39,6 +40,7 @@ describe('player trades with gold (§3.3, M6 p. 5)', () => {
     expect(goldOf(s, 1)).toBe(0);
     expect(s.players[0]?.resources).toEqual(R({ brick: 1 }));
     expect(s.players[1]?.resources).toEqual(R({ wool: 2 }));
+    expect(s.log.at(-1)?.text).toMatch(/ traded 2 wool to .+ for 1 brick, 1 gold$/);
   });
 
   it('a partner without the gold asked for cannot accept', () => {

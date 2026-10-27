@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { victoryPoints } from '../../../engine/selectors';
 import type { Action, GameState, PlayerId } from '../../../engine/types';
-import { A, pirateTargets } from './actions';
+import { A, pirateTargets, shipPlace, shipText } from './actions';
 import { graph, isPirateHex } from './geometry';
 import { T } from './maps';
 import { advance, tileHolder } from './missions';
@@ -158,6 +158,31 @@ describe('sailing (§4.4)', () => {
   });
 });
 
+describe('the movement log says what sailed where', () => {
+  it('names the cargo', () => {
+    expect(shipText({ cargo: [] })).toBe('a ship');
+    expect(shipText({ cargo: ['settler'] })).toBe('a ship with a settler');
+    expect(shipText({ cargo: ['crew', 'crew'] })).toBe('a ship with 2 crews');
+    expect(shipText({ cargo: ['crew', 'spice'] })).toBe('a ship with a crew and a spice sack');
+  });
+
+  it('names the distance and the explored land beside the end (a face-down hex is not named)', () => {
+    let s = movement(blank());
+    addShip(s, 0, E(5, 2, 'E'));
+    ship(s, 0).cargo = ['settler'];
+    s.board.hexes[H(7, 2)] = { ...s.board.hexes[H(7, 2)]!, terrain: 'lumber', token: 5 };
+    epSlice(s).hidden[H(9, 2)] = { terrain: 'ore' };
+    s = run(s, A.moveShip, 0, { ship: 0, edge: E(7, 2, 'NE') });
+    const who = s.players[0]?.name;
+    const line = s.log.map((e) => e.text).find((t) => t.includes(' sailed '));
+    expect(line).toBe(`${who} sailed a ship with a settler 2 spaces, next to lumber 5`);
+    // The move turned (9,2) over: it touches the end of the edge (settlers land at corners).
+    expect(shipPlace(s, E(7, 2, 'NE'))).toMatch(/^next to lumber 5 and ore( \d+)?$/);
+    epSlice(s).hidden[H(7, 2)] = { terrain: 'brick' };
+    expect(shipPlace(s, E(7, 2, 'NE'))).not.toContain('lumber');
+  });
+});
+
 describe('exploring (§4.3)', () => {
   it('an end at a corner of a face-down hex turns it over, pays 1 card, stops the ship', () => {
     let s = movement(blank());
@@ -240,6 +265,9 @@ describe('cargo and settlers (§4.5-4.6)', () => {
     // A piece can be returned to the supply to make room.
     const w = run(u, A.dump, 0, { vertex: COAST, cargo: 'settler' });
     expect(epSlice(w).harbors[COAST]).toEqual([]);
+    // Only to make room (§4.6): with the basin empty, nothing more may be thrown away.
+    expect(tryAct(w, A.dump, 0, { edge: E(5, 0, 'SE'), ship: 0, cargo: 'crew' }).ok).toBe(false);
+    expect(legalActions(w, 0).some((a) => a.type === A.dump)).toBe(false);
   });
 
   it('no crews in Land Ho!', () => {
@@ -285,6 +313,8 @@ describe('cargo and settlers (§4.5-4.6)', () => {
     expect(s.pieces.buildings[spot]).toEqual({ owner: 0, kind: 'settlement' });
     expect(epSlice(s).ships).toHaveLength(0);
     expect(victoryPoints(s, 0)).toBe(1);
+    // One settler piece: singular in the log.
+    expect(s.log.at(-1)?.text).toMatch(/’s settler founded a settlement$/);
   });
 
   it('landing obeys the distance rule and needs a settlement piece; not on sea-only corners', () => {

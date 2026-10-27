@@ -60,6 +60,11 @@ export interface ExtBuildCard {
   /** Pieces left / total for the counter (omit for no counter). */
   left?(state: GameState, player: PlayerId): number;
   total?(state: GameState, player: PlayerId): number;
+  /**
+   * Why the card is off besides missing resources (no spot, none left), shown with them in the
+   * disabled reason; null = no such reason. Default: none ("Not possible right now").
+   */
+  blocker?(state: GameState, player: PlayerId): string | null;
 }
 
 export interface HudExtension {

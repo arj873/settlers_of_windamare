@@ -36,6 +36,7 @@ import {
   availability,
   bestRatios,
   blockReasons,
+  tradeBlockReason,
   buildCards,
   devCardRows,
   DEV_CARD_INFO,
@@ -794,18 +795,27 @@ export class Hud {
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
+    // The CSS sizes the narrowest fan from these (hud.css, `.hand`).
+    hand.style.setProperty('--hand-n', String(hand.querySelectorAll(':scope > .hcard').length));
+    hand.style.setProperty(
+      '--hand-seps',
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
 
-    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: Dialog) =>
-      h(
+    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: 'trade' | 'bank') => {
+      const why = enabled && !over ? null : tradeBlockReason(state, view.viewer, d);
+      return h(
         'button',
         {
           class: `act tbtn${this.dialog === d ? ' is-active' : ''}`,
           disabled: !enabled || over,
           on: { click: () => this.open(d) },
+          ...(why ? { attrs: { 'data-why': why } } : {}),
         },
         glyph(label === 'Trade' ? 'trade' : 'bank', 20),
         h('span', {}, label),
       );
+    };
     const trade = h(
       'div',
       { class: 'trade-col wood' },
@@ -905,7 +915,11 @@ export class Hud {
           cost && hand
             ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
             : [];
-        const why = short.length > 0 ? `Missing ${short.join(', ')}` : 'Not possible right now';
+        const reasons = [
+          short.length > 0 ? `Missing ${short.join(', ')}` : null,
+          over ? null : (c.blocker?.(state, view.viewer) ?? null),
+        ].filter((x): x is string => x !== null);
+        const why = reasons.length > 0 ? reasons.join('; ') : 'Not possible right now';
         build.append(
           h(
             'span',
@@ -942,6 +956,7 @@ export class Hud {
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
+    build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
   }
 
