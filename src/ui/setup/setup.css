@@ -142,6 +142,165 @@
   grid-template-columns: minmax(0, 260px);
 }
 
+/* game mode: base + expansion chips (U7) */
+.su-mode-base,
+.su-mode-add,
+.su-mode-result {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.su-mode-base {
+  font-size: 15px;
+}
+.su-mode-tick {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.su-mode-add {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.su-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.su-chip {
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--tile-bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--tile-shadow);
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+.su-chip:hover:not(:disabled) {
+  border-color: var(--tile-hover-edge);
+}
+.su-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.su-chip.is-on {
+  border-color: var(--accent);
+  background: var(--tile-on-bg), var(--tile-bg);
+  box-shadow:
+    var(--tile-shadow),
+    0 0 14px color-mix(in srgb, var(--accent-glow) 35%, transparent);
+}
+.su-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.su-chip-ico {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+}
+.su-chip-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+}
+.su-chip-mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+}
+.su-chip.is-on .su-chip-mark {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.su-mode-result {
+  font-size: 15px;
+  align-items: baseline;
+}
+.su-mode-result strong {
+  min-width: 0;
+}
+.su-mode-arrow {
+  flex: none;
+  color: var(--accent);
+  font-weight: 800;
+}
+.su-mode-status {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--bad);
+}
+.su-mode-notes {
+  margin: -4px 0 0;
+  padding: 0 0 0 22px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+.su-mode-notes:empty {
+  display: none;
+}
+
+/* scenarios of a selection that stands for several modes */
+.su-scen-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.su-scen-group + .su-scen-group {
+  margin-top: 6px;
+}
+.su-scen-head {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+}
+.su-scen-blurb {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+/* a one-scenario mode keeps the column width of its neighbours */
+.su-scen-group .su-tiles.su-maps {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 /* maps */
 .su-maps {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -540,7 +699,9 @@
 
 /* narrow screens: single column */
 @media (max-width: 760px) {
-  .su-maps {
+  .su-maps,
+  .su-chips,
+  .su-scen-group .su-tiles.su-maps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .su-rules {

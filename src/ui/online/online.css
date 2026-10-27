@@ -445,6 +445,10 @@ button.ol-choice:hover {
 .ol-config.is-readonly * {
   cursor: default !important;
 }
+/* Guests see the host's pick, not why other chips are off. */
+.ol-config.is-readonly .su-mode-notes {
+  display: none;
+}
 
 /* ---- chat ------------------------------------------------------------- */
 .chat {

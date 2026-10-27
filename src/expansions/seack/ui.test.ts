@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createGame, legalActions, type Action, type GameState } from '../../engine';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { ckSlice } from '../ck/engine';
@@ -20,7 +21,7 @@ describe('Seafarers + C&K setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${SEACK_MODE}`)?.click();
+    expect(pickMode(screen.element, SEACK_MODE)).toBe(true);
     expect(screen.state.mode).toBe(SEACK_MODE);
     expect(q(screen, 'scenario-seafarers/newShores')).not.toBeNull();
     expect(q(screen, 'scenario-seafarers/throughTheDesert')).not.toBeNull();
@@ -37,7 +38,7 @@ describe('Seafarers + C&K setup screen', () => {
   it('refuses Rush mode (C&K) with a message', () => {
     const screen = new SetupScreen({ onStart: () => undefined, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${SEACK_MODE}`)?.click();
+    expect(pickMode(screen.element, SEACK_MODE)).toBe(true);
     expect(setupError({ ...screen.state, rushMode: true })).toMatch(/Rush/);
     expect(setupError({ ...screen.state, eventCards: true })).toBeNull();
   });

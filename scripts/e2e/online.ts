@@ -285,15 +285,15 @@ async function main() {
     check(true, 'closed tab shows the away icon');
     await shot(ann, '7-bob-away');
 
-    // Expansion room (X1): the host picks Cities & Knights with the setup screen's mode tile;
-    // Ann + Dan play against two bots; the C&K HUD renders from the masked views.
+    // Expansion room (X1): the host picks Cities & Knights with the setup screen's expansion
+    // chip; Ann + Dan play against two bots; the C&K HUD renders from the masked views.
     const host = await open(REMOTE ? base : `${base}?server=local`);
     await host.fill('[data-k="nickname"]', 'Ann');
     await host.click('[data-k="create"]');
     await host.waitForSelector('.ol-lobby');
-    await host.click('.ol-config [data-k="mode-ck"]');
+    await host.click('.ol-config [data-k="chip-ck"]');
     await host.waitForFunction(`${clientExpr}.room.config.mode === 'ck'`);
-    check(true, 'host picked Cities & Knights in the lobby (setup screen mode tile)');
+    check(true, 'host picked Cities & Knights in the lobby (setup screen expansion chip)');
     const dan = await open(await host.inputValue('[data-k="invite"]'));
     await dan.fill('[data-k="nickname"]', 'Dan');
     await dan.click('[data-k="join"]');
