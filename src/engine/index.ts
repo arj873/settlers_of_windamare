@@ -70,4 +70,13 @@ export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';
 export { bankTradeRatio } from './actions/trade';
 export { specialBuildQueue } from './actions/turn';
 export * from './view';
-export { DICE_TOTALS, GAIN_SOURCES, LOSS_SINKS, emptyStats, statsOf, sumCounts } from './stats';
+export {
+  DICE_TOTALS,
+  GAIN_SOURCES,
+  LOSS_SINKS,
+  bankCards,
+  emptyStats,
+  statsOf,
+  sumCounts,
+  tradesByRatio,
+} from './stats';

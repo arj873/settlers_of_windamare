@@ -4,9 +4,11 @@
  * SVG; every colour is a theme token except the players' own colours (series identity).
  */
 import {
+  bankCards,
   EVENT_INFO,
   RESOURCES,
   sumCounts,
+  tradesByRatio,
   type EventKind,
   type GameState,
   type GameStats,
@@ -30,6 +32,7 @@ import {
   standings,
   STATS_TABS,
   total,
+  tradeRatioRows,
   vpSeries,
   type StatsTab,
 } from './model';
@@ -536,6 +539,28 @@ function vpChart(state: GameState, stats: GameStats): HTMLElement {
   );
 }
 
+/** Bank / harbor rows: one per ratio used, a total when there are several, and cards moved. */
+function bankRows(stats: GameStats): Row[] {
+  const rows: Row[] = tradeRatioRows(stats).map(({ label, cell }) => ({ label, cell }));
+  if (rows.length === 0) return [{ label: 'Bank & harbor trades', cell: () => 0 }];
+  if (rows.length > 1) {
+    rows.push({
+      label: 'Bank & harbor trades',
+      title: 'All ratios together',
+      cell: (s) => tradesByRatio(s).reduce((n, t) => n + t.count, 0),
+    });
+  }
+  rows.push({
+    label: 'Cards to / from bank',
+    title: 'Cards given to the bank and harbors / cards received (known ratios)',
+    cell: (s) => {
+      const c = bankCards(s);
+      return `${c.given} / ${c.received}`;
+    },
+  });
+  return rows;
+}
+
 function activity(state: GameState, stats: GameStats): HTMLElement[] {
   return [
     section(
@@ -557,8 +582,7 @@ function activity(state: GameState, stats: GameStats): HTMLElement[] {
           title: 'Own offers accepted + others’ offers completed',
           cell: (s) => s.tradesAsOfferer + s.tradesAsPartner,
         },
-        { label: 'Bank trades (4:1)', cell: (s) => s.bankTrades },
-        { label: 'Harbor trades', cell: (s) => s.portTrades },
+        ...bankRows(stats),
         { label: 'Robber moves', cell: (s) => s.robberMoves },
         { label: 'Steals', cell: (s) => s.steals },
         { label: 'Robbed', cell: (s) => s.robbed },
