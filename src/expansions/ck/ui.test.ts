@@ -179,6 +179,19 @@ describe('C&K HUD', () => {
     expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'irrigation' });
   });
 
+  it('each progress card Play button names its card', () => {
+    const s = main();
+    build(s, 0, V(0, 0, 'S'), 'city');
+    giveCards(s, 0, 'irrigation', 'mining');
+    show(s);
+    const names = [...root.querySelectorAll('.ck-card button')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(names).toEqual(expect.arrayContaining(['Play Irrigation', 'Play Mining']));
+    root.querySelector<HTMLButtonElement>('.ck-card button[aria-label="Play Mining"]')?.click();
+    expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'mining' });
+  });
+
   it('the hand bar shows commodities and the progress stack', () => {
     const s = main();
     setGoods(s, 0, { coin: 2, paper: 1 });

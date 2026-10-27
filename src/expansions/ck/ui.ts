@@ -523,11 +523,25 @@ function progressList(state: GameState, view: HudView, send: Send): HTMLElement 
         { class: `ck-card ck-card-${CARD_TRACK[c]}` },
         h('span', { class: 'ck-card-name', title: CARD_TEXT[c] }, CARD_NAMES[c], n > 1 && ` ×${n}`),
         h('span', { class: 'muted ck-card-text' }, CARD_TEXT[c]),
-        play && h('button', { class: 'btn btn-sm', on: { click: () => send(play) } }, 'Play'),
+        // Named per card: two cards' "Play" buttons must not share a name.
+        play &&
+          h(
+            'button',
+            {
+              class: 'btn btn-sm',
+              attrs: { 'aria-label': `Play ${CARD_NAMES[c]}` },
+              on: { click: () => send(play) },
+            },
+            'Play',
+          ),
         drop &&
           h(
             'button',
-            { class: 'btn btn-sm btn-ghost', on: { click: () => send(drop) } },
+            {
+              class: 'btn btn-sm btn-ghost',
+              attrs: { 'aria-label': `Discard ${CARD_NAMES[c]}` },
+              on: { click: () => send(drop) },
+            },
             'Discard',
           ),
       );
