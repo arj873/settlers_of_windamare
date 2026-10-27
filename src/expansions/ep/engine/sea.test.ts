@@ -240,6 +240,9 @@ describe('cargo and settlers (§4.5-4.6)', () => {
     // A piece can be returned to the supply to make room.
     const w = run(u, A.dump, 0, { vertex: COAST, cargo: 'settler' });
     expect(epSlice(w).harbors[COAST]).toEqual([]);
+    // Only to make room (§4.6): with the basin empty, nothing more may be thrown away.
+    expect(tryAct(w, A.dump, 0, { edge: E(5, 0, 'SE'), ship: 0, cargo: 'crew' }).ok).toBe(false);
+    expect(legalActions(w, 0).some((a) => a.type === A.dump)).toBe(false);
   });
 
   it('no crews in Land Ho!', () => {
