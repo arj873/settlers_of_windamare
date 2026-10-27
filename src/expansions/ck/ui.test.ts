@@ -171,6 +171,8 @@ describe('C&K HUD', () => {
     show(s);
     const improve = root.querySelector<HTMLButtonElement>('.ck-trk-trade .ck-improve');
     expect(improve?.disabled).toBe(false);
+    // Named for what it buys, not just its price ("1× Cloth" read like a trade).
+    expect(improve?.getAttribute('aria-label')).toBe('Improve trade to level 1 (Market): 1 cloth');
     improve?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/improve', player: 0, track: 'trade' });
     byText('Play')?.click();

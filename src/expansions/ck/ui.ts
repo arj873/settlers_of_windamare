@@ -287,6 +287,9 @@ function trackRows(state: GameState, view: HudView, send: Send): HTMLElement {
               class: 'btn btn-sm ck-improve',
               disabled: !can,
               title: `${IMPROVEMENT_NAMES[t][level]} (level ${level + 1}): ${cost} ${TRACK_COMMODITY[t]}`,
+              attrs: {
+                'aria-label': `Improve ${t} to level ${level + 1} (${IMPROVEMENT_NAMES[t][level]}): ${cost} ${TRACK_COMMODITY[t]}`,
+              },
               on: { click: () => can && send(can) },
             },
             `${cost}×`,
