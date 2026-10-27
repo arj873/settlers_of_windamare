@@ -419,18 +419,17 @@
     return { ...p, cover: p.ok ? null : topAt(p.x, p.y) };
   }
 
-  // ---- render on demand (headless sessions) ------------------------------------------------
-  // Pixi redraws the board every animation frame. Headless Chromium has no GPU, so each frame
-  // is drawn in software (~1.5 cores per page) and every Playwright call to the page waits on
-  // it. `renderOnDemand()` stops the ticker and draws one frame after each HUD change (the
-  // controller renders board and HUD together), before screenshots, and every few seconds.
+  // ---- still board (headless sessions) ------------------------------------------------------
+  // The board draws only when something changed or moves (BoardView). Headless Chromium has no
+  // GPU, so each frame is drawn in software (~1.5 cores per page) and every Playwright call to
+  // the page waits on it. `renderOnDemand()` also stops the motion (`setAnimated(false)`):
+  // highlights hold still instead of pulsing, pop-ins and robber moves jump to their end.
   let onDemand = false;
-  let pending = 0;
   function appOf() {
     const b = window.catan && window.catan.board;
     return b && b.app && b.app.ticker ? b.app : null;
   }
-  /** Draw one frame now (animations jump to their end: the frame delta is not capped). */
+  /** Draw one frame now. */
   function render() {
     const app = appOf();
     if (!app) return false;
@@ -440,38 +439,12 @@
   function renderOnDemand() {
     if (onDemand) return;
     onDemand = true;
-    const soon = () => {
-      if (pending) return;
-      pending = setTimeout(() => {
-        pending = 0;
-        render();
-      }, 120);
+    const still = () => {
+      const b = window.catan && window.catan.board;
+      if (!b) return setTimeout(still, 200);
+      b.setAnimated(false);
     };
-    setInterval(() => {
-      const app = appOf();
-      if (!app) return;
-      if (app.ticker.started) {
-        app.ticker.stop();
-        app.ticker.maxFPS = 0;
-        app.ticker.minFPS = 0;
-      }
-      render();
-    }, 3000);
-    const watch = () => {
-      const ui = document.getElementById('ui');
-      if (!ui) return setTimeout(watch, 200);
-      // Our own `data-pt` tags (every scan) are not a change worth a frame.
-      const real = (records) =>
-        records.some((r) => r.type !== 'attributes' || r.attributeName !== 'data-pt');
-      new MutationObserver((records) => real(records) && soon()).observe(ui, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        characterData: true,
-      });
-      window.addEventListener('resize', soon);
-    };
-    watch();
+    still();
   }
 
   window.__pt = { snapshot, topAt, pointFor, render, renderOnDemand };

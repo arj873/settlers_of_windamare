@@ -803,7 +803,7 @@ async function screenshot(
   const { page } = ctxOf(seat);
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${base}.png`);
-  // Render on demand (headless): draw the current board first.
+  // Draw the current board first (headless: harmless, the board already draws on change).
   await page.evaluate('window.__pt && window.__pt.render()');
   if (mode === 'board') {
     await page.evaluate(`document.getElementById('ui').style.visibility = 'hidden'`);
@@ -845,8 +845,8 @@ async function newSeatCtx(browser: Browser): Promise<SeatCtx> {
   // Same page size headed or not, so screenshots and click positions match what a watcher sees.
   const context = await browser.newContext({ viewport: VIEWPORT });
   await context.addInitScript({ path: join(REPO_ROOT, 'scripts', 'playtest', 'inpage.js') });
-  // Headless has no GPU: drawing the board every frame in software starves the page (and the
-  // machine, with several sessions). Watchers of a headed window keep the smooth board.
+  // Headless has no GPU: a pulsing highlight is drawn in software every frame and starves the
+  // page (and the machine, with several sessions). Watchers of a headed window keep the motion.
   if (!headed) await context.addInitScript('window.__pt.renderOnDemand()');
   const page = await context.newPage();
   const ctx: SeatCtx = { page, context, consoleLog: [], dropped: false };

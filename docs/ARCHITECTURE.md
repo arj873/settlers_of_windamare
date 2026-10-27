@@ -505,7 +505,15 @@ view.setInsets(insets, avoid?);           // Insets = { top, right, bottom, left
 view.isFitted();                          // false once the user panned/zoomed, until the next refit
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
+view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
 ```
+
+- Render on demand (`render/frames.ts`): the view stops `app.ticker` after the first frame with
+  nothing moving and restarts it on any change (state, highlights, hover, pan/zoom, resize,
+  retheme). Glow pulse, pop-ins, robber travel and a pending text re-raster keep it running. Pixi's
+  event system is off (the view reads pointer input itself) and `Ticker.system` (texture GC) runs
+  inside the board's frames, so an idle board requests no animation frames at all.
+  `scripts/cpu-idle.mjs <url>` measures an idle game screen (headless, swiftshader).
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
 - While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
