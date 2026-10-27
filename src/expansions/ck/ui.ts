@@ -134,6 +134,15 @@ export function commodityFace(c: Commodity, w: number, ...extra: Child[]): HTMLE
   );
 }
 
+/** A card face standing for "commodity cards" of any type (players' public totals). */
+function anyCommodityFace(w: number): HTMLElement {
+  return h('span', {
+    class: 'card-face ck-cf ck-cf-any',
+    style: { '--cw': `${w}px` },
+    attrs: { 'aria-hidden': 'true' },
+  });
+}
+
 export function goodFace(g: Good, w: number): HTMLElement {
   return isCommodity(g) ? commodityFace(g, w) : resCardFace(g as Resource, w);
 }
@@ -314,7 +323,8 @@ function playerRows(state: GameState): HTMLElement {
         h(
           'span',
           { class: 'ck-stat', title: 'Commodity cards' },
-          commodityFace('coin', 11),
+          // Not a coin face: online, other seats' split is hidden and only the total is known.
+          anyCommodityFace(11),
           String(commodities),
         ),
         h(

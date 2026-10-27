@@ -5,6 +5,7 @@ import {
   applyAction,
   createGame,
   legalActions,
+  viewFor,
   type Action,
   type GameState,
   type VertexId,
@@ -110,6 +111,28 @@ describe('C&K HUD', () => {
     expect(panel?.querySelectorAll('.ck-trk')).toHaveLength(3);
     expect(panel?.querySelectorAll('.ck-row')).toHaveLength(4);
     expect(byText('Buy card')).toBeUndefined();
+  });
+
+  it('player rows show commodity totals as commodities, not as one type (online view)', () => {
+    const s = main();
+    setGoods(s, 2, { paper: 2 });
+    setGoods(s, 1, { cloth: 1 });
+    show(viewFor(s, 0) as GameState);
+    const rows = [...root.querySelectorAll('.sec-ext-ck .ck-row')];
+    const stat = (p: number) =>
+      [...rows[p]!.querySelectorAll<HTMLElement>('.ck-stat')].find((e) =>
+        e.title.startsWith('Commodity'),
+      )!;
+    expect(stat(2).textContent).toBe('2');
+    expect(stat(1).textContent).toBe('1');
+    for (const row of rows) {
+      const labels = [...row.querySelectorAll('[aria-label]')].map((e) =>
+        e.getAttribute('aria-label'),
+      );
+      expect(labels).not.toContain('Coin');
+      expect(labels).not.toContain('Paper');
+      expect(labels).not.toContain('Cloth');
+    }
   });
 
   it('Improve buttons send ck/improve; progress cards have Play buttons', () => {
