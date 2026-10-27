@@ -261,6 +261,28 @@
       });
     }
 
+    // Dropdowns (C&K trade rows, Oil): named by aria-label, else row / section + position.
+    const dropdowns = [];
+    const unnamed = new Map();
+    for (const sel of document.querySelectorAll('select')) {
+      if (!visible(sel)) continue;
+      let label = sel.getAttribute('aria-label') || '';
+      if (!label) {
+        const ctx = rowName(sel) || 'Dropdown';
+        const n = (unnamed.get(ctx) || 0) + 1;
+        unnamed.set(ctx, n);
+        label = `${ctx} ${n}`;
+      }
+      const options = [...sel.options].map((o) => text(o) || o.value);
+      dropdowns.push({
+        id: tag(sel, 'd'),
+        label,
+        value: sel.selectedIndex >= 0 ? options[sel.selectedIndex] : '',
+        options,
+        enabled: !sel.disabled,
+      });
+    }
+
     const dialogText = dialog
       ? [...dialog.querySelectorAll('p:not(.sub), .offer-line, .resp')]
           .filter(visible)
@@ -286,7 +308,7 @@
     const panels = [...document.querySelectorAll('.hud-players .pp')].map((pp) => ({
       name: text(pp.querySelector('.pp-name')),
       vp: Number(text(pp.querySelector('.vp-badge, .pp-vp')).replace(/[^0-9]/g, '')),
-      cards: stat(pp, 'Resource cards in hand'),
+      cards: stat(pp, 'Cards in hand'),
       dev: stat(pp, 'Development cards'),
       knights: stat(pp, 'Knights played'),
     }));
@@ -308,6 +330,7 @@
       dialogText,
       controls,
       steppers,
+      dropdowns,
       toasts: [...document.querySelectorAll('.game-toast:not(.is-leaving)')].map(text),
       hand,
       handExtras: handExtras(),

@@ -27,6 +27,7 @@ Act (only when it is your move; others are refused):
   click <button text>    click a HUD/dialog button by its text, e.g. click Roll dice
   click-tile <text>      same as click (resource tiles, dev cards, players)
   set <label> <n>        set a stepper (discard / trade), e.g. set brick 2, set give wool 1
+  choose <label> = <opt> pick a dropdown option, e.g. choose Bank: give = Grain
   click-spot <n>         click spot n from the last \`spots\` list
   click-board <id>       click a board id (v:.., e:.., h:..)
 

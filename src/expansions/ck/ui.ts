@@ -366,8 +366,8 @@ function playerRows(state: GameState): HTMLElement {
   );
 }
 
-function select(opts: readonly [string, string][]): HTMLSelectElement {
-  const el = h('select', { class: 'ck-select' });
+function select(opts: readonly [string, string][], label: string): HTMLSelectElement {
+  const el = h('select', { class: 'ck-select', attrs: { 'aria-label': label } });
   for (const [value, label] of opts) {
     const o = document.createElement('option');
     o.value = value;
@@ -381,8 +381,11 @@ function bankForm(state: GameState, view: HudView, send: Send): HTMLElement | nu
   const trades = mine(view, 'ck/bankTrade');
   if (trades.length === 0) return null;
   const gives = [...new Set(trades.map((a) => field(a, 'give') as Good))];
-  const give = select(gives.map((g) => [g, goodLabel(g)]));
-  const receive = select([]);
+  const give = select(
+    gives.map((g) => [g, goodLabel(g)]),
+    'Bank: give',
+  );
+  const receive = select([], 'Bank: receive');
   const go = h('button', { class: 'btn btn-sm' }, 'Trade');
   // The button states the price: one click trades at once (no dialog).
   const price = () => {
@@ -419,10 +422,22 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
   if (mine(view, 'ck/offerTrade').length === 0) return null;
   const me = view.viewer;
   const goods = [...RESOURCES, ...COMMODITIES] as Good[];
-  const counts = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const give = select(goods.map((g) => [g, goodLabel(g)]));
-  const wantN = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const want = select(goods.map((g) => [g, goodLabel(g)]));
+  const counts = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: give count',
+  );
+  const give = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: give',
+  );
+  const wantN = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: want count',
+  );
+  const want = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: want',
+  );
   want.value = 'coin';
   const go = h('button', { class: 'btn btn-sm' }, 'Offer');
   const others = state.players.filter((p) => p.id !== me).map((p) => p.id);
@@ -453,8 +468,8 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
 function alchemistForm(view: HudView, send: Send): HTMLElement | null {
   if (mine(view, 'ck/alchemist').length === 0) return null;
   const faces = [1, 2, 3, 4, 5, 6].map((n): [string, string] => [String(n), String(n)]);
-  const yellow = select(faces);
-  const red = select(faces);
+  const yellow = select(faces, 'Alchemist: yellow die');
+  const red = select(faces, 'Alchemist: red die');
   return h(
     'div',
     { class: 'ck-form' },
