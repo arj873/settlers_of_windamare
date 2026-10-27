@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Action, GameState, VertexId } from '../engine';
-import { cornerVertex, createGame, legalActions, PLAYER_COLORS, TOPOLOGY } from '../engine';
+import {
+  applyAction,
+  cornerVertex,
+  createGame,
+  legalActions,
+  PLAYER_COLORS,
+  TOPOLOGY,
+} from '../engine';
 import {
   discardGame,
   freshGame,
@@ -293,6 +300,25 @@ describe('hints and board prompt', () => {
     ]);
     expect(hintFor(s, v, null)?.text).toBe('Place a settlement');
     expect(boardPrompt(v)).toBe('setupSettlement');
+  });
+
+  it('names the city when the setup step places one (C&K round 2)', () => {
+    let s = createGame({ seed: 'ck-hint', players: PLAYER_COLORS.slice(0, 3), mode: 'ck' });
+    // Round 1: three settlements + roads, first legal spot each.
+    while (s.phase.kind === 'setup' && s.phase.index < s.players.length) {
+      const a = legalActions(s)[0] as Action;
+      const r = applyAction(s, a);
+      if (!r.ok) throw new Error(r.error);
+      s = r.state;
+    }
+    const p = s.turn.current;
+    const v = view(p, legalActions(s));
+    expect(hintFor(s, v, null)?.text).toBe('Place a city');
+    const placed = applyAction(s, legalActions(s)[0] as Action);
+    if (!placed.ok) throw new Error(placed.error);
+    expect(hintFor(placed.state, view(p, legalActions(placed.state)), null)?.text).toBe(
+      'Place a road next to your new city',
+    );
   });
 
   it('shows the active build mode', () => {

@@ -42,6 +42,15 @@ describe('matchChoice', () => {
     });
   });
 
+  it('prefers a label that starts with the query words', () => {
+    // "knight" also prefixes a word of "Collapse Cities & Knights".
+    const labels = ['Collapse Cities & Knights', 'Knight 2/2', 'Command'];
+    expect(matchChoice('Knight', labels)).toMatchObject({ kind: 'one', index: 1 });
+    expect(matchChoice('Ship 2', ['Ship 1 settler: Select', 'Ship 2 empty: Select'])).toMatchObject(
+      { kind: 'one', index: 1 },
+    );
+  });
+
   it('reports no match', () => {
     expect(matchChoice('fly', bar)).toEqual({ kind: 'none' });
     expect(matchChoice('', bar)).toEqual({ kind: 'none' });

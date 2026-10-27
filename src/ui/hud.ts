@@ -78,6 +78,13 @@ const BUILD_LABEL: Record<BuildKind, string> = {
   city: 'City',
 };
 
+/** The board action each base build card's place mode submits. */
+const BUILD_ACTION: Record<Exclude<BuildKind, 'dev'>, string> = {
+  road: 'buildRoad',
+  settlement: 'buildSettlement',
+  city: 'buildCity',
+};
+
 const BUILD_COST: Record<BuildKind, Partial<Record<Resource, number>>> = {
   road: { brick: 1, lumber: 1 },
   settlement: { brick: 1, lumber: 1, wool: 1, grain: 1 },
@@ -814,14 +821,20 @@ export class Hud {
         .filter((c) => !hiddenBaseCards(state).has(c.kind))
         .map((c) => {
           const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
+          // What the card's place mode submits on the board (the playtest CLI reads it).
+          const actionsAttr: Record<string, string> =
+            c.kind === 'dev' ? {} : { 'data-actions': BUILD_ACTION[c.kind] };
           const button = h(
             'button',
             {
               class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
               disabled: !c.enabled || over,
               ...(why.length > 0
-                ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
-                : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
+                ? { attrs: { 'data-why': why.map((w) => w.text).join('; '), ...actionsAttr } }
+                : {
+                    title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
+                    attrs: actionsAttr,
+                  }),
               on: {
                 click:
                   c.kind === 'dev'
@@ -887,6 +900,12 @@ export class Hud {
         const cost = costOf(state, c.costItem ?? c.mode);
         const left = c.left?.(state, view.viewer);
         const total = c.total?.(state, view.viewer);
+        const hand = state.players[view.viewer]?.resources;
+        const short =
+          cost && hand
+            ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
+            : [];
+        const why = short.length > 0 ? `Missing ${short.join(', ')}` : 'Not possible right now';
         build.append(
           h(
             'span',
@@ -897,7 +916,11 @@ export class Hud {
                 class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
                 disabled: !enabled,
                 title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
-                attrs: enabled ? {} : { 'data-why': 'Not possible right now' },
+                // data-actions: what the card's place mode submits on the board (playtest CLI).
+                attrs: {
+                  'data-actions': [c.actionType, ...(c.alsoActions ?? [])].join(' '),
+                  ...(enabled ? {} : { 'data-why': why }),
+                },
                 on: { click: toggleMode(c.mode) },
               },
               h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),

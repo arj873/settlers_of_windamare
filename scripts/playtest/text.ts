@@ -33,6 +33,8 @@ export function matchChoice(
   const tiers: ((c: string, i: number) => boolean)[] = [
     (_c, i) => choices[i] === query,
     (c) => c === q,
+    // The label starts with the query's words ("knight" -> "Knight 2/2", not "...& Knights").
+    (c) => c.startsWith(`${q} `),
     (c) => {
       const cw = c.split(' ');
       return words.every((w) => cw.some((x) => x.startsWith(w)));
