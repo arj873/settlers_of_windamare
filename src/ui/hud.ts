@@ -794,6 +794,12 @@ export class Hud {
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
+    // The CSS sizes the narrowest fan from these (hud.css, `.hand`).
+    hand.style.setProperty('--hand-n', String(hand.querySelectorAll(':scope > .hcard').length));
+    hand.style.setProperty(
+      '--hand-seps',
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
 
     const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: Dialog) =>
       h(
@@ -942,6 +948,7 @@ export class Hud {
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
+    build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
   }
 
