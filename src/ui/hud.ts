@@ -36,6 +36,7 @@ import {
   availability,
   bestRatios,
   blockReasons,
+  tradeBlockReason,
   buildCards,
   devCardRows,
   DEV_CARD_INFO,
@@ -795,17 +796,20 @@ export class Hud {
       ...devCards,
     );
 
-    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: Dialog) =>
-      h(
+    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: 'trade' | 'bank') => {
+      const why = enabled && !over ? null : tradeBlockReason(state, view.viewer, d);
+      return h(
         'button',
         {
           class: `act tbtn${this.dialog === d ? ' is-active' : ''}`,
           disabled: !enabled || over,
           on: { click: () => this.open(d) },
+          ...(why ? { attrs: { 'data-why': why } } : {}),
         },
         glyph(label === 'Trade' ? 'trade' : 'bank', 20),
         h('span', {}, label),
       );
+    };
     const trade = h(
       'div',
       { class: 'trade-col wood' },
