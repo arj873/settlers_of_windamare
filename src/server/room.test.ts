@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HIDDEN_SEED, Rng, type Action, type GameState } from '../engine';
 import { defaultBot } from '../game/controller';
 import { DEFAULT_ROOM_CONFIG, type RoomConfig } from '../net/protocol';
-import type { SessionSnapshot } from '../net/session';
+import { DEFAULT_SESSION_OPTIONS, type SessionSnapshot } from '../net/session';
 import { SERVER_LIMITS } from './limits';
 import { CLOSE_POLICY, RETRY_AFTER_ERROR_MS, sessionDeps, sessionOptionsFrom } from './room';
 import { FakeRuntime, type FakeSocket } from './testRuntime';
@@ -190,8 +190,12 @@ describe('RoomCore: storage and alarms', () => {
     await rt.send(s, { type: 'hello', token: hostToken, name: 'Ann' });
     expect(rt.alarmAt).toBeNull(); // lobby, someone connected: nothing scheduled
     await rt.disconnect(s);
-    expect(rt.alarmAt).toBe(rt.now + 24 * 3600_000); // empty room: idle expiry
-    await rt.advance(24 * 3600_000);
+    // Ann sat down on joining (L1): her lobby seat is kept for the grace period first.
+    const grace = DEFAULT_SESSION_OPTIONS.graceMs;
+    expect(rt.alarmAt).toBe(rt.now + grace);
+    await rt.advance(grace);
+    expect(rt.alarmAt).toBe(rt.now - grace + 24 * 3600_000); // empty room: idle expiry
+    await rt.advance(24 * 3600_000 - grace);
     expect(rt.core.exists).toBe(false);
     expect(rt.stored).toBeUndefined();
     expect(rt.alarmAt).toBeNull();

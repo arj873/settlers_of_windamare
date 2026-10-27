@@ -129,3 +129,42 @@ export function validateDiscard(
 export function discardAction(player: PlayerId, selection: ResourceCounts): Action {
   return { type: 'discard', player, resources: toBundle(selection) };
 }
+
+/** One row of the discard dialog: what you hold, what is picked, and how far "+" may go. */
+export interface DiscardRow {
+  resource: Resource;
+  held: number;
+  picked: number;
+  /** Most that can be picked for this row right now (0 for a card you do not hold). */
+  max: number;
+  /** Held minus picked: what stays in the hand. */
+  left: number;
+}
+
+/** Every resource gets a row, so a missing card reads as "you have 0", not as a missing row. */
+export function discardRows(
+  hand: ResourceCounts,
+  selection: ResourceCounts,
+  required: number,
+): DiscardRow[] {
+  const picked = totalResources(selection);
+  return RESOURCES.map((resource) => ({
+    resource,
+    held: hand[resource],
+    picked: selection[resource],
+    max: Math.min(hand[resource], required - (picked - selection[resource])),
+    left: hand[resource] - selection[resource],
+  }));
+}
+
+/** Status line under the rows: what is still to pick, or that the pick is complete. */
+export function discardStatus(
+  hand: ResourceCounts,
+  required: number,
+  selection: ResourceCounts,
+): { text: string; ok: boolean } {
+  const error = validateDiscard(hand, required, selection);
+  return error === null
+    ? { text: `Discarding ${required} of ${required}`, ok: true }
+    : { text: error, ok: false };
+}

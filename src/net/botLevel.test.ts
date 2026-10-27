@@ -16,6 +16,7 @@ function lobby() {
   net.send('host', { type: 'hello', token: hostToken, name: 'Ann' });
   net.connect('eve');
   net.send('eve', { type: 'hello', token: null, name: 'Eve' });
+  net.send('eve', { type: 'leaveSeat' }); // Eve watches: seats 1-3 are bots
   return { net, session };
 }
 
