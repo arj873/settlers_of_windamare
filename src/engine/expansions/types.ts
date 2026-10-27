@@ -259,6 +259,12 @@ export interface ExpansionHooks {
     action: Action,
     player: PlayerId,
   ): { gain?: GainSource; loss?: LossSink } | undefined;
+  /**
+   * first non-undefined wins. For a module's own bank-like action (a trade with the bank that
+   * the base `bankTrade` does not cover): the "n:1" ratio it will use, evaluated on the state
+   * BEFORE the action (stats count it in `tradesByRatio`). undefined = not such an action.
+   */
+  statsBankTradeRatio?(state: GameState, action: Action): number | undefined;
   /** chained. Bank / harbour ratio for giving `resource`. */
   bankTradeRatio?(state: GameState, player: PlayerId, resource: Resource, base: number): number;
   /**

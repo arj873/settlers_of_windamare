@@ -1020,6 +1020,7 @@ export class Hud {
   private diceBox(state: GameState): HTMLElement {
     const d = state.dice;
     if (!d) {
+      this.lastDice = 'stale'; // the first roll of the game animates
       return h(
         'div',
         { class: 'dice dice-empty', title: 'No roll yet' },
@@ -1027,8 +1028,12 @@ export class Hud {
         h('span', { class: 'die die-blank' }),
       );
     }
-    const key = `${state.turn.number}:${d[0]}:${d[1]}`;
-    const fresh = key !== this.lastDice;
+    // Animate only for a roll made this turn. Before the roll (preRoll, special build, setup)
+    // the faces are last turn's, so End turn must not re-tumble them; a reload or reconnect
+    // (first render) shows the faces still.
+    const stale = ['preRoll', 'specialBuild', 'setup', 'mapVeto'].includes(state.phase.kind);
+    const key = stale ? 'stale' : `${state.turn.number}:${d[0]}:${d[1]}`;
+    const fresh = !stale && this.lastDice !== '' && key !== this.lastDice;
     this.lastDice = key;
     const total = diceTotal(d);
     // Event Cards: the card's event is shown under the dice.

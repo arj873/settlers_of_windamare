@@ -21,7 +21,7 @@
  */
 import { DEV_CARD_TYPES, RESOURCES, tokenPips } from './constants';
 import { namespaceOf } from './expansions/ext';
-import { hookStatsCategory } from './expansions/hooks';
+import { hookStatsBankTradeRatio, hookStatsCategory } from './expansions/hooks';
 import { emptyDevCards, emptyResources, isResource } from './resources';
 import { victoryPoints } from './selectors';
 import { hexVertices, topologyOf } from './topology';
@@ -124,6 +124,7 @@ function copyPlayerStats(p: PlayerStats): PlayerStats {
     blocked: copyCounts(p.blocked),
     rolls: [...p.rolls],
     built: { ...p.built },
+    ...(p.tradesByRatio ? { tradesByRatio: { ...p.tradesByRatio } } : {}),
     devBought: { ...p.devBought },
     devPlayed: { ...p.devPlayed },
   };
@@ -342,6 +343,46 @@ function recordExpansionAction(prev: GameState, next: GameState, ed: StatsEditor
   });
 }
 
+/** Count one bank / harbor trade that took `ratio` cards for 1 (4 = plain bank). */
+function recordBankTrade(s: PlayerStats, ratio: number): void {
+  if (ratio >= 4) s.bankTrades += 1;
+  else s.portTrades += 1;
+  const key = `${Math.max(1, ratio)}:1`;
+  s.tradesByRatio = { ...s.tradesByRatio, [key]: (s.tradesByRatio?.[key] ?? 0) + 1 };
+}
+
+/** A ratio key's number of cards given per card received ("3:1" → 3). */
+const ratioOf = (key: string): number => Number.parseInt(key, 10) || 0;
+
+/**
+ * Bank / harbor trades of a player by ratio, ascending ("2:1", "3:1", "4:1"), only ratios that
+ * occurred. Old saves have no `tradesByRatio`: their 4:1 count is `bankTrades`, and their harbor
+ * trades (ratio not recorded) show under "harbor".
+ */
+export function tradesByRatio(p: PlayerStats): { key: string; count: number }[] {
+  const out = new Map<string, number>(Object.entries(p.tradesByRatio ?? {}));
+  if (p.bankTrades > 0) out.set('4:1', p.bankTrades);
+  let known = 0;
+  for (const [k, n] of out) if (ratioOf(k) < 4) known += n;
+  if (p.portTrades > known) out.set('harbor', p.portTrades - known);
+  return [...out]
+    .filter(([, count]) => count > 0)
+    .sort(([a], [b]) => (ratioOf(a) || 3.5) - (ratioOf(b) || 3.5))
+    .map(([key, count]) => ({ key, count }));
+}
+
+/** Cards given to / received from the bank and harbors (known ratios only: n per trade). */
+export function bankCards(p: PlayerStats): { given: number; received: number } {
+  let given = 0;
+  let received = 0;
+  for (const { key, count } of tradesByRatio(p)) {
+    if (ratioOf(key) === 0) continue;
+    given += ratioOf(key) * count;
+    received += count;
+  }
+  return { given, received };
+}
+
 /**
  * Update `next.stats` for `action`, which took `prev` to `next` (next is applyAction's draft,
  * after awards and the victory check). The hooks above may already have replaced next.stats.
@@ -399,11 +440,11 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
       ed.player(action.partner).tradesAsPartner += 1;
       break;
     case 'bankTrade': {
-      const given =
+      recordBankTrade(
+        me(),
         (prev.players[action.player]?.resources[action.give] ?? 0) -
-        (next.players[action.player]?.resources[action.give] ?? 0);
-      if (given >= 4) me().bankTrades += 1;
-      else me().portTrades += 1;
+          (next.players[action.player]?.resources[action.give] ?? 0),
+      );
       break;
     }
     case 'moveRobber':
@@ -425,7 +466,11 @@ export function recordAction(prev: GameState, next: GameState, action: Action): 
     default: {
       const card = PLAYED_CARD[action.type];
       if (card) me().devPlayed[card] += 1;
-      else if (namespaceOf(action.type) !== null) recordExpansionAction(prev, next, ed);
+      else if (namespaceOf(action.type) !== null) {
+        const ratio = hookStatsBankTradeRatio(prev, action);
+        if (ratio !== undefined) recordBankTrade(me(), ratio);
+        recordExpansionAction(prev, next, ed);
+      }
     }
   }
 
