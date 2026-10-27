@@ -29,6 +29,7 @@ import { parseParams, type DevParams } from './game/params';
 import { SpotPrompt } from './ui/spotPrompt';
 import {
   CONFIRM_BUILD_KEY,
+  LONGEST_ROAD_KEY,
   SPEED_KEY,
   browserStorage,
   clearSession,
@@ -128,6 +129,7 @@ async function boot() {
   onThemeChange(frameToTheme);
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
+  wireLongestRoad(board, hud, prefs);
   // A click on a board spot asks before building (issue #28), unless switched off in the menu.
   const prompt = new SpotPrompt(uiRoot);
   let confirmOn = loadNumber(prefs, CONFIRM_BUILD_KEY) !== 0;
@@ -235,6 +237,32 @@ function homeUrl(): string {
   u.hash = '';
   if (server) u.searchParams.set('server', server);
   return u.toString();
+}
+
+/**
+ * #51: the menu setting "Show longest road on the board" (saved; default off) outlines the
+ * Longest Road holder's route; pointing at the holder's road count or award badge shows it too,
+ * stronger (a tap: for a few seconds).
+ */
+function wireLongestRoad(board: BoardView, hud: Hud, prefs: KeyValueStore | null): void {
+  const show = loadNumber(prefs, LONGEST_ROAD_KEY) === 1;
+  board.setLongestRoad(show);
+  hud.setLongestRoadToggle({
+    value: show,
+    onChange: (on) => {
+      board.setLongestRoad(on);
+      saveNumber(prefs, LONGEST_ROAD_KEY, on ? 1 : 0);
+    },
+  });
+  let tapTimer: ReturnType<typeof setTimeout> | undefined;
+  document.addEventListener('pointerover', (e) => {
+    const on = e.target instanceof Element && e.target.closest('[data-longest-road]') !== null;
+    clearTimeout(tapTimer);
+    board.setLongestRoadHover(on);
+    if (on && e.pointerType !== 'mouse') {
+      tapTimer = setTimeout(() => board.setLongestRoadHover(false), 2500);
+    }
+  });
 }
 
 /** The hotseat game: controller, bot speed, debug hook, dev params, resume prompt. */

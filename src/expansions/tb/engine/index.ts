@@ -31,6 +31,7 @@ import {
   totalResources,
 } from '../../../engine/resources';
 import { rollTwoDice } from '../../../engine/rules/dice';
+import { longestRoadTrail } from '../../../engine/rules/longestRoad';
 import type { Rng } from '../../../engine/rng';
 import { piecesLeft, victoryPoints } from '../../../engine/selectors';
 import { canPlaceRoad } from '../../../engine/rules/placement';
@@ -1137,6 +1138,16 @@ export const tbModule: ExpansionModule = {
       let n = has(state, 'caravans') ? Math.max(base, camelRoadLength(state, p)) : base;
       if (isTwo(state)) n = lengthAgainstNeutrals(state, p, n);
       return n;
+    },
+
+    // The route roadLength counts (#51). Traders and a beaten 2-player road count 0: the engine
+    // draws nothing for a 0 length, so only the camels' longer route needs a path here.
+    roadPath(state, p, base) {
+      if (has(state, 'traders')) return { length: 0, edges: [] };
+      if (!has(state, 'caravans')) return base;
+      const camels = new Set(caravansOf(state).camels.map((c) => c.edge));
+      const trail = longestRoadTrail(state, p, (e) => (camels.has(e) ? 2 : 1));
+      return trail.length > base.length ? trail : base;
     },
 
     supply: (state, base) => (has(state, 'ba') ? { ...base, devDeck: emptyDevCards() } : base),

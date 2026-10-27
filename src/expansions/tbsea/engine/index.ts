@@ -18,6 +18,7 @@ import type {
   ExpansionModule,
   ExtHandler,
   ExtWrap,
+  RouteTrail,
   ScenarioDef,
 } from '../../../engine/expansions/types';
 import { canPlaceRoad } from '../../../engine/rules/placement';
@@ -30,7 +31,14 @@ import { seafarersModule, seaSlice, type MoveShipPhase } from '../../seafarers/e
 import { SEA_ACTIONS } from '../../seafarers/engine/actions';
 import { graph } from '../../seafarers/engine/geometry';
 import { OFF_BOARD } from '../../seafarers/engine/maps';
-import { shipSpots, shipsLeft, shipsOf, tradeRouteLength } from '../../seafarers/engine/ships';
+import {
+  longerRoute,
+  shipSpots,
+  shipsLeft,
+  shipsOf,
+  tradeRoute,
+  tradeRouteLength,
+} from '../../seafarers/engine/ships';
 import { addGold, goldOf } from '../../tb/engine/common';
 import { isConqueredBuilding } from '../../tb/engine/conquest';
 import { fishBlocker, fishPayment, payFish } from '../../tb/engine/fish';
@@ -285,6 +293,19 @@ function roadLength(state: GameState, p: PlayerId, base: number): number {
   return base;
 }
 
+/** The route `roadLength` counts (#51: drawn on the board). */
+function roadPath(state: GameState, p: PlayerId, base: RouteTrail): RouteTrail {
+  if (has(state, 'caravans')) {
+    const camels = new Set(caravansOf(state).camels.map((c) => c.edge));
+    return longerRoute(
+      base,
+      tradeRoute(state, p, (e) => (camels.has(e) ? 2 : 1)),
+    );
+  }
+  if (has(state, 'ba')) return tradeRoute(state, p);
+  return base;
+}
+
 // ---------------------------------------------------------------------------------------------
 // The module
 // ---------------------------------------------------------------------------------------------
@@ -408,6 +429,7 @@ export const tbseaModule: ExpansionModule = {
   hooks: {
     afterProduction,
     roadLength,
+    roadPath,
     // Wagons travel on ships like on roads (T&B + Seafarers, FAQ 65).
     routeEdges: (state, p) => (has(state, 'traders') ? shipsOf(state, p) : []),
     // Barbarian Attack: a conquered settlement interrupts the trade route (FAQ 6).

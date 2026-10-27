@@ -17,7 +17,15 @@ import { isVertexOpen, touchesLand } from '../../../engine/rules/placement';
 import { topologyOf } from '../../../engine/topology';
 import type { Action, GameState } from '../../../engine/types';
 import { graph } from './geometry';
-import { canMoveShip, canPlaceShip, markClosedRoutes, shipsLeft, tradeRouteLength } from './ships';
+import { longestRoadPath } from '../../../engine/rules/longestRoad';
+import {
+  canMoveShip,
+  canPlaceShip,
+  markClosedRoutes,
+  shipsLeft,
+  tradeRoute,
+  tradeRouteLength,
+} from './ships';
 import { seaSlice } from './state';
 import { E, H, V, mainPhase, seaGame, ship } from './testkit';
 
@@ -240,6 +248,20 @@ describe('Longest Trade Route (§3.5, FAQ #12, #16)', () => {
     // Without the settlement the road and the ships do not join (F16).
     delete s.pieces.buildings[TIP_W];
     expect(tradeRouteLength(s, 0)).toBe(2);
+  });
+
+  // #51: the board draws the counted route, ships included.
+  it('the counted route runs over roads and ships (longestRoadPath)', () => {
+    const s = game();
+    s.pieces.buildings[TIP_W] = { owner: 0, kind: 'settlement' };
+    const road = E(2, 8, 'SW');
+    s.pieces.roads[road] = 0;
+    ship(s, 0, COAST_S, OPEN_SEA);
+    expect(tradeRoute(s, 0).length).toBe(3);
+    expect(new Set(longestRoadPath(s, 0))).toEqual(new Set([road, COAST_S, OPEN_SEA]));
+    // Unjoined: the two ships are the longer piece.
+    delete s.pieces.buildings[TIP_W];
+    expect(new Set(longestRoadPath(s, 0))).toEqual(new Set([COAST_S, OPEN_SEA]));
   });
 
   it('a 5-long ship route takes the award (2 VP)', () => {

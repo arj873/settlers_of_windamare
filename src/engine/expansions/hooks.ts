@@ -24,7 +24,7 @@ import type {
 import type { Viewer } from '../viewer';
 import { activeModules, expansionById, scenarioById } from './registry';
 import { namespaceOf } from './ext';
-import type { ProductionContext, SetupOrder, Supply, VictoryPointPart } from './types';
+import type { ProductionContext, RouteTrail, SetupOrder, Supply, VictoryPointPart } from './types';
 
 type State = Pick<GameState, 'settings'>;
 
@@ -244,6 +244,16 @@ export function hookRoadLength(state: GameState, player: PlayerId, base: number)
     if (f) n = f(state, player, n);
   }
   return n;
+}
+
+/** The counted route's edges after the roadPath hooks (mirrors `hookRoadLength`). */
+export function hookRoadPath(state: GameState, player: PlayerId, base: RouteTrail): RouteTrail {
+  let trail = base;
+  for (const m of activeModules(state)) {
+    const f = m.hooks?.roadPath;
+    if (f) trail = f(state, player, trail);
+  }
+  return trail;
 }
 
 export function hasRoadLengthHook(state: State): boolean {

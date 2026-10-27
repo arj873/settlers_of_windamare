@@ -15,6 +15,7 @@ import { Color, Container, EventsTicker, Graphics, Text, Ticker, type Applicatio
 import {
   TOPOLOGY,
   edgeInfo,
+  longestRoadPath,
   terrainKind,
   tokenPips,
   topologyOf,
@@ -33,6 +34,7 @@ import {
   drawRobber,
   drawRoad,
   drawRoadJoint,
+  drawRouteHalo,
   drawSettlement,
   drawTerrainMotif,
   hexPoints,
@@ -156,6 +158,12 @@ export class BoardView {
   private readonly tokenLayer = new Container();
   private readonly jointLayer = new Container();
   private readonly roadLayer = new Container();
+  /** #51: halo under the Longest Road holder's counted route (below roads and ships). */
+  private readonly routeLayer = new Graphics();
+  private routeShown = false;
+  private routeHover = false;
+  private routeState: GameState | null = null;
+  private routeSig = '';
   private readonly buildingLayer = new Container();
   private readonly robberLayer = new Container();
   /** Expansion drawer layers (render/expansions.ts), by z-slot. */
@@ -221,6 +229,7 @@ export class BoardView {
       this.portLayer,
       this.tokenLayer,
       this.extBoardLayer,
+      this.routeLayer,
       this.roadLayer,
       this.jointLayer,
       this.buildingLayer,
@@ -297,8 +306,25 @@ export class BoardView {
     this.syncPieces(state);
     this.syncRobber(state);
     this.syncExtLayers(state);
+    this.routeState = state;
+    this.syncRoute();
     this.markNewPieces(state);
     this.frames.invalidate();
+  }
+
+  /**
+   * #51: outline the Longest Road holder's counted route (roads and ships, as the award counts
+   * it) on every render (the "Show longest road" setting). Off: nothing extra is drawn.
+   */
+  setLongestRoad(show: boolean): void {
+    this.routeShown = show;
+    this.syncRoute();
+  }
+
+  /** Emphasise the route while the pointer is on the Longest Road badge (shown even when off). */
+  setLongestRoadHover(on: boolean): void {
+    this.routeHover = on;
+    this.syncRoute();
   }
 
   /**
@@ -828,6 +854,46 @@ export class BoardView {
       entry.node.destroy({ children: true });
       this.extNodes.delete(key);
     }
+  }
+
+  /** Redraw the route halo when the holder, their route or its emphasis changed. */
+  private syncRoute() {
+    const s = this.routeState;
+    const holder = s?.awards.longestRoad ?? null;
+    const edges =
+      s && holder !== null && (this.routeShown || this.routeHover)
+        ? longestRoadPath(s, holder)
+        : [];
+    const color = s && holder !== null ? this.colorOf(s, holder) : 0;
+    const sig = edges.length > 0 ? `${color}|${this.routeHover}|${edges.join(' ')}` : '';
+    if (sig === this.routeSig) return;
+    this.routeSig = sig;
+    this.routeLayer.clear();
+    this.frames.invalidate();
+    if (edges.length === 0) return;
+    // The trail as polylines through vertex centres (a new line where it does not continue).
+    const lines: VertexId[][] = [];
+    let cur: VertexId[] = [];
+    edges.forEach((e, i) => {
+      const [a, b] = edgeInfo(this.topo, e)?.vertices ?? [];
+      if (a === undefined || b === undefined) return void (cur = []);
+      const last = cur.at(-1);
+      if (last === a) cur.push(b);
+      else if (last === b) cur.push(a);
+      else {
+        // A new line, oriented so its far end joins the next edge.
+        const next: readonly VertexId[] = edgeInfo(this.topo, edges[i + 1] ?? e)?.vertices ?? [];
+        cur = next.includes(a) && !next.includes(b) ? [b, a] : [a, b];
+        lines.push(cur);
+      }
+    });
+    const pts = lines.map((line) =>
+      line.flatMap((v) => {
+        const info = vertexInfo(this.topo, v);
+        return info ? [pt(info)] : [];
+      }),
+    );
+    drawRouteHalo(this.routeLayer, pts, color, this.routeHover);
   }
 
   /** #33: a ring in the builder's colour over every piece built (or moved) since the last render. */
