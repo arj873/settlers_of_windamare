@@ -74,6 +74,19 @@ describe('E&P HUD', () => {
     expect(actions).toEqual([{ type: A.startMovement, player: 0 }]);
   });
 
+  it('player rows: the extra-VP stat names its parts (a harbor is not mission VP)', () => {
+    const s = blank('pirateLairs');
+    settle(s, 0, COAST, true);
+    show(s);
+    const vpStat = (i: number) =>
+      [...(root.querySelectorAll('.ep-row')[i]?.querySelectorAll<HTMLElement>('.ep-stat') ?? [])]
+        .at(-1)!;
+    expect(vpStat(0).textContent).toBe('+1');
+    expect(vpStat(0).title).toMatch(/Harbors \+1/);
+    expect(vpStat(0).title).not.toMatch(/mission VP/);
+    expect(vpStat(1).title).toMatch(/none yet/);
+  });
+
   it('build bar: Harbor, Ship, Settler and Crew cards; no City card', () => {
     const s = blank('full');
     settle(s, 0, COAST);

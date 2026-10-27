@@ -13,7 +13,7 @@ import { glyph, RESOURCE_LABEL } from '../../ui/icons';
 import type { HudView } from '../../ui/types';
 import { playerStyle, resCardFace } from '../../ui/widgets';
 import { A } from './engine/actions';
-import { missionsOf, missionVp, tileHolder, totalMissionVp } from './engine/missions';
+import { missionsOf, missionVp, tileHolder, totalMissionVp, vpParts } from './engine/missions';
 import { crewsLeft, harborsLeft, mpLeft, settlersLeft, shipsLeft, shipsOf } from './engine/ships';
 import { goldOffer } from './engine/trade';
 import {
@@ -134,7 +134,10 @@ function playerRows(state: GameState): HTMLElement {
     'ul',
     { class: 'ep-list' },
     ...state.players.map((p) => {
-      const mvp = totalMissionVp(missionVp(state, p.id));
+      const v = missionVp(state, p.id);
+      const mvp = totalMissionVp(v);
+      // Harbor settlements' extra VP plus mission tracks and tiles (not only missions).
+      const parts = vpParts(v).map((x) => `${x.label} +${x.vp}`);
       return h(
         'li',
         { class: 'ep-row', style: playerStyle(p.color) },
@@ -163,7 +166,7 @@ function playerRows(state: GameState): HTMLElement {
           'span',
           {
             class: 'ep-stat',
-            title: `${harborsLeft(state, p.id)} harbor settlements left; mission VP`,
+            title: `${harborsLeft(state, p.id)} harbor settlements left; extra VP: ${parts.join(', ') || 'none yet'}`,
           },
           glyph('victoryPoint', 13),
           `+${mvp}`,
