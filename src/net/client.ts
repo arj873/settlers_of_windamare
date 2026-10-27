@@ -24,6 +24,7 @@ import {
   type ServerMessage,
   type TimerInfo,
 } from './protocol';
+import type { AvatarRef, PieceStyleId } from '../ui/profile/model';
 import {
   tokenKey,
   type Clock,
@@ -56,7 +57,15 @@ export type ClientEvent =
   | { type: 'game'; game: GameSnapshot }
   | { type: 'chat'; entry: ChatEntry }
   | { type: 'reaction'; member: MemberId; seat: PlayerId | null; reaction: Reaction }
+  /** PR1: new uploaded pictures arrived (`avatarOf` resolves them now). */
+  | { type: 'avatars' }
   | { type: 'error'; code: ErrorCode; message: string; ref?: string };
+
+/** PR1: the cosmetic profile sent after the first welcome (and by `setProfile`). */
+export interface ClientProfile {
+  avatar: AvatarRef | null;
+  pieceStyle: PieceStyleId;
+}
 
 export interface Backoff {
   baseMs: number;
@@ -72,6 +81,8 @@ export interface RoomClientOptions {
   store?: KeyStore | null;
   /** Nickname sent in hello. */
   name?: string;
+  /** PR1: picture and piece style, sent once welcomed. */
+  profile?: ClientProfile;
   backoff?: Partial<Backoff>;
   /** 0..1, spreads reconnects of many clients (default: no jitter). */
   random?: () => number;
@@ -117,6 +128,11 @@ export class RoomClient {
   private pingTimer: TimerHandle | null = null;
   private lastFrameAt = 0;
   private name: string | undefined;
+  private profile: ClientProfile | undefined;
+  /** The server has our profile (sent after a welcome; it keeps it across reconnects). */
+  private profileSent = false;
+  /** Uploaded pictures by `img:` key (MemberInfo.avatar). */
+  private readonly images = new Map<string, string>();
 
   private youValue: { member: MemberId; token: string } | null = null;
   private roomValue: RoomInfo | null = null;
@@ -133,6 +149,7 @@ export class RoomClient {
     this.roomId = opts.roomId;
     this.backoff = { ...DEFAULT_BACKOFF, ...opts.backoff };
     this.name = opts.name;
+    this.profile = opts.profile;
   }
 
   // -------------------------------------------------------------------------
@@ -167,6 +184,17 @@ export class RoomClient {
   }
   get mySeat(): PlayerId | null {
     return this.me?.seat ?? null;
+  }
+
+  /**
+   * PR1: a member's picture as an AvatarRef (gallery id or data URL), or null (none, or an
+   * upload that has not arrived yet).
+   */
+  avatarOf(member: MemberId | null | undefined): AvatarRef | null {
+    const key = this.roomValue?.members.find((m) => m.id === member)?.avatar;
+    if (key === undefined) return null;
+    if (key.startsWith('img:')) return this.images.get(key) ?? null;
+    return key;
   }
 
   /** Turn clock left at `now` (clock.now() by default), or null without a timer. */
@@ -231,6 +259,14 @@ export class RoomClient {
   setName(name: string): boolean {
     this.name = name;
     return this.send({ type: 'setName', name });
+  }
+
+  /** PR1: change our picture / piece style (kept and re-sent if not connected yet). */
+  setProfile(profile: ClientProfile): boolean {
+    this.profile = profile;
+    const sent = this.send({ type: 'setProfile', ...profile });
+    this.profileSent ||= sent;
+    return sent;
   }
 
   chatSend(text: string): boolean {
@@ -361,9 +397,14 @@ export class RoomClient {
         this.attempt = 0;
         this.setRoom(msg.room);
         this.setStatus('open');
+        if (this.profile && !this.profileSent) this.setProfile(this.profile);
         return;
       case 'room':
         this.setRoom(msg.room);
+        return;
+      case 'avatars':
+        for (const [key, url] of Object.entries(msg.images)) this.images.set(key, url);
+        this.emit({ type: 'avatars' });
         return;
       case 'game': {
         const game: GameSnapshot = {

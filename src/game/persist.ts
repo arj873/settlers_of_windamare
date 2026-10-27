@@ -2,6 +2,7 @@
 import { upgradeState, type GameState, type PlayerId } from '../engine';
 import { isBotLevel, type BotLevel } from '../bots/levels';
 import type { Controller } from '../ui';
+import { cleanLooks, type SeatLook } from '../ui/profile/model';
 
 export const SAVE_KEY = 'catan:save:v1';
 export const SPEED_KEY = 'catan:botSpeed';
@@ -26,6 +27,8 @@ export interface SavedSession {
   playedMs?: number;
   /** B1: each seat's bot level (indexed like `seats`); absent in older saves = all Normal. */
   botLevels?: BotLevel[];
+  /** PR1: each seat's picture and piece style (indexed like `seats`); absent = none / classic. */
+  looks?: SeatLook[];
 }
 
 /** `window.localStorage`, or null when it is unavailable or throws on access. */
@@ -92,6 +95,7 @@ export function loadSession(store: KeyValueStore | null): SavedSession | null {
       s.botLevels.every(isBotLevel)
         ? { botLevels: s.botLevels }
         : {}),
+      ...(Array.isArray(s.looks) ? { looks: cleanLooks(s.looks, s.seats.length) } : {}),
     };
   } catch {
     return null;

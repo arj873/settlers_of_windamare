@@ -28,17 +28,16 @@ import {
   type VertexId,
 } from '../engine';
 import {
-  drawCity,
   drawResourceIcon,
   drawRobber,
   drawRoad,
   drawRoadJoint,
-  drawSettlement,
   drawTerrainMotif,
   hexPoints,
   shade,
 } from './art';
 import * as art from './art';
+import { pieceStyle } from './pieceStyles';
 import { drawersFor, terrainPainter, tokenPlace, type DrawContext } from './expansions';
 import {
   HEX_SIZE as S,
@@ -151,6 +150,10 @@ export class BoardView {
 
   private readonly pieces = new Map<string, PieceNode>();
   private seeded = false;
+  /** Last state drawn (setPieceStyles redraws from it). */
+  private lastState: GameState | null = null;
+  /** PR1: piece style id per PlayerId. */
+  private styles: string[] = [];
   private pops: { node: Container; t0: number }[] = [];
 
   private readonly robber = new Graphics();
@@ -255,10 +258,25 @@ export class BoardView {
       this.buildPorts(state);
       this.buildTokens(state);
     }
+    this.lastState = state;
     this.syncPieces(state);
     this.syncRobber(state);
     this.syncExtLayers(state);
     this.frames.invalidate();
+  }
+
+  /**
+   * PR1: each player's piece style (index = PlayerId; unknown/absent = classic). Cosmetic only;
+   * the shown buildings are redrawn at once.
+   */
+  setPieceStyles(styles: readonly (string | null | undefined)[]): void {
+    const next = styles.map((s) => pieceStyle(s).id);
+    if (next.join() === this.styles.join()) return;
+    this.styles = next;
+    if (this.lastState) {
+      this.syncPieces(this.lastState);
+      this.frames.invalidate();
+    }
   }
 
   /** Mark legal spots (they pulse and become hoverable/clickable); `{}` clears. */
@@ -702,8 +720,9 @@ export class BoardView {
       { owner: PlayerId; kind: string },
     ][]) {
       const color = this.colorOf(state, b.owner);
+      const style = pieceStyle(this.styles[b.owner]);
       wanted.set(id, {
-        sig: `${b.kind}:${color}`,
+        sig: `${b.kind}:${color}:${style.id}`,
         layer: this.buildingLayer,
         make: () => {
           const info = this.topo.vertex[id];
@@ -711,8 +730,8 @@ export class BoardView {
           if (!info) return c;
           c.position.set(...pt(info));
           const g = new Graphics();
-          if (b.kind === 'city') drawCity(g, 0, 0, color);
-          else drawSettlement(g, 0, 0, color);
+          if (b.kind === 'city') style.city(g, 0, 0, color);
+          else style.settlement(g, 0, 0, color);
           c.addChild(g);
           return c;
         },

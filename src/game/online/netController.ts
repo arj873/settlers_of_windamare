@@ -5,7 +5,8 @@
  * calls on the view (docs/MULTIPLAYER.md §6).
  */
 import type { Action, GameState, PlayerId } from '../../engine';
-import type { RoomClient, RoomInfo } from '../../net';
+import type { MemberId, RoomClient, RoomInfo } from '../../net';
+import type { AvatarRef, SeatLook } from '../../ui/profile/model';
 import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
 import {
@@ -24,6 +25,26 @@ export interface NetControllerOptions {
   onRender?: () => void;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
+  /** PR1: the seats' pictures and piece styles, before each render (cosmetic). */
+  onLooks?: (looks: readonly SeatLook[]) => void;
+}
+
+/** PR1: each seat's look from its occupant's profile (open seats: none, classic). */
+export function roomLooks(
+  room: RoomInfo | null,
+  avatarOf: (member: MemberId) => AvatarRef | null,
+  players: number,
+): SeatLook[] {
+  return Array.from({ length: players }, (_, i) => {
+    const occupant = room?.seats[i]?.occupant ?? null;
+    const m = occupant === null ? undefined : room?.members.find((x) => x.id === occupant);
+    if (!m) return {};
+    const avatar = avatarOf(m.id);
+    return {
+      ...(avatar === null ? {} : { avatar }),
+      ...(m.pieceStyle ? { pieceStyle: m.pieceStyle } : {}),
+    };
+  });
 }
 
 export const NET_TIMER_TICK_MS = 250;
@@ -57,6 +78,7 @@ export class NetGameController {
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly onRender: () => void;
   private readonly every: (fn: () => void, ms: number) => () => void;
+  private readonly onLooks: (looks: readonly SeatLook[]) => void;
   private active = false;
   private placeMode: PlaceMode | null = null;
   private stopTimer: (() => void) | null = null;
@@ -74,6 +96,7 @@ export class NetGameController {
     this.toast = opts.toast ?? ((m) => console.info(m));
     this.onRender = opts.onRender ?? (() => undefined);
     this.every = opts.every ?? defaultEvery;
+    this.onLooks = opts.onLooks ?? (() => undefined);
 
     // The HUD has no unsubscribe: these stay registered and check `active`.
     this.hud.on('action', (a) => {
@@ -90,7 +113,9 @@ export class NetGameController {
       this.board.on('hexClick', (id) => this.click({ kind: 'hex', id })),
       // Server errors are toasted by the online app (lobby and game alike).
       this.client.on((e) => {
-        if (this.active && (e.type === 'game' || e.type === 'room')) this.render();
+        if (this.active && (e.type === 'game' || e.type === 'room' || e.type === 'avatars')) {
+          this.render();
+        }
       }),
     );
   }
@@ -166,6 +191,9 @@ export class NetGameController {
     if (!g || !hv) return;
     this.noticeTradeEnd(g.view, hv.viewer);
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
+    this.onLooks(
+      roomLooks(this.client.room, (m) => this.client.avatarOf(m), g.view.players.length),
+    );
     this.board.render(g.view);
     this.hud.render(g.view, hv);
     this.updateHighlights();

@@ -3,6 +3,7 @@ import type { DevCardType, Player, Resource } from '../engine';
 import { h, type Child } from './dom';
 import { DEV_GLYPH, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import { DEV_CARD_INFO, inkFor } from './model';
+import { avatarPicture, seatAvatar } from './profile/looks';
 
 /** A resource card face (`.rcard-face`); `w` is the card width in px, height follows 5:7. */
 export function resCardFace(resource: Resource, w: number, ...extra: Child[]): HTMLElement {
@@ -52,21 +53,25 @@ export function playerStyle(color: string): Record<string, string> {
   return { '--pc': color, '--pc-ink': inkFor(color) === 'dark' ? '#1d1208' : '#ffffff' };
 }
 
-/** Round avatar in the player's colour: person or bot silhouette. */
+/**
+ * Round avatar in the player's colour: the seat's profile picture (PR1, profile/looks.ts) with a
+ * player-colour ring, else a person silhouette; bots always show the bot.
+ */
 export function avatar(
-  p: Pick<Player, 'color' | 'name'>,
+  p: Pick<Player, 'color' | 'name'> & { id?: number },
   isBot: boolean,
   size: number,
   ...extra: Child[]
 ) {
+  const pic = isBot || p.id === undefined ? null : avatarPicture(seatAvatar(p.id));
   return h(
     'span',
     {
-      class: `avatar${isBot ? ' is-bot' : ''}`,
+      class: `avatar${isBot ? ' is-bot' : ''}${pic ? ' has-pic' : ''}`,
       style: { ...playerStyle(p.color), '--av': `${size}px` },
       title: isBot ? `${p.name} (bot)` : p.name,
     },
-    glyph(isBot ? 'bot' : 'person', Math.round(size * 0.62)),
+    pic ?? glyph(isBot ? 'bot' : 'person', Math.round(size * 0.62)),
     ...extra,
   );
 }

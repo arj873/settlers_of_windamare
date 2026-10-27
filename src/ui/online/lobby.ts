@@ -11,6 +11,8 @@ import { append, h } from '../dom';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
 import { RoomConfigPanel, withSeatCount } from './configPanel';
+import { profileAvatar, profileChip, stylePreviewImg } from '../profile/dialog';
+import { PIECE_STYLE_LABEL, pieceStyleOr, type AvatarRef } from '../profile/model';
 import { lobbyView, type LobbyView, type SeatView } from './lobbyModel';
 import './online.css';
 
@@ -34,6 +36,10 @@ export interface LobbyOptions {
   chat: HTMLElement;
   /** Clipboard write; default navigator.clipboard with a select() fallback. */
   copy?: (text: string) => Promise<void>;
+  /** PR1: a member's picture (RoomClient.avatarOf). */
+  avatarOf?: (member: MemberId) => AvatarRef | null;
+  /** PR1: open the Profile dialog (a chip in the "You" section). */
+  onProfile?: () => void;
 }
 
 async function defaultCopy(text: string, input: HTMLInputElement): Promise<void> {
@@ -63,6 +69,8 @@ export class LobbyScreen {
   private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly configHost = h('div');
+  /** PR1: the Profile chip (picture of the viewer). */
+  private readonly profileBox = h('span', { class: 'pf-chip-slot' });
 
   constructor(private readonly opts: LobbyOptions) {
     this.linkInput = h('input', {
@@ -153,6 +161,7 @@ export class LobbyScreen {
                 { class: 'ol-row' },
                 this.nameInput,
                 h('button', { class: 'btn', on: { click: () => this.commitName() } }, 'Save'),
+                this.profileBox,
                 this.roleBox,
               ),
             ),
@@ -190,6 +199,18 @@ export class LobbyScreen {
         ? h('span', { class: 'tag' }, 'Player')
         : h('span', { class: 'tag' }, 'Spectator'),
     ]);
+    const onProfile = this.opts.onProfile;
+    this.profileBox.replaceChildren(
+      ...(onProfile && v.me
+        ? [
+            profileChip(
+              this.opts.avatarOf?.(v.me.id) ?? null,
+              onProfile,
+              v.me.seat === null ? undefined : room.seats[v.me.seat]?.color,
+            ),
+          ]
+        : []),
+    );
     this.renderSeats(v);
     this.renderFooter(v);
     if (!this.config) {
@@ -280,6 +301,10 @@ export class LobbyScreen {
     const a = this.opts.actions;
     const room = this.room;
     const meSeated = v.me?.seat !== null && v.me?.seat !== undefined;
+    // PR1: the occupant's picture and piece style.
+    const occupant = room?.seats[s.index]?.occupant ?? null;
+    const member = occupant === null ? undefined : room?.members.find((m) => m.id === occupant);
+    const pic = member ? (this.opts.avatarOf?.(member.id) ?? null) : null;
     return h(
       'div',
       {
@@ -287,7 +312,9 @@ export class LobbyScreen {
         style: { '--pc': s.color },
         attrs: { 'data-seat': String(s.index) },
       },
-      h('span', { class: 'ol-seat-dot' }, glyph(s.name === null ? 'bot' : 'person', 22)),
+      pic
+        ? profileAvatar(pic, s.color, 40)
+        : h('span', { class: 'ol-seat-dot' }, glyph(s.name === null ? 'bot' : 'person', 22)),
       h(
         'div',
         { class: 'ol-seat-main' },
@@ -322,6 +349,16 @@ export class LobbyScreen {
                 on: { click: () => c !== s.color && a.setColor(c) },
               }),
             ),
+          ),
+        member &&
+          h(
+            'div',
+            {
+              class: 'pf-seat-style',
+              title: `Pieces: ${PIECE_STYLE_LABEL[pieceStyleOr(member.pieceStyle)]}`,
+            },
+            stylePreviewImg(pieceStyleOr(member.pieceStyle), s.color),
+            h('span', {}, PIECE_STYLE_LABEL[pieceStyleOr(member.pieceStyle)]),
           ),
         s.canSetLevel &&
           botLevelSelect(s.botLevel, { seat: s.index, key: 'seat-level' }, (level) =>

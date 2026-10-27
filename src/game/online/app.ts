@@ -21,6 +21,8 @@ import { LobbyScreen } from '../../ui/online/lobby';
 import { inviteUrl } from '../../ui/online/lobbyModel';
 import { errorText, fatalText } from '../../ui/online/messages';
 import type { SessionAction } from '../../ui/types';
+import { openProfileDialog } from '../../ui/profile/dialog';
+import { loadProfile, saveProfile, type SeatLook } from '../../ui/profile/model';
 import type { BoardLike, ToastKind } from '../controller';
 import type { Backend } from './backend';
 import { NetGameController } from './netController';
@@ -44,6 +46,8 @@ export interface OnlineEnv {
   goHome: () => void;
   /** From the invite landing card: play hotseat instead. */
   playOffline: () => void;
+  /** PR1: the seats' pictures and piece styles in a game (board + HUD). */
+  onLooks?: (looks: readonly SeatLook[]) => void;
 }
 
 export class OnlineApp {
@@ -121,13 +125,17 @@ export class OnlineApp {
     const home = new HomeScreen({
       name,
       invite: { roomId: this.roomId, playing: room.phase === 'playing' || room.phase === 'over' },
+      profile: {
+        load: () => loadProfile(this.env.store),
+        save: (p) => saveProfile(this.env.store, p),
+      },
       onOffline: () => {
         this.show(null);
         this.env.playOffline();
       },
       onCreate: () => Promise.resolve(),
       onJoin: (_code, nick) => {
-        this.env.store.set(NAME_KEY, nick);
+        saveProfile(this.env.store, { ...loadProfile(this.env.store), name: nick });
         this.connect(nick);
         return Promise.resolve();
       },
@@ -146,6 +154,7 @@ export class OnlineApp {
       clock: env.clock,
       store: env.tokens,
       ...(name ? { name } : {}),
+      profile: (({ avatar, pieceStyle }) => ({ avatar, pieceStyle }))(loadProfile(env.store)),
       random: Math.random,
     });
     this.client = client;
@@ -155,6 +164,7 @@ export class OnlineApp {
       send: (text) => this.sendOrWarn(client.chatSend(text)),
       react: (r) => this.sendOrWarn(client.react(r)),
       colorOf: (e) => this.colorOf(e),
+      avatarOf: (e) => client.avatarOf(e.from),
     });
     this.net = new NetGameController({
       board: env.board,
@@ -162,6 +172,7 @@ export class OnlineApp {
       client,
       toast: env.toast,
       ...(env.onRender ? { onRender: env.onRender } : {}),
+      ...(env.onLooks ? { onLooks: env.onLooks } : {}),
     });
     client.on((e) => {
       switch (e.type) {
@@ -173,6 +184,12 @@ export class OnlineApp {
           break;
         case 'chat':
           this.chat?.add(e.entry);
+          break;
+        case 'avatars':
+          // Uploaded pictures arrive after the room: redraw what shows them.
+          this.chat?.setEntries(client.chat);
+          if (client.room?.phase === 'lobby')
+            this.lobby?.update(client.room, client.you?.member ?? null);
           break;
         case 'reaction': {
           const m = client.room?.members.find((x) => x.id === e.member);
@@ -276,6 +293,8 @@ export class OnlineApp {
           roomId: this.roomId,
           inviteUrl: inviteUrl(this.env.href, this.roomId),
           chat: this.chat.element,
+          avatarOf: (m) => c.avatarOf(m),
+          onProfile: () => this.editProfile(),
           actions: {
             setName: (name) => {
               this.env.store.set(NAME_KEY, name);
@@ -306,6 +325,24 @@ export class OnlineApp {
       this.net?.start();
     }
     this.env.hud.setSessionActions(this.sessionActions(room));
+  }
+
+  /** PR1: the Profile dialog; saves locally, then tells the room (name, picture, pieces). */
+  private editProfile(): void {
+    const c = this.client;
+    if (!c) return;
+    const saved = loadProfile(this.env.store);
+    const me = c.me;
+    const seat = me?.seat ?? null;
+    openProfileDialog({
+      profile: { ...saved, name: me?.name || saved.name },
+      ...(seat === null ? {} : { color: c.room?.seats[seat]?.color ?? '#d64541' }),
+      onSave: (p) => {
+        saveProfile(this.env.store, p);
+        if (p.name && p.name !== me?.name) this.sendOrWarn(c.setName(p.name));
+        this.sendOrWarn(c.setProfile({ avatar: p.avatar, pieceStyle: p.pieceStyle }));
+      },
+    });
   }
 
   private sessionActions(room: RoomInfo): SessionAction[] {

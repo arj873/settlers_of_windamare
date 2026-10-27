@@ -16,7 +16,8 @@ import {
 import { h, type Child } from '../dom';
 import { DEV_GLYPH, glyph, RESOURCE_LABEL, resourceIcon } from '../icons';
 import { DEV_CARD_INFO } from '../model';
-import { playerStyle } from '../widgets';
+import { avatar, playerStyle } from '../widgets';
+import { seatAvatar } from '../profile/looks';
 import {
   awards,
   devRows,
@@ -68,7 +69,8 @@ function who(state: GameState, p: PlayerId): HTMLElement {
   return h(
     'span',
     { class: 'gs-who', style: playerStyle(pl?.color ?? '#999') },
-    dot(pl?.color ?? '#999'),
+    // PR1: the profile picture when the seat has one (bots and pictureless seats keep the dot).
+    pl && seatAvatar(p) ? avatar(pl, false, 22) : dot(pl?.color ?? '#999'),
     h('span', { class: 'gs-name' }, pl?.name ?? `Player ${p + 1}`),
   );
 }

@@ -33,6 +33,7 @@ import {
   type Seats,
 } from './logic';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
+import { cleanLooks, type SeatLook } from '../ui/profile/model';
 import {
   IDLE_CLOCK,
   bankAfterAction,
@@ -65,6 +66,8 @@ export interface ControllerOptions {
   onRender?: () => void;
   /** Wall clock in ms for the game duration (UX2 stats); default Date.now. */
   wallClock?: () => number;
+  /** PR1: the seats' pictures and piece styles changed (a new or resumed game). Cosmetic. */
+  onLooks?: (looks: readonly SeatLook[]) => void;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -92,7 +95,10 @@ export class GameController {
   private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
+  private readonly onLooks: (looks: readonly SeatLook[]) => void;
   private speedMs: number;
+  /** PR1: picture and piece style per seat (index = PlayerId). */
+  private looks: SeatLook[] = [];
 
   private current: GameState | null = null;
   private seatList: Seats = [];
@@ -132,6 +138,7 @@ export class GameController {
     this.bot = opts.bot ?? null;
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
+    this.onLooks = opts.onLooks ?? (() => undefined);
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
 
     this.hud.on('action', (a) => this.dispatch(a));
@@ -160,6 +167,10 @@ export class GameController {
   /** Each seat's bot level (B1). */
   get botLevels(): readonly BotLevel[] {
     return this.seatList.map((_, i) => this.levels[i] ?? DEFAULT_BOT_LEVEL);
+  }
+  /** PR1: each seat's picture and piece style. */
+  get seatLooks(): readonly SeatLook[] {
+    return this.looks;
   }
   get viewer(): PlayerId | null {
     return this.viewerId;
@@ -192,6 +203,8 @@ export class GameController {
       playedMs?: number | null;
       /** Bot level per seat (B1); absent = all DEFAULT_BOT_LEVEL. */
       botLevels?: readonly BotLevel[];
+      /** PR1: picture and piece style per seat; absent = none / classic. */
+      looks?: readonly SeatLook[];
     } = {},
   ) {
     if (seats.length !== state.players.length) {
@@ -202,6 +215,8 @@ export class GameController {
     this.current = state;
     this.seatList = [...seats];
     this.levels = seats.map((_, i) => opts.botLevels?.[i] ?? DEFAULT_BOT_LEVEL);
+    this.looks = cleanLooks(opts.looks, seats.length);
+    this.onLooks(this.looks);
     this.viewerId = opts.viewer ?? null;
     this.placeMode = null;
     this.offers.clear();
@@ -227,7 +242,16 @@ export class GameController {
     this.start(
       state,
       order.map((i) => cfg.players[i]?.controller ?? 'bot'),
-      { botLevels: order.map((i) => cfg.players[i]?.botLevel ?? DEFAULT_BOT_LEVEL) },
+      {
+        botLevels: order.map((i) => cfg.players[i]?.botLevel ?? DEFAULT_BOT_LEVEL),
+        looks: order.map((i) => {
+          const p = cfg.players[i];
+          return {
+            avatar: p?.avatar ?? null,
+            ...(p?.pieceStyle ? { pieceStyle: p.pieceStyle } : {}),
+          };
+        }),
+      },
     );
   }
 
@@ -238,6 +262,7 @@ export class GameController {
       banks: saved.banks,
       playedMs: saved.playedMs ?? null,
       ...(saved.botLevels ? { botLevels: saved.botLevels } : {}),
+      ...(saved.looks ? { looks: saved.looks } : {}),
     });
   }
 
@@ -253,6 +278,7 @@ export class GameController {
       viewer: this.viewerId,
       botRng: this.botRng.state,
       botLevels: [...this.botLevels],
+      ...(this.looks.some((l) => l.avatar || l.pieceStyle) ? { looks: [...this.looks] } : {}),
       ...(timerOf(this.current.settings).kind === 'bank'
         ? { banks: flushBank(this.clock, this.banks) }
         : {}),
