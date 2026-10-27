@@ -26,6 +26,8 @@ import { V, build, ckMain, giveCards, setGoods } from './engine/testkit';
 import { SEACK_MODE } from '../seack/engine';
 import { TBCK_MODE } from '../tbck/engine';
 import { EPCK_MODE } from '../epck/engine';
+import { BACK_MODE } from '../back/engine';
+import { TWOCK_MODE } from '../twock/engine';
 
 const withSlice = (state: GameState, s: CkSlice): GameState => ({
   ...state,
@@ -134,6 +136,14 @@ describe('C&K online views: secrets in bot games', () => {
 
   it('E&P + C&K: the C&K mask runs (hands, commodities, stacks)', () => {
     checkGame({ seed: 41, players: 4, mode: EPCK_MODE, scenario: 'ep/pirateLairs' }, 3000, 60);
+  }, 60_000);
+
+  it('Barbarian Attack + C&K: the C&K mask runs (hands, commodities, stacks)', () => {
+    checkGame({ seed: 51, players: 4, mode: BACK_MODE, scenario: 'tb/barbarianAttack' }, 3000, 60);
+  }, 60_000);
+
+  it('Catan for Two + C&K: the C&K mask runs (neutral knights are no seat)', () => {
+    checkGame({ seed: 61, players: 2, mode: TWOCK_MODE, scenario: 'tb/variants' }, 3000, 60);
   }, 60_000);
 });
 

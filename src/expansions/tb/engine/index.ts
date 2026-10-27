@@ -32,7 +32,8 @@ import {
 } from '../../../engine/resources';
 import { rollTwoDice } from '../../../engine/rules/dice';
 import type { Rng } from '../../../engine/rng';
-import { victoryPoints } from '../../../engine/selectors';
+import { piecesLeft, victoryPoints } from '../../../engine/selectors';
+import { canPlaceRoad } from '../../../engine/rules/placement';
 import { hexVertices, topologyOf } from '../../../engine/topology';
 import type {
   Action,
@@ -613,7 +614,17 @@ function neutralHandler(
   if (!opt) return fail('the neutral player cannot build there');
   placeNeutral(draft, opt);
   draft.phase = phase.resume;
+  // The neutral road may have taken Road Building's last spot: the card ends (as in the base).
+  const rb = draft.phase;
+  if (rb.kind === 'roadBuilding' && !canPlaceAnyRoad(draft, a.player)) {
+    draft.phase = resumePhase(draft, rb.resume);
+  }
   return ok(draft);
+}
+
+function canPlaceAnyRoad(state: GameState, p: PlayerId): boolean {
+  if (piecesLeft(state, p).road < 1) return false;
+  return topologyOf(state).edges.some((e) => canPlaceRoad(state, p, e));
 }
 
 // ---------------------------------------------------------------------------

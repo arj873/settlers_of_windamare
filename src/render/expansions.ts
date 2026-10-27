@@ -12,6 +12,8 @@ import { ckDrawer } from '../expansions/ck/render';
 import { seafarersDrawer } from '../expansions/seafarers/render';
 import { tbDrawer } from '../expansions/tb/render';
 import { epDrawer } from '../expansions/ep/render';
+import { backDrawer } from '../expansions/back/render';
+import { twockDrawer } from '../expansions/twock/render';
 import type { ExpansionId, GameState, HexId, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 
@@ -72,6 +74,8 @@ export const BOARD_DRAWERS: readonly BoardDrawer[] = [
   seafarersDrawer,
   tbDrawer,
   epDrawer,
+  backDrawer,
+  twockDrawer,
   // new modules go here, one per line
 ];
 

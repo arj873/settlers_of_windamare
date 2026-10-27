@@ -16,6 +16,8 @@ import { tbseaBots } from '../expansions/tbsea/bots';
 import { tbpairBots } from '../expansions/tbpair/bots';
 import { epckBots } from '../expansions/epck/bots';
 import { eptbBots } from '../expansions/eptb/bots';
+import { backBots } from '../expansions/back/bots';
+import { twockBots } from '../expansions/twock/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 import type { BotContext, BotGoal } from './smart/context';
@@ -59,6 +61,8 @@ export const BOT_EXTENSIONS: readonly BotExtension[] = [
   tbpairBots,
   epckBots,
   eptbBots,
+  backBots,
+  twockBots,
   // new modules go here, one per line
 ];
 

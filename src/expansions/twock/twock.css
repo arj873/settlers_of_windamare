@@ -1,0 +1,32 @@
+/* Catan for Two + C&K HUD (classes are prefixed twock-). Colours come from the theme tokens. */
+.twock-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.twock-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.twock-fact,
+.twock-warn {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.twock-warn {
+  border-left-color: var(--danger, #b4472f);
+}
+.twock-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.twock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

@@ -20,6 +20,7 @@ export function isConqueredHex(state: GameState, h: HexId): boolean {
  */
 export function isConqueredBuilding(state: GameState, v: VertexId): boolean {
   if (!has(state, 'ba') || state.pieces.buildings[v] === undefined) return false;
+  if (tbSlice(state).ba?.safe?.includes(v)) return false;
   const hexes = topologyOf(state).vertex[v]?.hexes ?? [];
   return (
     hexes.length > 0 &&
