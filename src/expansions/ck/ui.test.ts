@@ -5,6 +5,7 @@ import {
   applyAction,
   createGame,
   legalActions,
+  viewFor,
   type Action,
   type GameState,
   type VertexId,
@@ -112,6 +113,55 @@ describe('C&K HUD', () => {
     expect(byText('Buy card')).toBeUndefined();
   });
 
+  it('player rows show commodity totals as commodities, not as one type (online view)', () => {
+    const s = main();
+    setGoods(s, 2, { paper: 2 });
+    setGoods(s, 1, { cloth: 1 });
+    show(viewFor(s, 0) as GameState);
+    const rows = [...root.querySelectorAll('.sec-ext-ck .ck-row')];
+    const stat = (p: number) =>
+      [...rows[p]!.querySelectorAll<HTMLElement>('.ck-stat')].find((e) =>
+        e.title.startsWith('Commodity'),
+      )!;
+    expect(stat(2).textContent).toBe('2');
+    expect(stat(1).textContent).toBe('1');
+    for (const row of rows) {
+      const labels = [...row.querySelectorAll('[aria-label]')].map((e) =>
+        e.getAttribute('aria-label'),
+      );
+      expect(labels).not.toContain('Coin');
+      expect(labels).not.toContain('Paper');
+      expect(labels).not.toContain('Cloth');
+    }
+  });
+
+  it('the commodity Bank form states the price on its button', () => {
+    const s = main();
+    setGoods(s, 0, { grain: 4, coin: 4 });
+    show(s);
+    const form = [...root.querySelectorAll('.sec-ext-ck .ck-form')].find((f) =>
+      f.textContent?.startsWith('Bank'),
+    )!;
+    const [give, receive] = [...form.querySelectorAll('select')];
+    const go = form.querySelector('button')!;
+    give!.value = 'grain';
+    give!.dispatchEvent(new Event('change'));
+    receive!.value = 'paper';
+    receive!.dispatchEvent(new Event('change'));
+    expect(go.textContent).toBe('Trade 4:1');
+    expect(go.getAttribute('aria-label')).toBe('Give 4 Grain for 1 Paper');
+    go.click();
+    expect(actions.at(-1)).toEqual({
+      type: 'ck/bankTrade',
+      player: 0,
+      give: 'grain',
+      receive: 'paper',
+    });
+    give!.value = 'coin';
+    give!.dispatchEvent(new Event('change'));
+    expect(go.getAttribute('aria-label')).toMatch(/^Give 4 Coin for 1 /);
+  });
+
   it('Improve buttons send ck/improve; progress cards have Play buttons', () => {
     const s = main();
     build(s, 0, V(0, 0, 'S'), 'city');
@@ -121,10 +171,25 @@ describe('C&K HUD', () => {
     show(s);
     const improve = root.querySelector<HTMLButtonElement>('.ck-trk-trade .ck-improve');
     expect(improve?.disabled).toBe(false);
+    // Named for what it buys, not just its price ("1× Cloth" read like a trade).
+    expect(improve?.getAttribute('aria-label')).toBe('Improve trade to level 1 (Market): 1 cloth');
     improve?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/improve', player: 0, track: 'trade' });
     byText('Play')?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'irrigation' });
+  });
+
+  it('each progress card Play button names its card', () => {
+    const s = main();
+    build(s, 0, V(0, 0, 'S'), 'city');
+    giveCards(s, 0, 'irrigation', 'mining');
+    show(s);
+    const names = [...root.querySelectorAll('.ck-card button')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(names).toEqual(expect.arrayContaining(['Play Irrigation', 'Play Mining']));
+    root.querySelector<HTMLButtonElement>('.ck-card button[aria-label="Play Mining"]')?.click();
+    expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'mining' });
   });
 
   it('the hand bar shows commodities and the progress stack', () => {

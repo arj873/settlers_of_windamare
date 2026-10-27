@@ -158,6 +158,7 @@ interface ExpansionModule {
   changesRoads?: ['<id>/...' | baseType]; // actions that change road lengths / occupancy (C2: base types too)
   actors?(state): PlayerId[] | undefined; // who acts in your phases
   hooks?: ExpansionHooks; // §5
+  terms?: { longestRoad?; route? }; // your words for base things in log / HUD (Seafarers: 'Longest Trade Route', 'road or ship')
 }
 ```
 
@@ -347,6 +348,7 @@ interface HudExtension {
     costItem?;
     left?(s, p);
     total?(s, p);
+    blocker?(s, p): string | null; // disabled reason besides missing resources ('No coastal settlement to upgrade')
   }[];
   dialog?(state, view, legal, send): { key; title; body; modal } | null; // after base forced dialogs
   hint?(state, view): string | null; // turn pill text in your phases

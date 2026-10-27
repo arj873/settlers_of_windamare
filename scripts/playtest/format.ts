@@ -5,6 +5,7 @@ import {
   handCount,
   piecesLeft,
   publicVictoryPoints,
+  longestRoadName,
   RESOURCES,
   victoryPoints,
   type Action,
@@ -104,6 +105,12 @@ export function formatControls(ui: UiScan): string[] {
     lines.push(`  buttons: ${on.map(btn).join(' ') || 'none'}`);
     if (off.length > 0) lines.push(`  disabled: ${off.map(btn).join(' ')}`);
   }
+  const drops = ui.dropdowns ?? [];
+  if (drops.length > 0) {
+    const one = (d: (typeof drops)[number]) =>
+      `[${d.label} = ${d.value}${d.enabled ? '' : ', disabled'}; options: ${d.options.join(' | ')}]`;
+    lines.push(`Dropdowns (use \`choose <label> = <option>\`): ${drops.map(one).join(' ')}`);
+  }
   const rest = ui.controls.filter((c) => !c.inDialog);
   const on = rest.filter((c) => c.enabled);
   const off = rest.filter((c) => !c.enabled);
@@ -186,7 +193,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   lines.push(`Others: ${others.join(' | ')}`);
   const award = (p: PlayerId | null) => (p === null ? 'nobody' : (state.players[p]?.name ?? p));
   lines.push(
-    `Longest Road: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
+    `${longestRoadName(state)}: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
   );
 
   if (ui.timer) {

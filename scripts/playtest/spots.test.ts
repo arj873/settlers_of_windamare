@@ -97,6 +97,13 @@ describe('describeEdge / describeHex', () => {
     expect(text).toContain(`${b} (open)`);
   });
 
+  it('names the ends of an open-sea edge too (not in the land topology)', () => {
+    const e = 'e:0,6,SE' as EdgeId;
+    expect(TOPOLOGY.edge[e]).toBeUndefined();
+    const text = describeEdge(freshGame(3), e, 0);
+    expect(text).toMatch(/^between sea; ends v:\S+ \(open\), v:\S+ \(open\)$/);
+  });
+
   it('lists the buildings around a robber target', () => {
     const h = TOPOLOGY.landHexes[0] as HexId;
     const v = TOPOLOGY.hex[h]?.vertices[0] as VertexId;
@@ -148,6 +155,17 @@ describe('expansion spots', () => {
     expect(actionName(s, { type: 'ck/selectKnight' })).toBe('select knight');
     expect(actionName(s, road)).toBe('setup road');
     expect(actionName(s, { type: 'placeSetupSettlement' })).toBe('setup settlement');
+  });
+
+  it('T&B barbarian: the pick step and the destination step have their own words', () => {
+    const s = freshGame(3);
+    const a = { type: 'tb/placeBarbarian' };
+    s.phase = { kind: 'tb/barbarian', from: null } as never;
+    expect(spotVerb(s, a.type)).toBe('pick the barbarian to move');
+    expect(actionName(s, a)).toBe('pick barbarian');
+    s.phase = { kind: 'tb/barbarian', from: 'e:0,1,E' } as never;
+    expect(spotVerb(s, a.type)).toBe('move the barbarian to');
+    expect(actionName(s, a)).toBe('move barbarian here');
   });
 
   it('names the setup city when the engine places one (C&K round 2)', () => {

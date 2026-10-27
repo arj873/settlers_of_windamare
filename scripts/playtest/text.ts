@@ -55,6 +55,35 @@ export function matchChoice(
   return { kind: 'none' };
 }
 
+/**
+ * `matchChoice` over a screen's buttons, disabled ones included: if the best match is a single
+ * disabled button, that is the answer (`disabled`), so "Ship" never falls through to an enabled
+ * "Move ship". Several hits are settled among the enabled buttons. Indices are into `controls`.
+ */
+export function matchControl(
+  query: string,
+  controls: readonly { label: string; enabled: boolean; inDialog?: boolean }[],
+): Match | { kind: 'disabled'; index: number } {
+  const all = matchChoice(
+    query,
+    controls.map((c) => c.label),
+  );
+  if (all.kind === 'one' && !controls[all.index]?.enabled) {
+    return { kind: 'disabled', index: all.index };
+  }
+  const on = controls.flatMap((c, i) => (c.enabled ? [{ ...c, at: i }] : []));
+  const m = matchChoice(
+    query,
+    on.map((c) => c.label),
+    (k) => on[k]?.inDialog === true,
+  );
+  const at = (k: number) => on[k]?.at ?? -1;
+  if (m.kind === 'one') return { ...m, index: at(m.index) };
+  if (m.kind === 'many') return { kind: 'many', indices: m.indices.map(at) };
+  if (all.kind === 'none') return all;
+  return { kind: 'disabled', index: all.kind === 'one' ? all.index : (all.indices[0] ?? -1) };
+}
+
 /** "Seat 2" / "seat2" / "2" -> 1 (0-based player index), or null. */
 export function parseSeat(raw: string | undefined, seats = 3): number | null {
   const m = /^(?:seat\s*)?([0-9]+)$/i.exec((raw ?? '').trim());

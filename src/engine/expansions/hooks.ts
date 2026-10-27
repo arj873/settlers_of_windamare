@@ -117,6 +117,20 @@ export function hasRouteBlockers(state: State): boolean {
   return activeModules(state).some((m) => m.hooks?.blocksRoute !== undefined);
 }
 
+/** The active modules' name for a base thing (`ExpansionModule.terms`), else `fallback`. */
+function termOf(state: State, key: 'longestRoad' | 'route', fallback: string): string {
+  for (const m of activeModules(state)) {
+    const t = m.terms?.[key];
+    if (t) return t;
+  }
+  return fallback;
+}
+
+/** The Longest Road card's name in this game (Seafarers: Longest Trade Route). */
+export const longestRoadName = (state: State) => termOf(state, 'longestRoad', 'Longest Road');
+/** What a new settlement must touch: 'road', or 'road or ship' with ships. */
+export const routeName = (state: State) => termOf(state, 'route', 'road');
+
 export function hookHandSize(state: GameState, player: PlayerId, base: number): number {
   let n = base;
   for (const m of activeModules(state)) {

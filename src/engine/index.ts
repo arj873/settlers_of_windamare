@@ -24,7 +24,9 @@ export {
   costOf,
   expansionVictoryParts,
   expansionVictoryPoints,
+  longestRoadName,
   pieceLimit,
+  routeName,
   terrainKind,
   type BaseCostItem,
 } from './expansions/hooks';
