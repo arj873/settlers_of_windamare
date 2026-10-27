@@ -235,7 +235,7 @@ export class ProductionFx {
 
   private row(player: PlayerId): HTMLElement | null {
     const el = this.root.querySelector<HTMLElement>(`.hud-players .pp[data-player="${player}"]`);
-    return el && visible(el) ? el : null;
+    return el && visible(el) && inScrollView(el) ? el : null;
   }
 
   /** Your own cards land on their card in the hand; everyone else's on their row. */
@@ -260,6 +260,16 @@ export class ProductionFx {
 function visible(el: HTMLElement): boolean {
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
+}
+
+/** The row's middle is inside the (scrollable, #54) sidebar's visible part and the window. */
+function inScrollView(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  const box = el.closest('.hud-side')?.getBoundingClientRect();
+  const mid = r.top + r.height / 2;
+  const top = Math.max(0, box && box.height > 0 ? box.top : 0);
+  const bottom = Math.min(window.innerHeight, box && box.height > 0 ? box.bottom : Infinity);
+  return mid >= top && mid <= bottom;
 }
 
 function center(el: HTMLElement): Point {

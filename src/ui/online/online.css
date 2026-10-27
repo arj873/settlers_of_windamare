@@ -555,6 +555,12 @@ button.ol-choice:hover {
   flex: 0 1 300px;
   min-height: 0;
 }
+/* #54: Chat and Game Events share the room left over (both basis 0), each down to a minimum
+   (here: a few lines, the reactions and the input); below that the sidebar scrolls. */
+.hud-side .sec-chat:not(.is-collapsed) {
+  flex: 1 1 0;
+  min-height: 210px;
+}
 .hud-side .sec-chat.is-collapsed {
   flex: none;
 }

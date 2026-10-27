@@ -8,10 +8,11 @@
 /* Sized with top/left/width/height (not inset) so an <img> stretches like a <span>. */
 .avatar > .avatar-pic {
   position: absolute;
-  top: 1px;
-  left: 1px;
-  width: calc(100% - 2px);
-  height: calc(100% - 2px);
+  /* The player colour shows as a ring around the picture. */
+  top: 2.5px;
+  left: 2.5px;
+  width: calc(100% - 5px);
+  height: calc(100% - 5px);
   border-radius: 50%;
   overflow: hidden;
   display: block;
