@@ -355,6 +355,7 @@ interface HudExtension {
   impliedActions?: string[]; // clicked on the board, no button
   handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
   offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
+  cardFace?(kind, w): HTMLElement | null; // art for a card kind the log names ('paper', 'gold', 'fish'): production animation
 }
 ```
 

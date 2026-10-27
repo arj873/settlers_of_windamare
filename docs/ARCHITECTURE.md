@@ -552,9 +552,16 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   `pointer-events: none`, so the slot gets hover (`.why` bubble) and tap (opens it for 3.5 s). The
   reason is also in the button's `data-why` (playtest harness).
 
+- Production animation (#29, `ui/production/`): after a roll, cards fly (DOM, Web Animations)
+  from each producing hex to the player's row (your own: your hand), then a "+2 grain" badge
+  pops on the row. `plan.ts` (pure, tested) reads the public log ("received" / "caught" / gold
+  "took" lines after "rolled N"), so it works on online views and every module. A new roll cancels
+  the running one; rolls < 900 ms apart (fast bots) and the menu's Animations off / reduced
+  motion show badges only. `Hud.setHexLocator(id => board.screenPos(id))`; the board draws nothing for it.
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
-  hand bar (`handCards`) and items in the trade offer rows (`offerExtras`). The setup
+  hand bar (`handCards`), items in the trade offer rows (`offerExtras`) and card art for the
+  production animation (`cardFace`). The setup
   screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
   modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
   `validate`, e.g. C&K + Rush) shows the reason and disables Start. The build bar has no Buy card
