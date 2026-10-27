@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { victoryPoints } from '../../../engine/selectors';
 import type { Action, GameState, PlayerId } from '../../../engine/types';
-import { A, pirateTargets } from './actions';
+import { A, pirateTargets, shipPlace, shipText } from './actions';
 import { graph, isPirateHex } from './geometry';
 import { T } from './maps';
 import { advance, tileHolder } from './missions';
@@ -155,6 +155,31 @@ describe('sailing (§4.4)', () => {
     const r = reachable(s, ship(s, 0));
     expect(r.has(E(2, 3, 'E'))).toBe(false); // between two island hexes
     expect([...r.keys()].length).toBeGreaterThan(0);
+  });
+});
+
+describe('the movement log says what sailed where', () => {
+  it('names the cargo', () => {
+    expect(shipText({ cargo: [] })).toBe('a ship');
+    expect(shipText({ cargo: ['settler'] })).toBe('a ship with a settler');
+    expect(shipText({ cargo: ['crew', 'crew'] })).toBe('a ship with 2 crews');
+    expect(shipText({ cargo: ['crew', 'spice'] })).toBe('a ship with a crew and a spice sack');
+  });
+
+  it('names the distance and the explored land beside the end (a face-down hex is not named)', () => {
+    let s = movement(blank());
+    addShip(s, 0, E(5, 2, 'E'));
+    ship(s, 0).cargo = ['settler'];
+    s.board.hexes[H(7, 2)] = { ...s.board.hexes[H(7, 2)]!, terrain: 'lumber', token: 5 };
+    epSlice(s).hidden[H(9, 2)] = { terrain: 'ore' };
+    s = run(s, A.moveShip, 0, { ship: 0, edge: E(7, 2, 'NE') });
+    const who = s.players[0]?.name;
+    const line = s.log.map((e) => e.text).find((t) => t.includes(' sailed '));
+    expect(line).toBe(`${who} sailed a ship with a settler 2 spaces, next to lumber 5`);
+    // The move turned (9,2) over: it touches the end of the edge (settlers land at corners).
+    expect(shipPlace(s, E(7, 2, 'NE'))).toMatch(/^next to lumber 5 and ore( \d+)?$/);
+    epSlice(s).hidden[H(7, 2)] = { terrain: 'brick' };
+    expect(shipPlace(s, E(7, 2, 'NE'))).not.toContain('lumber');
   });
 });
 
