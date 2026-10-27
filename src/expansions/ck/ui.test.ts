@@ -160,6 +160,39 @@ describe('C&K HUD', () => {
     expect(actions.at(-1)).toEqual({ type: 'ck/activateKnight', player: 0, vertex: V(0, 0, 'N') });
   });
 
+  describe('knight dialog and turn pill say the same, and what is true', () => {
+    const selected = (active: boolean, withRoad: boolean) => {
+      const s = main();
+      build(s, 0, V(0, 0, 'SW'));
+      roads(s, 0, E(0, 0, 'W'), ...(withRoad ? [E(0, 0, 'NW')] : []));
+      setGoods(s, 0, { grain: 1, wool: 1, ore: 1 }); // activate or promote: selectable
+      knight(s, 0, V(0, 0, 'NW'), 1, active, active ? 1 : null);
+      return applyOk(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') } as Action);
+    };
+    const pill = () => root.querySelector('.hint')?.textContent ?? '';
+    const say = () => root.querySelector('.dialog p')?.textContent ?? '';
+
+    it('an active knight with a free spot: move', () => {
+      show(selected(true, true));
+      expect(pill()).toBe('Knight: move');
+      expect(say()).toBe('Click a highlighted spot to move there.');
+    });
+
+    it('an active knight with nowhere to go says so (not "must be active")', () => {
+      show(selected(true, false));
+      expect(pill()).toBe('Knight has nowhere to go: promote it, or close');
+      expect(say()).toContain('This active knight has nowhere to go');
+      expect(root.textContent).not.toContain('must be active');
+      expect(pill()).not.toBe('Your move');
+    });
+
+    it('an inactive knight: activate it', () => {
+      show(selected(false, true));
+      expect(pill()).toBe('Inactive knight: activate or promote it, or close');
+      expect(say()).toContain('An inactive knight cannot move');
+    });
+  });
+
   it('discarding on a 7 counts commodities', () => {
     const s = main();
     setGoods(s, 0, { ore: 4, coin: 4 });

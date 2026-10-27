@@ -39,15 +39,19 @@ import {
   WALLS_PER_PLAYER,
   activeStrength,
   barbarianStrength,
+  canChase,
   choiceOf,
   ckSlice,
   commodityCount,
   defenderStrength,
+  displaceTargets,
   improvementCost,
   isCommodity,
+  knightActionBlocker,
   knightsInSupply,
   knightsOf,
   metropolisesOf,
+  moveTargets,
   phaseOf,
   promptFor,
   redDieDraws,
@@ -768,6 +772,80 @@ function promptDialog(state: GameState, view: HudView, send: Send): HudDialog | 
   };
 }
 
+/** Sentence-case list: "move, displace or chase". */
+const orList = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`;
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * What the selected knight (phase ck/knight) can do, for the turn pill (`pill`) and the knight
+ * dialog (`text`): both say the same, from the engine's own reason when it cannot act.
+ */
+export function knightStatus(state: GameState, view: HudView): { pill: string; text: string } {
+  const phase = phaseOf(state);
+  if (phase.kind !== 'ck/knight') return { pill: '', text: '' };
+  const p = view.viewer;
+  const v = phase.vertex;
+  const tidy = [
+    mine(view, 'ck/activateKnight').length > 0 && 'activate',
+    mine(view, 'ck/promoteKnight').length > 0 && 'promote',
+  ].filter((x): x is string => typeof x === 'string');
+  const orTidy = tidy.length > 0 ? `: ${orList(tidy)} it, or close` : ': close';
+  if (phase.resume === 'specialBuild') {
+    return {
+      pill: `Special build${orTidy}`,
+      text: 'In the special build phase a knight can only be activated or promoted.',
+    };
+  }
+  const blocker = knightActionBlocker(state, p, v);
+  if (blocker === null) {
+    const moves = moveTargets(state, p, v).length > 0;
+    const displaces = displaceTargets(state, p, v).length > 0;
+    const chases = canChase(state, p, v);
+    const verbs = [
+      moves && 'move',
+      displaces && 'displace a weaker knight',
+      chases && 'chase the robber',
+    ].filter((x): x is string => typeof x === 'string');
+    const click = [
+      moves && 'click a highlighted spot to move there',
+      displaces && 'click a weaker knight to displace it',
+    ].filter((x): x is string => typeof x === 'string');
+    return {
+      pill: `Knight: ${orList(verbs)}`,
+      text:
+        click.length > 0
+          ? `${capital(orList(click))}${chases ? ', or chase the robber' : ''}.`
+          : 'This knight can chase the robber away.',
+    };
+  }
+  if (phase.resume === 'preRoll') {
+    return {
+      pill: 'Before the roll a knight can only chase the robber',
+      text: `Before the roll a knight can only chase the robber, and ${blocker}.`,
+    };
+  }
+  if (blocker === 'only an active knight can act') {
+    return {
+      pill: `Inactive knight${orTidy}`,
+      text: 'An inactive knight cannot move, displace or chase. Once activated it can act from your next turn.',
+    };
+  }
+  if (blocker === 'a knight activated this turn cannot act yet') {
+    return {
+      pill: `Knight activated this turn${orTidy}`,
+      text: 'This knight was activated this turn: it can act from your next turn.',
+    };
+  }
+  if (blocker === 'that knight has nowhere to go') {
+    return {
+      pill: `Knight has nowhere to go${orTidy}`,
+      text: 'This active knight has nowhere to go: no free spot along your roads, no weaker knight in reach, and the robber is not on a hex next to it.',
+    };
+  }
+  return { pill: `Your knight cannot act${orTidy}`, text: `This knight cannot act: ${blocker}.` };
+}
+
 function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | null {
   const phase = phaseOf(state);
   if (phase.kind !== 'ck/knight' || state.turn.current !== view.viewer) return null;
@@ -775,7 +853,6 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
   const cancel = mine(view, 'ck/cancel')[0];
   const activate = mine(view, 'ck/activateKnight')[0];
   const promote = mine(view, 'ck/promoteKnight')[0];
-  const targets = mine(view, 'ck/pickVertex').length;
   const k = ckSlice(state).knights[phase.vertex];
   const costFaces = (item: string) =>
     RESOURCES.flatMap((r) =>
@@ -794,15 +871,7 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
     title: k ? `${KNIGHT_TITLE[k.level]} knight (${k.active ? 'active' : 'inactive'})` : 'Knight',
     modal: false,
     body: [
-      h(
-        'p',
-        {},
-        targets > 0
-          ? 'Click a highlighted spot to move there, or onto a weaker knight to displace it.'
-          : chase
-            ? 'This knight can chase the robber away.'
-            : 'This knight cannot act now (it must be active, and not activated this turn).',
-      ),
+      h('p', {}, knightStatus(state, view).text),
       h(
         'div',
         { class: 'ck-choices' },
@@ -897,9 +966,10 @@ export const ckHud: HudExtension = {
   hint(state, view) {
     const phase = phaseOf(state);
     const prompt = promptFor(state);
-    if (prompt && prompt.actor === view.viewer) return promptText(state).text;
+    // (The knight phase is a prompt too, with no prompt text: the dialog says the same.)
     if (phase.kind === 'ck/knight' && state.turn.current === view.viewer)
-      return 'Move, displace or chase the robber';
+      return knightStatus(state, view).pill;
+    if (prompt && prompt.actor === view.viewer) return promptText(state).text;
     if (
       (phase.kind === 'ck/sabotage' || phase.kind === 'ck/wedding') &&
       (phase.pending[view.viewer] ?? 0) > 0
