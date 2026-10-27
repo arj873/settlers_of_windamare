@@ -89,7 +89,10 @@ const setTheme = (page, t) =>
   await page.close();
 }
 
-for (const g of process.argv.includes('--setup-only') ? [] : GAMES) {
+// --only=a,b: just those scenarios (ids without the module prefix).
+const ONLY = process.argv.find((a) => a.startsWith('--only='))?.slice(7).split(',');
+const games = ONLY ? GAMES.filter((g) => ONLY.includes(g.scenario.split('/')[1])) : GAMES;
+for (const g of process.argv.includes('--setup-only') ? [] : games) {
   const tag = g.scenario.split('/')[1];
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   watch(page, tag);
