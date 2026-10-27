@@ -18,7 +18,19 @@ CLI, same loop below. What is different:
 
 - `wait` wakes on what the **server** says: your move, a discard you owe, a trade offer to answer
   (also `GAME OVER`, or `DISCONNECTED for good` if the room closed on you). There is no cover:
-  ignore `pass`. After your action the reply may take up to a second (server round trip).
+  ignore `pass`. On waking it prints the log **since your last command** (attacks, robberies).
+- Acting commands wait for the server's answer (up to 15 s on a busy machine) and say what
+  happened in their first line:
+  - `OK: ... the server applied it (game seq 41 -> 42)`: done.
+  - `OK: clicked [Bank]` + `screen-only change`: a local click (opened a dialog, picked a mode).
+  - `REFUSED BY THE SERVER: ...`: the server said no (the message says why). Run `status`.
+  - `SENT, NO ANSWER YET: ...`: the move went out but nothing came back yet. **Do not click
+    again**: run `status` or `wait` first, it may still apply. Report it only if `status` still
+    shows the old state after a minute.
+- `REFUSED: [X] is covered by ...` means a player really could not click it: worth a `shot` and
+  a report.
+- `reload` puts you back in your seat. If `status` ever says "the page lost its `?debug=1` hook",
+  run `reload`.
 - Bots play at their own pace; "thinking…" in the prompt is a bot. Other humans can be slow.
 - **Chat is allowed but optional**: `pnpm -s pt K chat "hello"`. `status` shows the last chat lines
   and the server's seat list (human / away / bot). Do not spend turns on chat.
@@ -106,6 +118,68 @@ CLI, same loop below. What is different:
 - **Dev cards:** in `Buttons` as `[Knight ×1]` etc. Cards bought this turn work next turn.
   `click Knight` -> robber as above. `click Road Building` -> `spots`/`click-spot` twice.
   `click Year of Plenty` -> click two resources. `click Monopoly` -> click one resource.
+
+## Expansions (`--mode ck | seafarers | tb | ep | ...`)
+
+Everything still goes through `status`, `spots`, `click` and `click-spot`. What helps:
+
+- `status` adds the expansion's own panel as `Panel "<name>":` lines (gold, commodities,
+  knights, wagons, ships, missions) and `Also in hand:` for non-resource cards (commodities,
+  gold, progress cards). `Dev cards:` notes expansion cards (Swift Journey) it cannot itemise.
+- `YOU MUST` quotes the screen's prompt in expansion steps ("Movement: click one of your ships
+  ...") and lists the expansion moves that are legal (`ep/moveShip`, `ck/activateKnight`).
+- `spots` names each spot's move when the list mixes them: `[setup road]` vs
+  `[place setup ship]`. `click-spot N` clicks the build card the move needs first (like a player
+  would) and says so: `clicked [Ship 15/15], then spot 4`.
+- When there is nothing on the board yet, `spots` lists **board moves behind a button**, e.g.
+  `[Command]: select knight (1)`: `click Command`, then `spots` again.
+- Two buttons with the same text are named by their row: `[Ship 1 settler 4 MP: Select]`,
+  `[Ship 2 empty 4 MP: Select]` (`click Ship 2` is enough).
+- `set <name> <n>` also works on expansion count pickers (C&K / T&B "less / more" buttons).
+
+### Cities & Knights (`ck`)
+
+- **Setup:** round 2 places a **city** (`YOU MUST: Place your setup city`), not a settlement.
+- **Knight:** `click Knight` -> `spots` -> `click-spot N` (wool + ore).
+- **Activate / promote / move / displace / chase the robber:** `click Command` -> `spots`
+  (your knights) -> `click-spot N` opens the knight dialog: `click Activate` (grain),
+  `click Promote`, `click Chase the robber`, or `spots` -> `click-spot N` to move there / onto a
+  weaker knight. `click Done` closes it. A knight activated this turn cannot move yet, and every
+  barbarian attack deactivates all knights.
+- **City wall:** `click City wall` -> `spots` -> `click-spot N`.
+- **Improvements / progress cards / commodity trades:** buttons in the `Panel "Cities & Knights"`
+  section of `status` (e.g. `[Cities & Knights: Trade]` for the trade track). Progress card
+  prompts (give a commodity, pick a player) show as `YOU MUST: Expansion step (ck/card): "..."`:
+  click the named button.
+- **Discard on a 7:** commodities count; `set cloth 1`, `set wool 2`, ... then `click Discard`.
+
+### Seafarers (`seafarers`, e.g. `--scenario fogIslands`)
+
+- **Setup on a coast:** `spots` lists both `[setup road]` and `[place setup ship]` for coast
+  edges; pick the number of the piece you want.
+- **Build a ship:** `click Ship` -> `spots` -> `click-spot N`. **Move a ship:** `click Move ship`
+  -> `spots` (your movable ships) -> `click-spot N` -> `spots` (where to) -> `click-spot N`.
+- Fog / gold hexes: the log and `Panel "..."` say what was revealed and what you may choose.
+
+### Traders & Barbarians (`tb`, scenarios such as `traders`)
+
+- **Wagon (Traders & Merchants):** `click Wagon` -> `spots` -> `click-spot N` per step; the
+  panel shows your gold, the commodity you carry and your baggage-train level.
+- **Swift Journey** (a development card) can only be played **after** your wagon moved this turn:
+  it then shows as a `[Swift Journey]` button.
+- Discards and gold trades use `set <resource> <n>` and the dialog's buttons.
+
+### Explorers & Pirates (`ep`, e.g. `--scenario pirateLairs`)
+
+- **Setup:** settlement, then `ep/setupRoad`, then `ep/setupShip` (with a settler): `spots` /
+  `click-spot N` each time.
+- **Gold:** `Also in hand: Gold: N`. Buy with gold: `[Buy for 2 gold (2 left): Lumber]`
+  (`click Buy for 2 gold (2 left): Lumber`, or a unique part of it).
+- **A turn:** roll, then build/trade (Action phase), then `click Start Movement phase` (no more
+  building or trading). In Movement: with several ships, `click Ship N` (its Select button) or
+  `spots` -> `click-spot N` on a ship; then `spots` lists where it can sail (`[move ship]`) ->
+  `click-spot N`. Load / Unload / Crew buttons appear on the ship's row. `click End turn` when done.
+- **7:** place your pirate ship: `spots` -> `click-spot N`.
 
 ## Strategy (short)
 
