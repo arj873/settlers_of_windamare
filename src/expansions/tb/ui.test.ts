@@ -12,6 +12,7 @@ import {
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import {
@@ -60,7 +61,7 @@ describe('T&B setup screen', () => {
 
   it('offers the five scenarios and the variants, 2-6 seats, Harbormaster adds 1 VP', () => {
     const screen = make();
-    q(screen, `mode-${TB}`)?.click();
+    expect(pickMode(screen.element, TB)).toBe(true);
     expect(screen.state.mode).toBe(TB);
     for (const id of [SC_FISH, SC_RIVERS, SC_CARAVANS, SC_BA, SC_TRADERS, 'tb/variants']) {
       expect(q(screen, `scenario-${id}`)).not.toBeNull();
@@ -82,7 +83,7 @@ describe('T&B setup screen', () => {
 
   it('refuses the robber variants in Barbarian Attack: the reason shows, Start is off', () => {
     const screen = make();
-    q(screen, `mode-${TB}`)?.click();
+    expect(pickMode(screen.element, TB)).toBe(true);
     q(screen, `scenario-${SC_BA}`)?.click();
     // Rush mode switches the friendly robber on.
     q(screen, 'rule-rushMode')?.click();

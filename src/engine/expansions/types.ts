@@ -311,6 +311,8 @@ export interface ExpansionModule {
   /** = folder name in src/expansions, no '/'. */
   id: ExpansionId;
   name: string;
+  /** One emoji for the setup screen's expansion chip (modules playable on their own). */
+  icon?: string;
   /** Activated automatically with this module. */
   requires?: readonly ExpansionId[];
   /** Officially impossible together (E&P vs Seafarers). Symmetric: either side may declare it. */

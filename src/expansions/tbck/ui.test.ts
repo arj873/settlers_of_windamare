@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createGame, legalActions, type Action, type GameState } from '../../engine';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { setGoods } from '../ck/engine/testkit';
@@ -20,12 +21,16 @@ describe('T&B + C&K setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${TBCK_MODE}`)?.click();
+    expect(pickMode(screen.element, TBCK_MODE)).toBe(true);
     expect(screen.state.mode).toBe(TBCK_MODE);
     for (const s of ['fishermen', 'rivers', 'caravans', 'traders', 'variants']) {
       expect(q(screen, `scenario-tb/${s}`), s).not.toBeNull();
     }
-    expect(q(screen, 'scenario-tb/barbarianAttack')).toBeNull();
+    // Barbarian Attack + C&K is its own mode (back), offered in the same chip selection.
+    const tile = (mode: string) =>
+      screen.element.querySelector(`[data-mode="${mode}"][data-scenario="tb/barbarianAttack"]`);
+    expect(tile(TBCK_MODE)).toBeNull();
+    expect(tile('ba+ck')).not.toBeNull();
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 6 });
     q(screen, 'scenario-tb/traders')?.click();
     q(screen, 'start')?.click();

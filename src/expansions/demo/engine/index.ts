@@ -143,6 +143,7 @@ export const OASIS_MAP: CustomMapDef = {
 export const demoModule: ExpansionModule = {
   id: DEMO,
   name: 'Oasis (demo)',
+  icon: '🌴',
   players: { min: 3, max: 4 },
   terrains: { [OASIS]: { kind: 'land', name: 'Oasis' } },
   maps: [OASIS_MAP],
