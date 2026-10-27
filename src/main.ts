@@ -261,7 +261,10 @@ function startOffline(o: {
 
   if (dev) {
     const levels = params.levels?.length === dev.seats.length ? params.levels : undefined;
-    controller.start(dev.state, dev.seats, levels ? { botLevels: levels } : {});
+    controller.start(dev.state, dev.seats, {
+      ...(levels ? { botLevels: levels } : {}),
+      ...(params.looks ? { looks: params.looks } : {}),
+    });
     const hl = params.hl;
     const s = dev.state;
     const topo = topologyOf(s);

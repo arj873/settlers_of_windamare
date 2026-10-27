@@ -506,7 +506,14 @@ view.isFitted();                          // false once the user panned/zoomed, 
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
+view.setPieceStyles(['keep', undefined]); // PR1: piece style id per PlayerId (render/pieceStyles.ts; unknown = classic)
 ```
+
+- Piece styles (PR1, cosmetic): `PIECE_STYLES` in `render/pieceStyles.ts` (classic, timber,
+  longhouse, keep, adobe, pagoda) paint settlements and cities with the classic footprint, so
+  expansion overlays (C&K walls/metropolis) still fit; expansion drawers keep `ctx.art` (classic).
+  `render/stylePreview.ts` renders previews for the dialogs on one shared offscreen renderer.
+  Dev galleries: `styles-dev.html`, `avatars-dev.html`; `?looks=fox:keep,owl:adobe` on dev games.
 
 - Render on demand (`render/frames.ts`): the view stops `app.ticker` after the first frame with
   nothing moving and restarts it on any change (state, highlights, hover, pan/zoom, resize,
@@ -630,6 +637,16 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   Cards (bought/played, Largest Army and Longest Road history). Pure derivations in
   `stats/model.ts`; theme tokens only (player colours for series). Footer: "Results" (back to the
   winner card) + New game / session actions. Works on a game-over `GameView` (online).
+- Player profile (PR1, `src/ui/profile/`, cosmetic, never in the engine state): `model.ts` (pure:
+  ids, `avatarError`, `loadProfile`/`saveProfile` under `catan.profile.v1` + `NAME_KEY`,
+  `SeatLook`), `gallery.ts` (18 original SVG avatars + bot face, CC0, docs/CREDITS.md), `looks.ts`
+  (`setSeatLooks(looks)` by PlayerId — `avatar()` in widgets.ts then shows the picture with the
+  player-colour ring; bots always show the bot), `dialog.ts` (Profile dialog: nickname, picture,
+  upload, piece style; `setStylePreview` installs the Pixi preview), `upload.ts` (square crop,
+  96×96, WebP/JPEG ≤ 12 KB), `seatLook.ts` (setup seat button; seat 1 defaults to the profile).
+  `SeatConfig.avatar?/pieceStyle?` flow from the setup screen through `GameController`
+  (`onLooks`, saved as `SavedSession.looks`); online, `NetGameController` builds looks from the
+  room members (`roomLooks`). main.ts sends looks to `board.setPieceStyles` + `setSeatLooks`.
 
 ## 13b. Game controller (`src/game`, T7)
 

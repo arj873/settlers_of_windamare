@@ -381,22 +381,23 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 
 **Client → server**
 
-| type          | fields                           | who / when          | errors                                                              |
-| ------------- | -------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `hello`       | `token: string \| null`, `name?` | first frame         | room_full, room_expired, version_mismatch                           |
-| `setName`     | `name`                           | any member          | name_required                                                       |
-| `takeSeat`    | `seat`                           | named member, lobby | wrong_phase, name_required, bad_seat, seat_taken                    |
-| `leaveSeat`   | —                                | seated, lobby       | wrong_phase, not_seated                                             |
-| `setColor`    | `color` (one of `ROOM_COLORS`)   | seated, lobby       | wrong_phase, not_seated, color_taken                                |
-| `setBotLevel` | `seat`, `level` (`BOT_LEVELS`)   | host, lobby         | not_host, wrong_phase, bad_message (B1)                             |
-| `configure`   | `config: RoomConfig`             | host, lobby         | not_host, wrong_phase, bad_message                                  |
-| `kick`        | `member`                         | host                | not_host, bad_message                                               |
-| `start`       | —                                | host, lobby         | not_host, wrong_phase, not_seated, bad_config                       |
-| `rematch`     | —                                | host, over          | not_host, wrong_phase                                               |
-| `intent`      | `action: Action`, `seq?`         | seated, playing     | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
-| `chat`        | `text`                           | named member        | name_required, rate_limited                                         |
-| `react`       | `reaction`                       | any member          | rate_limited                                                        |
-| `sync`        | —                                | any member          | — (resends `room` + `game`)                                         |
+| type          | fields                           | who / when           | errors                                                              |
+| ------------- | -------------------------------- | -------------------- | ------------------------------------------------------------------- |
+| `hello`       | `token: string \| null`, `name?` | first frame          | room_full, room_expired, version_mismatch                           |
+| `setName`     | `name`                           | any member           | name_required                                                       |
+| `setProfile`  | `avatar`, `pieceStyle` (PR1)     | any member, any time | bad_message, rate_limited (`profile` bucket)                        |
+| `takeSeat`    | `seat`                           | named member, lobby  | wrong_phase, name_required, bad_seat, seat_taken                    |
+| `leaveSeat`   | —                                | seated, lobby        | wrong_phase, not_seated                                             |
+| `setColor`    | `color` (one of `ROOM_COLORS`)   | seated, lobby        | wrong_phase, not_seated, color_taken                                |
+| `setBotLevel` | `seat`, `level` (`BOT_LEVELS`)   | host, lobby          | not_host, wrong_phase, bad_message (B1)                             |
+| `configure`   | `config: RoomConfig`             | host, lobby          | not_host, wrong_phase, bad_message                                  |
+| `kick`        | `member`                         | host                 | not_host, bad_message                                               |
+| `start`       | —                                | host, lobby          | not_host, wrong_phase, not_seated, bad_config                       |
+| `rematch`     | —                                | host, over           | not_host, wrong_phase                                               |
+| `intent`      | `action: Action`, `seq?`         | seated, playing      | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
+| `chat`        | `text`                           | named member         | name_required, rate_limited                                         |
+| `react`       | `reaction`                       | any member           | rate_limited                                                        |
+| `sync`        | —                                | any member           | — (resends `room` + `game`)                                         |
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
 plus `seatCount` (`mode` (any registered mode, X1), `scenario?` (one of the mode's), `options?`
@@ -425,6 +426,7 @@ handler checks its meaning. **Intent guard:** an intent is refused (`illegal_act
 | ---------- | ---------------------------------------------------------------- | -------------------------------------------------- |
 | `welcome`  | `you{member, token}`, `room: RoomInfo`, `chat: ChatEntry[]`      | reply to `hello`                                   |
 | `room`     | `room: RoomInfo` (`id, phase, host, config, seats[], members[]`) | to everyone after any lobby/seat/member change     |
+| `avatars`  | `images: Record<imgKey, dataUrl>` (PR1)                          | after `welcome` (all), on each new upload (one)    |
 | `game`     | `seq`, `view: GameView`, `legal: Action[]`, `timer`              | to each member after every state change (own view) |
 | `chat`     | `entry: ChatEntry{id, at, from, name, seat, text}`               | to everyone                                        |
 | `reaction` | `member`, `seat`, `reaction`                                     | to everyone                                        |
@@ -432,6 +434,19 @@ handler checks its meaning. **Intent guard:** an intent is refused (`illegal_act
 
 The client validates server frames with `parseServerMessage` (JSON, version, known type; the
 payload is trusted). A `room` with `phase: 'lobby'` after a game means the game is gone (rematch).
+
+**Profiles (PR1, cosmetic).** `setProfile {avatar, pieceStyle}` sets the sender's own picture and
+piece style (no member field: nobody can change someone else's). `avatar` is `null`, a gallery id
+(`AVATAR_IDS`, `src/ui/profile/model.ts`) or a `data:image/(webp|jpeg|png);base64,…` URL of at
+most `AVATAR_LIMITS.maxBytes` (16 KB decoded) whose bytes start with that format's signature
+(`avatarError`); SVG, other types and any URL to fetch are refused (`bad_message`). `pieceStyle`
+is one of `PIECE_STYLE_IDS`. Rate limit: `RATE_LIMITS.profile` (4, then one per 5 s); at most
+`LIMITS.avatarImages` (12) members per room hold an uploaded picture. `LIMITS.messageChars` is
+sized to fit the largest picture. `MemberInfo` carries `pieceStyle?` and `avatar?` — the gallery
+id, or an `img:<member>.<rev>` key whose data URL is sent once in an `avatars` message (all of them
+right after `welcome`, then each new upload to everyone), so `room` updates stay small. Stored
+with the member in the snapshot. The client (`RoomClient`, option `profile`) sends its profile
+after the first `welcome`; `avatarOf(member)` resolves a member's picture.
 
 ## 14. Error and close codes
 

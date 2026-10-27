@@ -2,6 +2,7 @@
 import { isMapId, modeById, scenarioById, type Layout, type MapId } from '../engine';
 import type { BotLevel } from '../bots/levels';
 import type { Controller } from '../ui';
+import { isAvatarId, isPieceStyle, type SeatLook } from '../ui/profile/model';
 
 export interface DevParams {
   /** `?fixture=midGame`: load an engine fixture (all seats human unless `?seats`). */
@@ -34,6 +35,11 @@ export interface DevParams {
   mode: string | null;
   /** `?scenario=tb/traders` / `seafarers/fogIslands`: with `?mode=`, one of its scenarios. */
   scenario: string | null;
+  /**
+   * PR1 `?looks=fox:keep,owl:adobe,-:pagoda`: picture (gallery id, `-` = none) and piece style
+   * per seat for dev games (screenshots).
+   */
+  looks: SeatLook[] | null;
 }
 
 export function parseParams(search: string): DevParams {
@@ -74,5 +80,14 @@ export function parseParams(search: string): DevParams {
     debug: p.get('debug') === '1',
     mode: modeById(p.get('mode') ?? '') ? p.get('mode') : null,
     scenario: scenarioById(p.get('scenario') ?? '') ? p.get('scenario') : null,
+    looks: p.get('looks')
+      ? (p.get('looks') ?? '').split(',').map((entry) => {
+          const [avatar, style] = entry.split(':');
+          return {
+            ...(isAvatarId(avatar) ? { avatar } : {}),
+            ...(isPieceStyle(style) ? { pieceStyle: style } : {}),
+          };
+        })
+      : null,
   };
 }
