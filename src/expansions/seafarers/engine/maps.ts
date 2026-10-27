@@ -453,7 +453,12 @@ function robberStart(p: Prepared, hexes: Record<HexId, HexTile>): HexId {
   return cellHex(parseCell(r));
 }
 
-function boardWith(p: Prepared, hexes: Record<HexId, HexTile>, ports: Port[]): GeneratedBoard {
+/** A generated board with its Seafarers data (exported for combination maps, C3). */
+export function boardWith(
+  p: Prepared,
+  hexes: Record<HexId, HexTile>,
+  ports: Port[],
+): GeneratedBoard {
   const board: Board = { hexes, ports, ext: { [SEAFARERS]: seaBoardOf(p, hexes) } };
   return { board, robber: robberStart(p, hexes) };
 }
@@ -482,7 +487,7 @@ function randomMain56(rng: Rng, cells: readonly CellEntry[], into: Record<HexId,
  * with fresh shuffles; falls back to the last shuffle (the constraints can always be met by the
  * printed layouts, so this only guards against an endless loop).
  */
-function dealTokens(
+export function dealTokens(
   rng: Rng,
   slots: readonly HexId[],
   tokens: readonly number[],
@@ -521,7 +526,10 @@ function fixedBoard(rng: Rng, p: Prepared): GeneratedBoard {
 }
 
 /** Extra token rules of a variable set-up (§2.2-§2.9). */
-function tokenRule(p: Prepared, hexes: Record<HexId, HexTile>): (h: HexId, n: number) => boolean {
+export function tokenRule(
+  p: Prepared,
+  hexes: Record<HexId, HexTile>,
+): (h: HexId, n: number) => boolean {
   const key = p.spec.key;
   if (key.startsWith('desert') || key.startsWith('newworld')) {
     // Through the Desert (S5 p.19) / New World (S6): no red number on a gold field.
@@ -631,7 +639,7 @@ function newWorldBoard(rng: Rng, p: Prepared): GeneratedBoard {
   }
 }
 
-function randomHarbors(rng: Rng, p: Prepared, hexes: Record<HexId, HexTile>): Port[] {
+export function randomHarbors(rng: Rng, p: Prepared, hexes: Record<HexId, HexTile>): Port[] {
   const candidates: { edge: HarborSpot['edge']; water: HexId; land: HexId }[] = [];
   for (const c of p.boardCells) {
     if (!isLandTerrain(hexes[c.hex]?.terrain ?? 'sea')) continue;

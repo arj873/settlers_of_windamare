@@ -63,6 +63,8 @@ describe('GameSession: expansion modes online', () => {
     { mode: 'seafarers+ck', scenario: 'seafarers/newShores' },
     { mode: 'ep+ck', scenario: 'ep/pirateLairs', vpToWin: 17 },
     { mode: 'ep+tb', scenario: 'ep/fish' },
+    { mode: 'tb+seafarers', scenario: 'tbsea/riversDesert' },
+    { mode: 'tb+seafarers', scenario: 'tbsea/tradersDesert' },
     { mode: 'ba+ck', scenario: 'tb/barbarianAttack' },
     { mode: 'two+ck', scenario: 'tb/variants', seatCount: 2 },
   ])('$mode $scenario: humans and bots play; each seat gets its own view', (patch) => {
