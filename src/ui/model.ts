@@ -19,6 +19,7 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
+  setupRoundAt,
   topologyOf,
   RESOURCES,
   victoryPoints,
@@ -447,16 +448,19 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
   if (ext) return { text: ext, tone: 'action' };
 
   switch (phase.kind) {
-    case 'setup':
+    case 'setup': {
+      // C&K, T&B and the setup variants make some setup buildings cities.
+      const building = setupRoundAt(state, phase.index).building;
       return {
         text:
           phase.step === 'settlement'
-            ? 'Place a settlement'
+            ? `Place a ${building}`
             : placeMode
               ? placeText(placeMode) // a module's build card in setup (the Seafarers Ship)
-              : 'Place a road next to your new settlement',
+              : `Place a road next to your new ${building}`,
         tone: 'action',
       };
+    }
     case 'preRoll':
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':

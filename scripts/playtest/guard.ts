@@ -6,7 +6,7 @@
  * only when it has a legal action. While the "Pass to <name>" cover is up, that seat may only
  * `pass`. This keeps three agents from clicking over each other.
  */
-import type { Action, GameState, PlayerId } from '../../src/engine';
+import { setupRoundAt, type Action, type GameState, type PlayerId } from '../../src/engine';
 import type { Snapshot } from './protocol';
 
 export type Verdict = { ok: true } | { ok: false; reason: string };
@@ -19,20 +19,52 @@ export function actors(legal: readonly Action[]): PlayerId[] {
   return [...new Set(legal.map((a) => a.player))].sort((a, b) => a - b);
 }
 
-/** One line: what `seat` has to do now (assumes it is their moment). */
-export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[]): string {
+const isExt = (a: Action) => a.type.includes('/');
+
+/**
+ * An expansion step: say what the screen says (modules word their own prompts) and which of
+ * its moves are legal, instead of a base-game sentence that does not fit.
+ */
+function expansionStep(hint: string | null | undefined, mine: readonly Action[]): string {
+  const ext = [...new Set(mine.filter(isExt).map((a) => a.type))];
+  const say = hint ? `"${hint}"` : 'an expansion step';
+  const moves = ext.length > 0 ? ` Expansion moves now: ${ext.join(', ')}.` : '';
+  return `${say}.${moves} Use the buttons in \`status\` (dialog / panel) or \`spots\` then \`click-spot N\`.`;
+}
+
+/**
+ * One line: what `seat` has to do now (assumes it is their moment). `hint` is the turn pill's
+ * prompt; expansion steps are worded by it.
+ */
+export function mustDo(
+  state: GameState,
+  seat: PlayerId,
+  legal: readonly Action[],
+  hint?: string | null,
+): string {
   const mine = legal.filter((a) => a.player === seat);
   const phase = state.phase;
   if (phase.kind === 'gameOver') return `Game over: ${nameOf(state, state.winner)} won.`;
   if (mine.length === 0) return 'Nothing to do right now.';
+  // Main phase with only expansion moves (+ End turn) and the screen saying something else than
+  // the base "build, trade or end your turn": e.g. the E&P Movement phase.
+  const extOnly =
+    mine.some(isExt) &&
+    mine.every((a) => isExt(a) || a.type === 'endTurn') &&
+    !!hint &&
+    !/build, trade or end your turn/i.test(hint);
   switch (phase.kind) {
-    case 'setup':
+    case 'setup': {
+      const building = setupRoundAt(state, phase.index).building;
+      const other = mine.some(isExt) ? ' (or another piece: `spots` names each spot’s move)' : '';
       return phase.step === 'settlement'
-        ? 'Place your setup settlement: run `spots`, then `click-spot N`.'
-        : 'Place your setup road next to the new settlement: `spots`, then `click-spot N`.';
+        ? `Place your setup ${building}${other}: run \`spots\`, then \`click-spot N\`.`
+        : `Place your setup road next to the new ${building}${other}: \`spots\`, then \`click-spot N\`.`;
+    }
     case 'preRoll':
       return 'Roll the dice: `click Roll dice` (you may play a ready development card first).';
     case 'main':
+      if (extOnly) return `${expansionStep(hint, mine)} Then \`click End turn\`.`;
       return 'Your turn: build, trade or play a card, then `click End turn`.';
     case 'discard':
       return `Discard ${phase.pending[seat] ?? 0} cards: \`set <resource> <count>\` for each, then \`click Discard\`.`;
@@ -59,7 +91,7 @@ export function mustDo(state: GameState, seat: PlayerId, legal: readonly Action[
     case 'event':
       return 'Event card: make your choice in the event dialog (`click <option>`).';
     default:
-      return `Expansion step (${phase.kind}): use the dialog or \`spots\` / \`click-spot N\`.`;
+      return `Expansion step (${phase.kind}): ${expansionStep(hint, mine)}`;
   }
 }
 
@@ -101,13 +133,17 @@ export function wakeReason(snap: Snapshot, seat: PlayerId): string | null {
   // Own trade offer: Cancel is always legal, so keep waiting until every addressee answered.
   if (pendingReplies(state, seat).length > 0) return null;
   const covered = snap.ui.cover !== null;
-  return `YOUR MOVE${covered ? ' (screen is covered: run `pass` first)' : ''}: ${mustDo(state, seat, snap.legal)}`;
+  return `YOUR MOVE${covered ? ' (screen is covered: run `pass` first)' : ''}: ${mustDo(state, seat, snap.legal, snap.ui.hint)}`;
 }
 
 /** Who the table is waiting on (for `wait` timeouts and refusals). */
 export function waitingOn(snap: Snapshot): string {
   const state = snap.state;
-  if (!state) return 'the game to load';
+  if (!state) {
+    return snap.online?.roomPhase === 'playing'
+      ? 'the CLI to read the page: it shows the game but lost its debug hook, run `reload`'
+      : 'the game to load';
+  }
   if (snap.online) return onlineWaitingOn(state);
   const who = actors(snap.legal).map((p) => nameOf(state, p));
   const screen = nameOf(state, snap.viewer);
