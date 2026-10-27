@@ -159,6 +159,58 @@ function mountain(g: Graphics, ox: number, oy: number, x: number, y: number, w: 
     apex[0] + W * 0.02,
     apex[1] + H * (c + 0.06),
   ]).fill({ color: 0xb8c8d8, alpha: 0.7 });
+  // An ore seam down the sunlit face: a dark crack studded with gold nuggets, a glint below.
+  const seam: Pt[] = [
+    [-0.3, -0.12],
+    [-0.2, -0.26],
+    [-0.24, -0.38],
+    [-0.12, -0.52],
+  ];
+  const at = ([a, b]: Pt): Pt => [X + W * a, Y + H * b * 1.1];
+  g.moveTo(...at(seam[0] as Pt));
+  for (const p of seam.slice(1)) g.lineTo(...at(p));
+  g.stroke({ width: Math.max(2, W * 0.07), color: 0x2f3842, join: 'round', cap: 'round' });
+  for (const p of seam) nugget(g, ...at(p), Math.max(2.4, W * 0.05));
+  sparkle(g, X + W * 0.24, Y - H * 0.28, Math.max(3, W * 0.07));
+}
+
+/** A gold ore nugget (a small outlined diamond) centred at (x, y) design px. */
+function nugget(g: Graphics, x: number, y: number, r: number) {
+  g.poly([x, y - r, x + r, y, x, y + r, x - r, y])
+    .fill(0xf0c040)
+    .stroke({ width: 1, color: 0x8a6a14, join: 'round' });
+}
+
+/** A white four-pointed glint centred at (x, y) design px. */
+function sparkle(g: Graphics, x: number, y: number, r: number) {
+  const k = r * 0.3;
+  g.poly([
+    x,
+    y - r,
+    x + k,
+    y - k,
+    x + r,
+    y,
+    x + k,
+    y + k,
+    x,
+    y + r,
+    x - k,
+    y + k,
+    x - r,
+    y,
+    x - k,
+    y - k,
+  ]).fill(0xffffff);
+}
+
+/** A heap of ore at the foot of the mountains: the resource icon's rocks on a shadow. */
+function orePile(g: Graphics, ox: number, oy: number, x: number, y: number, size: number) {
+  const X = ox + px(x);
+  const Y = oy + px(y);
+  const U = px(size);
+  g.ellipse(X, Y + U * 0.3, U * 0.56, U * 0.12).fill({ color: 0x000000, alpha: 0.25 });
+  drawResourceIcon(g, 'ore', X, Y, U);
 }
 
 function cactus(g: Graphics, ox: number, oy: number, x: number, y: number, h: number) {
@@ -272,6 +324,10 @@ export function drawTerrainMotif(
       for (const [x, y] of scatter(rng, 5, 0.25, 0.8, 0.6)) {
         g.ellipse(ox + px(x), oy + px(y + 0.12), 3.5, 2.5).fill(pal.dark);
       }
+      // Mined ore heaped by the mountains (#50): the hex reads "ore" at a glance, like the card.
+      orePile(g, ox, oy, -0.58, -0.17, 0.42);
+      orePile(g, ox, oy, 0.6, -0.13, 0.38);
+      orePile(g, ox, oy, 0.02, 0.62, 0.42);
       break;
     }
     case 'desert': {
