@@ -20,6 +20,7 @@ import { eptbHud } from '../expansions/eptb/ui';
 import { backHud } from '../expansions/back/ui';
 import { twockHud } from '../expansions/twock/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
+import type { ExtensionSounds, SoundRecipe } from '../audio/types';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
 import type { GlyphName } from './icons';
@@ -93,6 +94,11 @@ export interface HudExtension {
    */
   hideBaseCards?:
     readonly BasePlaceMode[] | ((state: Pick<GameState, 'settings'>) => readonly BasePlaceMode[]);
+  /**
+   * Sound effects (A1): recipes under `<id>/<name>` (registered for every module at boot) and a
+   * cue hook called with each state change of a game the module is active in (src/game/sounds.ts).
+   */
+  sounds?: ExtensionSounds<GameState>;
 }
 
 export const HUD_EXTENSIONS: readonly HudExtension[] = [
@@ -137,6 +143,19 @@ export function extensionHint(state: GameState, view: HudView): string | null {
     if (h) return h;
   }
   return null;
+}
+
+/** The sound hooks of the expansions active in `state` (A1). */
+export function extensionSounds(state: Pick<GameState, 'settings'>): ExtensionSounds<GameState>[] {
+  return hudExtensionsFor(state).flatMap((x) => (x.sounds ? [x.sounds] : []));
+}
+
+/** Every module's sound recipes, keyed by namespaced id (registered once at boot). */
+export function extensionSoundRecipes(): Record<string, SoundRecipe> {
+  return Object.assign({}, ...HUD_EXTENSIONS.map((x) => x.sounds?.recipes ?? {})) as Record<
+    string,
+    SoundRecipe
+  >;
 }
 
 /** Every implied (button-less) board action type of every extension. */

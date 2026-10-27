@@ -10,6 +10,7 @@ import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
 import { tradeEndNotice, type BoardClick } from '../logic';
 import { SpotPicker, type SpotPromptLike } from '../spotPicker';
+import type { SoundObserver } from '../sounds';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -23,6 +24,8 @@ export interface NetControllerOptions {
   prompt?: SpotPromptLike | null;
   /** The "Confirm before building" setting; default on. */
   confirmBuild?: () => boolean;
+  /** Sound effects (A1): told about every rendered view and the turn timer. */
+  sounds?: SoundObserver;
 }
 
 export const NET_TIMER_TICK_MS = 250;
@@ -56,6 +59,7 @@ export class NetGameController {
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly onRender: () => void;
   private readonly every: (fn: () => void, ms: number) => () => void;
+  private readonly sounds: SoundObserver | null;
   private active = false;
   private placeMode: PlaceMode | null = null;
   private readonly spots: SpotPicker;
@@ -82,6 +86,7 @@ export class NetGameController {
       submit: (a) => this.send(a),
       rehighlight: () => this.updateHighlights(),
     });
+    this.sounds = opts.sounds ?? null;
 
     // The HUD has no unsubscribe: these stay registered and check `active`.
     this.hud.on('action', (a) => {
@@ -185,6 +190,12 @@ export class NetGameController {
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
     this.board.render(g.view);
     this.hud.render(g.view, hv);
+    const seat = this.viewer;
+    this.sounds?.observe(g.view, {
+      viewer: seat,
+      local: g.view.players.map((_, i) => i === seat),
+      bots: hv.bots ?? [],
+    });
     this.updateHighlights();
     this.onRender();
   }
@@ -234,5 +245,7 @@ export class NetGameController {
     if (shown === this.shownSec) return;
     this.shownSec = shown;
     this.hud.setTurnTimer(t);
+    const owner = this.client.game.timer?.player;
+    this.sounds?.timer(t ? t.remainingSec : null, owner !== undefined && owner === this.viewer);
   }
 }

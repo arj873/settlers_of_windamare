@@ -24,6 +24,7 @@ import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import { gameConfigOf, isStalled, nextBot, pickViewer, type BoardClick, type Seats } from './logic';
 import { SpotPicker, type SpotPromptLike } from './spotPicker';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
+import type { SoundObserver } from './sounds';
 import {
   IDLE_CLOCK,
   bankAfterAction,
@@ -61,6 +62,8 @@ export interface ControllerOptions {
   prompt?: SpotPromptLike | null;
   /** The "Confirm before building" setting; default on. */
   confirmBuild?: () => boolean;
+  /** Sound effects (A1): told about every rendered state and the turn timer. */
+  sounds?: SoundObserver;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -88,6 +91,7 @@ export class GameController {
   private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
+  private readonly sounds: SoundObserver | null;
   private speedMs: number;
 
   private current: GameState | null = null;
@@ -129,6 +133,7 @@ export class GameController {
     this.bot = opts.bot ?? null;
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
+    this.sounds = opts.sounds ?? null;
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
     const board = this.board;
     this.spots = new SpotPicker({
@@ -360,6 +365,11 @@ export class GameController {
       turnTimer,
       gameDurationMs: this.durationMs,
     });
+    this.sounds?.observe(state, {
+      viewer: this.viewerId,
+      local: this.seatList.map((s) => s === 'human'),
+      bots: this.seatList.map((s) => s === 'bot'),
+    });
     this.updateHighlights();
     this.persist();
     this.onRender();
@@ -441,6 +451,8 @@ export class GameController {
     if (shown !== this.clockShown) {
       this.clockShown = shown;
       this.hud.setTurnTimer(view);
+      // Bots are never timed: the clock is always a human's on this screen.
+      this.sounds?.timer(view ? view.remainingSec : null, true);
     }
   }
 

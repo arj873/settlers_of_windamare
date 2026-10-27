@@ -62,6 +62,7 @@ import {
   type TbPhase,
   sheetRules,
 } from './engine';
+import { tbSounds } from './sounds';
 import './tb.css';
 
 type Send = (a: Action) => void;
@@ -869,6 +870,7 @@ function hint(state: GameState, view: HudView): string | null {
 
 export const tbHud: HudExtension = {
   id: TB,
+  sounds: tbSounds,
 
   panel(state, view, send) {
     const scenario = state.settings.scenario ?? SC_BASE;
