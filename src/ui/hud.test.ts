@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { legalActions, type Action } from '../engine';
-import { discardGame, midGame, moveRobberGame, tradeOfferGame } from '../engine/fixtures';
+import {
+  discardGame,
+  freshGame,
+  midGame,
+  moveRobberGame,
+  tradeOfferGame,
+} from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
 import { Hud } from './hud';
 import type { NewGameConfig, PlaceMode } from './types';
@@ -343,6 +349,46 @@ describe('Hud', () => {
     );
     expect(tip.textContent).toContain('You have the cards');
     expect(tip.querySelector('.is-missing')).toBeNull();
+  });
+
+  it('cost tooltips work at any time: another player’s turn, setup, spectating (#35)', () => {
+    const tipOf = (label: string) =>
+      [...root.querySelectorAll('.bslot')]
+        .find((s) => s.querySelector('.bcard-label')?.textContent === label)
+        ?.querySelector('.cost-tip');
+    const s = midGame(); // Blue's turn; Red (0) watches their hand
+    hud.render(s, { viewer: 0, legal: legalActions(s, 0), isBotTurn: false });
+    for (const label of ['Road', 'Settlement', 'City']) {
+      expect(tipOf(label)?.querySelector('.cost-cards')).not.toBeNull();
+    }
+    expect(tipOf('Road')!.textContent).toMatch(/not your turn/i);
+
+    const setup = freshGame(4);
+    hud.render(setup, { viewer: 0, legal: legalActions(setup, 0), isBotTurn: false });
+    expect(tipOf('City')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
+      'Cost: 2 grain, 3 ore',
+    );
+  });
+
+  it('a spectator has no hand but a read-only bar with the cost tooltips (#35)', () => {
+    const tipOf = (label: string) =>
+      [...root.querySelectorAll('.bslot')]
+        .find((s) => s.querySelector('.bcard-label')?.textContent === label)
+        ?.querySelector('.cost-tip');
+    hud.render(midGame(), { viewer: -1, legal: [], isBotTurn: false, spectator: true });
+    expect(root.querySelector('.hand')).toBeNull();
+    const bar = root.querySelector('.build-bar.is-costs')!;
+    expect([...bar.querySelectorAll('.bcard-label')].map((l) => l.textContent)).toEqual([
+      'Buy card',
+      'Road',
+      'Settlement',
+      'City',
+    ]);
+    expect(tipOf('Settlement')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
+      'Cost: 1 brick, 1 lumber, 1 wool, 1 grain',
+    );
+    expect(tipOf('Settlement')?.querySelector('.cost-have')).toBeNull();
+    expect(bar.querySelectorAll('button:not([disabled])')).toHaveLength(0);
   });
 
   it('a long-press on an enabled build button opens its cost tooltip instead of clicking (#35)', () => {

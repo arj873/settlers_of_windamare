@@ -4,6 +4,7 @@
  */
 import {
   costOf,
+  devDeckCounts,
   emptyResources,
   EVENT_INFO,
   getPlayer,
@@ -30,7 +31,7 @@ import {
 import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
-import { costLabel, costTip, missingCards } from './costView';
+import { costLabel, costTip, missingCards, type Cost } from './costView';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
@@ -447,8 +448,9 @@ export class Hud {
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
     if (view.spectator) {
-      // Public info only: no hand, no buttons, no dialogs; the dice stay visible.
-      r.bottom.replaceChildren();
+      // Public info only: no hand, no buttons, no dialogs; the dice stay visible. The build
+      // costs stay readable (#35: a read-only bar with the cost tooltips).
+      r.bottom.replaceChildren(this.costBar(state));
       r.controls.replaceChildren(this.diceBox(state));
       r.dialog.replaceChildren();
       this.lastDialogKey = '';
@@ -1001,6 +1003,54 @@ export class Hud {
     // CSS `order` shows hand | trade | build from left to right.
     build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
+  }
+
+  /**
+   * Spectators (#35): the build cards as a read-only price list, each with its cost tooltip
+   * (hover / tap), base and expansion cards alike.
+   */
+  private costBar(state: GameState): HTMLElement {
+    const hidden = hiddenBaseCards(state);
+    const card = (key: string, label: string, art: HTMLElement, cost: Cost | null) =>
+      this.buildSlot(
+        key,
+        h(
+          'button',
+          { class: 'act bcard', disabled: true, attrs: { 'data-why': 'Spectating' } },
+          h('span', { class: 'bcard-art' }, art),
+          h('span', { class: 'bcard-label' }, label),
+          cost &&
+            h(
+              'span',
+              { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+              ...RESOURCES.flatMap((r) =>
+                Array.from({ length: cost[r] ?? 0 }, () => resCardFace(r, 16)),
+              ),
+            ),
+        ),
+        costTip(label, cost, null, [h('span', { class: 'why-line' }, 'You are watching')]),
+        true,
+      );
+    const base = (['dev', 'road', 'settlement', 'city'] as const)
+      .filter((k) => !hidden.has(k) && (k !== 'dev' || devDeckCounts(state).total > 0))
+      .map((k) =>
+        card(k, BUILD_LABEL[k], k === 'dev' ? devCardFace(null, 26) : glyph(k, 30), BUILD_COST[k]),
+      );
+    const ext = hudExtensionsFor(state).flatMap((x) =>
+      (x.buildCards ?? [])
+        .filter((c) => !c.available || c.available(state))
+        .map((c) =>
+          card(
+            c.mode,
+            c.label,
+            glyph(c.glyph ?? 'settlement', 30),
+            costOf(state, c.costItem ?? c.mode) ?? null,
+          ),
+        ),
+    );
+    const bar = h('div', { class: 'build-bar wood is-costs' }, ...base, ...ext);
+    bar.style.setProperty('--build-n', String(bar.childElementCount));
+    return bar;
   }
 
   // --- bottom-right: dice, roll, end turn ------------------------------------

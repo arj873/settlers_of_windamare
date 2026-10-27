@@ -571,7 +571,9 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   reason is also in the button's `data-why` (playtest harness).
 - Cost tooltips (#35): every build-bar slot (base and expansion cards, prices from `BUILD_COST` /
   `costOf`) has a `.why.cost-tip` bubble: title, the cost as card faces (cards the hand lacks
-  dimmed, `.is-missing`), "You have the cards" or "Missing …", then the block reasons. Hover
+  dimmed, `.is-missing`), "You have the cards" or "Missing …", then the block reasons. It works
+  at any time: on other players' turns, in setup, at game over, and for spectators (a read-only
+  bar of disabled cards, `Hud.costBar`). Hover
   opens it; on touch a tap on a disabled card or a 450 ms long-press on an enabled one (the
   click that ends the press is swallowed). The cost pieces are the shared component
   `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other

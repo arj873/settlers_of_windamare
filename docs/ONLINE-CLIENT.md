@@ -60,7 +60,8 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 ## HUD additions (`src/ui`)
 
 - `HudView.spectator` (pass `viewer: -1`): no hand bar, no buttons, no dialogs, dice stay, a
-  "Spectating" pill next to the turn pill.
+  "Spectating" pill next to the turn pill. The build cards stay as a read-only price list
+  (`.build-bar.is-costs`, all disabled) with their cost tooltips (#35).
 - `HudView.away[]`: disconnected owner → offline icon in the player list (also when a bot plays
   for them).
 - `Hud.setChat(el)`: a persistent Chat section at the bottom of the sidebar (typing survives
