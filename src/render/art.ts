@@ -622,6 +622,35 @@ export function drawRoad(g: Graphics, a: Pt, b: Pt, color: number) {
 }
 
 /**
+ * Halo under a counted route (#51: the Longest Road holder's path), layered BELOW the roads so
+ * it shows as a rim around them. `lines` are polylines through vertex centres (design px), one
+ * stroke each so the joints do not double up. Subtle: a pale band in the holder's `color` with
+ * a dark rim; `strong` (hover) adds a wide soft glow.
+ */
+export function drawRouteHalo(g: Graphics, lines: Pt[][], color: number, strong: boolean) {
+  const line = (pts: Pt[]) => {
+    const [first, ...rest] = pts;
+    if (!first) return g;
+    g.moveTo(...first);
+    for (const p of rest) g.lineTo(...p);
+    return g;
+  };
+  const style = { cap: 'round', join: 'round' } as const;
+  for (const pts of lines) {
+    if (strong) {
+      line(pts).stroke({ ...style, width: ROAD_W + px(0.36), color, alpha: 0.3 });
+      line(pts).stroke({ ...style, width: ROAD_W + px(0.22), color, alpha: 0.45 });
+    }
+    line(pts).stroke({ ...style, width: ROAD_W + px(strong ? 0.15 : 0.11), color: INK });
+    line(pts).stroke({
+      ...style,
+      width: ROAD_W + px(strong ? 0.1 : 0.065),
+      color: strong ? 0xffffff : shade(color, 0.55),
+    });
+  }
+}
+
+/**
  * Junction peg at a building-free vertex (x, y). Must be layered ABOVE roads and below
  * buildings. With `color` (a dead end, one road) it is a rounded road end in that colour;
  * without it (2+ roads, any owners) it is a neutral wooden peg.

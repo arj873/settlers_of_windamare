@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { cornerVertex, sideEdge } from '../hex';
+import { edgeVertices, topologyOf } from '../topology';
 import type { EdgeId, GameState } from '../types';
-import { longestRoadLength, longestRoadLengths } from './longestRoad';
+import {
+  longestRoadLength,
+  longestRoadLengths,
+  longestRoadPath,
+  longestRoadTrail,
+} from './longestRoad';
 import { addRoads, emptyBoard, ring, settle, zigzag, zigzagJoint } from './roadTestBoard';
 
 function len(edges: EdgeId[], setup?: (s: GameState) => void): number {
@@ -90,5 +96,80 @@ describe('longestRoadLength', () => {
     addRoads(s, 0, zigzag(-2, 0, 5));
     addRoads(s, 2, zigzag(-2, 1, 3));
     expect(longestRoadLengths(s)).toEqual([5, 0, 3, 0]);
+  });
+});
+
+/** `edges` form one trail: distinct, each consecutive pair sharing a vertex. */
+function isTrail(s: GameState, edges: readonly EdgeId[]): boolean {
+  const t = topologyOf(s);
+  if (new Set(edges).size !== edges.length) return false;
+  return edges.every((e, i) => {
+    const prev = edges[i - 1];
+    if (prev === undefined) return true;
+    const a = edgeVertices(t, prev);
+    return edgeVertices(t, e).some((v) => a.includes(v));
+  });
+}
+
+// #51: the board draws the counted road.
+describe('longestRoadTrail / longestRoadPath', () => {
+  function path(edges: EdgeId[], setup?: (s: GameState) => void) {
+    const s = emptyBoard();
+    addRoads(s, 0, edges);
+    setup?.(s);
+    return { s, trail: longestRoadTrail(s, 0), path: longestRoadPath(s, 0) };
+  }
+
+  it('is empty without roads', () => {
+    expect(path([]).path).toEqual([]);
+    expect(path([]).trail).toEqual({ length: 0, edges: [] });
+  });
+
+  it('is the whole chain, in order', () => {
+    const road = zigzag(-2, 0, 6);
+    const { s, path: p } = path(road);
+    expect(new Set(p)).toEqual(new Set(road));
+    expect(isTrail(s, p)).toBe(true);
+  });
+
+  it('leaves the shorter arm of a fork out', () => {
+    const branch = [sideEdge(-2, 0, 'E'), sideEdge(-2, 1, 'NE'), sideEdge(-2, 1, 'E')];
+    const { s, path: p } = path([...zigzag(-2, 0, 6), ...branch]);
+    expect(p).toHaveLength(7);
+    expect(isTrail(s, p)).toBe(true);
+    expect(p).toEqual(expect.arrayContaining(branch));
+    // The left arm (2 roads) is the one left out.
+    expect(p).not.toContain(zigzag(-2, 0, 6)[0]);
+  });
+
+  it('covers a loop plus its tail', () => {
+    const edges = [...ring(0, 0), sideEdge(0, -1, 'E')];
+    const { s, path: p } = path(edges);
+    expect(new Set(p)).toEqual(new Set(edges));
+    expect(isTrail(s, p)).toBe(true);
+  });
+
+  it('stops at an opponent building', () => {
+    const road = zigzag(-2, 0, 7);
+    // Cut after road 3 of 7: the 4 roads past the opponent count, the 3 before do not.
+    const { s, path: p } = path(road, (st) => settle(st, 1, zigzagJoint(-2, 0, 2)));
+    expect(p).toHaveLength(4);
+    expect(p).not.toContain(road[0]);
+    expect(isTrail(s, p)).toBe(true);
+  });
+
+  it("matches the award's length for every player", () => {
+    const s = emptyBoard();
+    addRoads(s, 0, zigzag(-2, 0, 5));
+    addRoads(s, 2, [...ring(0, 0), sideEdge(0, -1, 'E')]);
+    const lengths = longestRoadLengths(s);
+    for (const p of s.players) expect(longestRoadPath(s, p.id)).toHaveLength(lengths[p.id] ?? 0);
+  });
+
+  it('weights edges (T&B camels count a road twice)', () => {
+    const road = zigzag(-2, 0, 4);
+    const s = emptyBoard();
+    addRoads(s, 0, road);
+    expect(longestRoadTrail(s, 0, (e) => (e === road[1] ? 2 : 1)).length).toBe(5);
   });
 });

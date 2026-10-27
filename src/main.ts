@@ -22,6 +22,7 @@ import { createFitButton, measureHudInsets } from './game/layout';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import {
+  LONGEST_ROAD_KEY,
   SPEED_KEY,
   browserStorage,
   clearSession,
@@ -113,6 +114,7 @@ async function boot() {
   onThemeChange(frameToTheme);
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
+  wireLongestRoad(board, hud, prefs);
 
   const fitBoard = () => {
     const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
@@ -204,6 +206,32 @@ function homeUrl(): string {
   u.hash = '';
   if (server) u.searchParams.set('server', server);
   return u.toString();
+}
+
+/**
+ * #51: the menu setting "Show longest road on the board" (saved; default off) outlines the
+ * Longest Road holder's route; pointing at the holder's road count or award badge shows it too,
+ * stronger (a tap: for a few seconds).
+ */
+function wireLongestRoad(board: BoardView, hud: Hud, prefs: KeyValueStore | null): void {
+  const show = loadNumber(prefs, LONGEST_ROAD_KEY) === 1;
+  board.setLongestRoad(show);
+  hud.setLongestRoadToggle({
+    value: show,
+    onChange: (on) => {
+      board.setLongestRoad(on);
+      saveNumber(prefs, LONGEST_ROAD_KEY, on ? 1 : 0);
+    },
+  });
+  let tapTimer: ReturnType<typeof setTimeout> | undefined;
+  document.addEventListener('pointerover', (e) => {
+    const on = e.target instanceof Element && e.target.closest('[data-longest-road]') !== null;
+    clearTimeout(tapTimer);
+    board.setLongestRoadHover(on);
+    if (on && e.pointerType !== 'mouse') {
+      tapTimer = setTimeout(() => board.setLongestRoadHover(false), 2500);
+    }
+  });
 }
 
 /** The hotseat game: controller, bot speed, debug hook, dev params, resume prompt. */

@@ -109,6 +109,12 @@ export interface BotSpeedControl {
   onChange: (ms: number) => void;
 }
 
+/** An on/off menu setting (#51: "Show longest road on the board"). */
+export interface ToggleControl {
+  value: boolean;
+  onChange: (on: boolean) => void;
+}
+
 /** Base build modes; the board layer shows the matching targets and calls `buildX` on click. */
 export type BasePlaceMode = 'road' | 'settlement' | 'city';
 /**

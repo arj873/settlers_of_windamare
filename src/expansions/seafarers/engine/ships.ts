@@ -3,6 +3,7 @@
  * the Longest Trade Route (roads and ships, joined only at the player's own buildings).
  */
 import { blocksRoute, hasRouteBlockers, pieceLimit } from '../../../engine/expansions/hooks';
+import type { RouteTrail } from '../../../engine/expansions/types';
 import type { EdgeId, GameState, PlayerId, ResourceCounts, VertexId } from '../../../engine/types';
 import { graph, isShipEdge } from './geometry';
 import { pirateLineAllows } from './pirates';
@@ -168,6 +169,15 @@ export function tradeRouteLength(
   player: PlayerId,
   weight: (e: EdgeId) => number = () => 1,
 ): number {
+  return tradeRoute(state, player, weight).length;
+}
+
+/** The Longest Trade Route of `player` (as `tradeRouteLength`) with its edges in order (#51). */
+export function tradeRoute(
+  state: GameState,
+  player: PlayerId,
+  weight: (e: EdgeId) => number = () => 1,
+): RouteTrail {
   const g = graph(state);
   const ships = seaSlice(state).ships;
   const roads = state.pieces.roads;
@@ -176,11 +186,12 @@ export function tradeRouteLength(
   const mine: EdgeId[] = [];
   for (const e of Object.keys(roads) as EdgeId[]) if (roads[e] === player) mine.push(e);
   for (const e of Object.keys(ships) as EdgeId[]) if (ships[e]?.owner === player) mine.push(e);
-  if (mine.length === 0) return 0;
+  let best: RouteTrail = { length: 0, edges: [] };
+  if (mine.length === 0) return best;
   const used = new Set<EdgeId>();
-  let best = 0;
+  const path: EdgeId[] = [];
   const walk = (v: VertexId, via: 'road' | 'ship' | null, len: number): void => {
-    if (len > best) best = len;
+    if (len > best.length) best = { length: len, edges: [...path] };
     const joint = via === null || ownBuilding(state, v, player);
     for (const e of g.edgesAt.get(v) ?? []) {
       if (used.has(e)) continue;
@@ -190,11 +201,13 @@ export function tradeRouteLength(
       const next = a === v ? b : a;
       const w = weight(e);
       if (blockedFor(state, next, player)) {
-        if (len + w > best) best = len + w;
+        if (len + w > best.length) best = { length: len + w, edges: [...path, e] };
         continue;
       }
       used.add(e);
+      path.push(e);
       walk(next, k, len + w);
+      path.pop();
       used.delete(e);
     }
   };
@@ -203,3 +216,7 @@ export function tradeRouteLength(
   for (const v of starts) walk(v, null, 0);
   return best;
 }
+
+/** `base` or `route`, whichever counts more (mirrors `Math.max` in the roadLength hooks). */
+export const longerRoute = (base: RouteTrail, route: RouteTrail): RouteTrail =>
+  route.length > base.length ? route : base;

@@ -5,6 +5,8 @@ import type { Controller } from '../ui';
 
 export const SAVE_KEY = 'catan:save:v1';
 export const SPEED_KEY = 'catan:botSpeed';
+/** #51: "Show longest road on the board" (1 = on; default off). */
+export const LONGEST_ROAD_KEY = 'catan:showLongestRoad';
 
 /** The subset of `Storage` we use (tests pass a Map-backed fake). */
 export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;

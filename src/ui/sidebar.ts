@@ -131,6 +131,15 @@ function stat(icon: Child, value: number | string, title: string, cls = ''): HTM
   return h('span', { class: `pstat${cls}`, title }, icon, h('span', {}, String(value)));
 }
 
+/**
+ * #51: the holder's road count and award badge: pointing at them outlines the counted route on
+ * the board (`data-longest-road`; main.ts tells the board).
+ */
+function longestRoadHover<T extends HTMLElement>(el: T, holder: boolean): T {
+  if (holder) el.dataset.longestRoad = '';
+  return el;
+}
+
 function playerBar(
   p: PlayerSummary,
   viewer: PlayerId,
@@ -188,18 +197,21 @@ function playerBar(
           p.largestArmy ? 'Knights played — holds Largest Army (+2 VP)' : 'Knights played',
           p.largestArmy ? ' is-award' : '',
         ),
-        stat(
-          glyph('road', 15),
-          p.roadLength,
-          p.longestRoad ? `Longest road — holds ${roadCard} (+2 VP)` : 'Longest road',
-          p.longestRoad ? ' is-award' : '',
+        longestRoadHover(
+          stat(
+            glyph('road', 15),
+            p.roadLength,
+            p.longestRoad ? `Longest road — holds ${roadCard} (+2 VP)` : 'Longest road',
+            p.longestRoad ? ' is-award' : '',
+          ),
+          p.longestRoad,
         ),
       ),
     ),
     h(
       'div',
       { class: 'pp-awards' },
-      p.longestRoad && glyph('longestRoad', 20, roadCard),
+      p.longestRoad && longestRoadHover(glyph('longestRoad', 20, roadCard), true),
       p.largestArmy && glyph('largestArmy', 20, 'Largest Army'),
     ),
   );

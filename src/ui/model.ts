@@ -15,6 +15,7 @@ import {
   getPlayer,
   handCount,
   longestRoadLength,
+  longestRoadLengths,
   PIECE_LIMITS,
   piecesLeft,
   portsOf,
@@ -195,7 +196,7 @@ export interface PlayerSummary {
   cards: number;
   devCards: number;
   knights: number;
-  /** Length of the player's longest road. */
+  /** Length of the player's longest road (Seafarers: trade route, ships included). */
   roadLength: number;
   longestRoad: boolean;
   largestArmy: boolean;
@@ -211,6 +212,9 @@ export function playerSummaries(
   bots: readonly boolean[] = [],
 ): PlayerSummary[] {
   const acting = actingPlayers(state);
+  // As the award counts it (Seafarers: roads + ships, T&B: camels); the plain road where a
+  // module switches the award off.
+  const routes = longestRoadLengths(state);
   return state.players.map((p) => ({
     id: p.id,
     name: p.name,
@@ -221,7 +225,7 @@ export function playerSummaries(
     cards: handCount(state, p.id),
     devCards: devCardCount(state, p.id),
     knights: p.knightsPlayed,
-    roadLength: longestRoadLength(state, p.id),
+    roadLength: Math.max(longestRoadLength(state, p.id), routes[p.id] ?? 0),
     longestRoad: state.awards.longestRoad === p.id,
     largestArmy: state.awards.largestArmy === p.id,
     isCurrent: state.turn.current === p.id,

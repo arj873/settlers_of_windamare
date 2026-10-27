@@ -66,7 +66,12 @@ export {
   type ResolvedMode,
 } from './createGame';
 export { applyAction, legalActions } from './engine';
-export { longestRoadLength, longestRoadLengths } from './rules/longestRoad';
+export {
+  longestRoadLength,
+  longestRoadLengths,
+  longestRoadPath,
+  longestRoadTrail,
+} from './rules/longestRoad';
 export { bankTradeRatio } from './actions/trade';
 export { specialBuildQueue } from './actions/turn';
 export * from './view';

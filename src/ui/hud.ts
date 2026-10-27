@@ -64,6 +64,7 @@ import type {
   HudView,
   PlaceMode,
   SessionAction,
+  ToggleControl,
 } from './types';
 import { avatar, devCardFace, playerStyle, resCardFace } from './widgets';
 import './hud.css';
@@ -159,6 +160,8 @@ export class Hud {
   /** The panel was just opened / expanded: play its fade-in once. */
   private statsEntering = false;
   private botSpeed: BotSpeedControl | null = null;
+  /** #51: "Show longest road on the board" in the menu (null hides it). */
+  private longestRoadToggle: ToggleControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
@@ -211,6 +214,12 @@ export class Hud {
   /** Show a bot-speed picker in the menu (null hides it). The HUD keeps the chosen value. */
   setBotSpeed(control: BotSpeedControl | null): void {
     this.botSpeed = control;
+    this.refresh();
+  }
+
+  /** #51: show the "Show longest road on the board" setting in the menu (null hides it). */
+  setLongestRoadToggle(control: ToggleControl | null): void {
+    this.longestRoadToggle = control;
     this.refresh();
   }
 
@@ -551,6 +560,7 @@ export class Hud {
               ),
             ),
           ),
+        this.longestRoadMenu(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
@@ -567,6 +577,39 @@ export class Hud {
         ),
       ),
     ];
+  }
+
+  /** #51: Off / On for outlining the Longest Road holder's route on the board. */
+  private longestRoadMenu(): HTMLElement | null {
+    const toggle = this.longestRoadToggle;
+    if (!toggle) return null;
+    const label = 'Show longest road on the board';
+    return h(
+      'div',
+      { class: 'menu-sec', attrs: { 'data-k': 'longest-road-setting' } },
+      h('div', { class: 'menu-label' }, label),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': label } },
+        ...[false, true].map((on) =>
+          h(
+            'button',
+            {
+              class: `seg-btn${on === toggle.value ? ' is-on' : ''}`,
+              attrs: { 'aria-pressed': String(on === toggle.value) },
+              on: {
+                click: () => {
+                  this.longestRoadToggle = { ...toggle, value: on };
+                  toggle.onChange(on);
+                  this.refresh();
+                },
+              },
+            },
+            on ? 'On' : 'Off',
+          ),
+        ),
+      ),
+    );
   }
 
   private turnPill(state: GameState, view: HudView): HTMLElement[] {
