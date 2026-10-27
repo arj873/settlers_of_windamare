@@ -251,7 +251,13 @@ async function main() {
     await eve.fill('[data-k="nickname"]', 'Eve');
     await eve.click('[data-k="join"]');
     await eve.waitForSelector('.spectate-pill');
-    check((await eve.$$('.hud-bottom > *')).length === 0, 'spectator has no hand bar');
+    check(!(await eve.$('.hud-bottom .hand')), 'spectator has no hand bar');
+    // #35: only a read-only price list (cost tooltips), nothing clickable.
+    check(
+      (await eve.$$('.hud-bottom > *')).length === 1 &&
+        (await eve.$$('.hud-bottom .build-bar.is-costs button:not([disabled])')).length === 0,
+      'spectator sees build costs only',
+    );
     check(!(await eve.$('.btn-roll')), 'spectator has no buttons');
     await shot(eve, '6-spectator');
 
