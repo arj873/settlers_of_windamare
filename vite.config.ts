@@ -11,5 +11,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
     environment: 'node',
+    // Simulator tests take 1-7 s; parallel agents and CI runners can push them past vitest's
+    // 5 s default. A hang still fails, just later.
+    testTimeout: 30_000,
   },
 });
