@@ -223,6 +223,52 @@ describe('stats panel in the HUD', () => {
     expect(root.querySelector<HTMLElement>('.gs-tip')!.hidden).toBe(false);
   });
 
+  it('Activity: one bank / harbor row per ratio that occurred, plus total and cards', () => {
+    const s = structuredClone(GAME);
+    const players = s.stats!.players;
+    for (const p of players) {
+      p.bankTrades = 0;
+      p.portTrades = 0;
+      delete p.tradesByRatio;
+    }
+    players[0]!.bankTrades = 1;
+    players[0]!.portTrades = 3;
+    players[0]!.tradesByRatio = { '4:1': 1, '3:1': 1, '2:1': 2 };
+    players[1]!.bankTrades = 2;
+    players[1]!.tradesByRatio = { '4:1': 2 };
+    open(s);
+    tab('activity').click();
+    const labels = [...root.querySelectorAll('.gs-table tbody th')].map((t) => t.textContent);
+    const bank = labels.filter((l) => /trades \(|Bank & harbor|Cards to/.test(l ?? ''));
+    expect(bank.filter((l) => /\(\d:1\)/.test(l!))).toEqual([
+      'Harbor trades (2:1)',
+      'Harbor trades (3:1)',
+      'Bank trades (4:1)',
+    ]);
+    expect(labels).toContain('Bank & harbor trades');
+    const row = (label: string) =>
+      [...root.querySelectorAll('.gs-table tbody tr')]
+        .find((r) => r.querySelector('th')!.textContent === label)!
+        .textContent!.replace(label, '');
+    expect(row('Bank & harbor trades').startsWith('4')).toBe(true);
+    expect(row('Cards to / from bank').startsWith('11 / 4')).toBe(true);
+  });
+
+  it('Activity: hides ratios nobody used', () => {
+    const s = structuredClone(GAME);
+    for (const p of s.stats!.players) {
+      p.bankTrades = 0;
+      p.portTrades = 0;
+      delete p.tradesByRatio;
+    }
+    s.stats!.players[0]!.bankTrades = 1;
+    open(s);
+    tab('activity').click();
+    const text = root.querySelector('.gs-body')!.textContent!;
+    expect(text).toContain('Bank trades (4:1)');
+    expect(text).not.toContain('Harbor trades');
+  });
+
   it('Dev Cards: bought / played tables, award history', () => {
     open(GAME);
     tab('dev').click();

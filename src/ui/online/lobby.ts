@@ -57,6 +57,11 @@ export class LobbyScreen {
   private readonly nameInput: HTMLInputElement;
   private readonly linkInput: HTMLInputElement;
   private readonly copyBtn: HTMLButtonElement;
+  private readonly copyLabel: HTMLElement;
+  private readonly copiedLabel: HTMLElement;
+  /** L1: "You're watching. Pick a seat" for a viewer without a seat. */
+  private readonly watchBox: HTMLElement;
+  private readonly inviteNote: HTMLElement;
   private config: RoomConfigPanel | null = null;
   private room: RoomInfo | null = null;
   private view: LobbyView | null = null;
@@ -71,15 +76,22 @@ export class LobbyScreen {
       attrs: { readonly: '', 'aria-label': 'Invite link', 'data-k': 'invite' },
       on: { focus: (e) => (e.target as HTMLInputElement).select() },
     });
+    // Both labels share one grid cell, so the button is as wide as the longer one either way.
+    this.copyLabel = h('span', { class: 'ol-copy-label' }, 'Copy link');
+    this.copiedLabel = h(
+      'span',
+      { class: 'ol-copy-label is-off', attrs: { 'aria-hidden': 'true' } },
+      'Copied!',
+    );
     this.copyBtn = h(
       'button',
       {
-        class: 'btn btn-primary',
+        class: 'btn btn-primary ol-copy',
         attrs: { 'data-k': 'copy' },
         on: { click: () => void this.copy() },
       },
       glyph('link', 16),
-      h('span', {}, 'Copy link'),
+      h('span', { class: 'ol-copy-labels' }, this.copyLabel, this.copiedLabel),
     );
     this.nameInput = h('input', {
       class: 'input ol-name',
@@ -94,6 +106,12 @@ export class LobbyScreen {
       },
     });
     this.roleBox = h('div', { class: 'ol-role' });
+    this.watchBox = h('div', {
+      class: 'ol-watch',
+      attrs: { role: 'status', 'data-k': 'watching' },
+    });
+    this.watchBox.hidden = true;
+    this.inviteNote = h('p', { class: 'ol-note', attrs: { 'data-k': 'invite-note' } });
     this.seatsBox = h('div', { class: 'ol-seats' });
     this.specBox = h('div', { class: 'ol-specs' });
     this.configNote = h('p', { class: 'ol-note' });
@@ -135,15 +153,12 @@ export class LobbyScreen {
                 h('p', { class: 'muted' }, 'Room ', h('b', { class: 'ol-code' }, opts.roomId)),
               ),
             ),
+            this.watchBox,
             section(
               'Invite friends',
               'invite',
               h('div', { class: 'ol-row' }, this.linkInput, this.copyBtn),
-              h(
-                'p',
-                { class: 'ol-note' },
-                'Anyone with the link can join. Late arrivals watch as spectators.',
-              ),
+              this.inviteNote,
             ),
             section(
               'You',
@@ -190,6 +205,8 @@ export class LobbyScreen {
         ? h('span', { class: 'tag' }, 'Player')
         : h('span', { class: 'tag' }, 'Spectator'),
     ]);
+    this.inviteNote.textContent = v.inviteNote;
+    this.renderWatching(v);
     this.renderSeats(v);
     this.renderFooter(v);
     if (!this.config) {
@@ -227,12 +244,51 @@ export class LobbyScreen {
   private async copy(): Promise<void> {
     const text = this.opts.inviteUrl;
     await (this.opts.copy ? this.opts.copy(text) : defaultCopy(text, this.linkInput));
-    const label = this.copyBtn.querySelector('span');
-    if (label) label.textContent = 'Copied!';
+    this.showCopied(true);
     if (this.copiedTimer !== null) clearTimeout(this.copiedTimer);
-    this.copiedTimer = setTimeout(() => {
-      if (label) label.textContent = 'Copy link';
-    }, 1800);
+    this.copiedTimer = setTimeout(() => this.showCopied(false), 1800);
+  }
+
+  private showCopied(on: boolean): void {
+    this.copyLabel.classList.toggle('is-off', on);
+    this.copyLabel.setAttribute('aria-hidden', String(on));
+    this.copiedLabel.classList.toggle('is-off', !on);
+    this.copiedLabel.setAttribute('aria-hidden', String(!on));
+  }
+
+  private renderWatching(v: LobbyView): void {
+    const w = v.watching;
+    this.watchBox.hidden = w === null;
+    if (!w) return;
+    const seat = w.openSeat;
+    const sit =
+      w.named && seat !== null
+        ? h(
+            'button',
+            {
+              class: 'btn btn-sm btn-primary',
+              title: `Take seat ${seat + 1} (or pick any open seat below)`,
+              attrs: { 'data-k': 'watch-sit' },
+              on: { click: () => this.opts.actions.takeSeat(seat) },
+            },
+            'Sit here',
+          )
+        : null;
+    const next = !w.named
+      ? 'Enter a nickname below to take a seat.'
+      : w.openSeat !== null
+        ? 'Pick a seat:'
+        : v.tableFull
+          ? 'Every seat has a player; you can sit if one frees up.'
+          : v.isHost
+            ? 'Add a seat below to sit down.'
+            : 'Ask the host to add a seat.';
+    this.watchBox.replaceChildren();
+    append(this.watchBox, [
+      glyph('eye', 18),
+      h('span', { class: 'ol-watch-text' }, h('b', {}, "You're watching."), ` ${next}`),
+      sit,
+    ]);
   }
 
   private renderSeats(v: LobbyView): void {
@@ -280,6 +336,47 @@ export class LobbyScreen {
     const a = this.opts.actions;
     const room = this.room;
     const meSeated = v.me?.seat !== null && v.me?.seat !== undefined;
+    const name = s.name ?? `${s.colorLabel} Bot`;
+    // Footer row: the bot level (host, open seat) on the left, the buttons on the right.
+    const buttons = [
+      s.canRemove &&
+        room &&
+        h(
+          'button',
+          {
+            class: 'btn btn-sm btn-ghost',
+            attrs: { 'data-k': 'remove-bot' },
+            title: 'Remove this seat',
+            on: { click: () => a.configure(withSeatCount(room.config, room.seats.length - 1)) },
+          },
+          'Remove',
+        ),
+      s.canStand &&
+        h(
+          'button',
+          { class: 'btn btn-sm', attrs: { 'data-k': 'stand' }, on: { click: () => a.leaveSeat() } },
+          'Stand up',
+        ),
+      s.canSit &&
+        h(
+          'button',
+          {
+            class: 'btn btn-sm btn-primary',
+            attrs: { 'data-k': `sit-${s.index}` },
+            on: { click: () => a.takeSeat(s.index) },
+          },
+          meSeated ? 'Move here' : 'Sit here',
+        ),
+      s.name === null &&
+        !s.canSit &&
+        !v.me?.name &&
+        h('span', { class: 'ol-hint' }, 'Pick a nickname to sit'),
+    ].filter((b): b is HTMLElement => b instanceof HTMLElement);
+    const level =
+      s.canSetLevel &&
+      botLevelSelect(s.botLevel, { seat: s.index, key: 'seat-level' }, (lv) =>
+        a.setBotLevel(s.index, lv),
+      );
     return h(
       'div',
       {
@@ -287,87 +384,54 @@ export class LobbyScreen {
         style: { '--pc': s.color },
         attrs: { 'data-seat': String(s.index) },
       },
-      h('span', { class: 'ol-seat-dot' }, glyph(s.name === null ? 'bot' : 'person', 22)),
       h(
         'div',
-        { class: 'ol-seat-main' },
+        { class: 'ol-seat-head' },
+        h('span', { class: 'ol-seat-dot' }, glyph(s.name === null ? 'bot' : 'person', 22)),
         h(
           'div',
-          { class: 'ol-seat-name' },
-          s.name ?? `${s.colorLabel} Bot`,
-          s.isMine && h('span', { class: 'tag' }, 'You'),
-          s.isHostSeat && h('span', { class: 'tag ol-tag-host' }, 'Host'),
-          s.isAway && glyph('offline', 14, 'Disconnected'),
-        ),
-        h(
-          'div',
-          { class: 'ol-seat-sub' },
-          s.name === null
-            ? s.canSetLevel
-              ? 'Open — a bot plays it:'
-              : `Open — a ${BOT_LEVEL_LABELS[s.botLevel]} bot plays it`
-            : s.isAway
-              ? 'Disconnected — the seat is kept for a minute'
-              : s.colorLabel,
-        ),
-        s.colors.length > 1 &&
+          { class: 'ol-seat-main' },
           h(
             'div',
-            { class: 'su-swatches', attrs: { role: 'group', 'aria-label': 'Your colour' } },
-            ...s.colors.map((c) =>
-              h('button', {
-                class: `swatch${c === s.color ? ' is-on' : ''}`,
-                style: { '--sw': c },
-                attrs: { 'aria-label': `Colour ${c}`, 'aria-pressed': String(c === s.color) },
-                on: { click: () => c !== s.color && a.setColor(c) },
-              }),
-            ),
+            { class: 'ol-seat-name' },
+            h('span', { class: 'ol-seat-label', title: name }, name),
+            s.isMine && h('span', { class: 'tag' }, 'You'),
+            s.isHostSeat && h('span', { class: 'tag ol-tag-host' }, 'Host'),
+            s.isAway && glyph('offline', 14, 'Disconnected'),
           ),
-        s.canSetLevel &&
-          botLevelSelect(s.botLevel, { seat: s.index, key: 'seat-level' }, (level) =>
-            a.setBotLevel(s.index, level),
+          h(
+            'div',
+            { class: 'ol-seat-sub' },
+            s.name === null
+              ? s.canSetLevel
+                ? 'Open seat · a bot plays it'
+                : `Open seat · a ${BOT_LEVEL_LABELS[s.botLevel]} bot plays it`
+              : s.isAway
+                ? 'Disconnected · seat kept for a minute'
+                : s.colorLabel,
           ),
+        ),
       ),
-      h(
-        'div',
-        { class: 'ol-seat-actions' },
-        s.canSit &&
-          h(
-            'button',
-            {
-              class: 'btn btn-sm btn-primary',
-              attrs: { 'data-k': `sit-${s.index}` },
-              on: { click: () => a.takeSeat(s.index) },
-            },
-            meSeated ? 'Move here' : 'Sit here',
+      s.colors.length > 1 &&
+        h(
+          'div',
+          { class: 'su-swatches', attrs: { role: 'group', 'aria-label': 'Your colour' } },
+          ...s.colors.map((c) =>
+            h('button', {
+              class: `swatch${c === s.color ? ' is-on' : ''}`,
+              style: { '--sw': c },
+              attrs: { 'aria-label': `Colour ${c}`, 'aria-pressed': String(c === s.color) },
+              on: { click: () => c !== s.color && a.setColor(c) },
+            }),
           ),
-        s.name === null &&
-          !s.canSit &&
-          !v.me?.name &&
-          h('span', { class: 'ol-hint' }, 'Pick a nickname to sit'),
-        s.canStand &&
-          h(
-            'button',
-            {
-              class: 'btn btn-sm',
-              attrs: { 'data-k': 'stand' },
-              on: { click: () => a.leaveSeat() },
-            },
-            'Stand up',
-          ),
-        s.canRemove &&
-          room &&
-          h(
-            'button',
-            {
-              class: 'btn btn-sm btn-ghost',
-              attrs: { 'data-k': 'remove-bot' },
-              title: 'Remove this seat',
-              on: { click: () => a.configure(withSeatCount(room.config, room.seats.length - 1)) },
-            },
-            'Remove bot',
-          ),
-      ),
+        ),
+      (level || buttons.length > 0) &&
+        h(
+          'div',
+          { class: 'ol-seat-foot' },
+          level,
+          h('div', { class: 'ol-seat-actions' }, ...buttons),
+        ),
     );
   }
 

@@ -522,6 +522,7 @@ function cloneExt(slice: unknown): CkSlice {
 export const ckModule: ExpansionModule = {
   id: CK,
   name: 'Cities & Knights',
+  icon: '🏰',
   // 2: Catan for Two + C&K (module `twock`); C&K's own mode and scenarios stay 3-6.
   players: { min: 2, max: 6 },
   maps: [CK_STARTER19],
@@ -770,6 +771,10 @@ export const ckModule: ExpansionModule = {
     },
 
     statsCategory,
+    statsBankTradeRatio: (state, action) =>
+      action.type === 'ck/bankTrade'
+        ? giveRatio(state, action.player, action['give'] as Parameters<typeof giveRatio>[2])
+        : undefined,
 
     maskFor: ckMaskFor,
   },

@@ -43,6 +43,7 @@ import {
   type PirateStealPhase,
   type Ship,
 } from './engine/state';
+import { epSounds } from './sounds';
 import './ep.css';
 
 type Send = (a: Action) => void;
@@ -522,6 +523,7 @@ const left = (item: string) => (state: GameState, p: PlayerId) =>
 
 export const epHud: HudExtension = {
   id: 'ep',
+  sounds: epSounds,
 
   cardFace: (kind, w) => (kind === 'gold' ? goldFace(w) : null),
 

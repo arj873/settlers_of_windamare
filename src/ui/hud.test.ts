@@ -218,6 +218,21 @@ describe('Hud', () => {
     expect(cfg?.map).toBe('baseRandom');
   });
 
+  it('tells the CSS how many hand cards, separators and build cards to fit', () => {
+    const s = midGame();
+    hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
+    const hand = root.querySelector<HTMLElement>('.hand')!;
+    const build = root.querySelector<HTMLElement>('.build-bar')!;
+    expect(hand.style.getPropertyValue('--hand-n')).toBe(
+      String(hand.querySelectorAll(':scope > .hcard').length),
+    );
+    expect(Number(hand.style.getPropertyValue('--hand-n'))).toBeGreaterThanOrEqual(5);
+    expect(hand.style.getPropertyValue('--hand-seps')).toBe(
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
+    expect(build.style.getPropertyValue('--build-n')).toBe(String(build.childElementCount));
+  });
+
   it('build bar shows pieces and dev cards left', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: fakeLegal(s, 1), isBotTurn: false });
@@ -271,6 +286,29 @@ describe('Hud', () => {
     expect(bars.filter((b) => b.querySelector('.tag-bot'))).toHaveLength(4);
     expect(bars[1]!.classList.contains('is-current')).toBe(true);
     expect(bars[1]!.textContent).toContain('You');
+  });
+
+  it('dice tumble only for a real roll, not on first render or End turn', () => {
+    const rolling = () => root.querySelector('.dice')!.classList.contains('rolling');
+    const view = { viewer: 1, legal: [], isBotTurn: false };
+    const s = midGame();
+    s.dice = [3, 4];
+    s.phase = { kind: 'main' };
+    hud.render(s, view);
+    expect(rolling()).toBe(false); // reload / reconnect
+    // End turn: next turn, same stale faces, waiting for the roll.
+    const next = {
+      ...s,
+      phase: { kind: 'preRoll' as const },
+      turn: { ...s.turn, number: s.turn.number + 1 },
+    };
+    hud.render(next, view);
+    expect(rolling()).toBe(false);
+    hud.render({ ...next }, view);
+    expect(rolling()).toBe(false);
+    // The roll with the very same faces still animates.
+    hud.render({ ...next, phase: { kind: 'main' } }, view);
+    expect(rolling()).toBe(true);
   });
 
   it('renders the log with player names and icons', () => {

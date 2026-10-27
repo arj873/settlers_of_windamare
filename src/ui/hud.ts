@@ -18,6 +18,8 @@ import {
 } from '../engine';
 import {
   discardAction,
+  discardRows,
+  discardStatus,
   draftToAction,
   emptyDraft,
   stepDiscard,
@@ -57,6 +59,7 @@ import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
 import { loadAnimations, saveAnimations } from './motion';
 import { ProductionFx, type HexLocator } from './production/fx';
+import { soundControl } from './sound';
 import type {
   BotSpeedControl,
   HudEventName,
@@ -399,7 +402,12 @@ export class Hud {
     const legal = viewerLegal(view);
     const av = availability(legal);
 
-    r.menu.replaceChildren(...this.menu(view));
+    // Don't rebuild the open menu under a dragged volume slider (bot moves re-render often).
+    const sliding =
+      this.menuOpen &&
+      r.menu.contains(document.activeElement) &&
+      document.activeElement instanceof HTMLInputElement;
+    if (!sliding) r.menu.replaceChildren(...this.menu(view));
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
     if (view.spectator) {
@@ -562,6 +570,7 @@ export class Hud {
             ),
           ),
         this.animationsToggle(),
+        h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
@@ -840,6 +849,12 @@ export class Hud {
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
+    // The CSS sizes the narrowest fan from these (hud.css, `.hand`).
+    hand.style.setProperty('--hand-n', String(hand.querySelectorAll(':scope > .hcard').length));
+    hand.style.setProperty(
+      '--hand-seps',
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
 
     const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: 'trade' | 'bank') => {
       const why = enabled && !over ? null : tradeBlockReason(state, view.viewer, d);
@@ -995,6 +1010,7 @@ export class Hud {
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
+    build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
   }
 
@@ -1049,6 +1065,7 @@ export class Hud {
   private diceBox(state: GameState): HTMLElement {
     const d = state.dice;
     if (!d) {
+      this.lastDice = 'stale'; // the first roll of the game animates
       return h(
         'div',
         { class: 'dice dice-empty', title: 'No roll yet' },
@@ -1056,8 +1073,12 @@ export class Hud {
         h('span', { class: 'die die-blank' }),
       );
     }
-    const key = `${state.turn.number}:${d[0]}:${d[1]}`;
-    const fresh = key !== this.lastDice;
+    // Animate only for a roll made this turn. Before the roll (preRoll, special build, setup)
+    // the faces are last turn's, so End turn must not re-tumble them; a reload or reconnect
+    // (first render) shows the faces still.
+    const stale = ['preRoll', 'specialBuild', 'setup', 'mapVeto'].includes(state.phase.kind);
+    const key = stale ? 'stale' : `${state.turn.number}:${d[0]}:${d[1]}`;
+    const fresh = !stale && this.lastDice !== '' && key !== this.lastDice;
     this.lastDice = key;
     const total = diceTotal(d);
     // Event Cards: the card's event is shown under the dice.
@@ -1382,15 +1403,17 @@ export class Hud {
     value: number,
     onDelta: (d: number) => void,
     max: number,
+    held?: number,
   ): HTMLElement {
     return h(
       'div',
       {
-        class: `step${value > 0 ? ' has-value' : ''}`,
+        class: `step${value > 0 ? ' has-value' : ''}${held === 0 ? ' is-none' : ''}`,
         style: { '--rc': `var(--res-${resource})` },
       },
       resourceIcon(resource, 26),
       h('span', { class: 'step-name' }, RESOURCE_LABEL[resource]),
+      held === undefined ? null : h('span', { class: 'step-have' }, `you have ${held}`),
       h(
         'div',
         { class: 'step-ctl' },
@@ -1711,6 +1734,8 @@ export class Hud {
   private discardDialog(view: HudView, hand: ResourceCounts, required: number) {
     const sel = this.discardSel;
     const error = validateDiscard(hand, required, sel);
+    const status = discardStatus(hand, required, sel);
+    const rows = discardRows(hand, sel, required);
     return {
       key: `discard-${view.viewer}`,
       title: `Discard ${required} cards`,
@@ -1724,25 +1749,23 @@ export class Hud {
         h(
           'div',
           { class: 'col wide-col' },
-          ...RESOURCES.filter((r) => hand[r] > 0).map((r) =>
+          ...rows.map((row) =>
             this.stepper(
-              r,
-              sel[r],
+              row.resource,
+              row.picked,
               (d) => {
-                this.discardSel = stepDiscard(sel, r, d, hand, required);
+                this.discardSel = stepDiscard(sel, row.resource, d, hand, required);
                 this.refresh();
               },
-              Math.min(
-                hand[r],
-                required - (Object.values(sel).reduce((a, b) => a + b, 0) - sel[r]),
-              ),
+              row.max,
+              row.held,
             ),
           ),
         ),
         h(
           'p',
-          { class: `summary${error ? '' : ' is-ok'}` },
-          error ?? `Discarding ${required} of ${required}`,
+          { class: `discard-status${status.ok ? ' is-ok' : ''}`, attrs: { role: 'status' } },
+          status.text,
         ),
         h(
           'div',

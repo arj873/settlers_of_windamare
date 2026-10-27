@@ -20,7 +20,7 @@ src/server/  Cloudflare room server   Worker + Durable Object around GameSession
 
 Online play (stage 4): `docs/MULTIPLAYER.md`. The server runs the engine on the full state;
 clients get `viewFor(state, seat)` (§8) and their legal actions. Every mode, scenario, option and
-combo plays online (X1): the lobby wraps the setup screen (mode tiles included), `RoomConfig`
+combo plays online (X1): the lobby wraps the setup screen (mode picker included), `RoomConfig`
 carries `mode/scenario/options`, expansion actions go over the wire, and each module masks its
 own secrets in views with the `maskFor` hook (docs/EXPANSIONS.md §5 "Online views"). Browser client (home, lobby,
 `RoomClient`, `NetGameController`, `src/game/online`, `src/ui/online`; `HudView.spectator` /
@@ -505,7 +505,15 @@ view.setInsets(insets, avoid?);           // Insets = { top, right, bottom, left
 view.isFitted();                          // false once the user panned/zoomed, until the next refit
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
+view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
 ```
+
+- Render on demand (`render/frames.ts`): the view stops `app.ticker` after the first frame with
+  nothing moving and restarts it on any change (state, highlights, hover, pan/zoom, resize,
+  retheme). Glow pulse, pop-ins, robber travel and a pending text re-raster keep it running. Pixi's
+  event system is off (the view reads pointer input itself) and `Ticker.system` (texture GC) runs
+  inside the board's frames, so an idle board requests no animation frames at all.
+  `scripts/cpu-idle.mjs <url>` measures an idle game screen (headless, swiftshader).
 
 - The view never decides legality: pass ids from `legalActions`, map clicks back to actions.
 - While any highlight list is non-empty, only highlighted ids are hoverable/clickable; with none, everything is.
@@ -562,8 +570,9 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
   hand bar (`handCards`), items in the trade offer rows (`offerExtras`) and card art for the
   production animation (`cardFace`). The setup
-  screen's mode tiles, scenario tiles and option tiles come from the engine registry (`ready`
-  modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
+  screen's expansion chips (U7: chip set -> mode, `ExpansionModule.icon`), scenario tiles
+  (grouped by mode when one chip set stands for several) and option tiles come from the engine
+  registry (`ready` modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
   `validate`, e.g. C&K + Rush) shows the reason and disables Start. The build bar has no Buy card
   when the game has no development deck. The stats screen's standings show expansions' named VP
   (`victoryPoints` hook `parts`) as chips. See `docs/EXPANSIONS.md` §8.
@@ -703,7 +712,8 @@ c.destroy();
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
   timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
-  mode), `?modes=all` (setup screen also offers wip / demo modes). `window.catan` = `{ controller, board, hud }`.
+  mode), `?modes=all` (setup screen also offers wip / demo modes), `?sfx=1` (sound audition
+  panel, §13d), `?mute=1` (no sound). `window.catan` = `{ controller, board, hud }`.
 - Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
@@ -738,6 +748,55 @@ near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`
   decisions (so no "select / cancel" loop runs forever).
 - **Benchmark:** `pnpm bench --hero normal --field easy --games 200 [--players N] [--mode M]`
   (one hero seat rotated over the table, every step checked by the sim invariants).
+
+## 13d. Sound effects (`src/audio`, `src/game/sounds.ts`, A1)
+
+All sounds are **synthesized** with the Web Audio API from small declarative recipes: no audio
+files, no third-party assets, nothing to license (the repo is public).
+
+- `src/audio/` (no DOM at import, no engine imports): `types.ts` (`SoundCue {id, level}`,
+  `CueLevel` high / normal / low with `LEVEL_GAIN` 1 / 0.6 / 0.32, `SoundRecipe` = voices: `tone`
+  (wave, freq, glide, partials) or `noise`, each with attack / hold / dur / gain / filter),
+  `voices.ts` (building blocks: bell, ting, pluck, knock, thud, horn, noise, tick, swish),
+  `recipes.ts` (`BASE_SOUNDS`), `synth.ts` (`playRecipe`: every voice gets a gain envelope 0 →
+  linear attack ≥ 2 ms → exponential decay → 0 before its source stops, so nothing clicks),
+  `limiter.ts`, `settings.ts`, `engine.ts` (`SoundEngine`: registry, settings, AudioContext,
+  master gain → soft compressor), `index.ts` (the page's engine `sfx`).
+- **Mapping** (`game/sounds.ts`, pure, unit-tested): `soundCues(prev, next, seats, ext)` →
+  cues, one per id, most important first. Reads only public state (pieces, robber, awards,
+  phase, the log via `newLogEntries`), so a hotseat state and an online `GameView` sound the
+  same. `SoundSeats = { viewer, local[], bots[] }`: `local` = seats played on this screen (all
+  hotseat humans; online the own seat). Level: something a local seat did or that hits it
+  (stolen from, offer to you, your offer answered, award gained / lost, must discard on a 7) →
+  high; a bot's action → low; a remote human's → normal. Silent for the first state, an unchanged
+  one and a different game (seed / mode / players / turn going back).
+- Base ids: `dice`, `seven` (after the dice), `yourTurn`, `road`, `settlement`, `city`,
+  `devBuy`, `devPlay`, `robber`, `steal`, `discard`, `tradeOffer`, `tradeAccept`,
+  `tradeReject`, `trade` (player or bank trade done), `longestRoad`, `largestArmy`, `victory`
+  (local winner; spectators too), `defeat` (someone else won), `chat` (online message from
+  someone else, `OnlineApp`), `timerWarn` / `timerUrgent` (own turn timer, once per second for
+  the last 10 / 3 s).
+- **Modules:** `HudExtension.sounds = { recipes, cues(prev, next, ctx) }` (EXPANSIONS.md §8);
+  `extensionSoundRecipes()` registers all at boot, `extensionSounds(state)` gives the active
+  hooks. C&K: `ck/barbarianAdvance`, `ck/barbarianAttack`; Seafarers: `seafarers/shipBuild`,
+  `seafarers/shipMove`; E&P: `ep/shipSail`, `ep/shipBuild`; T&B: `tb/wagonMove`.
+- **Wiring:** `GameSounds` (game/sounds.ts) keeps the previous state, runs `soundCues` and the
+  `SoundLimiter`, and plays. Both controllers take `sounds?: SoundObserver` (`observe(state,
+seats)` after each render, `timer(remainingSec, mine)` when the shown second changes, `cue(id)`
+  for chat); `OnlineEnv.sounds` passes it to `NetGameController`. main.ts builds one for the page.
+- **Limiter** (`SoundLimiter`, unit-tested): coalesce per update, per-id cooldown (150 ms;
+  dice 600, your turn 1 s), at most 3 cues per update, normal / low cues share a budget of
+  4 / 2 per second, high cues only obey cooldown and cap. Instant bot play stays a quiet trickle.
+- **Settings:** master volume (default 0.6, gain = volume²) + mute, `localStorage['catan:sound']`
+  (try/catch). `soundControl()` (`ui/sound.ts`) in the HUD menu ("Sound") and, compact, the setup
+  footer (so also the online lobby). The HUD does not rebuild the open menu while its slider has
+  focus (bot renders would cut a drag).
+- **Autoplay / headless:** the AudioContext is created on the first pointer / key gesture
+  (`sfx.installUnlock(window)`). `isHeadless`: `?debug=1` (playtest harness),
+  `navigator.webdriver` (Playwright, e2e) and `?mute=1` suppress all sound. Tests have no
+  AudioContext, so nothing plays there.
+- **Audition:** `?sfx=1` adds a panel (`ui/sfxPanel.ts`) with a button per registered sound
+  (base + modules), the level (you / others / bots), Play all and the volume control.
 
 ## 14. Decisions and open questions
 

@@ -293,6 +293,15 @@ export function expansionVictoryParts(state: GameState, player: PlayerId): Victo
   return activeModules(state).flatMap((m) => m.hooks?.victoryPoints?.(state, player).parts ?? []);
 }
 
+/** Ratio of a module's own bank trade action (statsBankTradeRatio hook), or undefined. */
+export function hookStatsBankTradeRatio(state: GameState, action: Action): number | undefined {
+  for (const m of activeModules(state)) {
+    const r = m.hooks?.statsBankTradeRatio?.(state, action);
+    if (r !== undefined) return r;
+  }
+  return undefined;
+}
+
 /** Stats category of a hand change made by an action (statsCategory hook), or undefined. */
 export function hookStatsCategory(
   state: GameState,
