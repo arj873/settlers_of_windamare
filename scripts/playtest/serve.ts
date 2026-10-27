@@ -48,7 +48,7 @@ import {
   spotKey,
   type Spot,
 } from './spots';
-import { matchChoice, parseFlags, slugify } from './text';
+import { matchChoice, matchControl, parseFlags, slugify } from './text';
 
 const SEVERITIES = ['blocker', 'major', 'minor', 'visual'] as const;
 const OUT_DIR = join(PLAYTEST_DIR, 'dist');
@@ -492,28 +492,25 @@ const commands: Record<string, Handler> = {
     const snap = await guarded(seat, 'act');
     if (typeof snap === 'string') return refuse(snap);
     const controls = snap.ui.controls;
-    const enabled = controls.filter((c) => c.enabled);
-    const m = matchChoice(
-      query,
-      enabled.map((c) => c.label),
-      (i) => enabled[i]?.inDialog === true,
-    );
+    // All buttons first: a better-matching disabled button is refused, never swapped for a
+    // looser enabled match ("Ship" must not press "Move ship").
+    const m = matchControl(query, controls);
     if (m.kind === 'many') {
-      const list = m.indices.map((i) => `[${enabled[i]?.label}]`).join(' ');
+      const list = m.indices.map((i) => `[${controls[i]?.label}]`).join(' ');
       return refuse(`"${query}" matches several buttons: ${list}. Use the full label.`);
     }
-    if (m.kind === 'none') {
-      const off = matchChoice(
-        query,
-        controls.filter((c) => !c.enabled).map((c) => c.label),
+    if (m.kind === 'disabled') {
+      const why = controls[m.index]?.why;
+      return refuse(
+        `[${controls[m.index]?.label}] is disabled right now${why ? ` (${why})` : ''}. ${listButtons(snap)}`,
       );
-      if (off.kind !== 'none')
-        return refuse(`That button is disabled right now. ${listButtons(snap)}`);
+    }
+    if (m.kind === 'none') {
       const stale = snap.state ? staleTradeHint(snap.state, query) : null;
       if (stale) return refuse(`${stale} ${listButtons(snap)}`);
       return refuse(`No button matches "${query}". ${listButtons(snap)}`);
     }
-    const c = enabled[m.index];
+    const c = controls[m.index];
     if (!c) return refuse('internal: match out of range');
     const err = await pressControl(seat, snap, c);
     if (err) return refuse(err);
