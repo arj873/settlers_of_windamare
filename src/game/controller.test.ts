@@ -127,6 +127,26 @@ describe('GameController: rendering and actions', () => {
     expect(hud.last.legal.length).toBeGreaterThan(0);
   });
 
+  it('announces an award changing hands (#36), once', () => {
+    const c = make();
+    // Nobody holds Longest Road yet, though Red has 5 roads: the next road change awards it.
+    c.start({ ...richMidGame(), awards: { longestRoad: null, largestArmy: 2 } }, humans4);
+    expect(notices).toEqual([]);
+    const road = c.legalActions.find((a) => a.type === 'buildRoad' && a.player === 1)!;
+    hud.emit('action', road);
+    expect(notices).toEqual([
+      expect.objectContaining({
+        kind: 'award',
+        award: 'longestRoad',
+        to: 0,
+        from: null,
+        text: 'Red took Longest Road',
+      }),
+    ]);
+    hud.emit('action', { type: 'endTurn', player: 1 });
+    expect(notices).toHaveLength(1);
+  });
+
   it('applies HUD actions through applyAction and re-renders', () => {
     const c = make();
     const s = midGame();

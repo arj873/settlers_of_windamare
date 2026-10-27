@@ -19,6 +19,7 @@ import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/o
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
+import { showNotice } from './game/noticeView';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import {
@@ -136,6 +137,7 @@ async function boot() {
           tokens: tokenStoreFor(backend.kind),
           clock: realClock,
           toast: showToast,
+          notice: showNotice,
           onRender: fitBoard,
           layer: document.body,
           href: location.href,
@@ -224,6 +226,7 @@ function startOffline(o: {
     storage,
     speed,
     toast: showToast,
+    notice: showNotice,
     onRender: fitBoard,
   });
   // Bot speed lives in the HUD menu (shown while any seat is a bot).

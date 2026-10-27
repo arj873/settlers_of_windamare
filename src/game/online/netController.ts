@@ -16,7 +16,7 @@ import {
   tradeEndNotice,
   type BoardClick,
 } from '../logic';
-import { emitGameNotice, gameNotices, type GameNotice } from '../notices';
+import { emitGameNotice, gameNotices, type NoticeSink } from '../notices';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -25,7 +25,7 @@ export interface NetControllerOptions {
   toast?: (message: string, kind: ToastKind) => void;
   onRender?: () => void;
   /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
-  notice?: (n: GameNotice) => void;
+  notice?: NoticeSink;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
 }
@@ -60,7 +60,7 @@ export class NetGameController {
   private readonly client: RoomClient;
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly onRender: () => void;
-  private readonly notice: (n: GameNotice) => void;
+  private readonly notice: NoticeSink;
   private readonly every: (fn: () => void, ms: number) => () => void;
   private active = false;
   private placeMode: PlaceMode | null = null;
@@ -191,7 +191,7 @@ export class NetGameController {
     this.updateHighlights();
     this.onRender();
     for (const n of notices) {
-      this.notice(n);
+      this.notice(n, g.view, hv.viewer < 0 ? null : hv.viewer);
       emitGameNotice(n);
     }
   }

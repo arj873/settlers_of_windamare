@@ -1,0 +1,85 @@
+/* Award banner (#36): Longest Road / Largest Army changed hands. Theme tokens only. */
+.award-banners {
+  position: fixed;
+  top: 18vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  font: 14px/1.35 var(--font-ui, system-ui, sans-serif);
+}
+.award-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 10px 20px 10px 12px;
+  border-radius: var(--radius, 10px);
+  color: var(--toast-ink, #eef3f8);
+  background: var(--toast-bg, rgba(13, 29, 46, 0.95));
+  border: 1.5px solid var(--accent, #f2c35a);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--pc, var(--accent, #f2c35a)) 45%, transparent),
+    0 12px 34px rgba(0, 0, 0, 0.45);
+  animation: award-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.award-banner .award-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--award-bg, var(--accent, #f2c35a));
+  box-shadow: 0 0 14px var(--accent-glow, rgba(242, 195, 90, 0.6));
+  animation: award-glow 1.2s ease-in-out 2;
+}
+.award-banner .award-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.award-banner .award-title {
+  font-family: var(--font-display, serif);
+  font-size: 17px;
+  font-weight: var(--display-weight, 700);
+  color: var(--accent-2, #ffe29a);
+}
+.award-banner .award-text {
+  color: var(--toast-ink, #eef3f8);
+}
+.award-banner .pname {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--pc) 70%, white);
+}
+.award-banner.is-lost {
+  border-color: var(--toast-edge, rgba(255, 255, 255, 0.16));
+}
+.award-banner.is-leaving {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+@keyframes award-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.85);
+  }
+}
+@keyframes award-glow {
+  50% {
+    box-shadow: 0 0 26px var(--accent-glow, rgba(242, 195, 90, 0.6));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .award-banner,
+  .award-banner .award-icon {
+    animation: none;
+  }
+}

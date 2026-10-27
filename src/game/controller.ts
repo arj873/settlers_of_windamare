@@ -33,7 +33,7 @@ import {
   type BoardClick,
   type Seats,
 } from './logic';
-import { emitGameNotice, gameNotices, type GameNotice } from './notices';
+import { emitGameNotice, gameNotices, type NoticeSink } from './notices';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
 import {
   IDLE_CLOCK,
@@ -68,7 +68,7 @@ export interface ControllerOptions {
   /** Wall clock in ms for the game duration (UX2 stats); default Date.now. */
   wallClock?: () => number;
   /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
-  notice?: (n: GameNotice) => void;
+  notice?: NoticeSink;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -96,7 +96,7 @@ export class GameController {
   private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
-  private readonly notice: (n: GameNotice) => void;
+  private readonly notice: NoticeSink;
   private speedMs: number;
 
   private current: GameState | null = null;
@@ -372,7 +372,7 @@ export class GameController {
     this.persist();
     this.onRender();
     for (const n of notices) {
-      this.notice(n);
+      this.notice(n, state, reader);
       emitGameNotice(n);
     }
 

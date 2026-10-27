@@ -32,6 +32,9 @@ export type GameNotice =
       text: string;
     };
 
+/** Shows a notice; `state` is the state (view) it describes, `viewer` the reader (null: none). */
+export type NoticeSink = (n: GameNotice, state: GameState, viewer: PlayerId | null) => void;
+
 type Listener = (n: GameNotice) => void;
 const listeners = new Set<Listener>();
 
