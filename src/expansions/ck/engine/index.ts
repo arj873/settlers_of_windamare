@@ -90,6 +90,7 @@ import {
   ckPlayer,
   ckSlice,
   ckVictoryParts,
+  commodityCount,
   commoditySupply,
   commodityTotal,
   emptyCommodities,
@@ -720,8 +721,8 @@ export const ckModule: ExpansionModule = {
       const k = ckSlice(state).knights[v];
       return k !== undefined && k.owner !== player;
     },
-    handSize: (state, p, base) =>
-      base + commodityTotal(ckSlice(state).players[p]?.commodities ?? {}),
+    // commodityCount: on an online view the split is masked, the total is public.
+    handSize: (state, p, base) => base + commodityCount(state, p),
     discardLimit: (state, p, base) => base + WALL_BONUS * wallsOf(state, p),
     supply: (_state, base) => ({ ...base, devDeck: emptyDevCards() }),
 

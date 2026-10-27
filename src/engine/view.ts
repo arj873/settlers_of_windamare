@@ -24,7 +24,7 @@
  * `state`: treat it as read-only. Never pass a view to applyAction / legalActions.
  */
 import { specialBuildQueue } from './actions/turn';
-import { hookMaskFor } from './expansions/hooks';
+import { hookHandSize, hookMaskFor } from './expansions/hooks';
 import { emptyDevCards, emptyResources, totalDevCards, totalResources } from './resources';
 import { getPlayer } from './selectors';
 import type { DevCardType, GameState, LogEntry, Player, PlayerId } from './types';
@@ -126,10 +126,15 @@ export function isGameView(state: GameState): state is GameView {
 // Public-info helpers for UI code (work on full states and on views)
 // ---------------------------------------------------------------------------
 
-/** Resource cards in `player`'s hand. */
+/**
+ * Cards in `player`'s hand as the rules count them (`cardsInHand`): resources plus expansion
+ * cards (the `handSize` hook, e.g. C&K commodities). Hooks must read public totals on a view.
+ */
 export function handCount(state: GameState, player: PlayerId): number {
-  if (isGameView(state)) return state.view.handCounts[player] ?? 0;
-  return totalResources(getPlayer(state, player).resources);
+  const resources = isGameView(state)
+    ? (state.view.handCounts[player] ?? 0)
+    : totalResources(getPlayer(state, player).resources);
+  return hookHandSize(state, player, resources);
 }
 
 /** Unplayed dev cards `player` holds (bought this turn included). */
