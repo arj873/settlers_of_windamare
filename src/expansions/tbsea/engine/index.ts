@@ -26,7 +26,7 @@ import { piecesLeft } from '../../../engine/selectors';
 import { topologyOf } from '../../../engine/topology';
 import { roadsBlocked } from '../../../engine/variants';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
-import { seafarersModule, SEAFARERS, seaSlice, type MoveShipPhase } from '../../seafarers/engine';
+import { seafarersModule, seaSlice, type MoveShipPhase } from '../../seafarers/engine';
 import { SEA_ACTIONS } from '../../seafarers/engine/actions';
 import { graph } from '../../seafarers/engine/geometry';
 import { OFF_BOARD } from '../../seafarers/engine/maps';
@@ -35,29 +35,38 @@ import { addGold, goldOf } from '../../tb/engine/common';
 import { isConqueredBuilding } from '../../tb/engine/conquest';
 import { fishBlocker, fishPayment, payFish } from '../../tb/engine/fish';
 import { edgeOnRiver, isBridgeSite } from '../../tb/engine/rivers';
-import { caravansOf, FISH_COST, fishOf, fishTotal, has, TB } from '../../tb/engine/state';
-import { mapIdOf, PAIRS, TBSEA, TBSEA_MAPS } from './maps';
+import { caravansOf, fishOf, fishTotal, has } from '../../tb/engine/state';
+import { mapIdOf, PAIRS, SEA_PAIRS, seaMapIdOf, TBSEA, TBSEA_MAPS } from './maps';
 
-export { TBSEA, PAIRS, pairOf, shiftId, BASE_MAP } from './maps';
+export { TBSEA, PAIRS, SEA_PAIRS, pairOf, seaPairOf, shiftId, BASE_MAP } from './maps';
 
 export const TBSEA_MODE = 'tb+seafarers';
-export const TBSEA_SCENARIOS = PAIRS.map((p) => p.id);
+export const TBSEA_SCENARIOS = [...PAIRS.map((p) => p.id), ...SEA_PAIRS.map((p) => p.id)];
 
-/** Fish for chasing the pirate off the board / for a free ship (Fishing + Seafarers). */
-export const FISH_PIRATE = FISH_COST.robber;
-export const FISH_SHIP = FISH_COST.road;
+// Nothing of another module is read at the top level of this file: when a Seafarers or T&B file
+// is the first import, the registry loads this module while theirs is still half-evaluated
+// (registry.test.ts). Module ids are literals; other modules' values are read on use.
+const TB = 'tb';
+const SEAFARERS = 'seafarers';
+
+/** Fish for chasing the pirate off the board / for a free ship: T&B's 2 and 5 (tested). */
+export const FISH_PIRATE = 2;
+export const FISH_SHIP = 5;
 
 export type TbseaAction =
   { type: 'tbsea/fishPirate'; player: PlayerId } | { type: 'tbsea/fishShip'; player: PlayerId };
 
-const pn = playerName;
-const T = SEA_ACTIONS;
+const pn = (s: GameState, p: PlayerId) => playerName(s, p);
 /** Seafarers actions that put a ship on `edge`. */
-const SHIP_BUILDS: readonly string[] = [T.buildShip, T.freeShip, T.setupShip];
+const shipBuilds = (): readonly string[] => [
+  SEA_ACTIONS.buildShip,
+  SEA_ACTIONS.freeShip,
+  SEA_ACTIONS.setupShip,
+];
 const edgeOf = (a: { [k: string]: unknown }): EdgeId | null =>
   typeof a['edge'] === 'string' ? (a['edge'] as EdgeId) : null;
 const movingFrom = (state: GameState): EdgeId | null =>
-  state.phase.kind === T.moveShip ? (state.phase as MoveShipPhase).from : null;
+  state.phase.kind === SEA_ACTIONS.moveShip ? (state.phase as MoveShipPhase).from : null;
 
 // ---------------------------------------------------------------------------------------------
 // Fishing: 2 fish chase the pirate off the board, 5 fish build a free ship
@@ -76,8 +85,13 @@ function fishTurnBlocker(state: GameState, p: PlayerId, cost: number): string | 
 export function fishPirateBlocker(state: GameState, p: PlayerId): string | null {
   const err = fishTurnBlocker(state, p, FISH_PIRATE);
   if (err) return err;
-  const pirate = seaSlice(state).pirate;
-  return pirate === null || pirate === OFF_BOARD ? 'the pirate is not on the board' : null;
+  const sea = seaSlice(state);
+  if (sea.pirate === null || sea.pirate === OFF_BOARD) return 'the pirate is not on the board';
+  // Cloth for Catan: only with a route from one of your buildings to a village.
+  if (sea.cloth && !Object.values(sea.cloth.links).some((l) => l.includes(p))) {
+    return 'needs a route to a village';
+  }
+  return null;
 }
 
 /**
@@ -131,10 +145,10 @@ const fishShip: ExtHandler = (draft, action) => {
 
 function riverShipBlocker(state: GameState, p: PlayerId, type: string, e: EdgeId): string | null {
   if (!has(state, 'rivers')) return null;
-  if (SHIP_BUILDS.includes(type) || type === T.moveShip) {
+  if (shipBuilds().includes(type) || type === SEA_ACTIONS.moveShip) {
     if (isBridgeSite(state, e)) return 'no ship on a bridge site';
   }
-  if (type === T.pickShip && edgeOnRiver(state, e) && goldOf(state, p) < 1) {
+  if (type === SEA_ACTIONS.pickShip && edgeOnRiver(state, e) && goldOf(state, p) < 1) {
     return 'moving a ship away from a river costs 1 gold';
   }
   return null;
@@ -171,12 +185,12 @@ export function anchored(state: GameState, p: PlayerId, e: EdgeId, ignore?: Edge
 }
 
 function baShipBlocker(state: GameState, p: PlayerId, type: string, e: EdgeId): string | null {
-  if (!has(state, 'ba') || type === T.setupShip) return null;
+  if (!has(state, 'ba') || type === SEA_ACTIONS.setupShip) return null;
   const from = movingFrom(state);
-  const target = type === T.moveShip ? anchored(state, p, e, from ?? undefined) : true;
-  const build = SHIP_BUILDS.includes(type) ? anchored(state, p, e) : true;
+  const target = type === SEA_ACTIONS.moveShip ? anchored(state, p, e, from ?? undefined) : true;
+  const build = shipBuilds().includes(type) ? anchored(state, p, e) : true;
   // Picking a ship up changes its route: it must hang on an unconquered building too.
-  const pick = type === T.pickShip ? anchored(state, p, e) : true;
+  const pick = type === SEA_ACTIONS.pickShip ? anchored(state, p, e) : true;
   return target && build && pick
     ? null
     : 'the route must start at one of your unconquered buildings';
@@ -211,28 +225,31 @@ const guard: ExtWrap = (draft, action, next) => {
   return err ? fail(err) : next(draft, action);
 };
 
-const wraps: Record<`${string}/${string}`, ExtWrap> = {
-  [T.buildShip]: riverGold,
-  [T.freeShip]: riverGold,
-  [T.setupShip]: riverGold,
-  [T.pickShip]: guard,
-  // Rivers: a ship leaving a river hex's edge costs 1 gold.
-  [T.moveShip]: (draft, action, next) => {
-    const err = shipBlocker(draft, action as unknown as Action);
-    if (err) return fail(err);
-    const from = movingFrom(draft);
-    const pays = from !== null && has(draft, 'rivers') && edgeOnRiver(draft, from);
-    if (pays && goldOf(draft, action.player) < 1) {
-      return fail('moving a ship away from a river costs 1 gold');
-    }
-    const r = next(draft, action);
-    if (r.ok && pays) {
-      addGold(draft, action.player, -1);
-      log(draft, action.player, `${pn(draft, action.player)} paid 1 gold to sail off a river`);
-    }
-    return r;
-  },
-};
+let wrapsMemo: Record<`${string}/${string}`, ExtWrap> | null = null;
+/** The wraps, keyed by Seafarers' action types (built on first use). */
+const wraps = (): Record<`${string}/${string}`, ExtWrap> =>
+  (wrapsMemo ??= {
+    [SEA_ACTIONS.buildShip]: riverGold,
+    [SEA_ACTIONS.freeShip]: riverGold,
+    [SEA_ACTIONS.setupShip]: riverGold,
+    [SEA_ACTIONS.pickShip]: guard,
+    // Rivers: a ship leaving a river hex's edge costs 1 gold.
+    [SEA_ACTIONS.moveShip]: (draft, action, next) => {
+      const err = shipBlocker(draft, action as unknown as Action);
+      if (err) return fail(err);
+      const from = movingFrom(draft);
+      const pays = from !== null && has(draft, 'rivers') && edgeOnRiver(draft, from);
+      if (pays && goldOf(draft, action.player) < 1) {
+        return fail('moving a ship away from a river costs 1 gold');
+      }
+      const r = next(draft, action);
+      if (r.ok && pays) {
+        addGold(draft, action.player, -1);
+        log(draft, action.player, `${pn(draft, action.player)} paid 1 gold to sail off a river`);
+      }
+      return r;
+    },
+  });
 
 // ---------------------------------------------------------------------------------------------
 // Production and the trade route
@@ -294,7 +311,8 @@ function freePieceFits(state: GameState, p: PlayerId): boolean {
     if (topologyOf(state).edges.some((e) => canPlaceRoad(state, p, e))) return true;
   }
   if (shipsLeft(state, p) <= 0) return false;
-  const free = (edge: EdgeId) => ({ type: T.freeShip, player: p, edge }) as unknown as Action;
+  const free = (edge: EdgeId) =>
+    ({ type: SEA_ACTIONS.freeShip, player: p, edge }) as unknown as Action;
   return shipSpots(state, p).some((e) => shipBlocker(state, free(e)) === null);
 }
 
@@ -314,16 +332,36 @@ function endRoadBuilding(draft: GameState): void {
   if (!freePieceFits(draft, draft.turn.current)) draft.phase = resumePhase(draft, phase.resume);
 }
 
-const scenarios: ScenarioDef[] = PAIRS.map((pair) => ({
-  id: pair.id,
-  name: pair.name,
-  blurb: pair.blurb,
-  players: { min: 3, max: 4 },
-  maps: [mapIdOf(pair)],
-  mapFor: () => mapIdOf(pair),
-  vpToWin: pair.vp,
-  playsAs: { [TB]: [pair.tb], [SEAFARERS]: ['seafarers/newShores'] },
-}));
+const scenarios: ScenarioDef[] = [
+  ...PAIRS.map((pair) => ({
+    id: pair.id,
+    name: pair.name,
+    blurb: pair.blurb,
+    players: { min: 3, max: 4 },
+    maps: [mapIdOf(pair)],
+    mapFor: () => mapIdOf(pair),
+    vpToWin: pair.vp,
+    playsAs: { [TB]: [pair.tb], [SEAFARERS]: ['seafarers/newShores'] },
+  })),
+  // C3: the T&B scenarios on the other Seafarers scenarios (one map per player count).
+  ...SEA_PAIRS.map((pair) => {
+    const ids = pair.maps.map((m) => seaMapIdOf(pair, m));
+    const forPlayers = (n: number) => {
+      const i = pair.maps.findIndex((m) => n >= m.players[0] && n <= m.players[1]);
+      return ids[Math.max(i, 0)] as `${string}/${string}`;
+    };
+    return {
+      id: pair.id,
+      name: pair.name,
+      blurb: pair.blurb,
+      players: { min: 3, max: 4 },
+      maps: ids,
+      mapFor: forPlayers,
+      vpToWin: pair.vp,
+      playsAs: { [TB]: [pair.tb], [SEAFARERS]: [pair.sea] },
+    };
+  }),
+];
 
 export const tbseaModule: ExpansionModule = {
   id: TBSEA,
@@ -337,7 +375,7 @@ export const tbseaModule: ExpansionModule = {
     {
       id: TBSEA_MODE,
       name: 'Traders & Barbarians + Seafarers',
-      blurb: 'Every T&B scenario on Heading for New Shores: wagons, fish and camels at sea',
+      blurb: 'T&B scenarios on the Seafarers maps: wagons, fish, rivers and camels at sea',
       status: 'ready',
       expansions: [TBSEA],
       scenarios: TBSEA_SCENARIOS,
@@ -349,7 +387,7 @@ export const tbseaModule: ExpansionModule = {
 
   validate(settings) {
     if (!TBSEA_SCENARIOS.includes(settings.scenario ?? '')) {
-      return 'Traders & Barbarians + Seafarers is played on its own New Shores scenarios';
+      return 'Traders & Barbarians + Seafarers is played on its own scenarios';
     }
     if (settings.options[SEAFARERS]?.['layout'] === 'variable') {
       return 'The T&B island sits on the printed New Shores map: use the standard map';
@@ -361,7 +399,9 @@ export const tbseaModule: ExpansionModule = {
   // Barbarian Attack: a conquest (or a freed hex) changes the trade route (FAQ 6). Barbarians
   // land after a city too, Treason and Intrigue move them, the end of the turn expels them.
   changesRoads: ['buildCity', 'endTurn', 'tb/treasonHex', 'tb/intrigueHex'],
-  wraps,
+  get wraps() {
+    return wraps();
+  },
   legal,
   filterLegal,
 

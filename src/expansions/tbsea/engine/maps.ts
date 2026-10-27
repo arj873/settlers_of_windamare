@@ -22,9 +22,31 @@ import type {
   Port,
   ScenarioId,
 } from '../../../engine/types';
-import { prepared, SEA_MAPS, SEAFARERS, type SeaBoard } from '../../seafarers/engine/maps';
+import {
+  prepared,
+  SEA_MAPS,
+  SEAFARERS,
+  type MapKey,
+  type SeaBoard,
+} from '../../seafarers/engine/maps';
 import { TB_MAPS, TRADERS_BARBARIANS_19 } from '../../tb/engine/maps';
 import type { TbBoard } from '../../tb/engine/state';
+import {
+  BA_DESERT3,
+  BA_DESERT4,
+  CARAVANS_FOUR3,
+  CARAVANS_FOUR4,
+  DESERT3_2025,
+  RIVERS_DESERT3_V1,
+  RIVERS_DESERT3_V2,
+  RIVERS_DESERT4_V1,
+  RIVERS_DESERT4_V2,
+  RIVERS_FOG3,
+  RIVERS_FOG4,
+  TRADERS_DESERT3,
+  TRADERS_DESERT4,
+} from './layouts';
+import { layoutFrame, planBoard, type Plan } from './overlays';
 
 export const TBSEA = 'tbsea';
 const TB = 'tb';
@@ -184,4 +206,169 @@ function mapDefOf(pair: Pair): CustomMapDef {
   };
 }
 
-export const TBSEA_MAPS: readonly CustomMapDef[] = PAIRS.map(mapDefOf);
+// ---------------------------------------------------------------------------------------------
+// C3: T&B scenarios on the other Seafarers scenarios (overlays.ts)
+// ---------------------------------------------------------------------------------------------
+
+export interface SeaPairMap {
+  key: MapKey;
+  players: readonly [number, number];
+  plan: Plan;
+}
+
+export interface SeaPair {
+  id: ScenarioId;
+  /** The T&B scenario and the Seafarers scenario it is played on. */
+  tb: ScenarioId;
+  sea: ScenarioId;
+  name: string;
+  blurb: string;
+  /** The Seafarers scenario's target plus the sheet's increment. */
+  vp: number;
+  maps: readonly SeaPairMap[];
+}
+
+const both = (key: MapKey, plan: Plan): SeaPairMap[] => [{ key, players: [3, 4], plan }];
+
+// prettier-ignore
+export const SEA_PAIRS: readonly SeaPair[] = [
+  { id: 'tbsea/fishermenFour', tb: 'tb/fishermen', sea: 'seafarers/fourIslands', vp: 13,
+    name: 'Fishermen on the Four Islands',
+    blurb: '4 and 8, 6 and 10 fish by the small islands, 5 and 9 by the big ones',
+    maps: [{ key: 'four3', players: [3, 3], plan: { grounds: 'fourIslands' } },
+      { key: 'four4', players: [4, 4], plan: { grounds: 'fourIslands' } }] },
+  { id: 'tbsea/fishermenFog', tb: 'tb/fishermen', sea: 'seafarers/fogIslands', vp: 12,
+    name: 'Fishermen on the Fog Islands',
+    blurb: 'Fishing grounds along the face-up islands; no lake',
+    maps: [{ key: 'fog3', players: [3, 3], plan: { grounds: 'any' } },
+      { key: 'fog4', players: [4, 4], plan: { grounds: 'any' } }] },
+  { id: 'tbsea/fishermenDesert', tb: 'tb/fishermen', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Fishermen Through the Desert',
+    blurb: 'The lake replaces a field (3) or a hill (4): its number joins another hex',
+    maps: [
+      { key: 'desert3', players: [3, 3],
+        plan: { layout: DESERT3_2025, lake: { terrain: 'grain', token: 2 }, disc: { terrain: 'wool', token: 12 }, grounds: 'any' } },
+      { key: 'desert4', players: [4, 4],
+        plan: { lake: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 }, grounds: 'any' } }] },
+  { id: 'tbsea/fishermenTribe', tb: 'tb/fishermen', sea: 'seafarers/forgottenTribe', vp: 13,
+    name: 'Fishermen and the Forgotten Tribe',
+    blurb: 'The lake replaces the 12 field; the robber stays on the large island',
+    maps: both('tribe', { lake: { terrain: 'grain', token: 12 }, grounds: 'main' }) },
+  { id: 'tbsea/fishermenCloth', tb: 'tb/fishermen', sea: 'seafarers/clothForCatan', vp: 14,
+    name: 'Fishermen and Cloth for Catan',
+    blurb: 'Three grounds by each large island; chase the pirate with a route to a village',
+    maps: both('cloth', { grounds: 'cloth' }) },
+  { id: 'tbsea/fishermenWonders', tb: 'tb/fishermen', sea: 'seafarers/wondersOfCatan', vp: 10,
+    name: 'Fishermen and the Wonders of Catan',
+    blurb: 'Fishing grounds along the large and small islands; no lake',
+    maps: both('wonders', { grounds: 'any' }) },
+  { id: 'tbsea/fishermenNewWorld', tb: 'tb/fishermen', sea: 'seafarers/newWorld', vp: 12,
+    name: 'Fishermen in the New World',
+    blurb: 'A random archipelago; the grounds placed like the harbours',
+    maps: both('newworld', { grounds: 'newWorld' }) },
+  { id: 'tbsea/caravansDesert', tb: 'tb/caravans', sea: 'seafarers/throughTheDesert', vp: 16,
+    name: 'Caravans Through the Desert',
+    blurb: 'The watering hole replaces a field (3) or a hill (4); camels may cross the sea',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: DESERT3_2025, oasis: { terrain: 'grain', token: 2 }, disc: { terrain: 'wool', token: 12 } } },
+      { key: 'desert4', players: [4, 4], plan: { oasis: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 } } }] },
+  { id: 'tbsea/caravansTribe', tb: 'tb/caravans', sea: 'seafarers/forgottenTribe', vp: 15,
+    name: 'Caravans and the Forgotten Tribe',
+    blurb: 'The robber starts on the watering hole and may go back there',
+    maps: both('tribe', { oasis: { terrain: 'grain', token: 12 }, disc: { terrain: 'wool', token: 2 },
+      robber: 'oasis', robberOnOasis: true }) },
+  { id: 'tbsea/caravansNewWorld', tb: 'tb/caravans', sea: 'seafarers/newWorld', vp: 14,
+    name: 'Caravans in the New World',
+    blurb: 'The watering hole in the middle of a random archipelago',
+    maps: both('newworld', { oasis: 'centre' }) },
+  { id: 'tbsea/riversTribe', tb: 'tb/rivers', sea: 'seafarers/forgottenTribe', vp: 13,
+    name: 'Rivers and the Forgotten Tribe',
+    blurb: 'Two rivers on a variable large island; the 2 and the 12 join weak hexes',
+    maps: both('tribe', { rivers: 'variableTribe', robber: 'swamp' }) },
+  { id: 'tbsea/riversNewWorld', tb: 'tb/rivers', sea: 'seafarers/newWorld', vp: 12,
+    name: 'Rivers in the New World',
+    blurb: 'Two rivers flow into the frame of a random archipelago',
+    maps: both('newworld', { rivers: 'newWorld' }) },
+  // --- The sheets' set-up diagrams (decoded in docs/rules/combos.md §2d) -----------------------
+  { id: 'tbsea/riversFog', tb: 'tb/rivers', sea: 'seafarers/fogIslands', vp: 12,
+    name: 'Rivers on the Fog Islands',
+    blurb: 'Rivers on both home islands; gold fields in the fog give resource cards',
+    maps: [
+      { key: 'fog3', players: [3, 3], plan: { robber: 'swamp', layout: RIVERS_FOG3 } },
+      { key: 'fog4', players: [4, 4], plan: { robber: 'swamp', layout: RIVERS_FOG4 } }] },
+  { id: 'tbsea/riversDesert', tb: 'tb/rivers', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Rivers Through the Desert (1)',
+    blurb: 'Swamps in the desert belt: the rivers flow into the desert and a gold field',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: RIVERS_DESERT3_V1 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: RIVERS_DESERT4_V1 } }] },
+  { id: 'tbsea/riversDesert2', tb: 'tb/rivers', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Rivers Through the Desert (2)',
+    blurb: 'A river beyond the desert instead of the strip’s gold field',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: RIVERS_DESERT3_V2 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: RIVERS_DESERT4_V2 } }] },
+  { id: 'tbsea/caravansFour', tb: 'tb/caravans', sea: 'seafarers/fourIslands', vp: 15,
+    name: 'Caravans on the Four Islands',
+    blurb: 'The watering hole alone in the middle; the pirate starts beside the board',
+    maps: [
+      { key: 'four3', players: [3, 3], plan: { layout: CARAVANS_FOUR3 } },
+      { key: 'four4', players: [4, 4], plan: { layout: CARAVANS_FOUR4 } }] },
+  { id: 'tbsea/tradersDesert', tb: 'tb/traders', sea: 'seafarers/throughTheDesert', vp: 17,
+    name: 'Traders & Barbarians Through the Desert',
+    blurb: 'Castle, quarry beyond the desert and glassworks; wagons cross sea and sand',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: TRADERS_DESERT3 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: TRADERS_DESERT4 } }] },
+  { id: 'tbsea/barbarianAttackDesert', tb: 'tb/barbarianAttack', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Barbarian Attack Through the Desert',
+    blurb: 'The barbarians land on the main island only; knights guard it',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: BA_DESERT3, ba: true } },
+      { key: 'desert4', players: [4, 4], plan: { layout: BA_DESERT4, ba: true } }] },
+];
+
+export const seaMapIdOf = (pair: SeaPair, m: SeaPairMap): `${string}/${string}` =>
+  `${TBSEA}/${pair.id.slice(TBSEA.length + 1)}-${m.key}`;
+
+export const seaPairOf = (scenario: ScenarioId | null): SeaPair | undefined =>
+  SEA_PAIRS.find((p) => p.id === scenario);
+
+/**
+ * A C3 map. Nothing of another module is read at module top level (the registry import cycle:
+ * Seafarers' `SEA_MAPS` may not be evaluated yet): the base map is looked up on first use.
+ */
+function seaMapDefOf(pair: SeaPair, m: SeaPairMap): CustomMapDef {
+  const id = seaMapIdOf(pair, m);
+  const basedOn = `seafarers/${m.key}` as const;
+  const base = (): CustomMapDef => {
+    const def = SEA_MAPS.find((x) => x.id === basedOn);
+    if (!def) throw new Error(`unknown Seafarers map ${basedOn}`);
+    return def;
+  };
+  let frame: HexListFrameDef | null = null;
+  return {
+    id,
+    name: `${pair.name} (${m.players[0] === m.players[1] ? m.players[0] : m.players.join('-')})`,
+    get frame() {
+      frame ??= layoutFrame(m.key, id, m.plan.layout);
+      return frame;
+    },
+    minPlayers: m.players[0],
+    maxPlayers: m.players[1],
+    layout: 'custom',
+    basedOn,
+    get bankPerResource(): number {
+      return base().bankPerResource;
+    },
+    get devDeck(): Readonly<DevCardCounts> {
+      return base().devDeck;
+    },
+    generate: (rng, players) => planBoard(rng, id, m.key, players, m.plan),
+  };
+}
+
+export const TBSEA_MAPS: readonly CustomMapDef[] = [
+  ...PAIRS.map(mapDefOf),
+  ...SEA_PAIRS.flatMap((p) => p.maps.map((m) => seaMapDefOf(p, m))),
+];
