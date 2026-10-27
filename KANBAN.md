@@ -23,6 +23,10 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✅ Stage 5 extras done (E5b, C2, B1)
 
+## 🏃 In Progress — Stage 6
+
+- **#47** · Rename Wool → Sheep, Grain → Wheat (display names only; ids unchanged) · `s14-names` (Sonnet) 🟦
+
 
 ## 🏃 In Progress — Stage 2
 
@@ -49,6 +53,13 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 💡 Ideas from agents
 
+- (C3) **framework:** combo modules read other modules' ids at load time (seack, tbck, epck, back, twock, eptb, tbpair); make them lazy like tbsea so load order can't break the registry · Barbarian Attack × Tribe / Pirate Islands / Wonders
+- (P1) HUD CSS pulses compositor-only + prefers-reduced-motion · CI check that an idle screen draws 0 frames/s
+- (A1) "your turn" chime at game start / reconnect · Barbarian Attack + C&K knight sounds
+- (#29) animate steals, Monopoly and trades the same way · commodity icons in the log
+- (#46) roll id in engine state so Catan for Two's second roll always animates
+- (L1) host confirms before a joiner moves the room to the 5–6 player board
+- (#51) a board-settings group in the menu
 - (C1) T&B + Seafarers (needs scenario-id seam) · Barbarian Attack + C&K · Catan for Two + C&K · T&B×T&B sheets · E&P + C&K / T&B
 - (E4) gold in player trades · 2025 T&B×T&B combination sheets · BA 5-6 SBP details · Caravans coalition vote
 - (E2) viewFor masking hook for expansion slices (fog stack, gifts, fish, progress cards) → expansions online · online protocol for expansion actions · Seafarers heuristic bot · verify guessed harbour sites vs the box
@@ -127,6 +138,13 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## ✔️ Done
 
+- **Stage 6 (Oct 26–27)**, all squash-merged to `main` via PRs:
+  - **C3** T&B + Seafarers on 18 more Seafarers scenarios (#40) · **C4** the six non-Fishing T&B × T&B sheets (#24) · **C5** Barbarian Attack + C&K, Catan for Two + C&K (#25)
+  - **H1** playtest harness for online + expansions (#26) · **B2** playtest round 2 fixes, 13 bugs (#27) · **P1** board renders on demand (idle CPU ~0%), C&K hand layout (#30)
+  - **L1** lobby auto-seat, add seats up to 8 (#38) · **U7** expansion-toggle mode picker (#39) · **A1** sound effects, owner-approved (#41) · **TS1** trade stats by ratio (#53)
+  - **PR1** piece styles (Classic/Timber/Keep/Adobe/Pagoda) + profile pictures (#45) · test timeout 30 s (#48) · README + AGPL-3.0 license (#56)
+  - Issues fixed: #28 click-to-build (#42) · #29 production animation (#43) · #31 discard dialog (#37) · #32–#36 steal reveal, build marks, auto-rob, cost tooltips, award pop-up (#44) · #46 dice on End turn (#52) · #49–#51 stats overlap, ore art, longest road option (#57) · #54 scrollable sidebar (#45) · #55 README (#56)
+  - Live on Cloudflare: https://colonizers-of-windamere.colonizers-of-windamere.workers.dev (owner deploys with `pnpm deploy:cf`)
 - **C2** · T&B + Seafarers (`tb+seafarers`: 5 T&B scenarios on New Shores, sea wagons, friendly pirate, FAQ rulings) + T&B × T&B Fishing pairs (`tb+tb`); `playsAs`/`basedOn` seam, `ModeDef.hideOptions`, stacked expansion panels shrink + scroll · `s5-tbsea` 🟦 · PR #23 (squashed) → `main` · 2121 tests
 - **E5b** · E&P combos: `ep+ck` (2025 sheet: city first, harbor second, +5 VP, island knights, Fast Gold + commodities), `ep+tb` (fishing grounds, lake, fish uses, event-card numbers), `ep/offerTrade` gold trades; VP cap 25; e2e waits out the room-create limit · `s5-epcombos` 🟦 · PR #22 (squashed) → `main` · 2050 tests
 - **B1** · Smarter bots: Easy (random, unchanged) / Normal / Hard heuristic bot in `src/bots/smart`; C&K + Seafarers strategies via `BotExtension.score/goals`; per-seat picker in setup + online lobby (`setBotLevel`); Normal 100% vs 3 Easy, Hard 33% vs 3 Normal (base) · `s5-bots` 🟦 · PR #21 (squashed) → `main` · 1968 tests
