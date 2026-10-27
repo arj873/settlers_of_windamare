@@ -55,6 +55,7 @@ import { bankPanel, logList, playersList } from './sidebar';
 import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
+import { soundControl } from './sound';
 import type {
   BotSpeedControl,
   HudEventName,
@@ -387,7 +388,12 @@ export class Hud {
     const legal = viewerLegal(view);
     const av = availability(legal);
 
-    r.menu.replaceChildren(...this.menu(view));
+    // Don't rebuild the open menu under a dragged volume slider (bot moves re-render often).
+    const sliding =
+      this.menuOpen &&
+      r.menu.contains(document.activeElement) &&
+      document.activeElement instanceof HTMLInputElement;
+    if (!sliding) r.menu.replaceChildren(...this.menu(view));
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
     if (view.spectator) {
@@ -549,6 +555,7 @@ export class Hud {
               ),
             ),
           ),
+        h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',

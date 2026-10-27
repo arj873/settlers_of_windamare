@@ -355,8 +355,18 @@ interface HudExtension {
   impliedActions?: string[]; // clicked on the board, no button
   handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
   offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
+  sounds?: {
+    // A1 sound effects (ARCHITECTURE.md §13d)
+    recipes?: Record<'<id>/<name>', SoundRecipe>; // synthesized, registered at boot for every module
+    cues?(prev, next, ctx): SoundCue[]; // one state change → cues; ctx.levelOf(actor) / isLocal(p)
+  };
 }
 ```
+
+- Sounds (A1): put them in `src/expansions/<id>/sounds.ts` (C&K barbarians, Seafarers ships,
+  E&P ships, T&B wagons are examples). Read your slice defensively (`Partial<…>`, absent fields)
+  from public state only, so online views sound the same; levels come from `ctx.levelOf(player)`.
+  Build recipes from `src/audio/voices.ts`; audition them with `?sfx=1`.
 
 - Expansion-only goods in a player trade: put your part of the offer in your slice and show it
   with `offerExtras` (C&K: `ck/offerTrade` + overrides of acceptTrade / confirmTrade).

@@ -61,6 +61,7 @@ import {
   type ProgressCard,
   type Track,
 } from './engine';
+import { ckSounds } from './sounds';
 import './ck.css';
 
 type Send = (a: Action) => void;
@@ -873,6 +874,7 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
 
 export const ckHud: HudExtension = {
   id: CK,
+  sounds: ckSounds,
 
   panel(state, view, send) {
     // Barbarian Attack + C&K has no barbarian ship (its barbarians land on the coast).
