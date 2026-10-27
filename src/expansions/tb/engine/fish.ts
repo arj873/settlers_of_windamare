@@ -8,7 +8,7 @@
  * one if it is bigger (the T5 "exchange", made automatic); the T6 once-per-turn wording is not
  * modelled. Fish are paid with whole tokens, the engine picks the smallest overpayment.
  */
-import { RESOURCES } from '../../../engine/constants';
+import { RESOURCES, resourceWord } from '../../../engine/constants';
 import { isCurrent, log } from '../../../engine/actions/common';
 import { stealSecret } from '../../../engine/rules/text';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
@@ -241,7 +241,7 @@ export function useFish(
     }
     case 'resource':
       takeBank(draft, p, resource as Resource);
-      log(draft, p, `${name} paid fish for 1 ${resource as Resource}`);
+      log(draft, p, `${name} paid fish for 1 ${resourceWord(resource as Resource)}`);
       break;
     case 'road':
       draft.phase = { kind: 'roadBuilding', remaining: 1, resume };

@@ -9,7 +9,7 @@
  *     Tasks that became impossible (empty bank, empty hands) are dropped, so the phase always ends.
  *   - Then production, then `main`.
  */
-import { RESOURCES } from '../constants';
+import { RESOURCES, resourceWord } from '../constants';
 import { hookAfterProduction } from '../expansions/hooks';
 import { isResource } from '../resources';
 import { EVENT_INFO, drawEventCard, facesFor } from '../rules/events';
@@ -236,7 +236,11 @@ export const eventHandlers: HandlerMap<
     if (!isResource(resource)) return fail('invalid resource');
     if (draft.bank[resource] < 1) return fail(`the bank has no ${resource}`);
     move(draft, 'bank', player, resource);
-    log(draft, player, `${playerName(draft, player)} took 1 ${resource} (${eventName(t.phase)})`);
+    log(
+      draft,
+      player,
+      `${playerName(draft, player)} took 1 ${resourceWord(resource)} (${eventName(t.phase)})`,
+    );
     done(draft, t.phase, player);
     return ok(draft);
   },

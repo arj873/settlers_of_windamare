@@ -15,7 +15,7 @@
  *   playYearOfPlenty  -> take 2 from bank (must be available)
  *   playMonopoly      -> all other players give all of that resource
  */
-import { RESOURCES } from '../constants';
+import { RESOURCES, resourceWord } from '../constants';
 import { costOf } from '../expansions/hooks';
 import { addResources, hasResources, isResource, subtractResources } from '../resources';
 import { canPlaceRoad } from '../rules/placement';
@@ -185,7 +185,11 @@ export const devHandlers: HandlerMap<
     const p = getPlayer(draft, player);
     p.resources = addResources(p.resources, bundle);
     draft.bank = subtractResources(draft.bank, bundle);
-    log(draft, player, `${p.name} took ${resources[0]} and ${resources[1]}`);
+    log(
+      draft,
+      player,
+      `${p.name} took ${resourceWord(resources[0])} and ${resourceWord(resources[1])}`,
+    );
     return ok(draft);
   },
 
@@ -202,7 +206,7 @@ export const devHandlers: HandlerMap<
       other.resources[resource] = 0;
     }
     me.resources[resource] += taken;
-    log(draft, player, `${me.name} took ${taken} ${resource}`);
+    log(draft, player, `${me.name} took ${taken} ${resourceWord(resource)}`);
     return ok(draft);
   },
 };

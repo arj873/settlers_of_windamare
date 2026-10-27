@@ -50,7 +50,7 @@ describe('discard', () => {
     expect(after.bank.grain).toBe(s.bank.grain + 3);
     expect(after.phase).toEqual({ kind: 'discard', pending: [0, 0, 0, 4] });
     expectConserved(after);
-    expect(after.log.at(-1)?.text).toBe('Blue discarded 3 grain, 2 ore');
+    expect(after.log.at(-1)?.text).toBe('Blue discarded 3 wheat, 2 ore');
   });
 
   it('any order; after the last discard -> moveRobber (resume main)', () => {

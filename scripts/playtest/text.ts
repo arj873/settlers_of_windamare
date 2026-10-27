@@ -1,5 +1,8 @@
 /** Text helpers for the playtest CLI: label cleanup and forgiving-but-safe choice matching. */
 
+/** The pre-#47 names still work in commands: `set grain 2` finds the Wheat stepper. */
+const OLD_NAMES: Record<string, string> = { wool: 'sheep', grain: 'wheat' };
+
 /** Lowercase, emoji and punctuation stripped, whitespace collapsed. "🎲 Roll dice!" -> "roll dice". */
 export function normalize(s: string): string {
   return s
@@ -7,7 +10,8 @@ export function normalize(s: string): string {
     .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, ' ')
     .replace(/[^\p{L}\p{N}:+×\-−]+/gu, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/\b(wool|grain)\b/g, (w) => OLD_NAMES[w] as string);
 }
 
 export type Match =

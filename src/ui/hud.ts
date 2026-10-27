@@ -16,6 +16,7 @@ import {
   type PlayerId,
   type Resource,
   type ResourceCounts,
+  resourceWord,
 } from '../engine';
 import {
   discardAction,
@@ -104,12 +105,12 @@ const BUILD_COST: Record<BuildKind, Partial<Record<Resource, number>>> = {
 
 const costText = (k: BuildKind) =>
   Object.entries(BUILD_COST[k])
-    .map(([r, n]) => `${n} ${r}`)
+    .map(([r, n]) => `${n} ${resourceWord(r)}`)
     .join(', ');
 
 const describeCost = (cost: ResourceCounts) =>
   RESOURCES.filter((r) => cost[r] > 0)
-    .map((r) => `${cost[r]} ${r}`)
+    .map((r) => `${cost[r]} ${resourceWord(r)}`)
     .join(', ');
 
 const SECTION_TITLE: Record<'log' | 'bank' | 'players' | 'chat', string> = {

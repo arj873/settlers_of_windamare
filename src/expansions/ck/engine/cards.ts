@@ -212,7 +212,7 @@ export function effectBlocker(state: GameState, p: PlayerId, card: ProgressCard)
       const hand = state.players[p]?.resources;
       if (buildingsOf(state, p, 'settlement').length === 0) return 'no settlement to upgrade';
       if (piecesLeft(state, p).city <= 0) return 'no cities left';
-      return hand && hasResources(hand, MEDICINE_COST) ? null : 'needs 2 ore and 1 grain';
+      return hand && hasResources(hand, MEDICINE_COST) ? null : 'needs 2 ore and 1 wheat';
     }
     case 'roadBuilding':
       return canPlaceAnyRoad(state, p) ? null : 'no road can be placed';
@@ -501,7 +501,7 @@ export function applyCardChoice(draft: GameState, phase: CardPhase, choice: Card
       if (choice.kind !== 'vertex') return;
       payResources(draft, p, MEDICINE_COST);
       draft.pieces.buildings[choice.id] = { owner: p, kind: 'city' };
-      log(draft, p, `${pn(draft, p)} built a city for 2 ore and 1 grain`);
+      log(draft, p, `${pn(draft, p)} built a city for 2 ore and 1 wheat`);
       return main();
     case 'smith': {
       if (choice.kind === 'done') return main();

@@ -229,7 +229,7 @@ export function moveKnight(draft: GameState, from: EdgeId, to: EdgeId): void {
   log(
     draft,
     owner,
-    `${pn(draft, owner)} moved a knight${d > KNIGHT_STEPS ? ' (paid 1 grain)' : ''}`,
+    `${pn(draft, owner)} moved a knight${d > KNIGHT_STEPS ? ' (paid 1 wheat)' : ''}`,
   );
 }
 

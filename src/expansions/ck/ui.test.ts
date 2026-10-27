@@ -150,7 +150,7 @@ describe('C&K HUD', () => {
     receive!.value = 'paper';
     receive!.dispatchEvent(new Event('change'));
     expect(go.textContent).toBe('Trade 4:1');
-    expect(go.getAttribute('aria-label')).toBe('Give 4 Grain for 1 Paper');
+    expect(go.getAttribute('aria-label')).toBe('Give 4 Wheat for 1 Paper');
     go.click();
     expect(actions.at(-1)).toEqual({
       type: 'ck/bankTrade',

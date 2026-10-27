@@ -16,7 +16,7 @@
  *   cancelTrade  -> offerer withdraws -> main
  * legalActions note: offerTrade is open-ended; we return 1:1 offers to all other players.
  */
-import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../constants';
+import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES, resourceWord } from '../constants';
 import { hookTradeRatio } from '../expansions/hooks';
 import {
   addResources,
@@ -136,7 +136,11 @@ export const tradeHandlers: HandlerMap<
     p.resources[receive] += 1;
     draft.bank[give] += ratio;
     draft.bank[receive] -= 1;
-    log(draft, player, `${p.name} traded ${ratio} ${give} for 1 ${receive} with the bank`);
+    log(
+      draft,
+      player,
+      `${p.name} traded ${ratio} ${resourceWord(give)} for 1 ${resourceWord(receive)} with the bank`,
+    );
     return ok(draft);
   },
 

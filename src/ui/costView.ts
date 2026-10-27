@@ -3,7 +3,7 @@
  * tooltips and anything else that shows a price next to a spot or a card: one component, one
  * look. A card the hand does not cover is dimmed and ringed (`.is-missing`). Pure DOM builders.
  */
-import { RESOURCES, type Resource, type ResourceCounts } from '../engine';
+import { RESOURCES, resourceWord, type Resource, type ResourceCounts } from '../engine';
 import { h, type Child } from './dom';
 import { resCardFace } from './widgets';
 import './costView.css';
@@ -23,7 +23,9 @@ export function missingCards(cost: Cost, hand: ResourceCounts | null | undefined
 
 /** "1 brick, 1 lumber" (empty cost: "free"). */
 export function costLabel(cost: Cost): string {
-  const parts = RESOURCES.flatMap((r) => ((cost[r] ?? 0) > 0 ? [`${cost[r]} ${r}`] : []));
+  const parts = RESOURCES.flatMap((r) =>
+    (cost[r] ?? 0) > 0 ? [`${cost[r]} ${resourceWord(r)}`] : [],
+  );
   return parts.length > 0 ? parts.join(', ') : 'free';
 }
 

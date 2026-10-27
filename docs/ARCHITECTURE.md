@@ -256,7 +256,7 @@ over `setupPlacement`; 'any vertex' still needs land and an unblocked vertex. Ma
 generators). Refused: `mapSelection 'veto'` with expansions (module `init` builds slices from the
 board, which must not change afterwards); `'random'` in a scenario picks among its maps that fit.
 
-- `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. `token` is `null` only on the desert.
+- `terrain` is named by the resource it yields: `brick lumber wool grain ore desert`. Display names: `RESOURCE_NAME` (wool = "Sheep", grain = "Wheat"); the ids never change (#47). `token` is `null` only on the desert.
 - `Port.kind`: `'generic'` (3:1) or a `Resource` (2:1).
 - Pieces left are **derived**, not stored: `piecesLeft(state, p)` (limits 15 roads / 5 settlements / 4 cities).
 - `devCards` = playable; `newDevCards` = bought this turn (not playable until next turn; merged on `endTurn`). VP cards in either count toward `victoryPoints()`.
@@ -590,7 +590,7 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   place that shows a price.
 
 - Production animation (#29, `ui/production/`): after a roll, cards fly (DOM, Web Animations)
-  from each producing hex to the player's row (your own: your hand), then a "+2 grain" badge
+  from each producing hex to the player's row (your own: your hand), then a "+2 wheat" badge
   pops on the row. `plan.ts` (pure, tested) reads the public log ("received" / "caught" / gold
   "took" lines after "rolled N"), so it works on online views and every module. A new roll cancels
   the running one; rolls < 900 ms apart (fast bots) and the menu's Animations off / reduced
@@ -760,7 +760,7 @@ c.destroy();
   builders, and the timer gives each human step its own slot.
 - Game notices (`game/notices.ts`, #32 / #36): after each render both controllers diff the last
   rendered state (view) with the new one, `gameNotices(prev, next, reader)`: `steal` (the
-  reader's private log texts, "You stole 1 wool from Blue") and `award` (Longest Road / Largest
+  reader's private log texts, "You stole 1 sheep from Blue") and `award` (Longest Road / Largest
   Army changing hands, with the expansions' names; C&K metropolis, Defender, T&B Harbormaster from
   their log lines). `ControllerOptions.notice` / `OnlineEnv.notice` show them (default: a
   toast); every notice also goes to `onGameNotice` listeners (generic hook, e.g. sounds). The
@@ -874,7 +874,7 @@ seats)` after each render, `timer(remainingSec, mine)` when the shown second cha
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
 - **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup or the special building phase. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
 - **Steal log:** the public `text` says who stole from whom, never which card. Since #32 the entry
-  also carries `secret: SecretText[]` (`{ to: PlayerId[], text }`): "Red stole 1 wool from Blue"
+  also carries `secret: SecretText[]` (`{ to: PlayerId[], text }`): "Red stole 1 sheep from Blue"
   for thief and victim (`stealSecret` in `rules/text.ts`; `log(draft, p, text, secret)`). Every
   hidden-card steal writes one: robber / knight, event card, C&K (+ Bishop, Spy, Master Merchant),
   Seafarers and E&P pirates, T&B traders / fish / forced trade (+ C&K combos), BA Taxation (the

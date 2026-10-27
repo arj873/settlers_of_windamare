@@ -129,7 +129,7 @@ export const epckHud: HudExtension = {
     }
     if (inMedicine(state) && state.turn.current === view.viewer) {
       return mine(view, 'epck/medicineHarbor').length > 0
-        ? 'Medicine: click a settlement for a city (1 grain, 2 ore), or pick Harbor (Medicine) (1 grain, 1 ore)'
+        ? 'Medicine: click a settlement for a city (1 wheat, 2 ore), or pick Harbor (Medicine) (1 wheat, 1 ore)'
         : null;
     }
     return null;

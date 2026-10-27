@@ -16,7 +16,7 @@
  * builds, and the end-of-turn steps (knights and expulsion, the caravan vote, the wagon move)
  * to endTurn.
  */
-import { COSTS, RESOURCES } from '../../../engine/constants';
+import { COSTS, RESOURCES, resourceWord } from '../../../engine/constants';
 import { fail, log, ok, resumePhase, isCurrent } from '../../../engine/actions/common';
 import { rollFor, turnHandlers } from '../../../engine/actions/turn';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
@@ -284,7 +284,11 @@ const actions: Record<`tb/${string}`, ExtHandler> = {
     const ratio = goldSaleRatio(draft, a.player);
     payBank(draft, a.player, { [a.resource]: ratio });
     addGold(draft, a.player, 1);
-    log(draft, a.player, `${pn(draft, a.player)} traded ${ratio} ${a.resource} for 1 gold`);
+    log(
+      draft,
+      a.player,
+      `${pn(draft, a.player)} traded ${ratio} ${resourceWord(a.resource)} for 1 gold`,
+    );
     return ok(draft);
   },
 
@@ -775,7 +779,7 @@ export const tbModule: ExpansionModule = {
     {
       id: SC_CARAVANS,
       name: 'The Caravans',
-      blurb: 'Vote with wool and grain where the camels go; build between camels',
+      blurb: 'Vote with sheep and wheat where the camels go; build between camels',
       players: { min: 2, max: 6 },
       maps: ['tb/caravans19', 'tb/caravans30'],
       mapFor: (n) => (n <= 4 ? 'tb/caravans19' : 'tb/caravans30'),

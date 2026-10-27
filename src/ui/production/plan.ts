@@ -9,6 +9,7 @@
  */
 import {
   hasRobber,
+  resourceId,
   hexVertices,
   topologyOf,
   type GameState,
@@ -82,7 +83,7 @@ export function parseGain(text: string): { kind: string; count: number }[] | nul
     const m = PART.exec(part);
     if (!m?.[1] || !m[2]) return null;
     const count = m[1] === 'a' || m[1] === 'an' ? 1 : Number(m[1]);
-    if (count > 0) out.push({ kind: m[2], count });
+    if (count > 0) out.push({ kind: resourceId(m[2]) ?? m[2], count });
   }
   return out.length > 0 ? out : null;
 }

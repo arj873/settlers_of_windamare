@@ -10,6 +10,8 @@ import {
   type Player,
   type PlayerId,
   type Resource,
+  resourceId,
+  resourceWord,
 } from '../engine';
 
 export type PieceKind = 'road' | 'settlement' | 'city';
@@ -57,7 +59,8 @@ const DEV_BY_NAME: Record<string, [DevCardType, string]> = {
   monopoly: ['monopoly', 'Monopoly'],
 };
 
-const RES = RESOURCES.join('|');
+/** Ids and display names (#47): old saved logs say "grain", new ones "wheat". */
+const RES = [...RESOURCES, 'sheep', 'wheat'].join('|');
 /** Keyword patterns, tried in this order at each position (after player names). */
 const PATTERNS: [RegExp, (m: RegExpExecArray) => LogToken[]][] = [
   [
@@ -73,11 +76,13 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => LogToken[]][] = [
   ],
   [
     new RegExp(`(\\d+) (${RES})\\b`, 'y'),
-    (m) => [{ kind: 'resource', resource: m[2] as Resource, count: Number(m[1]) }],
+    (m) => [
+      { kind: 'resource', resource: resourceId(m[2] ?? '') as Resource, count: Number(m[1]) },
+    ],
   ],
   [
-    new RegExp(`\\b(${RES})\\b`, 'y'),
-    (m) => [{ kind: 'resource', resource: m[1] as Resource, count: 1 }],
+    new RegExp(`(?<!harvested |stored |replanted )\\b(${RES})\\b`, 'y'),
+    (m) => [{ kind: 'resource', resource: resourceId(m[1] ?? '') as Resource, count: 1 }],
   ],
   [
     /\ba (free )?(road|settlement|city)\b/y,
@@ -195,7 +200,7 @@ export function tokensText(
         case 'player':
           return players.find((p) => p.id === t.id)?.name ?? '';
         case 'resource':
-          return `${t.count} ${t.resource}`;
+          return `${t.count} ${resourceWord(t.resource)}`;
         case 'dice':
           return String(t.total);
         case 'piece':

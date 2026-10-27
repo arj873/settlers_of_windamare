@@ -277,7 +277,7 @@ export function buildKnightBlocker(
   const t = buildTurn(state, p);
   if (t) return t;
   if (knightsInSupply(state, p, 1) <= 0) return 'no basic knights left (promote one first)';
-  if (!canAfford(state, p, KNIGHT_ITEM)) return 'a knight costs 1 wool and 1 ore';
+  if (!canAfford(state, p, KNIGHT_ITEM)) return 'a knight costs 1 sheep and 1 ore';
   if (v !== null && !canPlaceKnightAt(state, p, v)) {
     return 'a knight goes on an empty spot on your road, linked to your buildings';
   }
@@ -317,7 +317,7 @@ export function activateBlocker(state: GameState, p: PlayerId, v: VertexId): str
   const k = ownKnight(state, p, v);
   if (!k) return 'not your knight';
   if (k.active) return 'that knight is already active';
-  if (!canAfford(state, p, ACTIVATE_ITEM)) return 'activating costs 1 grain';
+  if (!canAfford(state, p, ACTIVATE_ITEM)) return 'activating costs 1 wheat';
   return null;
 }
 
@@ -338,7 +338,7 @@ export function promoteBlocker(
   if (knightsInSupply(state, p, (k.level + 1) as KnightLevel) <= 0) {
     return `no ${KNIGHT_NAMES[(k.level + 1) as KnightLevel]} knights left`;
   }
-  if (!free && !canAfford(state, p, PROMOTE_ITEM)) return 'promoting costs 1 wool and 1 ore';
+  if (!free && !canAfford(state, p, PROMOTE_ITEM)) return 'promoting costs 1 sheep and 1 ore';
   return null;
 }
 

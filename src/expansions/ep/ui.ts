@@ -249,7 +249,7 @@ function shipButton(state: GameState, a: Action, send: Send): HTMLElement {
     case A.selectShip:
       return btn('Select', a, send, 'Moves are offered for the selected ship');
     case A.extraMove:
-      return btn('+2 moves', a, send, 'Extra ship move: 1 wool, once per ship per turn');
+      return btn('+2 moves', a, send, 'Extra ship move: 1 sheep, once per ship per turn');
     case A.load:
       return btn(
         h('span', {}, 'Load ', icon(c ?? 'crew', 14)),
