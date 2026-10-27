@@ -13,6 +13,7 @@
  * (prompts.ts).
  */
 import { fail, log, ok, resumePhase } from '../../../engine/actions/common';
+import { extendTradeLog } from '../../../engine/actions/trade';
 import { continueRoll } from '../../../engine/actions/turn';
 import { runOnRoll } from '../../../engine/expansions/hooks';
 import type { ExpansionModule, ExtHandler } from '../../../engine/expansions/types';
@@ -636,18 +637,15 @@ export const ckModule: ExpansionModule = {
           return fail('your partner no longer has the commodities');
         }
       }
-      const offer = draft.phase.kind === 'trade' ? draft.phase.offer : null;
       const r = next(draft, action);
-      if (r.ok && t && offer) {
+      if (r.ok && t) {
         for (const c of COMMODITIES) {
           if (t.give[c] > 0) moveGood(draft, action.player, action.partner, c, t.give[c]);
           if (t.want[c] > 0) moveGood(draft, action.partner, action.player, c, t.want[c]);
         }
-        // The base line names the resources only: name the commodities too.
-        const line = draft.log.at(-1);
-        if (line) {
-          line.text = `${pn(draft, action.player)} traded ${describeGoods(offer.give, t.give)} to ${pn(draft, action.partner)} for ${describeGoods(offer.want, t.want)}`;
-        }
+        // The base line names the resources only: add the commodities.
+        const g = describeGoods({}, t.give);
+        extendTradeLog(draft, action.player, action.partner, g, describeGoods({}, t.want));
       }
       return r;
     },

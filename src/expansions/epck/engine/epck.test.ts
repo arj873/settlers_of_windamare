@@ -329,8 +329,11 @@ describe('trading', () => {
     setGoods(s, 0, { paper: 1 });
     epSlice(s).gold[1] = 1;
     s = run(s, a('epck/offerTrade', 0, { give: { paper: 1 }, want: { gold: 1 }, to: [1] }));
+    expect(s.log.at(-1)?.text).toMatch(/ offers 1 paper for 1 gold$/);
     expect(legalOf(s, 'acceptTrade', 1)).toHaveLength(1);
     s = run(s, a('acceptTrade', 1), a('confirmTrade', 0, { partner: 1 }));
+    // Each module adds its own part to the base line.
+    expect(s.log.at(-1)?.text).toMatch(/ traded 1 paper to .+ for 1 gold$/);
     expect(gold(s, 0)).toBe(1);
     expect(gold(s, 1)).toBe(0);
     expect(ckSlice(s).players[1]?.commodities.paper).toBe(1);

@@ -6,6 +6,7 @@
  */
 import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../../../engine/constants';
 import { fail, log, ok } from '../../../engine/actions/common';
+import { extendTradeLog } from '../../../engine/actions/trade';
 import type { Override } from '../../../engine/expansions/types';
 import { playerName } from '../../../engine/rules/text';
 import { hasResources, isValidBundle, toCounts, totalResources } from '../../../engine/resources';
@@ -165,18 +166,15 @@ export const tradeOverrides: {
         return fail('your partner no longer has the gold');
       }
     }
-    const offer = draft.phase.kind === 'trade' ? draft.phase.offer : null;
     const r = next(draft, action);
-    if (r.ok && g && offer) {
+    if (r.ok && g) {
       const gold = epSlice(draft).gold;
       const net = g.want - g.give;
       gold[action.player] = (gold[action.player] ?? 0) + net;
       gold[action.partner] = (gold[action.partner] ?? 0) - net;
       // The base line names the resources only ("traded  to X for "): add the gold.
-      const line = draft.log.at(-1);
-      if (line) {
-        line.text = `${playerName(draft, action.player)} traded ${describe(offer.give, g.give)} to ${playerName(draft, action.partner)} for ${describe(offer.want, g.want)}`;
-      }
+      const part = (n: number) => (n > 0 ? `${n} gold` : '');
+      extendTradeLog(draft, action.player, action.partner, part(g.give), part(g.want));
     }
     return r;
   },
