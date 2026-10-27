@@ -79,8 +79,9 @@ describe('E&P HUD', () => {
     settle(s, 0, COAST, true);
     show(s);
     const vpStat = (i: number) =>
-      [...(root.querySelectorAll('.ep-row')[i]?.querySelectorAll<HTMLElement>('.ep-stat') ?? [])]
-        .at(-1)!;
+      [
+        ...(root.querySelectorAll('.ep-row')[i]?.querySelectorAll<HTMLElement>('.ep-stat') ?? []),
+      ].at(-1)!;
     expect(vpStat(0).textContent).toBe('+1');
     expect(vpStat(0).title).toMatch(/Harbors \+1/);
     expect(vpStat(0).title).not.toMatch(/mission VP/);
