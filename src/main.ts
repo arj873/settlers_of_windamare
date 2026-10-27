@@ -15,6 +15,10 @@ import { NAME_KEY, parseRoomCode, tokenKey } from './net/transport';
 import { HomeScreen } from './ui/online/home';
 import { inviteUrl } from './ui/online/lobbyModel';
 import { OnlineApp } from './game/online/app';
+import { pieceStylePreview } from './render/stylePreview';
+import { setStylePreview } from './ui/profile/dialog';
+import { setSeatLooks } from './ui/profile/looks';
+import { loadProfile, saveProfile, type Profile, type SeatLook } from './ui/profile/model';
 import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { isHeadless, sfx } from './audio';
@@ -119,6 +123,16 @@ async function boot() {
   document.getElementById('app')?.appendChild(app.canvas);
 
   const board = new BoardView(app);
+  // PR1: piece-style previews in the profile dialogs; seat looks onto the board and the HUD.
+  setStylePreview((style, color) => pieceStylePreview(style, color));
+  const applyLooks = (looks: readonly SeatLook[]) => {
+    board.setPieceStyles(looks.map((l) => l.pieceStyle));
+    setSeatLooks(looks);
+  };
+  const profileStore = {
+    load: () => loadProfile(browserKeyStore),
+    save: (p: Profile) => void saveProfile(browserKeyStore, p),
+  };
   const frameToTheme = () => {
     const frame = boardFrameColors();
     if (!frame) return;
@@ -168,6 +182,7 @@ async function boot() {
           toast: showToast,
           notice: showNotice,
           onRender: fitBoard,
+          onLooks: applyLooks,
           sounds,
           layer: document.body,
           href: location.href,
@@ -193,13 +208,14 @@ async function boot() {
 
   // Hotseat: everything below is the offline game, unchanged.
   const offline = (dev: { state: GameState; seats: Controller[] } | null) =>
-    startOffline({ board, hud, params, dev, storage, prefs, fitBoard, spots, sounds });
+    startOffline({ board, hud, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds });
   if (dev) {
     offline(dev);
     return;
   }
   const home = new HomeScreen({
     name: browserKeyStore.get(NAME_KEY) ?? '',
+    profile: profileStore,
     onOffline: () => {
       home.element.remove();
       offline(null);
@@ -208,7 +224,7 @@ async function boot() {
       const backend = await pickBackend(location.search);
       const room = await backend.api.create();
       tokenStoreFor(backend.kind).set(tokenKey(room.roomId), room.hostToken);
-      browserKeyStore.set(NAME_KEY, name);
+      profileStore.save({ ...profileStore.load(), name });
       history.pushState(null, '', inviteUrl(location.href, room.roomId));
       online(room.roomId, (a) => {
         home.element.remove();
@@ -218,7 +234,7 @@ async function boot() {
     onJoin: async (code, name) => {
       const backend = await pickBackend(location.search);
       if (!(await backend.api.check(code))) throw new Error(`There is no room “${code}”.`);
-      browserKeyStore.set(NAME_KEY, name);
+      profileStore.save({ ...profileStore.load(), name });
       history.pushState(null, '', inviteUrl(location.href, code));
       online(code, (a) => {
         home.element.remove();
@@ -274,10 +290,11 @@ function startOffline(o: {
   storage: KeyValueStore | null;
   prefs: KeyValueStore | null;
   fitBoard: () => void;
+  applyLooks: (looks: readonly SeatLook[]) => void;
   spots: { prompt: SpotPrompt; confirmBuild: () => boolean };
   sounds: GameSounds;
 }): void {
-  const { board, hud, params, dev, storage, prefs, fitBoard, spots, sounds } = o;
+  const { board, hud, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds } = o;
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,
@@ -287,6 +304,7 @@ function startOffline(o: {
     toast: showToast,
     notice: showNotice,
     onRender: fitBoard,
+    onLooks: applyLooks,
     ...spots,
     sounds,
   });
@@ -307,7 +325,10 @@ function startOffline(o: {
 
   if (dev) {
     const levels = params.levels?.length === dev.seats.length ? params.levels : undefined;
-    controller.start(dev.state, dev.seats, levels ? { botLevels: levels } : {});
+    controller.start(dev.state, dev.seats, {
+      ...(levels ? { botLevels: levels } : {}),
+      ...(params.looks ? { looks: params.looks } : {}),
+    });
     const hl = params.hl;
     const s = dev.state;
     const topo = topologyOf(s);

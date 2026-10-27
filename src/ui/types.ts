@@ -1,4 +1,5 @@
 import type { BotLevel } from '../bots/levels';
+import type { PieceStyleId } from './profile/model';
 import type {
   Action,
   ExpansionId,
@@ -22,6 +23,10 @@ export interface SeatConfig {
   controller: Controller;
   /** B1: the bot's difficulty on a 'bot' seat (absent = DEFAULT_BOT_LEVEL). */
   botLevel?: BotLevel;
+  /** PR1 (cosmetic): profile picture, AvatarRef (absent = none; bots show the bot). */
+  avatar?: string;
+  /** PR1 (cosmetic): piece style id (absent = classic). */
+  pieceStyle?: PieceStyleId;
 }
 
 export type MapId = 'base' | 'baseRandom' | 'base56' | 'base78';

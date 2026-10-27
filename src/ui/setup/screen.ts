@@ -71,6 +71,26 @@ import {
   type SetupStorage,
 } from './model';
 import './setup.css';
+import { seatLookButton, withProfileLook } from '../profile/seatLook';
+import { loadProfile, type AvatarRef, type PieceStyleId } from '../profile/model';
+
+/** A seat with a new picture / piece style (classic and no picture are stored as absent). */
+function withLook<T extends { avatar?: string; pieceStyle?: PieceStyleId }>(
+  seat: T,
+  look: { avatar: AvatarRef | null; pieceStyle: PieceStyleId },
+): T {
+  const { avatar: _a, pieceStyle: _p, ...rest } = seat;
+  return {
+    ...rest,
+    ...(look.avatar ? { avatar: look.avatar } : {}),
+    ...(look.pieceStyle !== 'classic' ? { pieceStyle: look.pieceStyle } : {}),
+  } as T;
+}
+
+/** The setup storage as the profile's KeyStore (same localStorage). */
+function keyStoreOf(s: SetupStorage) {
+  return { get: (k: string) => s.getItem(k), set: (k: string, v: string) => s.setItem(k, v) };
+}
 
 export interface SetupScreenOptions {
   onStart: (cfg: NewGameConfig) => void;
@@ -136,6 +156,11 @@ export class SetupScreen {
     this.storage = opts.storage === undefined ? defaultStorage() : opts.storage;
     this.showAllModes = opts.showAllModes ?? urlShowsAllModes();
     this.draft = loadSetup(this.storage);
+    // PR1: seat 1 wears the local profile unless it has a look of its own.
+    if (this.storage) {
+      const profile = loadProfile(keyStoreOf(this.storage));
+      this.draft = { ...this.draft, seats: withProfileLook(this.draft.seats, profile) };
+    }
     // A remembered hidden mode (e.g. last game was the demo) falls back to base when not offered.
     if (!visibleModes(this.showAllModes).some((m) => m.id === this.draft.mode)) {
       this.draft = setMode(this.draft, 'base');
@@ -902,6 +927,12 @@ export class SetupScreen {
             'div',
             { class: 'su-seat', style: { '--pc': seat.color } },
             h('span', { class: 'su-seat-no' }, String(i + 1)),
+            seatLookButton(seat, i, (look) =>
+              this.set({
+                ...this.draft,
+                seats: this.draft.seats.map((s, j) => (j === i ? withLook(s, look) : s)),
+              }),
+            ),
             h('input', {
               class: 'input su-name',
               value: seat.name,

@@ -5,7 +5,8 @@
  * calls on the view (docs/MULTIPLAYER.md §6).
  */
 import type { Action, GameState, PlayerId } from '../../engine';
-import type { RoomClient, RoomInfo } from '../../net';
+import type { MemberId, RoomClient, RoomInfo } from '../../net';
+import type { AvatarRef, SeatLook } from '../../ui/profile/model';
 import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
 import { autoSteal, tradeEndNotice, type BoardClick } from '../logic';
@@ -24,12 +25,32 @@ export interface NetControllerOptions {
   notice?: NoticeSink;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
+  /** PR1: the seats' pictures and piece styles, before each render (cosmetic). */
+  onLooks?: (looks: readonly SeatLook[]) => void;
   /** The popover a click on a board spot opens (issue #28); absent = a click acts at once. */
   prompt?: SpotPromptLike | null;
   /** The "Confirm before building" setting; default on. */
   confirmBuild?: () => boolean;
   /** Sound effects (A1): told about every rendered view and the turn timer. */
   sounds?: SoundObserver;
+}
+
+/** PR1: each seat's look from its occupant's profile (open seats: none, classic). */
+export function roomLooks(
+  room: RoomInfo | null,
+  avatarOf: (member: MemberId) => AvatarRef | null,
+  players: number,
+): SeatLook[] {
+  return Array.from({ length: players }, (_, i) => {
+    const occupant = room?.seats[i]?.occupant ?? null;
+    const m = occupant === null ? undefined : room?.members.find((x) => x.id === occupant);
+    if (!m) return {};
+    const avatar = avatarOf(m.id);
+    return {
+      ...(avatar === null ? {} : { avatar }),
+      ...(m.pieceStyle ? { pieceStyle: m.pieceStyle } : {}),
+    };
+  });
 }
 
 export const NET_TIMER_TICK_MS = 250;
@@ -64,6 +85,7 @@ export class NetGameController {
   private readonly onRender: () => void;
   private readonly notice: NoticeSink;
   private readonly every: (fn: () => void, ms: number) => () => void;
+  private readonly onLooks: (looks: readonly SeatLook[]) => void;
   private readonly sounds: SoundObserver | null;
   private active = false;
   private placeMode: PlaceMode | null = null;
@@ -87,6 +109,7 @@ export class NetGameController {
     this.onRender = opts.onRender ?? (() => undefined);
     this.notice = opts.notice ?? ((n) => this.toast(n.text, 'info'));
     this.every = opts.every ?? defaultEvery;
+    this.onLooks = opts.onLooks ?? (() => undefined);
     const board = this.board;
     this.spots = new SpotPicker({
       prompt: opts.prompt ?? null,
@@ -113,7 +136,9 @@ export class NetGameController {
       this.board.on('hexClick', (id) => this.click({ kind: 'hex', id })),
       // Server errors are toasted by the online app (lobby and game alike).
       this.client.on((e) => {
-        if (this.active && (e.type === 'game' || e.type === 'room')) this.render();
+        if (this.active && (e.type === 'game' || e.type === 'room' || e.type === 'avatars')) {
+          this.render();
+        }
       }),
     );
   }
@@ -209,6 +234,9 @@ export class NetGameController {
       }
     }
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
+    this.onLooks(
+      roomLooks(this.client.room, (m) => this.client.avatarOf(m), g.view.players.length),
+    );
     this.board.render(g.view);
     this.hud.render(g.view, hv);
     const seat = this.viewer;

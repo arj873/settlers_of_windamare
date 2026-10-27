@@ -45,6 +45,7 @@ import {
 } from '../game/turnTimer';
 import type { NewGameConfig, SeatConfig } from '../ui/types';
 import { SEAT_COLORS } from '../ui/setup/model';
+import { isImageAvatar, type AvatarRef, type PieceStyleId } from '../ui/profile/model';
 import {
   CLOSE_CODES,
   cleanText,
@@ -120,6 +121,11 @@ interface MemberRec {
   /** When the member's socket closed (set at creation too); null while connected. */
   leftAt: number | null;
   buckets: Partial<Record<RateKind, Bucket>>;
+  /** PR1 profile (absent in older snapshots): picture (AvatarRef) and piece style. */
+  avatar?: AvatarRef;
+  /** Bumped on every uploaded picture, so its `img:` key never names two pictures. */
+  avatarRev?: number;
+  pieceStyle?: PieceStyleId;
 }
 
 interface SeatRec {
@@ -278,6 +284,8 @@ export class GameSession {
         name: m.name,
         connected: m.conn !== null,
         seat: this.seatOf(m.id),
+        ...(m.avatar === undefined ? {} : { avatar: avatarKey(m) }),
+        ...(m.pieceStyle === undefined ? {} : { pieceStyle: m.pieceStyle }),
       })),
     };
   }
@@ -427,7 +435,9 @@ export class GameSession {
     const kind: RateKind =
       msg.type === 'chat' || msg.type === 'react' || msg.type === 'intent'
         ? (msg.type as RateKind)
-        : 'lobby';
+        : msg.type === 'setProfile'
+          ? 'profile'
+          : 'lobby';
     if (!this.take(m, kind)) {
       this.error(conn, 'rate_limited', `too many ${kind} messages, slow down`, msg.type);
       return;
@@ -440,6 +450,8 @@ export class GameSession {
     switch (msg.type) {
       case 'setName':
         return this.setName(m, msg.name);
+      case 'setProfile':
+        return this.setProfile(m, msg.avatar, msg.pieceStyle);
       case 'takeSeat':
         return this.takeSeat(m, msg.seat);
       case 'leaveSeat':
@@ -525,6 +537,10 @@ export class GameSession {
       room: this.room(),
       chat: this.d.chat,
     });
+    const images = this.images(this.d.members);
+    if (Object.keys(images).length > 0) {
+      this.send(conn, { v: PROTOCOL_VERSION, type: 'avatars', images });
+    }
     if (this.d.game) this.gameFor.add(conn);
     this.roomDirty = true;
   }
@@ -545,6 +561,45 @@ export class GameSession {
     if (before === '') this.autoSeat(m);
     this.roomDirty = true;
     return null;
+  }
+
+  /** PR1: the member's own picture and piece style (cosmetic; any phase). */
+  private setProfile(
+    m: MemberRec,
+    avatar: AvatarRef | null,
+    pieceStyle: PieceStyleId,
+  ): Failure | null {
+    const image = avatar !== null && isImageAvatar(avatar);
+    const changed = avatar !== (m.avatar ?? null);
+    if (image && changed) {
+      const others = this.d.members.filter(
+        (x) => x.id !== m.id && x.avatar !== undefined && isImageAvatar(x.avatar),
+      );
+      if (others.length >= LIMITS.avatarImages) {
+        return [
+          'bad_message',
+          'too many uploaded pictures in this room; pick one from the gallery',
+        ];
+      }
+    }
+    if (avatar === null) delete m.avatar;
+    else m.avatar = avatar;
+    m.pieceStyle = pieceStyle;
+    if (image && changed) {
+      m.avatarRev = (m.avatarRev ?? 0) + 1;
+      this.broadcast({ v: PROTOCOL_VERSION, type: 'avatars', images: this.images([m]) });
+    }
+    this.roomDirty = true;
+    return null;
+  }
+
+  /** Uploaded pictures of `members` by `img:` key. */
+  private images(members: readonly MemberRec[]): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const m of members) {
+      if (m.avatar !== undefined && isImageAvatar(m.avatar)) out[avatarKey(m)] = m.avatar;
+    }
+    return out;
   }
 
   /**
@@ -1104,6 +1159,12 @@ type Failure = [ErrorCode, string];
 
 function freshSeats(n: number): SeatRec[] {
   return ROOM_COLORS.slice(0, n).map((color) => ({ color, occupant: null, status: 'bot' }));
+}
+
+/** MemberInfo.avatar: the gallery id, or the `img:` key of an uploaded picture. */
+function avatarKey(m: MemberRec): string {
+  const a = m.avatar ?? '';
+  return isImageAvatar(a) ? `img:${m.id}.${m.avatarRev ?? 0}` : a;
 }
 
 function botName(color: string, seat: PlayerId): string {

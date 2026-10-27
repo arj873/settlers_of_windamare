@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Avatar gallery dev page</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #1d2733;
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+      .panel {
+        padding: 16px 20px 24px;
+      }
+      .panel.dark {
+        background: #1d2733;
+        color: #cdd9e5;
+      }
+      .panel.light {
+        background: #f3efe6;
+        color: #3a2a22;
+      }
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 14px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 150px);
+        gap: 14px 10px;
+      }
+      .card {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        grid-template-rows: auto auto 1fr;
+        column-gap: 10px;
+        row-gap: 6px;
+        align-items: center;
+      }
+      .card .sq {
+        grid-row: 1 / span 3;
+        width: 96px;
+        height: 96px;
+      }
+      .card .name {
+        grid-column: 1 / span 2;
+      }
+      .av svg,
+      .sq svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .av {
+        border-radius: 50%;
+        overflow: hidden;
+      }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/ui/profile/galleryDev.ts"></script>
+  </body>
+</html>

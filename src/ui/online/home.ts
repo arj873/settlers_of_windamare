@@ -8,6 +8,8 @@ import { parseRoomCode } from '../../net/transport';
 import { h, type Child } from '../dom';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
+import { openProfileDialog, profileChip } from '../profile/dialog';
+import type { Profile } from '../profile/model';
 import './online.css';
 
 export interface HomeOptions {
@@ -19,6 +21,14 @@ export interface HomeOptions {
   onJoin: (code: string, name: string) => Promise<void>;
   /** Invite-link landing: join this room (the game may already be running). */
   invite?: { roomId: string; playing: boolean };
+  /** PR1: the local profile (a Profile button next to the nickname). */
+  profile?: ProfileStore;
+}
+
+/** Where the local profile lives (main.ts: localStorage). */
+export interface ProfileStore {
+  load(): Profile;
+  save(p: Profile): void;
 }
 
 const LOGO = `<svg viewBox="0 0 32 32" width="56" height="56" aria-hidden="true">
@@ -63,7 +73,12 @@ export class HomeScreen {
       },
     });
     this.error = h('p', { class: 'ol-error', attrs: { role: 'alert' } });
-    const nameField = h('label', { class: 'ol-field' }, h('span', {}, 'Nickname'), this.nameInput);
+    const nameField = h(
+      'div',
+      { class: 'pf-name-row' },
+      h('label', { class: 'ol-field' }, h('span', {}, 'Nickname'), this.nameInput),
+      opts.profile && this.profileChip(opts.profile),
+    );
 
     if (opts.invite) {
       const inv = opts.invite;
@@ -170,6 +185,29 @@ export class HomeScreen {
       ),
       this.error,
     );
+  }
+
+  /** PR1: the Profile chip; saving also fills in the nickname. */
+  private profileChip(store: ProfileStore): HTMLElement {
+    const slot = h('span', { class: 'pf-chip-slot' });
+    const draw = () => {
+      slot.replaceChildren(
+        profileChip(store.load().avatar, () => {
+          const typed = this.nameInput.value.trim();
+          const current = store.load();
+          openProfileDialog({
+            profile: { ...current, name: typed || current.name },
+            onSave: (p) => {
+              store.save(p);
+              this.nameInput.value = p.name;
+              draw();
+            },
+          });
+        }),
+      );
+    };
+    draw();
+    return slot;
   }
 
   private name(): string | null {

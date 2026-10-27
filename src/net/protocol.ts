@@ -60,6 +60,13 @@ import {
   TIMER_STEPS,
 } from '../ui/setup/model';
 import {
+  avatarError,
+  PIECE_STYLE_IDS,
+  AVATAR_MAX_CHARS,
+  type AvatarRef,
+  type PieceStyleId,
+} from '../ui/profile/model';
+import {
   arrayOf,
   bool,
   field,
@@ -82,8 +89,8 @@ export const PROTOCOL_VERSION = 1;
 // ---------------------------------------------------------------------------
 
 export const LIMITS = {
-  /** Raw frame size (characters) the server accepts before parsing. */
-  messageChars: 8_000,
+  /** Raw frame size (characters) the server accepts before parsing (fits a `setProfile` picture). */
+  messageChars: AVATAR_MAX_CHARS + 2_000,
   /** Nickname length (same as the hotseat setup screen). */
   name: NAME_MAX,
   /** Chat message length. */
@@ -95,6 +102,8 @@ export const LIMITS = {
   /** Reconnect token length bounds. */
   tokenMin: 16,
   tokenMax: 128,
+  /** PR1: members with an uploaded picture per room (gallery avatars are unlimited). */
+  avatarImages: 12,
 } as const;
 
 /** Token buckets per member: `burst` messages at once, refilled at `perSec`. */
@@ -104,6 +113,8 @@ export const RATE_LIMITS = {
   intent: { burst: 20, perSec: 10 },
   /** Lobby and host operations (setName, takeSeat, configure, ...). */
   lobby: { burst: 10, perSec: 2 },
+  /** PR1: profile changes (picture, piece style): a few at once, then one per 5 s. */
+  profile: { burst: 4, perSec: 0.2 },
 } as const;
 export type RateKind = keyof typeof RATE_LIMITS;
 
@@ -174,6 +185,13 @@ export interface MemberInfo {
   connected: boolean;
   /** Seat index, or null for a spectator. */
   seat: PlayerId | null;
+  /**
+   * PR1 profile picture: a gallery AvatarId, or an `img:` key of an uploaded picture whose data
+   * URL comes in an `avatars` message. Absent = the generic icon.
+   */
+  avatar?: string;
+  /** PR1: the member's piece style (absent = classic). */
+  pieceStyle?: PieceStyleId;
 }
 
 export interface RoomInfo {
@@ -264,6 +282,8 @@ export type ClientMessage = V &
         name?: string;
       }
     | { type: 'setName'; name: string }
+    /** PR1: the sender's own profile picture (AvatarRef, null = none) and piece style. */
+    | { type: 'setProfile'; avatar: AvatarRef | null; pieceStyle: PieceStyleId }
     | { type: 'takeSeat'; seat: PlayerId }
     | { type: 'leaveSeat' }
     | { type: 'setColor'; color: string }
@@ -297,6 +317,11 @@ export type ServerMessage = V &
         chat: ChatEntry[];
       }
     | { type: 'room'; room: RoomInfo }
+    /**
+     * PR1: uploaded profile pictures by `img:` key (MemberInfo.avatar). All of them right after
+     * `welcome`, then each new one as it is set. Keys never change meaning.
+     */
+    | { type: 'avatars'; images: Record<string, string> }
     | {
         type: 'game';
         /** Increases with every state change; echo it in `intent.seq`. */
@@ -528,6 +553,12 @@ export const parseAction: Check<Action> = (x, path) => {
 };
 
 const NAME = str(LIMITS.name * 4); // trimmed + clipped by the server (cleanName)
+/** A gallery id or a small base64 picture (avatarError): never a URL to fetch. */
+const AVATAR: Check<AvatarRef> = (x, path) => {
+  const err = avatarError(x);
+  if (err !== null) throw new Invalid(path, err);
+  return x as AvatarRef;
+};
 const TOKEN = str(LIMITS.tokenMax, { min: LIMITS.tokenMin, pattern: /^[A-Za-z0-9_-]+$/ });
 
 /** Options of the mode's modules: known keys only, typed and in range, in the setup screen's order. */
@@ -784,6 +815,12 @@ const CLIENT: ClientParsers = {
     };
   },
   setName: (o, p) => ({ v, type: 'setName', name: field(o, 'name', NAME, p) }),
+  setProfile: (o, p) => ({
+    v,
+    type: 'setProfile',
+    avatar: field(o, 'avatar', nullable(AVATAR), p),
+    pieceStyle: field(o, 'pieceStyle', oneOf(PIECE_STYLE_IDS), p),
+  }),
   takeSeat: (o, p) => ({ v, type: 'takeSeat', seat: field(o, 'seat', PLAYER_ID, p) }),
   leaveSeat: () => ({ v, type: 'leaveSeat' }),
   setColor: (o, p) => ({ v, type: 'setColor', color: field(o, 'color', oneOf(ROOM_COLORS), p) }),
@@ -857,6 +894,7 @@ export function parseClientMessage(raw: unknown): Parsed<ClientMessage> {
 const SERVER_TYPES: readonly ServerMessageType[] = [
   'welcome',
   'room',
+  'avatars',
   'game',
   'chat',
   'reaction',

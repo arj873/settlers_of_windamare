@@ -29,6 +29,7 @@ import {
 } from '../../engine';
 import type { Controller, MapId, NewGameConfig, NewGameVariants, SeatConfig } from '../types';
 import { isBotLevel, type BotLevel } from '../../bots/levels';
+import { avatarError, isPieceStyle, type PieceStyleId } from '../profile/model';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -102,6 +103,9 @@ export interface SeatDraft {
   controller: Controller;
   /** B1: difficulty when the seat is a bot (absent = DEFAULT_BOT_LEVEL). */
   botLevel?: BotLevel;
+  /** PR1 (cosmetic): the seat's picture (AvatarRef) and piece style; absent = none / classic. */
+  avatar?: string;
+  pieceStyle?: PieceStyleId;
 }
 
 export interface SetupDraft {
@@ -690,6 +694,8 @@ export function buildConfig(draft: SetupDraft): NewGameConfig {
       color: s.color,
       controller: s.controller,
       ...(s.controller === 'bot' && s.botLevel !== undefined ? { botLevel: s.botLevel } : {}),
+      ...(s.avatar ? { avatar: s.avatar } : {}),
+      ...(s.pieceStyle ? { pieceStyle: s.pieceStyle } : {}),
     };
   });
   const cfg: NewGameConfig = {
@@ -782,6 +788,10 @@ export function sanitizeSetup(raw: unknown): SetupDraft {
             ? 'human'
             : 'bot',
       ...(isBotLevel(o['botLevel']) ? { botLevel: o['botLevel'] } : {}),
+      ...(typeof o['avatar'] === 'string' && avatarError(o['avatar']) === null
+        ? { avatar: o['avatar'] }
+        : {}),
+      ...(isPieceStyle(o['pieceStyle']) ? { pieceStyle: o['pieceStyle'] } : {}),
     });
   });
   while (seats.length < MIN_PLAYERS)

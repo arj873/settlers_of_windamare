@@ -82,6 +82,13 @@
   border-width: 0 0 0 3px;
   pointer-events: auto;
   box-shadow: var(--side-shadow);
+  /* #54: when the panels' minimum heights don't fit (short windows, chat + expansions), the
+     sidebar scrolls instead of pushing the last panels (Chat) off-screen. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
 }
 .hud-drawer {
   display: none;
@@ -444,8 +451,11 @@
 .side-sec:first-child {
   border-top: 0;
 }
+/* Game Events fills the room the other panels leave (basis 0: a long log never squeezes them),
+   down to a readable minimum; below that the sidebar scrolls (#54). */
 .sec-log {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 150px;
 }
 .sec-log.is-collapsed {
   flex: none;
@@ -709,9 +719,10 @@
   box-shadow: var(--pp-shadow);
   transition: transform 0.2s ease;
 }
+/* #54: the avatar sits inside the row's rounded end (its ring and shadow included). */
 .pp > .avatar {
-  margin-left: -6px;
-  --av: 40px;
+  margin: 3px 0 3px 3px;
+  --av: 38px;
 }
 .pp.is-current {
   transform: translateX(-5px);
@@ -803,7 +814,7 @@
   gap: 7px;
 }
 .is-compact .pp > .avatar {
-  --av: 30px !important;
+  --av: 26px !important;
 }
 .is-compact .pp-main {
   flex-direction: row;
@@ -1998,7 +2009,7 @@
     min-height: 40px;
   }
   .pp > .avatar {
-    --av: 36px;
+    --av: 32px;
   }
   .bcard {
     height: 78px;

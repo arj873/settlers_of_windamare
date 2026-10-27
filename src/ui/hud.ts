@@ -1813,7 +1813,7 @@ export class Hud {
         h(
           'div',
           { class: `resp resp-${resp}`, style: { '--pc': p.color } },
-          h('span', { class: 'pp-dot' }),
+          avatar(p, this.view?.bots?.[id] ?? false, 24),
           h('span', { class: 'resp-name' }, p.name),
           h(
             'span',
@@ -1880,6 +1880,7 @@ export class Hud {
         h(
           'div',
           { class: 'offer-line', style: { '--pc': from.color } },
+          avatar(from, view.bots?.[offer.from] ?? false, 28),
           h('span', {}, `${from.name} gives`),
           this.bundleRow(offer.give, this.offerExtras(state, 'give')),
           h('span', { class: 'swap' }, '⇄'),

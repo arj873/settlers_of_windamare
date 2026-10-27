@@ -6,6 +6,8 @@ import type { ChatEntry, Reaction } from '../../net/protocol';
 import { LIMITS, REACTIONS } from '../../net/protocol';
 import { h } from '../dom';
 import { glyph } from '../icons';
+import { profileAvatar } from '../profile/dialog';
+import type { AvatarRef } from '../profile/model';
 import './online.css';
 
 export const REACTION_FACE: Record<Reaction, string> = {
@@ -36,6 +38,8 @@ export interface ChatPanelOptions {
   react: (r: Reaction) => boolean;
   /** Seat colour of a chat line (null = no seat). */
   colorOf: (entry: ChatEntry) => string | null;
+  /** PR1: the sender's picture (null = none: no picture shown). */
+  avatarOf?: (entry: ChatEntry) => AvatarRef | null;
 }
 
 export class ChatPanel {
@@ -149,6 +153,7 @@ export class ChatPanel {
     this.lastId = Math.max(this.lastId, e.id);
     const atBottom = this.list.scrollTop + this.list.clientHeight >= this.list.scrollHeight - 12;
     const color = this.opts.colorOf(e);
+    const pic = e.from === null ? null : (this.opts.avatarOf?.(e) ?? null);
     const when = new Date(e.at);
     const time = Number.isNaN(when.getTime())
       ? ''
@@ -159,6 +164,7 @@ export class ChatPanel {
         : h(
             'div',
             { class: 'chat-row', title: time },
+            pic && profileAvatar(pic, color ?? '#9a9a9a', 20),
             h(
               'b',
               { class: 'chat-name', style: color ? { '--pc': color } : {} },
