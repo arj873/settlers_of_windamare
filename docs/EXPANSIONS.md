@@ -137,6 +137,7 @@ version where the slice is read (or add a migration step in your module and ask 
 interface ExpansionModule {
   id;
   name;
+  icon?: string; // one emoji for the setup screen's expansion chip (modules that play alone)
   requires?;
   conflicts?;
   before?: ExpansionId[]; // composition order: run (and wrap) before these modules (§11)
@@ -360,8 +361,18 @@ interface HudExtension {
   impliedActions?: string[]; // clicked on the board, no button
   handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
   offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
+  sounds?: {
+    // A1 sound effects (ARCHITECTURE.md §13d)
+    recipes?: Record<'<id>/<name>', SoundRecipe>; // synthesized, registered at boot for every module
+    cues?(prev, next, ctx): SoundCue[]; // one state change → cues; ctx.levelOf(actor) / isLocal(p)
+  };
 }
 ```
+
+- Sounds (A1): put them in `src/expansions/<id>/sounds.ts` (C&K barbarians, Seafarers ships,
+  E&P ships, T&B wagons are examples). Read your slice defensively (`Partial<…>`, absent fields)
+  from public state only, so online views sound the same; levels come from `ctx.levelOf(player)`.
+  Build recipes from `src/audio/voices.ts`; audition them with `?sfx=1`.
 
 - Expansion-only goods in a player trade: put your part of the offer in your slice and show it
   with `offerExtras` (C&K: `ck/offerTrade` + overrides of acceptTrade / confirmTrade).
@@ -382,11 +393,21 @@ interface HudExtension {
   and Road Building's free ship); with the mode on, a click prefers them over the implied prompts
   (a coast edge could otherwise only take the road). A module's `hint` may word any phase the
   viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
+- A plain board click (no place mode) also offers every build card's `actionType` at the clicked
+  spot, in the spot prompt (issue #28, docs/ARCHITECTURE.md "Build by clicking a spot"), labelled
+  with the card's `label`, `glyph` and cost. Give a card's action a board location (`vertex`,
+  `edge` or `hex`) and it works there with no extra code.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
-- **Setup screen** (generated from the registry): mode tiles from `listModes()` (`status: 'ready'`
-  always; `'wip'` / `'demo'` with `?modes=all`), base first and default; an expansion mode shows its
-  scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
+- **Setup screen** (generated from the registry, U7 `src/ui/setup/modePicker.ts`): modes from
+  `listModes()` (`status: 'ready'` always; `'wip'` / `'demo'` with `?modes=all`) are picked with
+  expansion chips, none on = base. A mode's chips are the modules it activates that have no
+  `requires` (combo modules drop out: `tb+ck` = C&K + T&B), so a new combo module appears by
+  itself. A chip is disabled when no offered mode has the resulting chips (reason: its
+  `conflicts`, else "no official combination"). Modes with the same chips (`tb+ck`, `ba+ck`,
+  `two+ck`) share one selection: the scenario picker lists every scenario of each, grouped by
+  mode, with seats and VP. Give a standalone module an `icon` (emoji) for its chip. An expansion
+  mode shows its scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
   selects (int / choice), and clamps seats to the mode's range. `NewGameConfig` carries
   `{ mode, scenario?, options? }`. Dev: `?mode=<id>` starts a game at once.
 

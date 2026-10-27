@@ -75,6 +75,33 @@ describe('lobbyView', () => {
     expect(v.seats.every((s) => !s.canSit)).toBe(true);
   });
 
+  it('L1: a viewer without a seat gets the watching prompt; the invite note names the cap', () => {
+    expect(lobbyView(room(), 'm1').watching).toBeNull();
+    expect(lobbyView(room(), 'm3').watching).toEqual({ named: true, openSeat: 2 });
+    const v = lobbyView(room(), 'm1');
+    expect(v.tableFull).toBe(false);
+    expect(v.inviteNote).toMatch(/take a bot's seat, or a new one up to 8 players/);
+
+    // Every seat has a person and a 3-4 player scenario: full, and the note says why.
+    const landHo = { ...DEFAULT_ROOM_CONFIG, mode: 'ep', scenario: 'ep/landHo' } as const;
+    const full = room({
+      config: landHo,
+      seats: room().seats.map((s, i) => ({ ...s, occupant: `m${i + 1}`, status: 'human' })),
+      members: [1, 2, 3, 4, 5].map((i) => ({
+        id: `m${i}`,
+        name: `P${i}`,
+        connected: true,
+        seat: i <= 4 ? i - 1 : null,
+      })),
+    });
+    const fv = lobbyView(full, 'm5');
+    expect(fv.tableFull).toBe(true);
+    expect(fv.watching).toEqual({ named: true, openSeat: null });
+    expect(fv.inviteNote).toMatch(/table is full \(4 players, the most .*Land Ho.* allows\)/);
+    // The same seats in the base game can still grow.
+    expect(lobbyView({ ...full, config: DEFAULT_ROOM_CONFIG }, 'm5').tableFull).toBe(false);
+  });
+
   it('summary and invite link', () => {
     expect(configSummary({ ...DEFAULT_ROOM_CONFIG, turnTimerSec: 120 })).toBe(
       'Base Random · 4 seats · 10 VP · 2 min timer',
@@ -243,6 +270,52 @@ describe('LobbyScreen', () => {
     name.value = 'Evie';
     name.dispatchEvent(new Event('change'));
     expect(log).toEqual(['sit:2', 'name:Evie']);
+  });
+
+  it('L1: "Copied!" replaces "Copy link" in the same cell, then flips back', async () => {
+    const { actions } = actionsLog();
+    const lobby = new LobbyScreen({
+      roomId: 'K3J9QX',
+      inviteUrl: 'http://x/?room=K3J9QX',
+      actions,
+      chat: document.createElement('div'),
+      copy: () => Promise.resolve(),
+    });
+    document.body.append(lobby.element);
+    lobby.update(room(), 'm1');
+    const btn = lobby.element.querySelector<HTMLButtonElement>('[data-k="copy"]')!;
+    const shown = () =>
+      [...btn.querySelectorAll('.ol-copy-label:not(.is-off)')].map((e) => e.textContent);
+    expect(shown()).toEqual(['Copy link']);
+    expect(btn.querySelector('.glyph svg')).not.toBeNull(); // the icon is untouched
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(shown()).toEqual(['Copied!']);
+    expect(btn.querySelectorAll('.ol-copy-label')).toHaveLength(2);
+    expect(btn.querySelector('.glyph svg')).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 1900));
+    expect(shown()).toEqual(['Copy link']);
+    lobby.destroy();
+  });
+
+  it('L1: a spectator sees "You\'re watching. Pick a seat" with a Sit here button', () => {
+    const { log, actions } = actionsLog();
+    const lobby = new LobbyScreen({
+      roomId: 'K3J9QX',
+      inviteUrl: 'http://x/?room=K3J9QX',
+      actions,
+      chat: document.createElement('div'),
+    });
+    document.body.append(lobby.element);
+    lobby.update(room(), 'm3');
+    const watch = lobby.element.querySelector<HTMLElement>('[data-k="watching"]')!;
+    expect(watch.hidden).toBe(false);
+    expect(watch.textContent).toContain("You're watching. Pick a seat:");
+    click(lobby.element, 'watch-sit');
+    expect(log).toEqual(['sit:2']);
+    // Seated: the prompt goes away.
+    lobby.update(room(), 'm1');
+    expect(watch.hidden).toBe(true);
   });
 });
 

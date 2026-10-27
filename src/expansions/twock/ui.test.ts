@@ -9,6 +9,7 @@ import { createGame, legalActions, type GameState } from '../../engine';
 import { topologyOf, vertexEdges } from '../../engine/topology';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { ckSlice } from '../ck/engine';
@@ -24,7 +25,7 @@ describe('Catan for Two + C&K setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${TWOCK_MODE}`)?.click();
+    expect(pickMode(screen.element, TWOCK_MODE)).toBe(true);
     expect(screen.state.mode).toBe(TWOCK_MODE);
     expect(playerRange(screen.state)).toEqual({ min: 2, max: 2 });
     q(screen, 'start')?.click();

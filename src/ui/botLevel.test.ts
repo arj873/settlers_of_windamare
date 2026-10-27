@@ -147,6 +147,6 @@ describe('lobby: bot difficulty per open seat', () => {
     });
     guest.update(room(), 'm2');
     expect(guest.element.querySelector('[data-k^="seat-level-"]')).toBeNull();
-    expect(guest.element.textContent).toContain('Open — a Hard bot plays it');
+    expect(guest.element.textContent).toContain('Open seat · a Hard bot plays it');
   });
 });

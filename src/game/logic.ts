@@ -102,6 +102,8 @@ export interface BoardExtensions {
   placeModeAction(mode: string): string | null;
   /** Every action type of a namespaced place mode (ExtBuildCard.alsoActions). */
   placeModeActions?(mode: string): readonly string[];
+  /** Every action type of every module build card (a plain click offers them: spot choices). */
+  buildCardActions?: ReadonlySet<string>;
 }
 let boardExtensions: BoardExtensions = { implied: new Set(), placeModeAction: () => null };
 export function setBoardExtensions(x: BoardExtensions): void {
@@ -149,8 +151,15 @@ export function boardActions(
   return buildType ? mine.filter((a) => a.type === buildType) : [];
 }
 
-/** Board highlights for a set of board actions (`{}` when there are none). */
-export function highlightsFor(actions: readonly Action[], color?: string): Highlights {
+/**
+ * Board highlights for a set of board actions (`{}` when there are none). `hoverOnly`: the spots
+ * glow only under the pointer (build-anywhere targets, issue #28).
+ */
+export function highlightsFor(
+  actions: readonly Action[],
+  color?: string,
+  hoverOnly = false,
+): Highlights {
   const vertices: VertexId[] = [];
   const edges: EdgeId[] = [];
   const hexes: HexId[] = [];
@@ -161,7 +170,13 @@ export function highlightsFor(actions: readonly Action[], color?: string): Highl
     else if (at?.kind === 'hex') hexes.push(at.id);
   }
   if (vertices.length + edges.length + hexes.length === 0) return {};
-  return { vertices, edges, hexes, ...(color ? { color } : {}) };
+  return {
+    vertices,
+    edges,
+    hexes,
+    ...(color ? { color } : {}),
+    ...(hoverOnly ? { hoverOnly } : {}),
+  };
 }
 
 export type BoardClick =
@@ -177,10 +192,84 @@ export function locationOf(a: Action): BoardClick | null {
 
 /** The board action matching a click, or undefined when the click means nothing right now. */
 export function actionForClick(actions: readonly Action[], click: BoardClick): Action | undefined {
-  return actions.find((a) => {
+  return actionsAt(actions, click)[0];
+}
+
+/** Every action of `actions` that targets the clicked spot, in order. */
+export function actionsAt(actions: readonly Action[], click: BoardClick): Action[] {
+  return actions.filter((a) => {
     const at = locationOf(a);
     return at !== null && at.kind === click.kind && at.id === click.id;
   });
+}
+
+/** Base action types a plain board click offers without a build mode (issue #28). */
+const BASE_SPOT_BUILDS: ReadonlySet<string> = new Set([
+  'buildRoad',
+  'buildSettlement',
+  'buildCity',
+]);
+
+/**
+ * Build actions a plain board click offers `viewer` when no build mode is on: the base builds and
+ * every module build card's actions (Ship, Knight, City wall, Bridge, Command…), wherever legal.
+ */
+export function spotBuildActions(legal: readonly Action[], viewer: PlayerId): Action[] {
+  const ext = boardExtensions.buildCardActions;
+  return legal.filter(
+    (a) =>
+      a.player === viewer &&
+      (BASE_SPOT_BUILDS.has(a.type) || ext?.has(a.type) === true) &&
+      locationOf(a) !== null,
+  );
+}
+
+/** What a board click may do now: `spot` = the build-anywhere targets (no mode, no prompt). */
+export interface ClickTargets {
+  actions: Action[];
+  spot: boolean;
+}
+
+/**
+ * The board's click targets: a prompt (setup, robber, free road…) or the build mode's spots
+ * (`boardActions`); with neither, the builds at any spot (`spotBuildActions`).
+ */
+export function clickTargets(
+  legal: readonly Action[],
+  viewer: PlayerId,
+  placeMode: PlaceMode | null,
+): ClickTargets {
+  const direct = boardActions(legal, viewer, placeMode);
+  if (direct.length > 0 || placeMode !== null) return { actions: direct, spot: false };
+  return { actions: spotBuildActions(legal, viewer), spot: true };
+}
+
+export type ClickOutcome =
+  | { kind: 'none' }
+  | { kind: 'act'; action: Action }
+  /** Ask first: the choices at the spot, one per action type (a single one = confirm). */
+  | { kind: 'choose'; choices: Action[] };
+
+/**
+ * What a click on a spot does. Several action types there (road or ship on a coast edge) always
+ * ask; a lone build-anywhere action asks when `confirm` is on; prompts and build modes act at once
+ * (the player already chose what to place). Same-type duplicates keep the first, as before.
+ */
+export function resolveClick(
+  targets: ClickTargets,
+  click: BoardClick,
+  confirm: boolean,
+): ClickOutcome {
+  const seen = new Set<string>();
+  const choices = actionsAt(targets.actions, click).filter((a) => {
+    if (seen.has(a.type)) return false;
+    seen.add(a.type);
+    return true;
+  });
+  const first = choices[0];
+  if (!first) return { kind: 'none' };
+  if (choices.length > 1 || (targets.spot && confirm)) return { kind: 'choose', choices };
+  return { kind: 'act', action: first };
 }
 
 export interface BotTurn {

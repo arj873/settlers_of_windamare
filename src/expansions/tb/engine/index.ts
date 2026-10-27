@@ -724,6 +724,7 @@ function neutralAfter(draft: GameState, piece: 'road' | 'settlement'): void {
 export const tbModule: ExpansionModule = {
   id: TB,
   name: 'Traders & Barbarians',
+  icon: '🐪',
   players: { min: 2, max: 6 },
   terrains: {
     'tb/lake': { kind: 'land', name: 'Lake', color: '#4f8fb8' },

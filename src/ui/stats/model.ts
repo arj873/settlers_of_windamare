@@ -11,6 +11,7 @@ import {
   RESOURCES,
   statsOf,
   sumCounts,
+  tradesByRatio,
   victoryPoints,
   type DevCardType,
   type GainSource,
@@ -263,4 +264,27 @@ export function devRows(
 /** The data the panel needs, or null when the state has no stats to show. */
 export function statsFor(state: GameState): GameStats | null {
   return state.stats ? statsOf(state) : null;
+}
+
+/** Label of a bank / harbor trade ratio key ("4:1" → "Bank trades (4:1)"). */
+export function tradeRatioLabel(key: string): string {
+  if (key === '4:1') return 'Bank trades (4:1)';
+  if (key === 'harbor') return 'Harbor trades (ratio not recorded)';
+  return `Harbor trades (${key})`;
+}
+
+/** One row per bank / harbor ratio that anybody used in this game, 2:1 first. */
+export function tradeRatioRows(
+  stats: GameStats,
+): { key: string; label: string; cell: (s: PlayerStats) => number }[] {
+  const keys = new Set<string>();
+  for (const p of stats.players) for (const t of tradesByRatio(p)) keys.add(t.key);
+  const order = (k: string) => Number.parseInt(k, 10) || 3.5;
+  return [...keys]
+    .sort((a, b) => order(a) - order(b))
+    .map((key) => ({
+      key,
+      label: tradeRatioLabel(key),
+      cell: (s) => tradesByRatio(s).find((t) => t.key === key)?.count ?? 0,
+    }));
 }

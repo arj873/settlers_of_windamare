@@ -68,6 +68,11 @@ import { Viewport, type Insets } from './viewport';
 export interface Highlights extends PickCandidates {
   /** Tint for the glow (CSS colour), e.g. the acting player's colour. Default: warm white. */
   color?: string;
+  /**
+   * The spots are clickable and hoverable as usual, but only the one under the pointer glows
+   * (build-anywhere targets: no build mode on, issue #28).
+   */
+  hoverOnly?: boolean;
 }
 
 export interface BoardEvents {
@@ -310,8 +315,8 @@ export class BoardView {
   /** Mark legal spots (they pulse and become hoverable/clickable); `{}` clears. */
   setHighlights(h: Highlights): void {
     this.highlights = h;
-    this.buildGlows();
     this.hover = null;
+    this.buildGlows();
     this.drawHover();
   }
 
@@ -428,6 +433,7 @@ export class BoardView {
     if (same) return;
     this.hover = hit;
     this.app.canvas.style.cursor = hit && this.candidates() ? 'pointer' : '';
+    if (this.highlights.hoverOnly) this.buildGlows();
     this.drawHover();
     this.emit('hover', hit);
   }
@@ -891,7 +897,12 @@ export class BoardView {
       this.glows.push({ node, glow, kind });
     };
 
-    for (const id of this.highlights.hexes ?? []) {
+    // Hover-only spots: just the hovered one glows (hover hits only highlighted spots).
+    const only = this.highlights.hoverOnly ? this.hover : undefined;
+    const shown = (kind: Glow['kind'], ids: readonly string[] | undefined): readonly string[] =>
+      only === undefined ? (ids ?? []) : only?.kind === kind ? [only.id] : [];
+
+    for (const id of shown('hex', this.highlights.hexes) as HexId[]) {
       const info = this.topo.hex[id] ?? this.topo.water[id];
       if (!info) continue;
       add('hex', info, (g) => {
@@ -900,7 +911,7 @@ export class BoardView {
           .stroke({ width: 5, color, alpha: 0.95, join: 'round' });
       });
     }
-    for (const id of this.highlights.edges ?? []) {
+    for (const id of shown('edge', this.highlights.edges) as EdgeId[]) {
       const info = edgeInfo(this.topo, id);
       const a = info && vertexInfo(this.topo, info.vertices[0]);
       const b = info && vertexInfo(this.topo, info.vertices[1]);
@@ -919,7 +930,7 @@ export class BoardView {
           .stroke({ width: 0.08 * S, color, alpha: 0.95, cap: 'round' });
       });
     }
-    for (const id of this.highlights.vertices ?? []) {
+    for (const id of shown('vertex', this.highlights.vertices) as VertexId[]) {
       const info = vertexInfo(this.topo, id);
       if (!info) continue;
       add('vertex', info, (g) => {

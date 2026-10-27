@@ -504,8 +504,13 @@ export interface PlayerStats {
   tradesAsPartner: number;
   /** 4:1 trades with the bank. */
   bankTrades: number;
-  /** 3:1 and 2:1 harbor trades. */
+  /** 3:1 and 2:1 harbor trades (any ratio below 4). */
   portTrades: number;
+  /**
+   * Bank / harbor trades by ratio, keyed "4:1", "3:1", "2:1". Absent in saves from before it
+   * existed: read it with `tradesByRatio(p)` (stats.ts), which also folds in the old counters.
+   */
+  tradesByRatio?: Record<string, number>;
   robberMoves: number;
   /** Cards stolen (robber and event steals). */
   steals: number;

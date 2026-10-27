@@ -49,8 +49,13 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 - Seats: open seats read "<Colour> Bot — a Normal bot plays it" (the seat's level); the host gets
   a difficulty picker (Easy / Normal / Hard, `setBotLevel`) on each open seat. Named members can sit / move / stand up and
   pick a free colour. Host: **Add bot** (+1 seat, the map follows like the setup screen's player
-  stepper), **Remove bot** (only the last seat, when open, above the map minimum), **Start**
-  (needs someone seated).
+  stepper), **Remove** (only the last seat, when open, above the map minimum), **Start**
+  (needs someone seated). Card layout: dot + name (one line, ellipsis) + status on top; the
+  colour swatches and a footer row (level picker left, buttons right, wrapping) under it.
+- Joining sits you down (server auto-seat, MULTIPLAYER.md §2); the invite note under the link
+  says so, and names the seat cap when the table is full. A member without a seat gets a
+  "You're watching. Pick a seat: [Sit here]" bar at the top (first open seat).
+- Copy link: "Copy link" and "Copied!" share one grid cell (the hidden one keeps its width).
 - Settings: the hotseat `SetupScreen` wrapped unchanged. Its `storage` option is a bridge: the
   draft it loads comes from the room config, every save becomes a (debounced 250 ms)
   `configure`. CSS hides its seats, seed and footer. Non-hosts get it `inert` and dimmed, rebuilt

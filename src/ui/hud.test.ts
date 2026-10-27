@@ -294,6 +294,29 @@ describe('Hud', () => {
     expect(bars[1]!.textContent).toContain('You');
   });
 
+  it('dice tumble only for a real roll, not on first render or End turn', () => {
+    const rolling = () => root.querySelector('.dice')!.classList.contains('rolling');
+    const view = { viewer: 1, legal: [], isBotTurn: false };
+    const s = midGame();
+    s.dice = [3, 4];
+    s.phase = { kind: 'main' };
+    hud.render(s, view);
+    expect(rolling()).toBe(false); // reload / reconnect
+    // End turn: next turn, same stale faces, waiting for the roll.
+    const next = {
+      ...s,
+      phase: { kind: 'preRoll' as const },
+      turn: { ...s.turn, number: s.turn.number + 1 },
+    };
+    hud.render(next, view);
+    expect(rolling()).toBe(false);
+    hud.render({ ...next }, view);
+    expect(rolling()).toBe(false);
+    // The roll with the very same faces still animates.
+    hud.render({ ...next, phase: { kind: 'main' } }, view);
+    expect(rolling()).toBe(true);
+  });
+
   it('renders the log with player names and icons', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: [], isBotTurn: false });

@@ -298,6 +298,7 @@ const PIECES: Readonly<Record<string, number>> = {
 export const epModule: ExpansionModule = {
   id: EP,
   name: 'Explorers & Pirates',
+  icon: '🏴‍☠️',
   conflicts: ['seafarers'],
   players: { min: 3, max: 6 },
   terrains: {

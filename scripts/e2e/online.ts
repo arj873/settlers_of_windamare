@@ -114,11 +114,35 @@ async function main() {
     await ann.waitForFunction(() => document.body.textContent?.includes('Bob'));
     check(true, 'Bob joined; Ann sees him');
 
-    await ann.click('[data-k="sit-0"]');
-    await bob.waitForSelector('[data-k="sit-1"]');
+    // L1: both sat down on joining, the host in seat 1, Bob in the first bot seat.
+    await ann.waitForFunction(() =>
+      document.querySelector('.ol-seat[data-seat="1"]')?.textContent?.includes('Bob'),
+    );
+    check(
+      (await ann.textContent('.ol-seat[data-seat="0"]'))?.includes('Ann') &&
+        (await ann.$('[data-k="watching"][hidden]')),
+      'host and guest are seated on joining (seats 1 and 2), nobody is watching',
+    );
+    // "Move here" still works: Bob moves to seat 4 and back.
+    await bob.click('[data-k="sit-3"]');
+    await ann.waitForFunction(() =>
+      document.querySelector('.ol-seat[data-seat="3"]')?.textContent?.includes('Bob'),
+    );
     await bob.click('[data-k="sit-1"]');
     await ann.waitForFunction(() =>
       document.querySelector('.ol-seat[data-seat="1"]')?.textContent?.includes('Bob'),
+    );
+    check(true, 'Move here: Bob moves seats and back');
+    await ann.click('[data-k="copy"]');
+    await ann.waitForSelector('[data-k="copy"] .ol-copy-label:not(.is-off):has-text("Copied!")');
+    check(
+      (await ann.$eval('[data-k="copy"] .ol-copy-label.is-off', (e) => e.textContent)) ===
+        'Copy link',
+      '"Copy link" is hidden while "Copied!" shows',
+    );
+    check(
+      (await ann.textContent('[data-k="copy"] .ol-copy-label:not(.is-off)')) === 'Copied!',
+      'Copy link shows only "Copied!"',
     );
     await ann.click('[data-k="remove-bot"]');
     await bob.waitForFunction(() => document.querySelectorAll('.ol-seat[data-seat]').length === 3);
@@ -267,15 +291,15 @@ async function main() {
     check(true, 'closed tab shows the away icon');
     await shot(ann, '7-bob-away');
 
-    // Expansion room (X1): the host picks Cities & Knights with the setup screen's mode tile;
-    // Ann + Dan play against two bots; the C&K HUD renders from the masked views.
+    // Expansion room (X1): the host picks Cities & Knights with the setup screen's expansion
+    // chip; Ann + Dan play against two bots; the C&K HUD renders from the masked views.
     const host = await open(REMOTE ? base : `${base}?server=local`);
     await host.fill('[data-k="nickname"]', 'Ann');
     await host.click('[data-k="create"]');
     await host.waitForSelector('.ol-lobby');
-    await host.click('.ol-config [data-k="mode-ck"]');
+    await host.click('.ol-config [data-k="chip-ck"]');
     await host.waitForFunction(`${clientExpr}.room.config.mode === 'ck'`);
-    check(true, 'host picked Cities & Knights in the lobby (setup screen mode tile)');
+    check(true, 'host picked Cities & Knights in the lobby (setup screen expansion chip)');
     const dan = await open(await host.inputValue('[data-k="invite"]'));
     await dan.fill('[data-k="nickname"]', 'Dan');
     await dan.click('[data-k="join"]');
@@ -284,9 +308,7 @@ async function main() {
       (await dan.textContent('.ol-lobby'))?.includes('Cities & Knights'),
       'guest sees the C&K setup',
     );
-    await host.click('[data-k="sit-0"]');
-    await dan.waitForSelector('[data-k="sit-1"]');
-    await dan.click('[data-k="sit-1"]');
+    // Both sat down on joining (L1).
     await host.waitForFunction(() =>
       document.querySelector('.ol-seat[data-seat="1"]')?.textContent?.includes('Dan'),
     );
