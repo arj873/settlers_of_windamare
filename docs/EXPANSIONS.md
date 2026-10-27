@@ -468,14 +468,14 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module   | Composes          | Scenarios (VP)                                                                                 |
-| -------------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
-| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
-| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
-| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                  |
-| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                          |
-| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                        |
+| Mode           | Module   | Composes          | Scenarios (VP)                                                                                                                                                |
+| -------------- | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                                                                                    |
+| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                                                                               |
+| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2); 18 pairs on the other Seafarers scenarios (C3, combos.md §2d) |
+| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                                                                                 |
+| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                                                                                         |
+| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                                                                                       |
 
 How a combination is built:
 
@@ -507,7 +507,10 @@ seafarers]`).
   cached): the listed ids, else the game's scenario (T&B's `featuresOf` takes the union, so a
   T&B × T&B scenario can list two). A combination map built on a module's map sets
   `CustomMapDef.basedOn` (Seafarers' `mapKeyOf` follows it) and may put data for each module in
-  `board.ext` (`tbsea` shifts T&B's whole 19-hex board onto New Shores' main island).
+  `board.ext` (`tbsea` shifts T&B's whole 19-hex board onto New Shores' main island). C3 lays
+  T&B's pieces on the Seafarers scenario's own map instead (`tbsea/engine/overlays.ts`: a `Plan`
+  of lake, watering hole, fishing grounds, rivers, second number discs, or a sheet diagram's
+  `Layout` of changed cells, harbours, rivers and trade hexes).
 - **Sea paths for road pieces.** On a map with open sea T&B's wagons, camels and barbarians also
   use sea edges (`tb/engine/paths.ts`); the pieces that carry a wagon like a road (ships) come
   from the `routeEdges` hook, so T&B never imports Seafarers.
@@ -552,8 +555,8 @@ seafarers]`).
 - ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
 - **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
-  built (§11). Not built: T&B + Seafarers on the other Seafarers scenarios (per-scenario maps),
-  Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
+  built (§11), T&B + Seafarers on the other Seafarers scenarios too (C3) except Barbarian Attack
+  with the Forgotten Tribe, Pirate Islands and Wonders. Not built: Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
   Fishing pairs are mode `tb+tb`). Details in
   `docs/rules/combos.md` §2b, §3.
 - ~~E&P combinations~~ — done (E5b): `ep+ck`, `ep+tb` (§11), player trades with gold

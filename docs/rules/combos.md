@@ -172,15 +172,7 @@ Winning the Game rule for the specific Seafarers scenario", and the Barbarian At
 | Friendly Robber FAQ 53: the pirate is friendly too                                                                                    | OK       | Every Seafarers game: `pirateTargets` skips hexes next to a ship of a player with 2 or fewer points (the mover's own ships aside).                                                                                                                 |
 | Event Cards FAQ 17 / 19 / 20: Robber Flees leaves the pirate; ships may be built with a damaged road; a ship is never turned sideways | OK       | Unchanged rules, pinned by tests (`tbsea.test.ts`).                                                                                                                                                                                                |
 
-Not built from these sheets (follow-up cards): T&B on **Through the Desert** (diagram set-ups);
-Fishing on Four Islands, Fog Islands, Through the Desert, Forgotten Tribe, Cloth for Catan,
-Wonders, New World (text set-ups: lake / ground placement, Tribe's robber on the large island,
-Cloth's pirate rule); Rivers on Fog Islands (gold fields produce resources), Through the Desert,
-Forgotten Tribe, New World; Merchant Trains on Four Islands (wagons on the pirate's edges),
-Through the Desert, Forgotten Tribe, ...; Barbarian Attack on Through the Desert, Forgotten
-Tribe, Pirate Islands, Wonders. Not playable per the sheets: T&B with Four Islands, Fog, Tribe,
-Cloth, Pirate Islands, Wonders, New World; Fishing with Pirate Islands; Rivers and Barbarian
-Attack with Four Islands; Merchant Trains with Fog Islands.
+The pairs on the other Seafarers scenarios are §2d (card C3).
 
 Edits to other modules (additive, listed for the merge): Seafarers (`rulesOf` and `mapKeyOf`
 follow `playsAs` / `basedOn`; `SeaBoard.pirate`; `blockedFor` asks `blocksRoute` at own
@@ -189,6 +181,147 @@ route lengths), T&B (`featuresOf` follows `playsAs` and `validate` uses features
 sea paths for wagons, camels and barbarians, ships via `routeEdges`; `TbBoard.barbarians`;
 `FishingGround.hex`, `payFish(…, blocked)`; Caravans' `roadLength` keeps a longer base; BA knights
 on land paths only; the renderer draws wagons, camels and barbarians on sea paths).
+
+## 2d. T&B + Seafarers on the other Seafarers scenarios — module `tbsea` (card C3)
+
+**Sources.** The same five 2025 sheets as §2b (catan.com, `sites/default/files/2025-07/` and
+`2025-08/`: `TradersBarbarians w SEA.pdf`, `Fishing on Catan w SEA.pdf`, `Rivers of Catan w
+SEA.pdf`, `Merchant Trains w SEA_21.07.25.pdf`, `Barbarian Attack w SEA.pdf`), read again in
+full for C3 on 2026-10-26: the text from `pdftotext`, wrapped sentences re-read from 200 dpi
+renders (the plain extraction mixes in the images' hidden alt text), and every set-up diagram
+decoded cell by cell (400-1000 dpi crops).
+
+**How the diagrams read.** The 2025 diagrams draw the board turned 90° (pointy-top rows, the
+engine's own view): top row = book column 6, left to right = increasing `r` (seafarers.md
+§2.0). Every fixed part of every diagram (islands, fog, deserts, the strip beyond the desert,
+Tribe gifts, fortresses, wonder marks) lands on our 5th-edition cells, so a diagram is stored
+as **changes to our printed map** (`tbsea/engine/layouts.ts`), not as a new map. Where the
+2025 map differs from ours (a number, a harbour side), the pair uses the sheet's.
+
+### The playability matrix (the sheets' words)
+
+| Seafarers scenario | Fishing         | Rivers                             | Merchant Trains     | Barbarian Attack           | T&B (main)          |
+| ------------------ | --------------- | ---------------------------------- | ------------------- | -------------------------- | ------------------- |
+| New Shores         | built (C2)      | built (C2)                         | built (C2)          | built (C2)                 | built (C2)          |
+| Four Islands       | text: **built** | not playable                       | diagrams: **built** | not playable               | not playable        |
+| Fog Islands        | text: **built** | diagrams: **built**                | not playable        | not playable               | not playable        |
+| Through the Desert | text: **built** | 2 diagram versions each: **built** | text: **built**     | diagrams: **built**        | diagrams: **built** |
+| Forgotten Tribe    | text: **built** | text: **built**                    | text: **built**     | diagram: not built (below) | not playable        |
+| Cloth for Catan    | text: **built** | not playable                       | not playable        | not playable               | not playable        |
+| Pirate Islands     | not playable    | not playable                       | not playable        | diagram: not built (below) | not playable        |
+| Wonders of Catan   | text: **built** | not playable                       | not playable        | diagram: not built (below) | not playable        |
+| New World          | text: **built** | text: **built**                    | text: **built**     | not playable               | not playable        |
+
+### Scenarios (18 new; 3-4 players, one map per player count)
+
+| Scenario                      | Plays as                                  | VP  | Set-up                             |
+| ----------------------------- | ----------------------------------------- | --- | ---------------------------------- |
+| `tbsea/fishermenFour`         | Fishermen + The Four Islands              | 13  | text                               |
+| `tbsea/fishermenFog`          | Fishermen + The Fog Islands               | 12  | text                               |
+| `tbsea/fishermenDesert`       | Fishermen + Through the Desert            | 14  | text (+ the 2025 3p number on 5,9) |
+| `tbsea/fishermenTribe`        | Fishermen + The Forgotten Tribe           | 13  | text                               |
+| `tbsea/fishermenCloth`        | Fishermen + Cloth for Catan               | 14  | text                               |
+| `tbsea/fishermenWonders`      | Fishermen + The Wonders of Catan          | 10  | text                               |
+| `tbsea/fishermenNewWorld`     | Fishermen + New World                     | 12  | text                               |
+| `tbsea/caravansDesert`        | Caravans + Through the Desert             | 16  | text                               |
+| `tbsea/caravansTribe`         | Caravans + The Forgotten Tribe            | 15  | text                               |
+| `tbsea/caravansNewWorld`      | Caravans + New World                      | 14  | text                               |
+| `tbsea/caravansFour`          | Caravans + The Four Islands               | 15  | diagrams                           |
+| `tbsea/riversTribe`           | Rivers + The Forgotten Tribe              | 13  | text (a variable set-up)           |
+| `tbsea/riversNewWorld`        | Rivers + New World                        | 12  | text (random)                      |
+| `tbsea/riversFog`             | Rivers + The Fog Islands                  | 12  | diagrams                           |
+| `tbsea/riversDesert`          | Rivers + Through the Desert               | 14  | diagrams, version 1                |
+| `tbsea/riversDesert2`         | Rivers + Through the Desert               | 14  | diagrams, version 2                |
+| `tbsea/tradersDesert`         | Traders & Barbarians + Through the Desert | 17  | diagrams                           |
+| `tbsea/barbarianAttackDesert` | Barbarian Attack + Through the Desert     | 14  | diagrams                           |
+
+VP: the Seafarers scenario's target ("use the Winning the Game rule for the specific Seafarers
+scenario", Fishing; the old boot +1 as T&B), + 2 Merchant Trains, + 3 T&B, Barbarian Attack's
+printed "14 or more". Rivers names no change (ours: the scenario's target, as C2). Wonders keeps
+its own win (a finished wonder, or 10 VP and the highest level); Cloth its own end.
+
+### The sheets' rules and the engine
+
+General rules of each sheet (wagons and barbarians at sea, fish for the pirate and for a ship,
+river ships, camels on ships, ships past conquered hexes, no robber and pirate in T&B and BA)
+are §2b's and apply unchanged. Per scenario:
+
+| Rule (sheet)                                                                                                                                                                                                                                                                                      | Status   | Engine                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fishing: the lake only where surrounded by land; no lake on Four Islands, Fog, Cloth, Wonders, New World                                                                                                                                                                                          | OK       | `overlays.ts` `Plan.lake` (Desert, Tribe: inner hexes).                                                                                                                                                                                                                                     |
+| Fishing, Four Islands: 4 + 8 by one small island, 6 + 10 by the other, 5 and 9 by one big island each                                                                                                                                                                                             | OK, ours | Which small / big island gets which pair: at random. Grounds: a notch of two land hexes and one water hex (the ground lies on that water hex), never sharing a corner, away from harbours when possible.                                                                                    |
+| Fishing, Fog / Desert / Tribe / Wonders: grounds "according to your preference" (face-up islands; main island + unexplored regions; main island; large and small islands)                                                                                                                         | ours     | Random notches in the named area, spread out (a far notch first).                                                                                                                                                                                                                           |
+| Fishing, Desert 3p: the lake replaces the 2 field, the 2 disc joins the 12 pasture                                                                                                                                                                                                                | OK       | 2,4 → lake; the 2025 map prints 12 on the 5,9 pasture (every 2025 Desert diagram; ours had 11), so the pair uses 12 there and the 2 joins it (`extraTokens`).                                                                                                                               |
+| Fishing, Desert 4p: the lake replaces the 11 hill, the 11 joins the 2 hill                                                                                                                                                                                                                        | OK       | 3,5 → lake; 4,12 produces on 2 and 11.                                                                                                                                                                                                                                                      |
+| A hex with two discs produces on either number                                                                                                                                                                                                                                                    | OK       | `board.ext.tbsea.extraTokens`, paid by tbsea's `production` hook (the robber blocks it); drawn by `tbsea/render.ts`.                                                                                                                                                                        |
+| Fishing, Tribe: the lake replaces the 12 field; the robber only on the large island                                                                                                                                                                                                               | OK       | 3,7 → lake; Seafarers' Tribe already bans the robber from the outer islands.                                                                                                                                                                                                                |
+| Fishing, Cloth: 3 + 3 grounds by the two large islands; 2 fish remove the pirate only with a route to a small-island village                                                                                                                                                                      | OK       | `fishPirateBlocker` reads Cloth's village links.                                                                                                                                                                                                                                            |
+| Fishing, Wonders: no pirate in the scenario, so the 2-fish pirate action never comes up                                                                                                                                                                                                           | OK       |                                                                                                                                                                                                                                                                                             |
+| Fishing, New World: grounds placed after the harbours "using the same method"                                                                                                                                                                                                                     | OK, ours | Random coast notches, never sharing a corner with a harbour.                                                                                                                                                                                                                                |
+| Merchant Trains, Desert: the watering hole on the 2 field (3p, the 2 joins the 12 pasture) / the 11 hill (4p, the 11 joins the 2 hill)                                                                                                                                                            | OK       | Camel starts at the hole's three arrow corners, as on T&B's board.                                                                                                                                                                                                                          |
+| Merchant Trains, Tribe: the hole on the 12 field, the 12 on the 2 pasture; the robber starts on the hole and may go back there                                                                                                                                                                    | OK       | T&B seam `TbBoard.robberOnOasis` lifts Caravans' oasis ban for this board.                                                                                                                                                                                                                  |
+| Merchant Trains, New World: the hole "as centrally as possible"                                                                                                                                                                                                                                   | OK, ours | The hole on the central cell, placed first; one sea hex of the New World supply stays out (42 cells).                                                                                                                                                                                       |
+| Merchant Trains, Four Islands: the 2025 islands (diagrams), the hole alone in the middle; the pirate beside the board until the first 7 / Knight; wagons may go on the edges of the pirate's hex                                                                                                  | OK       | `CARAVANS_FOUR3/4`. The camels start on sea edges. The robber starts on the 12 as in Seafarers (ours: neither text nor diagram places it). The hole is no island for the 2 VP bonus (ours).                                                                                                 |
+| Rivers, Tribe: variable set-up; 2 hills, 2 pastures, 1 field, 2 mountains make way for the two river tiles (swamps flowing into the sea, tiles apart); numbers without 2 and 12 (swamps skipped, reds apart), then the 2 and the 12 on the lowest-ranking pasture or field; the robber on a swamp | OK, ours | T&B's T5 rivers (pasture-hills-mountains + swamp, hills-mountains + swamp) as straight lines; Seafarers' variable Tribe token rule kept. The 12 never joins the 2's hex (ours).                                                                                                             |
+| Rivers, New World: 2 hills, 1 pasture, 2 mountains, 2 sea out; the river tiles at random, "best on opposite sides, flowing into the frame"                                                                                                                                                        | OK, ours | Swamps on the frame, the second river's swamp ≥ 4 hexes from the first when possible.                                                                                                                                                                                                       |
+| Rivers, Fog: the diagrams (rivers on both home islands, second discs on the hills); robber on a swamp; gold fields produce resource cards                                                                                                                                                         | OK       | `RIVERS_FOG3/4`; 4p has 8 harbours (the sheet drops 6,10 S). Gold in Seafarers is a resource choice, never T&B coins (pinned by a test).                                                                                                                                                    |
+| Rivers, Desert: two diagram versions per player count (v1: swamps in the desert belt, the mouths open onto the middle desert and the strip's gold field; v2: the 3-hex river replaces the strip)                                                                                                  | OK       | Two scenarios. A mouth on land is a bridge site like any river crossing (ours: no text). Bridge sites are not printed at the sheets' resolution: the river's crossings + the mouth, 7 (as T5).                                                                                              |
+| T&B, Desert: castle on 1,1, quarry beyond the desert (5,1), glassworks on 3,7 (3p: a sea cell, its harbour gone); barbarians on 5,3 NW, 3,5 SW, 2,2 SW; no robber, no pirate                                                                                                                      | OK       | `TRADERS_DESERT3/4`; plazas spoke to the trade hexes' corners on other land; their sea corners and sides are closed (T&B's `noBuild` / `noRoad`, the red X marks).                                                                                                                          |
+| T&B, Desert: the board prints a 2 and a 12                                                                                                                                                                                                                                                        | OK, ours | Not re-rolled (T&B seam `keep212`, as T&B's own 5-6 board).                                                                                                                                                                                                                                 |
+| BA, Desert: the castle (3p 2,0, 4p 3,3), the diagram's numbers; barbarians and knights only on the main island; attacks after building there or on an unexplored region                                                                                                                           | OK, ours | Coast = the main island's coastal hexes (deserts count as land), check order clockwise from the castle. Knights: T&B seam `knightArea`. "Unexplored region" read as every other land: attacks after every building, as in T&B (ours). The 4p coast has two 9s: both get a barbarian on a 9. |
+| BA, Desert: start barbarians on the coastal 2 and 12; 14 VP                                                                                                                                                                                                                                       | OK       | T&B's own start.                                                                                                                                                                                                                                                                            |
+
+### Not built (diagrams decoded, rules missing)
+
+- **Barbarian Attack + The Forgotten Tribe** (13 VP). Castle on 3,1; barbarians start on all four
+  2 / 12 hexes; "if a 2 or 12 is rolled, a barbarian is placed on both of the corresponding
+  hexes". Needs: the Tribe's 4 gift cards drawn from the **BA deck** (picked up and resolved like
+  a bought BA card: a Seafarers gift → T&B card seam) and T&B's start on every 2 / 12 hex.
+- **Barbarian Attack + The Pirate Islands** (fortress + 12 VP). Castle on 3,13, its 12 on 4,10;
+  no barbarians at start; starting pieces all settlements; ships only before your fortress falls;
+  a revealed Knighthood card may turn the ship nearest your start into a warship; a number twice
+  on the main island fills its hexes evenly (the roller picks on a tie). Needs a BA card →
+  warship seam, setup without cities, even filling.
+- **Barbarian Attack + The Wonders of Catan** (a wonder, or 12 VP and the highest level). Castle
+  on 3,5; 12 barbarians on each desert (conquered); landing barbarians come from the deserts,
+  evenly (the roller picks); conquered buildings do not count for wonder requirements; even
+  filling as above. Needs a desert barbarian stock in T&B and a wonder-requirement seam in
+  Seafarers.
+
+The three diagrams, decoded (book cells; only what differs from our maps in mapdata.ts):
+
+- **BA + Tribe** (same geometry, gifts and chits): main island `4,0 wool 9; 4,2 lumber 8;
+4,4 ore 10; 4,6 brick 3; 4,8 lumber 4; 4,10 ore 2; 3,1 castle; 3,3 brick 4; 3,5 wool 8;
+3,7 grain 5; 3,9 lumber 6; 3,11 desert; 2,0 lumber 12; 2,2 grain 6; 2,4 ore 5; 2,6 wool 2;
+2,8 brick 11; 2,10 grain 12`. Barbarians on 4,10, 2,6, 2,0, 2,10. The 4 BA cards lie by
+  6,2 N, 6,12 S, 0,2 N, 0,12 S. Six gift harbours: our five plus **6,8 NE** (settles
+  seafarers.md §2.6's open sixth site).
+- **BA + Pirate Islands** (same geometry, fortresses, beachheads, start pieces, fleet path,
+  harbour sites): `3,13 castle; 4,10 lumber 2/12; 0,10 grain 3; 0,12 brick 10; 1,11 ore 8;
+1,13 lumber 4; 2,12 lumber 5; 5,11 ore 5; 5,13 lumber 9; 6,10 grain 10; 6,12 brick 4`. No
+  barbarians at the start; the robber crossed out, the fleet kept.
+- **BA + Wonders** (same geometry, marks and harbour sites; the harbour tab is on **4,6 NE**,
+  settling our either/or): `3,5 castle; 4,6 ore 6; 4,0 ore 11; 4,4 brick 10; 0,8 wool 2/12`;
+  the deserts 5,11, 4,12, 3,11 hold 12 barbarians each; no pirate.
+
+All three diagrams (and the Desert and Tribe ones) still draw a robber, and Desert and Tribe a
+pirate, although the BA sheet's general rule says neither is used: we follow the text.
+
+### Seams added (all additive; listed for the merge)
+
+Seafarers `maps.ts`: `boardWith`, `dealTokens`, `tokenRule`, `randomHarbors` exported. T&B:
+`maps.ts` exports `ARROWS`, `sharedEdge`, `RIVERS_19` (+ its type); `TbBoard.robberOnOasis`,
+`keep212`, `knightArea` (state.ts, read in index.ts and ba.ts); `render.ts` exports `disc`;
+`bots.ts`: the dev-card count stands aside when Seafarers is composed (Seafarers' own count
+includes the Tribe's gifts), wagons are checked after the set-up (a gold choice may open in
+it), the robber may stand on an oasis the board allows. `src/render/expansions.ts`: the tbsea
+drawer (one line). Tests: `src/net/sessionExpansions.test.ts` (two C3 scenarios),
+`scripts/e2e-server.ts` (Fishermen on the Fog Islands online, fish and fog masked),
+`scripts/shots-tbsea.mjs --c3`.
+
+Tests: `tbsea/engine/overlays.test.ts` (text set-ups), `diagrams.test.ts` (diagram set-ups),
+`sound.test.ts` (every scenario), `mask.test.ts` (T&B and Seafarers secrets in five C3
+scenarios), `ui.test.ts`.
 
 ## 2c. T&B scenario pairs: Fishing on Catan with another — module `tbpair`, mode `tb+tb`
 
@@ -215,14 +348,13 @@ counts where it matters). The other six T&B × T&B sheets are listed in §3.
 
 ## 3. Not built (listed for follow-up cards)
 
-| Combination                                           | Why / what it needs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Barbarian Attack + C&K (13 VP)                        | A redesign (barbarians land by a 3-dice rule, metropolis conquest, knight actions at turn end, special progress cards); scenarios-and-combos.md C4.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Catan for Two + C&K (13 VP)                           | 2 players (C&K's module is 3-6), neutral knights, two-version forced trade.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Fishing on Catan + other Seafarers scenarios          | Built on New Shores (§2b). Sheet set-ups for the rest: Four Islands 4/8 and 6/10 on the small islands, 5 and 9 on the big ones; Fog, Desert (3p lake on the 2-field, 2 joins the 12 pasture; 4p lake on the 11-hill, 11 joins the 2 hill), Forgotten Tribe (lake on the 12-field; the robber only on the large island), Cloth (3 + 3 grounds; 2 fish move the pirate only with a route to a small-island village), Wonders, New World (grounds placed like the harbours); not Pirate Islands. The seam exists (`playsAs`, `basedOn`); each needs its map (a lake hex, grounds with a water hex). |
-| T&B / Rivers / BA / Merchant Trains + other Seafarers | Built on New Shores (§2b). Left: T&B on Through the Desert; Rivers on Fog Islands, Through the Desert, Forgotten Tribe, New World; Merchant Trains and Barbarian Attack on several (§2b list). Set-ups are diagrams.                                                                                                                                                                                                                                                                                                                                                                             |
-| T&B × T&B, the six non-Fishing sheets                 | The four Fishing pairs are built (§2c). Left: Barbarian Attack + T&B (14), Merchant Trains + BA / + T&B (12 / 15), Rivers + BA / + Merchant Trains / + T&B (12 / 12 / 13): T6 boards (watering hole, commodity hexes that produce, barbarians tied to hex paths) and per-pair rules (traders-barbarians.md §8.1).                                                                                                                                                                                                                                                                                |
-| Explorers & Pirates + C&K / + T&B                     | Built (E5b): §7 and §8. E&P + Seafarers is officially impossible (`conflicts`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Combination                                    | Why / what it needs                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barbarian Attack + C&K (13 VP)                 | A redesign (barbarians land by a 3-dice rule, metropolis conquest, knight actions at turn end, special progress cards); scenarios-and-combos.md C4.                                                                                                                                                               |
+| Catan for Two + C&K (13 VP)                    | 2 players (C&K's module is 3-6), neutral knights, two-version forced trade.                                                                                                                                                                                                                                       |
+| T&B + Seafarers, the other Seafarers scenarios | Built (C3, §2d): every pair the five sheets set up, except Barbarian Attack with the Forgotten Tribe, the Pirate Islands and the Wonders (diagrams decoded in §2d; each needs a new rule seam).                                                                                                                   |
+| T&B × T&B, the six non-Fishing sheets          | The four Fishing pairs are built (§2c). Left: Barbarian Attack + T&B (14), Merchant Trains + BA / + T&B (12 / 15), Rivers + BA / + Merchant Trains / + T&B (12 / 12 / 13): T6 boards (watering hole, commodity hexes that produce, barbarians tied to hex paths) and per-pair rules (traders-barbarians.md §8.1). |
+| Explorers & Pirates + C&K / + T&B              | Built (E5b): §7 and §8. E&P + Seafarers is officially impossible (`conflicts`).                                                                                                                                                                                                                                   |
 
 ## 4. Variants with the combined modes
 
