@@ -81,11 +81,13 @@ describe('GameSession lobby', () => {
     expect(net.last('c2', 'error')!.code).toBe('name_required');
     net.send('c2', { type: 'setName', name: 'ann' });
     expect(net.last('c2', 'room')!.room.members[1]!.name).toBe('ann 2');
+    // Naming yourself sits you in the first open seat (L1): the host has seat 0.
+    expect(net.last('c2', 'room')!.room.seats[1]!.occupant).toBe('m2');
 
     net.send('host', { type: 'takeSeat', seat: 1 });
-    net.send('c2', { type: 'takeSeat', seat: 1 });
-    expect(net.last('c2', 'error')!.code).toBe('seat_taken');
+    expect(net.last('host', 'error')!.code).toBe('seat_taken');
     net.send('c2', { type: 'takeSeat', seat: 2 });
+    net.send('host', { type: 'takeSeat', seat: 1 });
     const seats = net.last('c2', 'room')!.room.seats;
     expect(seats[1]!.occupant).toBe('m1');
     expect(seats[2]!.occupant).toBe('m2');
@@ -106,8 +108,10 @@ describe('GameSession lobby', () => {
     const { net } = room();
     net.connect('bob');
     net.send('bob', { type: 'hello', token: null, name: 'Bob' });
+    net.send('host', { type: 'leaveSeat' });
+    net.send('bob', { type: 'leaveSeat' });
     net.send('host', { type: 'start' });
-    expect(net.last('host', 'error')!.code).toBe('not_seated'); // nobody seated yet
+    expect(net.last('host', 'error')!.code).toBe('not_seated'); // nobody seated
     expect(net.last('host', 'game')).toBeUndefined();
 
     net.send('bob', { type: 'takeSeat', seat: 3 });
@@ -124,6 +128,124 @@ describe('GameSession lobby', () => {
     // Invalid configs never reach the session.
     net.send('host', { type: 'configure', config: { ...DEFAULT_ROOM_CONFIG, seatCount: 6 } });
     expect(net.last('host', 'error')!.code).toBe('bad_message');
+  });
+
+  /** Joins `names` in order (each on its own connection); returns everyone's seat by name. */
+  function join(net: LocalNet, session: GameSession, names: string[]) {
+    for (const name of names) {
+      net.connect(name);
+      net.send(name, { type: 'hello', token: null, name });
+      expect(net.messages(name, 'error')).toEqual([]);
+    }
+    return Object.fromEntries(session.room().members.map((m) => [m.name, m.seat]));
+  }
+
+  it('L1: the host sits in seat 1 once they have a nickname', () => {
+    const { session, hostToken } = GameSession.create('room1', 1000, fakeDeps(), {
+      graceMs: GRACE,
+    });
+    const net = new LocalNet(session, 1000);
+    net.connect('host');
+    // The creator connects without a nickname first: not seated yet.
+    net.send('host', { type: 'hello', token: hostToken });
+    expect(session.room().members[0]!.seat).toBeNull();
+    net.send('host', { type: 'setName', name: 'Ann' });
+    expect(session.room().members[0]!.seat).toBe(0);
+    expect(session.room().seats[0]!.status).toBe('human');
+    // A hello with the nickname seats the host right away, too.
+    expect(room().session.room().members[0]!.seat).toBe(0);
+  });
+
+  it('L1: a joiner takes the first seat a bot holds; leaving and moving still work', () => {
+    const { net, session } = room();
+    net.send('host', { type: 'takeSeat', seat: 2 }); // Move here: seats 0, 1 and 3 have bots
+    expect(join(net, session, ['Bob', 'Cy'])).toEqual({ Ann: 2, Bob: 0, Cy: 1 });
+    expect(session.room().seats).toHaveLength(4);
+    // Someone who stood up stays standing, even after a rename.
+    net.send('Bob', { type: 'leaveSeat' });
+    net.send('Bob', { type: 'setName', name: 'Robert' });
+    expect(session.room().members[1]!.seat).toBeNull();
+    // A member named later (no nickname in hello) sits down when they pick one.
+    net.connect('anon');
+    net.send('anon', { type: 'hello', token: null });
+    expect(session.room().members[3]!.seat).toBeNull();
+    net.send('anon', { type: 'setName', name: 'Dee' });
+    expect(session.room().members[3]!.seat).toBe(0);
+  });
+
+  it('L1: a joiner adds a seat when every seat has a human (base game grows its board)', () => {
+    const { net, session } = room();
+    join(net, session, ['Bob', 'Cy', 'Dee']);
+    expect(session.room().seats.every((s) => s.occupant !== null)).toBe(true);
+    expect(join(net, session, ['Eve'])['Eve']).toBe(4);
+    const r = session.room();
+    expect(r.seats).toHaveLength(5);
+    expect(r.config.seatCount).toBe(5);
+    expect(r.config.map).toBe('base56'); // like the host's Add bot: the 5-6 player board
+    expect(new Set(r.seats.map((s) => s.color)).size).toBe(5);
+    expect(net.messages('host', 'chat').map((c) => c.entry.text)).toContain('Added seat 5 for Eve');
+    // The host can still remove an open seat.
+    net.send('Eve', { type: 'leaveSeat' });
+    net.send('host', { type: 'configure', config: { ...r.config, seatCount: 4 } });
+    expect(net.last('host', 'error')).toBeUndefined();
+    expect(session.room().seats).toHaveLength(4);
+  });
+
+  it('L1: the table grows to 8 players; the ninth person watches', () => {
+    const { net, session } = room();
+    const seats = join(net, session, ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
+    expect(Object.values(seats)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, null]);
+    expect(session.room().config).toMatchObject({ seatCount: 8, map: 'base78' });
+    net.send('host', { type: 'start' });
+    expect(net.last('host', 'error')).toBeUndefined();
+    expect(session.state!.players).toHaveLength(8);
+  });
+
+  it("L1: a mode's lower cap holds (Seafarers 6, a 3-4 player scenario 4)", () => {
+    const { net, session } = room();
+    net.send('host', {
+      type: 'configure',
+      config: {
+        ...DEFAULT_ROOM_CONFIG,
+        mode: 'seafarers',
+        scenario: 'seafarers/fourIslands',
+        seatCount: 3,
+      },
+    });
+    const six = join(net, session, ['B', 'C', 'D', 'E', 'F', 'G']);
+    expect(Object.values(six)).toEqual([0, 1, 2, 3, 4, 5, null]);
+    expect(session.room().config.mode).toBe('seafarers');
+
+    const r2 = room();
+    r2.net.send('host', {
+      type: 'configure',
+      config: { ...DEFAULT_ROOM_CONFIG, mode: 'ep', scenario: 'ep/landHo', seatCount: 3 },
+    });
+    expect(r2.net.last('host', 'error')).toBeUndefined();
+    const four = join(r2.net, r2.session, ['B', 'C', 'D', 'E']);
+    expect(Object.values(four)).toEqual([0, 1, 2, 3, null]);
+    expect(r2.session.room().seats).toHaveLength(4);
+  });
+
+  it('L1: nobody is auto-seated once the game has started', () => {
+    const { net, session } = started({ seatCount: 4 });
+    net.connect('late');
+    net.send('late', { type: 'hello', token: null, name: 'Late' });
+    expect(session.room().members.find((m) => m.name === 'Late')!.seat).toBeNull();
+    expect(session.room().seats[3]!.occupant).toBeNull();
+    expect(net.messages('late', 'error')).toEqual([]);
+  });
+
+  it('L1: a returning member keeps their own seat, not a new one', () => {
+    const { net, session } = room();
+    net.connect('bob');
+    net.send('bob', { type: 'hello', token: null, name: 'Bob' });
+    const token = net.last('bob', 'welcome')!.you.token;
+    net.send('bob', { type: 'takeSeat', seat: 3 });
+    net.disconnect('bob');
+    net.connect('bob2');
+    net.send('bob2', { type: 'hello', token, name: 'Bob' });
+    expect(session.room().seats.map((s) => s.occupant)).toEqual(['m1', null, null, 'm2']);
   });
 
   it('a lobby seat is freed after the grace period', () => {
@@ -419,7 +541,7 @@ describe('GameSession identity and safety', () => {
     expect(net.last('host', 'reaction')).toMatchObject({
       member: 'm2',
       reaction: 'gg',
-      seat: null,
+      seat: 1,
     });
 
     // History comes with the welcome.
@@ -437,8 +559,8 @@ describe('GameSession identity and safety', () => {
     net.connect('extra');
     net.send('extra', { type: 'hello', token: null, name: 'Extra' });
     expect(net.last('extra', 'error')!.code).toBe('room_full');
-    // A gone spectator makes room.
-    net.disconnect('c5');
+    // A gone spectator makes room (c0-c6 filled the 8 seats with the host).
+    net.disconnect('c20');
     net.connect('extra2');
     net.send('extra2', { type: 'hello', token: null, name: 'Extra' });
     expect(net.last('extra2', 'welcome')).toBeDefined();
