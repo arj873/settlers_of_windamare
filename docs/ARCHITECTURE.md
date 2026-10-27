@@ -496,7 +496,8 @@ files (a selector, a constant) are fine — mention them in your report.
 ```ts
 const view = new BoardView(app);          // adds itself to app.stage; app must already be init'd
 view.render(state);                       // cheap; call after every state change
-view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} clears
+view.setHighlights({ vertices, edges, hexes, color?, hoverOnly? });   // legal spots; {} clears
+                                          // hoverOnly: clickable as usual, but only the spot under the pointer glows
 view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
@@ -543,6 +544,7 @@ const hud = new Hud(document.getElementById('ui')!);          // overlay; only i
 hud.render(state, { viewer, legal, isBotTurn, bots?, turnTimer? }); // call after every state change / viewer change
                                                               // bots: boolean[] by PlayerId (bot marker); turnTimer: { remainingSec, totalSec } | null (T14)
 hud.setBotSpeed({ value, presets, onChange } | null);         // bot-speed picker inside the HUD menu (main.ts wires it)
+hud.setBuildConfirm({ value, onChange } | null);              // "Confirm before building" On/Off in the menu (main.ts saves it: catan:confirmBuild)
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
 hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode, scenario?, options?, map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
 hud.on('placeMode', (m: PlaceMode|null) => …);                // 'road'|'settlement'|'city' or an expansion build card's '<id>/<x>'; board shows targets
@@ -657,6 +659,16 @@ c.destroy();
   pending trade replies — first, then the current human; previous viewer kept during bot turns;
   all-bot = spectator viewer 0), `boardActions`/`highlightsFor`/`actionForClick` (implied prompts
   or HUD place mode), `nextBot` (bots owing a response first; a bot offerer waits for human replies).
+- Build by clicking a spot (issue #28): with no prompt and no place mode, `clickTargets` offers
+  `spotBuildActions` (the viewer's base builds and every module build card's `actionType`,
+  wherever legal), highlighted `hoverOnly`. `resolveClick(targets, click, confirm)` → `none` /
+  `act` / `choose`: several action types at one spot always ask (road or ship on a coast edge,
+  settlement or knight, also in setup / Road Building); a lone build-anywhere action asks while
+  "Confirm before building" is on; prompts and place modes act at once. `game/spotPicker.ts`
+  (shared by `GameController` and `NetGameController`) opens `ui/spotPrompt.ts` `SpotPrompt`
+  (anchored at `board.screenPos`, label + cost per choice, Build / Cancel; Esc or a press
+  elsewhere cancels) and closes it when its choices stop being legal, the viewer changes or a
+  place mode starts. Controllers take `prompt` and `confirmBuild` options (absent: act at once).
 - Bots (B1): each bot seat plays its level (`SeatConfig.botLevel`, the setup screen's per-seat
   difficulty picker; `start(…, { botLevels })`, saved as `SavedSession.botLevels`, absent =
   Normal): `botForLevel` (`src/bots/byLevel.ts`) → Easy = `defaultBot` =

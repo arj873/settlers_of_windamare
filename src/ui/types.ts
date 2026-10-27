@@ -109,6 +109,12 @@ export interface BotSpeedControl {
   onChange: (ms: number) => void;
 }
 
+/** The "Confirm before building" menu setting (issue #28): ask before a board click builds. */
+export interface BuildConfirmControl {
+  value: boolean;
+  onChange: (on: boolean) => void;
+}
+
 /** Base build modes; the board layer shows the matching targets and calls `buildX` on click. */
 export type BasePlaceMode = 'road' | 'settlement' | 'city';
 /**

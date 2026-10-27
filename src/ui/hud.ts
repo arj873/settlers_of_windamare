@@ -62,6 +62,7 @@ import { ProductionFx, type HexLocator } from './production/fx';
 import { soundControl } from './sound';
 import type {
   BotSpeedControl,
+  BuildConfirmControl,
   HudEventName,
   HudEvents,
   HudView,
@@ -162,6 +163,7 @@ export class Hud {
   /** The panel was just opened / expanded: play its fade-in once. */
   private statsEntering = false;
   private botSpeed: BotSpeedControl | null = null;
+  private buildConfirm: BuildConfirmControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
@@ -218,6 +220,12 @@ export class Hud {
   /** Show a bot-speed picker in the menu (null hides it). The HUD keeps the chosen value. */
   setBotSpeed(control: BotSpeedControl | null): void {
     this.botSpeed = control;
+    this.refresh();
+  }
+
+  /** Show the "Confirm before building" switch in the menu (null hides it). */
+  setBuildConfirm(control: BuildConfirmControl | null): void {
+    this.buildConfirm = control;
     this.refresh();
   }
 
@@ -570,6 +578,7 @@ export class Hud {
             ),
           ),
         this.animationsToggle(),
+        this.buildConfirmSec(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
@@ -616,6 +625,42 @@ export class Hud {
             v ? 'On' : 'Off',
           ),
         ),
+      ),
+    );
+  }
+
+  /** Menu: "Confirm before building" On / Off (off: a click on a spot with one build builds). */
+  private buildConfirmSec(): HTMLElement | null {
+    const c = this.buildConfirm;
+    if (!c) return null;
+    const option = (on: boolean) =>
+      h(
+        'button',
+        {
+          class: `seg-btn${c.value === on ? ' is-on' : ''}`,
+          attrs: {
+            'aria-pressed': String(c.value === on),
+            'data-k': `confirm-${on ? 'on' : 'off'}`,
+          },
+          on: {
+            click: () => {
+              this.buildConfirm = { ...c, value: on };
+              c.onChange(on);
+              this.refresh();
+            },
+          },
+        },
+        on ? 'On' : 'Off',
+      );
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Confirm before building'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Confirm before building' } },
+        option(true),
+        option(false),
       ),
     );
   }

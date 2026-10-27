@@ -24,6 +24,7 @@ import type { SessionAction } from '../../ui/types';
 import type { BoardLike, ToastKind } from '../controller';
 import type { SoundObserver } from '../sounds';
 import type { Backend } from './backend';
+import type { SpotPromptLike } from '../spotPicker';
 import { NetGameController } from './netController';
 
 export interface OnlineEnv {
@@ -45,6 +46,9 @@ export interface OnlineEnv {
   goHome: () => void;
   /** From the invite landing card: play hotseat instead. */
   playOffline: () => void;
+  /** Board spot prompt and the "Confirm before building" setting (NetControllerOptions). */
+  prompt?: SpotPromptLike | null;
+  confirmBuild?: () => boolean;
   /** Sound effects (A1): game views, the turn timer and chat messages from others. */
   sounds?: SoundObserver;
 }
@@ -165,6 +169,8 @@ export class OnlineApp {
       client,
       toast: env.toast,
       ...(env.onRender ? { onRender: env.onRender } : {}),
+      ...(env.prompt ? { prompt: env.prompt } : {}),
+      ...(env.confirmBuild ? { confirmBuild: env.confirmBuild } : {}),
       ...(env.sounds ? { sounds: env.sounds } : {}),
     });
     client.on((e) => {

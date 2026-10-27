@@ -198,4 +198,11 @@ export function placeModeActions(mode: string): readonly string[] {
 
 // boardActions (game/logic.ts) learns the extensions' board actions from here, so the headless room
 // server, which imports game/logic but no UI, never loads module stylesheets.
-setBoardExtensions({ implied: impliedExtActions(), placeModeAction, placeModeActions });
+setBoardExtensions({
+  implied: impliedExtActions(),
+  placeModeAction,
+  placeModeActions,
+  buildCardActions: new Set(
+    HUD_EXTENSIONS.flatMap((x) => (x.buildCards ?? []).map((c) => c.actionType)),
+  ),
+});

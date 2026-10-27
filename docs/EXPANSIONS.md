@@ -389,6 +389,10 @@ interface HudExtension {
   and Road Building's free ship); with the mode on, a click prefers them over the implied prompts
   (a coast edge could otherwise only take the road). A module's `hint` may word any phase the
   viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
+- A plain board click (no place mode) also offers every build card's `actionType` at the clicked
+  spot, in the spot prompt (issue #28, docs/ARCHITECTURE.md "Build by clicking a spot"), labelled
+  with the card's `label`, `glyph` and cost. Give a card's action a board location (`vertex`,
+  `edge` or `hex`) and it works there with no extra code.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
 - **Setup screen** (generated from the registry, U7 `src/ui/setup/modePicker.ts`): modes from
