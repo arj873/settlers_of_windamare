@@ -285,6 +285,8 @@ describe('cargo and settlers (§4.5-4.6)', () => {
     expect(s.pieces.buildings[spot]).toEqual({ owner: 0, kind: 'settlement' });
     expect(epSlice(s).ships).toHaveLength(0);
     expect(victoryPoints(s, 0)).toBe(1);
+    // One settler piece: singular in the log.
+    expect(s.log.at(-1)?.text).toMatch(/’s settler founded a settlement$/);
   });
 
   it('landing obeys the distance rule and needs a settlement piece; not on sea-only corners', () => {

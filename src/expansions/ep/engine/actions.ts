@@ -929,7 +929,7 @@ export const HANDLERS: Record<EpActionType, H> = {
         if (s.turn.active === id) s.turn.active = null;
         if (s.turn.selected === id) s.turn.selected = null;
         draft.pieces.buildings[v] = { owner: a.player, kind: 'settlement' };
-        log(draft, a.player, `${name(draft, a.player)}’s settlers founded a settlement`);
+        log(draft, a.player, `${name(draft, a.player)}’s settler founded a settlement`);
       },
       draft,
     );
