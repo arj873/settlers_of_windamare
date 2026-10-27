@@ -566,6 +566,7 @@ function stepper(g: Good, max: number, onChange: () => void): HTMLElement {
     'div',
     { class: 'ck-step' },
     goodFace(g, 22),
+    h('span', { class: 'ck-step-name' }, goodLabel(g)),
     h(
       'button',
       {
