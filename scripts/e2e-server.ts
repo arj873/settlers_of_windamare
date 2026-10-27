@@ -322,6 +322,26 @@ const EXPANSION_GAMES: ExpansionGame[] = [
     },
   },
   {
+    // C3: a T&B scenario on another Seafarers scenario: fish and fog stacks stay hidden.
+    label: 'T&B + Seafarers: Fishermen on the Fog Islands',
+    config: { mode: 'tb+seafarers', scenario: 'tbsea/fishermenFog', vpToWin: 4 },
+    timeoutMs: 480_000,
+    hidden: (view) => {
+      const fog = (view.ext['seafarers'] as { fog?: { terrains: string[]; tokens: number[] } }).fog;
+      if (!fog) return 'no fog stacks';
+      if (fog.terrains.some((t) => t !== 'fog') || fog.tokens.some((t) => t !== 0)) {
+        return 'fog stack contents are visible';
+      }
+      const fish = (view.ext['tb'] as { fish?: { pool: number[]; hands: number[][] } }).fish;
+      if (!fish) return 'no fish';
+      if (fish.pool.some((t) => t !== 0)) return 'the fish pool is visible';
+      for (const p of opponents(view)) {
+        if ((fish.hands[p.id] ?? []).some((t) => t !== 0)) return `${p.name}'s fish`;
+      }
+      return null;
+    },
+  },
+  {
     label: 'Explorers & Pirates: Land Ho!',
     config: { mode: 'ep', scenario: 'ep/landHo', vpToWin: 5 },
     hidden: epHidden,

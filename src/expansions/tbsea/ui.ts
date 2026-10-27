@@ -56,9 +56,7 @@ export function pairRules(state: GameState): string[] {
       'A ship built on a river hex’s edge earns 1 gold; sailing it off costs 1 gold.',
       'No ship on a bridge site.',
     );
-    if (Object.values(state.board.hexes).some((h) => h.terrain === 'gold')) {
-      out.push('Gold fields produce resource cards, never gold coins.');
-    }
+    out.push('Gold fields produce resource cards, never gold coins.');
   }
   if (has(state, 'caravans')) {
     out.push(

@@ -9,7 +9,7 @@ import { SetupScreen } from '../../ui/setup/screen';
 import { modeOptions, playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { fishOf } from '../tb/engine/state';
-import { PAIRS, TBSEA_MODE } from './engine';
+import { PAIRS, SEA_PAIRS, TBSEA_MODE } from './engine';
 
 const players = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ name: `P${i}`, color: `#20202${i}` }));
@@ -23,7 +23,9 @@ describe('T&B + Seafarers setup screen', () => {
     document.body.replaceChildren(screen.element);
     q(screen, `mode-${TBSEA_MODE}`)?.click();
     expect(screen.state.mode).toBe(TBSEA_MODE);
-    for (const p of PAIRS) expect(q(screen, `scenario-${p.id}`), p.id).not.toBeNull();
+    for (const p of [...PAIRS, ...SEA_PAIRS]) {
+      expect(q(screen, `scenario-${p.id}`), p.id).not.toBeNull();
+    }
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 4 });
     q(screen, 'scenario-tbsea/traders')?.click();
     q(screen, 'start')?.click();
@@ -112,6 +114,25 @@ describe('T&B + Seafarers HUD', () => {
       expect(text, p.id).toContain(`${p.vp} VP to win`);
       expect(text, p.id).toContain(want[p.id]);
     }
+  });
+
+  it('C3: the panel names the rules each Seafarers scenario adds', () => {
+    const want: Record<string, string[]> = {
+      'tbsea/fishermenDesert': ['The hex with 2 and 11 produces on either number'],
+      'tbsea/fishermenCloth': ['needs a route to a village'],
+      'tbsea/fishermenWonders': ['5 fish build a free ship', 'Ships catch no fish'],
+      'tbsea/caravansTribe': ['may go back there', 'The hex with 2 and 12'],
+      'tbsea/riversFog': ['Gold fields produce resource cards'],
+      'tbsea/tradersDesert': ['Wagons cross the sea'],
+    };
+    for (const [sc, lines] of Object.entries(want)) {
+      show(main(sc));
+      const text = root.querySelector('.tbsea-panel')?.textContent ?? '';
+      expect(text, sc).toContain(`${SEA_PAIRS.find((p) => p.id === sc)?.vp} VP to win`);
+      for (const l of lines) expect(text, sc).toContain(l);
+    }
+    show(main('tbsea/fishermenWonders'));
+    expect(root.querySelector('.tbsea-panel')?.textContent).not.toContain('pirate');
   });
 
   it('Fishermen: 2 fish chase the pirate from the panel', () => {
