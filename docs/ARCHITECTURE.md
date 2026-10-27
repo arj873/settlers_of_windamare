@@ -753,6 +753,9 @@ near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`
   tests, `?first=`).
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.
+  Both controllers submit a human's only steal on their own (#34, `autoSteal` in `game/logic.ts`:
+  the viewer's only legal move is a `…steal…` action with a victim), so the "Steal from whom?"
+  dialog opens only for a real choice. Engine, bots and sims are unchanged.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
 - **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup or the special building phase. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.

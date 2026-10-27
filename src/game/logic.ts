@@ -262,6 +262,19 @@ export function tradeEndNotice(
   return answer === 'accepted' ? `${offerer} traded with ${partner?.name ?? 'someone else'}` : null;
 }
 
+/**
+ * The steal the controllers submit for `viewer` without asking (#34): their only legal move is a
+ * steal (robber, knight, pirate, event card, any module's `…steal…` action) from one player. A
+ * real choice (several victims, cloth or a card, an optional pass) still opens the dialog.
+ */
+export function autoSteal(legal: readonly Action[], viewer: PlayerId | null): Action | null {
+  if (viewer === null) return null;
+  const mine = legal.filter((a) => a.player === viewer);
+  const only = mine.length === 1 ? mine[0] : undefined;
+  if (!only || !/steal/i.test(only.type)) return null;
+  return typeof (only as { victim?: unknown }).victim === 'number' ? only : null;
+}
+
 /** Nobody can move but the game is not over: the controller reports this instead of hanging. */
 export function isStalled(state: GameState, legal: readonly Action[]): boolean {
   return state.phase.kind !== 'gameOver' && legal.length === 0;

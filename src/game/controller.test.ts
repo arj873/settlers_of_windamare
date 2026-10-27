@@ -5,6 +5,7 @@ import {
   discardGame,
   freshGame,
   midGame,
+  moveRobberGame,
   tradeOfferGame,
 } from '../engine/fixtures';
 import type { BoardEvents, Highlights } from '../render';
@@ -256,6 +257,33 @@ describe('GameController: viewer and hotseat', () => {
     hud.emit('action', discard(3));
     expect(c.state?.phase.kind).toBe('moveRobber');
     expect(c.viewer).toBe(1);
+  });
+
+  it('robs the only player who can be robbed without asking (#34)', () => {
+    const s = moveRobberGame(); // Blue (1) played a knight
+    const moves = legalActions(s).filter((a) => a.type === 'moveRobber');
+    const victimsAt = (a: Action) => {
+      const r = applyAction(s, a);
+      return r.ok && r.state.phase.kind === 'steal' ? r.state.phase.candidates : [];
+    };
+    const one = moves.find((a) => victimsAt(a).length === 1)!;
+    const two = moves.find((a) => victimsAt(a).length > 1)!;
+    expect(one && two).toBeTruthy();
+
+    const c = make();
+    c.start(s, humans4);
+    const before = c.state!.players[1]!.resources;
+    hud.emit('action', one);
+    expect(c.state?.phase.kind).toBe('preRoll');
+    expect(hud.views.some((v) => v.legal.some((a) => a.type === 'steal'))).toBe(false);
+    const total = (r: typeof before) => Object.values(r).reduce((n, k) => n + k, 0);
+    expect(total(c.state!.players[1]!.resources)).toBe(total(before) + 1);
+
+    // Two victims: the dialog asks.
+    c.start(moveRobberGame(), humans4);
+    hud.emit('action', two);
+    expect(c.state?.phase.kind).toBe('steal');
+    expect(hud.last.legal.filter((a) => a.type === 'steal').length).toBeGreaterThan(1);
   });
 
   it('lets a pending human trade responder view before the offerer', () => {

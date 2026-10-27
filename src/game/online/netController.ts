@@ -10,6 +10,7 @@ import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
 import {
   actionForClick,
+  autoSteal,
   boardActions,
   highlightsFor,
   tradeEndNotice,
@@ -65,6 +66,8 @@ export class NetGameController {
   private shown: GameState | null = null;
   /** The last action this seat sent (a cancel / confirm / reject ends offers on purpose). */
   private lastSent: Action['type'] | null = null;
+  /** The steal phase whose only steal this seat already sent on its own (#34). */
+  private autoKey: string | null = null;
   private readonly offs: (() => void)[] = [];
 
   constructor(opts: NetControllerOptions) {
@@ -165,6 +168,16 @@ export class NetGameController {
     const hv = this.hudView();
     if (!g || !hv) return;
     this.noticeTradeEnd(g.view, hv.viewer);
+    // #34: rob the only player who can be robbed at once; the dialog never opens for it.
+    const steal = autoSteal(g.legal, hv.viewer);
+    if (steal) {
+      hv.legal = g.legal.filter((a) => a !== steal);
+      const key = JSON.stringify([g.view.turn.number, g.view.phase, steal]);
+      if (key !== this.autoKey) {
+        this.autoKey = key;
+        this.send(steal);
+      }
+    }
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
     this.board.render(g.view);
     this.hud.render(g.view, hv);

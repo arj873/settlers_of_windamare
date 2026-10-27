@@ -1088,7 +1088,8 @@ export class Hud {
     }
     if (phase.kind === 'steal') {
       const victims = ofType(legal, 'steal');
-      // Always show the picker: the engine needs an explicit steal action even with one victim.
+      // The engine needs an explicit steal action even with one victim; the controllers submit
+      // that one on their own (#34, `autoSteal`), so the picker shows for a real choice.
       if (victims.length > 0)
         return this.stealDialog(
           state,

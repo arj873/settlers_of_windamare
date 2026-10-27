@@ -23,6 +23,7 @@ import type { BoardView } from '../render';
 import type { Hud, NewGameConfig, PlaceMode } from '../ui';
 import {
   actionForClick,
+  autoSteal,
   boardActions,
   gameConfigOf,
   highlightsFor,
@@ -328,6 +329,15 @@ export class GameController {
     if (!state) return;
     this.legal = legalActions(state);
     this.viewerId = pickViewer(state, this.seatList, this.legal, this.viewerId);
+    // #34: robbing the only player who can be robbed needs no "Steal from whom?" dialog.
+    const steal =
+      this.viewerId !== null && this.seatList[this.viewerId] === 'human'
+        ? autoSteal(this.legal, this.viewerId)
+        : null;
+    if (steal && this.apply(steal)) {
+      this.refresh();
+      return;
+    }
     if (state.phase.kind === 'gameOver' && this.durationMs === null && this.startedAt !== null) {
       this.durationMs = this.wallClock() - this.startedAt;
     }
