@@ -97,10 +97,10 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => LogToken[]][] = [
   ],
   [/\bthe robber\b/y, () => [{ kind: 'robber' }]],
   [
-    /Longest Road/y,
-    () => [
+    /Longest (?:Road|Trade Route)/y,
+    (m) => [
       { kind: 'award', award: 'longestRoad' },
-      { kind: 'text', text: ' Longest Road' },
+      { kind: 'text', text: ` ${m[0]}` },
     ],
   ],
   [

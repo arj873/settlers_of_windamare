@@ -43,6 +43,7 @@ import {
   ckSlice,
   commodityCount,
   defenderStrength,
+  giveRatio,
   improvementCost,
   isCommodity,
   knightsInSupply,
@@ -132,6 +133,15 @@ export function commodityFace(c: Commodity, w: number, ...extra: Child[]): HTMLE
     svg(COMMODITY_SVG[c], Math.round(w * 0.72)),
     ...extra,
   );
+}
+
+/** A card face standing for "commodity cards" of any type (players' public totals). */
+function anyCommodityFace(w: number): HTMLElement {
+  return h('span', {
+    class: 'card-face ck-cf ck-cf-any',
+    style: { '--cw': `${w}px` },
+    attrs: { 'aria-hidden': 'true' },
+  });
 }
 
 export function goodFace(g: Good, w: number): HTMLElement {
@@ -277,6 +287,9 @@ function trackRows(state: GameState, view: HudView, send: Send): HTMLElement {
               class: 'btn btn-sm ck-improve',
               disabled: !can,
               title: `${IMPROVEMENT_NAMES[t][level]} (level ${level + 1}): ${cost} ${TRACK_COMMODITY[t]}`,
+              attrs: {
+                'aria-label': `Improve ${t} to level ${level + 1} (${IMPROVEMENT_NAMES[t][level]}): ${cost} ${TRACK_COMMODITY[t]}`,
+              },
               on: { click: () => can && send(can) },
             },
             `${cost}×`,
@@ -314,7 +327,8 @@ function playerRows(state: GameState): HTMLElement {
         h(
           'span',
           { class: 'ck-stat', title: 'Commodity cards' },
-          commodityFace('coin', 11),
+          // Not a coin face: online, other seats' split is hidden and only the total is known.
+          anyCommodityFace(11),
           String(commodities),
         ),
         h(
@@ -352,8 +366,8 @@ function playerRows(state: GameState): HTMLElement {
   );
 }
 
-function select(opts: readonly [string, string][]): HTMLSelectElement {
-  const el = h('select', { class: 'ck-select' });
+function select(opts: readonly [string, string][], label: string): HTMLSelectElement {
+  const el = h('select', { class: 'ck-select', attrs: { 'aria-label': label } });
   for (const [value, label] of opts) {
     const o = document.createElement('option');
     o.value = value;
@@ -363,13 +377,24 @@ function select(opts: readonly [string, string][]): HTMLSelectElement {
   return el;
 }
 
-function bankForm(view: HudView, send: Send): HTMLElement | null {
+function bankForm(state: GameState, view: HudView, send: Send): HTMLElement | null {
   const trades = mine(view, 'ck/bankTrade');
   if (trades.length === 0) return null;
   const gives = [...new Set(trades.map((a) => field(a, 'give') as Good))];
-  const give = select(gives.map((g) => [g, goodLabel(g)]));
-  const receive = select([]);
+  const give = select(
+    gives.map((g) => [g, goodLabel(g)]),
+    'Bank: give',
+  );
+  const receive = select([], 'Bank: receive');
   const go = h('button', { class: 'btn btn-sm' }, 'Trade');
+  // The button states the price: one click trades at once (no dialog).
+  const price = () => {
+    const n = giveRatio(state, view.viewer, give.value as Good);
+    go.textContent = `Trade ${n}:1`;
+    const got = goodLabel(receive.value as Good);
+    go.setAttribute('aria-label', `Give ${n} ${goodLabel(give.value as Good)} for 1 ${got}`);
+  };
+  receive.addEventListener('change', price);
   const sync = () => {
     const options = trades.filter((a) => field(a, 'give') === give.value);
     receive.replaceChildren(
@@ -380,6 +405,7 @@ function bankForm(view: HudView, send: Send): HTMLElement | null {
         return o;
       }),
     );
+    price();
   };
   give.addEventListener('change', sync);
   go.addEventListener('click', () => {
@@ -396,10 +422,22 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
   if (mine(view, 'ck/offerTrade').length === 0) return null;
   const me = view.viewer;
   const goods = [...RESOURCES, ...COMMODITIES] as Good[];
-  const counts = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const give = select(goods.map((g) => [g, goodLabel(g)]));
-  const wantN = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const want = select(goods.map((g) => [g, goodLabel(g)]));
+  const counts = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: give count',
+  );
+  const give = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: give',
+  );
+  const wantN = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: want count',
+  );
+  const want = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: want',
+  );
   want.value = 'coin';
   const go = h('button', { class: 'btn btn-sm' }, 'Offer');
   const others = state.players.filter((p) => p.id !== me).map((p) => p.id);
@@ -430,8 +468,8 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
 function alchemistForm(view: HudView, send: Send): HTMLElement | null {
   if (mine(view, 'ck/alchemist').length === 0) return null;
   const faces = [1, 2, 3, 4, 5, 6].map((n): [string, string] => [String(n), String(n)]);
-  const yellow = select(faces);
-  const red = select(faces);
+  const yellow = select(faces, 'Alchemist: yellow die');
+  const red = select(faces, 'Alchemist: red die');
   return h(
     'div',
     { class: 'ck-form' },
@@ -485,11 +523,25 @@ function progressList(state: GameState, view: HudView, send: Send): HTMLElement 
         { class: `ck-card ck-card-${CARD_TRACK[c]}` },
         h('span', { class: 'ck-card-name', title: CARD_TEXT[c] }, CARD_NAMES[c], n > 1 && ` ×${n}`),
         h('span', { class: 'muted ck-card-text' }, CARD_TEXT[c]),
-        play && h('button', { class: 'btn btn-sm', on: { click: () => send(play) } }, 'Play'),
+        // Named per card: two cards' "Play" buttons must not share a name.
+        play &&
+          h(
+            'button',
+            {
+              class: 'btn btn-sm',
+              attrs: { 'aria-label': `Play ${CARD_NAMES[c]}` },
+              on: { click: () => send(play) },
+            },
+            'Play',
+          ),
         drop &&
           h(
             'button',
-            { class: 'btn btn-sm btn-ghost', on: { click: () => send(drop) } },
+            {
+              class: 'btn btn-sm btn-ghost',
+              attrs: { 'aria-label': `Discard ${CARD_NAMES[c]}` },
+              on: { click: () => send(drop) },
+            },
             'Discard',
           ),
       );
@@ -834,7 +886,7 @@ export const ckHud: HudExtension = {
       const extra = [
         alchemistForm(view, send),
         progressList(state, view, send),
-        bankForm(view, send),
+        bankForm(state, view, send),
         offerForm(state, view, send),
       ].filter((x): x is HTMLElement => x !== null);
       if (extra.length > 0) body.append(h('div', { class: 'ck-actions' }, ...extra));

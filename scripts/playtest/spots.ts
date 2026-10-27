@@ -1,5 +1,6 @@
 /** Board-target descriptions for the playtest CLI: "what is at this spot", in words. */
 import {
+  edgeEndpoints,
   edgeVertices,
   setupRoundAt,
   tokenPips,
@@ -59,6 +60,12 @@ const SPOT_NOUN: Partial<Record<Action['type'], string>> = {
   eventDamageRoad: 'damage road',
 };
 
+/** T&B: one action type picks a barbarian (phase `from` null), then its new path. */
+function barbarianStep(state: GameState | null, type: string): 'pick' | 'move' | null {
+  if (type !== 'tb/placeBarbarian' || state?.phase.kind !== 'tb/barbarian') return null;
+  return (state.phase as { from?: unknown }).from == null ? 'pick' : 'move';
+}
+
 /**
  * A short name for what an action does: base types from the table, module types from their
  * name ("seafarers/placeSetupShip" -> "place setup ship"). The setup building names the piece
@@ -68,6 +75,8 @@ export function actionName(state: GameState | null, a: { type: string }): string
   if (a.type === 'placeSetupSettlement' && state?.phase.kind === 'setup') {
     return `setup ${setupRoundAt(state, state.phase.index).building}`;
   }
+  const step = barbarianStep(state, a.type);
+  if (step) return step === 'pick' ? 'pick barbarian' : 'move barbarian here';
   const base = SPOT_NOUN[a.type as Action['type']];
   if (base) return base;
   const name = a.type.includes('/') ? a.type.slice(a.type.indexOf('/') + 1) : a.type;
@@ -77,6 +86,8 @@ export function actionName(state: GameState | null, a: { type: string }): string
 /** The heading verb for a list of spots of one type ("place your setup city"). */
 export function spotVerb(state: GameState, type: string): string {
   if (type === 'placeSetupSettlement') return `place your ${actionName(state, { type })}`;
+  const step = barbarianStep(state, type);
+  if (step) return step === 'pick' ? 'pick the barbarian to move' : 'move the barbarian to';
   return SPOT_VERB[type as Action['type']] ?? actionName(state, { type });
 }
 
@@ -131,7 +142,11 @@ export function describeEdge(state: GameState, e: EdgeId, viewer: PlayerId): str
   const hexes = topologyOf(state).edge[e]?.hexes ?? [];
   const sides = hexes.map((h) => hexLabel(state, h));
   if (hexes.length < 2) sides.push('sea');
-  const ends = edgeVertices(topologyOf(state), e).map((v) => endpoint(state, v, viewer));
+  // Open-sea edges (ships) are not in the land topology: take the ends from the id.
+  const t = topologyOf(state);
+  const ends = (t.edge[e] ? edgeVertices(t, e) : edgeEndpoints(e)).map((v) =>
+    endpoint(state, v, viewer),
+  );
   return `between ${sides.join(' | ')}; ends ${ends.join(', ')}`;
 }
 

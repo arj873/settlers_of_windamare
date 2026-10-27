@@ -425,18 +425,25 @@ function button(
   return h('button', { class: cls, title, on: { click: () => send(a) } }, ...label);
 }
 
-function resourceButtons(options: Action[], send: Send): HTMLElement {
+/** Resource-card buttons; `name` says what each does ("Buy 1 Ore for 2 gold"), so a buy and a
+ * sell button of one resource never share a name. */
+function resourceButtons(
+  options: Action[],
+  send: Send,
+  name: (label: string) => string,
+): HTMLElement {
   return h(
     'span',
     { class: 'tb-res' },
     ...options.map((a) => {
       const r = field(a, 'resource') as Resource;
+      const what = name(RESOURCE_LABEL[r]);
       return h(
         'button',
         {
           class: 'tb-resbtn',
-          title: RESOURCE_LABEL[r],
-          attrs: { 'aria-label': RESOURCE_LABEL[r] },
+          title: what,
+          attrs: { 'aria-label': what },
           on: { click: () => send(a) },
         },
         resCardFace(r, 24),
@@ -467,8 +474,15 @@ function fishActions(state: GameState, view: HudView, send: Send): Child[] {
     const list = fish.filter((a) => field(a, 'use') === use);
     if (list.length === 0) continue;
     const cost = label(tbIcon('fish', 14), `${fishCost(state, me, use)}: ${FISH_LABEL[use]}`);
-    if (use === 'resource') out.push(row(cost, resourceButtons(list, send)));
-    else if (use === 'steal') {
+    if (use === 'resource') {
+      const n = fishCost(state, me, use);
+      out.push(
+        row(
+          cost,
+          resourceButtons(list, send, (r) => `Take 1 ${r} for ${n} fish`),
+        ),
+      );
+    } else if (use === 'steal') {
       out.push(
         row(
           cost,
@@ -516,14 +530,18 @@ function goldActions(state: GameState, view: HudView, send: Send): Child[] {
   const buy = mine(view, 'tb/buyResource');
   if (buy.length > 0)
     out.push(
-      row(label(tbIcon('gold', 14), ` ${GOLD_PER_RESOURCE} gold → 1`), resourceButtons(buy, send)),
+      row(
+        label(tbIcon('gold', 14), ` ${GOLD_PER_RESOURCE} gold → 1`),
+        resourceButtons(buy, send, (r) => `Buy 1 ${r} for ${GOLD_PER_RESOURCE} gold`),
+      ),
     );
   const sell = mine(view, 'tb/sellForGold');
   if (sell.length > 0) {
+    const n = goldSaleRatio(state, view.viewer);
     out.push(
       row(
-        label(`${goldSaleRatio(state, view.viewer)} of a kind → 1 `, tbIcon('gold', 14)),
-        resourceButtons(sell, send),
+        label(`${n} of a kind → 1 `, tbIcon('gold', 14)),
+        resourceButtons(sell, send, (r) => `Sell ${n} ${r} for 1 gold`),
       ),
     );
   }

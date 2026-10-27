@@ -445,7 +445,16 @@ function whyDump(state: GameState, p: PlayerId, from: number | VertexId, c: Carg
       : state.pieces.buildings[from]?.owner === p
         ? (s.harbors[from] ?? null)
         : null;
-  return cargo?.includes(c) ? null : 'nothing like that there';
+  if (!cargo?.includes(c)) return 'nothing like that there';
+  // §4.6 (R6 p. 9): a piece is thrown away only to make room, when every slot a newly built
+  // piece of some kind could go to is full.
+  const kinds: Cargo[] = rulesOf(state).crews ? ['settler', 'crew'] : ['settler'];
+  const roomFor = (k: Cargo) =>
+    targetsOf(state, p).some((t) => {
+      const there = targetCargo(state, p, t);
+      return there !== null && fits(there, k);
+    });
+  return kinds.every(roomFor) ? 'there is still room: throw a piece away only to make room' : null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -929,7 +938,7 @@ export const HANDLERS: Record<EpActionType, H> = {
         if (s.turn.active === id) s.turn.active = null;
         if (s.turn.selected === id) s.turn.selected = null;
         draft.pieces.buildings[v] = { owner: a.player, kind: 'settlement' };
-        log(draft, a.player, `${name(draft, a.player)}’s settlers founded a settlement`);
+        log(draft, a.player, `${name(draft, a.player)}’s settler founded a settlement`);
       },
       draft,
     );

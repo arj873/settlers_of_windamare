@@ -71,6 +71,20 @@ describe('parseAction', () => {
     for (const a of actions) expect(parseAction(JSON.parse(JSON.stringify(a)), 'a')).toEqual(a);
   });
 
+  it('accepts T&B spoke edges and plaza vertices (F2 ids)', () => {
+    for (const a of [
+      { type: 'buildRoad', player: 0, edge: 'e:2,-2,CS' },
+      { type: 'placeSetupRoad', player: 0, edge: 'e:-3,3,CNW' },
+      { type: 'placeFreeRoad', player: 0, edge: 'e:0,0,CNE' },
+      { type: 'buildSettlement', player: 0, vertex: 'v:2,-2,C' },
+    ]) {
+      expect(parseAction(a, 'a')).toEqual(a);
+    }
+    expect(() => parseAction({ type: 'buildRoad', player: 0, edge: 'e:0,0,CE' }, 'a')).toThrow(
+      Invalid,
+    );
+  });
+
   it('rebuilds the object from known fields only', () => {
     const a = parseAction({ type: 'rollDice', player: 1, junk: 'x', __proto__: { evil: 1 } }, 'a');
     expect(a).toEqual({ type: 'rollDice', player: 1 });

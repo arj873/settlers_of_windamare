@@ -6,6 +6,7 @@ import {
   createGame,
   legalActions,
   PLAYER_COLORS,
+  RESOURCES,
   TOPOLOGY,
 } from '../engine';
 import {
@@ -22,6 +23,7 @@ import {
   bankView,
   bestRatios,
   blockReasons,
+  tradeBlockReason,
   boardPrompt,
   buildCards,
   inkFor,
@@ -254,6 +256,25 @@ describe('why a build button is disabled', () => {
       'Missing 3 ore',
       'No settlement to upgrade',
     ]);
+  });
+
+  it('Bank and Trade say why they are off', () => {
+    const s = midGame();
+    s.turn.current = 1;
+    s.phase = { kind: 'main' };
+    const ratios = bestRatios(s, 1);
+    s.players[1]!.resources = { brick: 1, lumber: 0, wool: 1, grain: 1, ore: 0 };
+    const need = RESOURCES.map((r) => `${ratios[r]} ${r}`).join(' or ');
+    expect(tradeBlockReason(s, 1, 'bank')).toBe(`Need ${need}`);
+    expect(tradeBlockReason(s, 1, 'trade')).toBeNull();
+    s.players[1]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(tradeBlockReason(s, 1, 'trade')).toBe('No cards to offer');
+    s.turn.tradeOffers = 3;
+    s.players[1]!.resources.ore = 1;
+    expect(tradeBlockReason(s, 1, 'trade')).toBe('At most 3 trade offers per turn');
+    expect(tradeBlockReason(s, 0, 'bank')).toBe('Not your turn');
+    s.phase = { kind: 'preRoll' };
+    expect(tradeBlockReason(s, 1, 'bank')).toBe('Roll the dice first');
   });
 });
 

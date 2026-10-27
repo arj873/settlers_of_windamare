@@ -68,6 +68,30 @@ function describe(counts: ResourceCounts): string {
   return parts.join(', ');
 }
 
+/**
+ * For confirmTrade overrides that move non-resource goods (C&K commodities, E&P gold): append
+ * `give` / `want` (e.g. "1 paper") to the last log line, the base "A traded X to B for Y".
+ * Appends rather than rewrites, so stacked modules each add their own part.
+ */
+export function extendTradeLog(
+  draft: GameState,
+  player: PlayerId,
+  partner: PlayerId,
+  give: string,
+  want: string,
+): void {
+  const line = draft.log.at(-1);
+  const head = `${getPlayer(draft, player).name} traded `;
+  const mid = ` to ${getPlayer(draft, partner).name} for `;
+  if (!line?.text.startsWith(head)) return;
+  const at = line.text.indexOf(mid, head.length);
+  if (at < 0) return;
+  const join = (a: string, b: string) => [a, b].filter((x) => x !== '').join(', ');
+  const g = join(line.text.slice(head.length, at), give);
+  const w = join(line.text.slice(at + mid.length), want);
+  line.text = `${head}${g}${mid}${w}`;
+}
+
 /** House rule: the current player may make MAX_TRADE_OFFERS_PER_TURN offers per turn. */
 function canOfferMore(state: GameState): boolean {
   return state.turn.tradeOffers < MAX_TRADE_OFFERS_PER_TURN;

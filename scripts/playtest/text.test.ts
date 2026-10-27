@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchChoice, normalize, parseFlags, parseSeat, slugify } from './text';
+import { matchChoice, matchControl, normalize, parseFlags, parseSeat, slugify } from './text';
 
 describe('normalize', () => {
   it('drops emoji, punctuation and case', () => {
@@ -54,6 +54,22 @@ describe('matchChoice', () => {
   it('reports no match', () => {
     expect(matchChoice('fly', bar)).toEqual({ kind: 'none' });
     expect(matchChoice('', bar)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('matchControl', () => {
+  const c = (label: string, enabled = true) => ({ label, enabled });
+  it('a disabled button that matches better wins over a looser enabled match', () => {
+    const controls = [c('Move ship'), c('Ship 11/15', false)];
+    expect(matchControl('Ship', controls)).toEqual({ kind: 'disabled', index: 1 });
+    expect(matchControl('Move ship', controls)).toEqual({ kind: 'one', index: 0, how: 'exact' });
+  });
+
+  it('several hits: the enabled ones decide, as before', () => {
+    const controls = [c('Brick'), c('Brick', false), c('Roll dice')];
+    expect(matchControl('brick', controls)).toEqual({ kind: 'one', index: 0, how: 'exact' });
+    expect(matchControl('dice', controls)).toEqual({ kind: 'one', index: 2, how: 'fuzzy' });
+    expect(matchControl('nope', controls)).toEqual({ kind: 'none' });
   });
 });
 

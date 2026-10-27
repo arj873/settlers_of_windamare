@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
+import { longestRoadName } from '../../../engine/expansions/hooks';
 import {
   expectConserved,
   expectFail,
@@ -258,6 +259,9 @@ describe('Longest Trade Route (§3.5, FAQ #12, #16)', () => {
     }
     expect(tradeRouteLength(s, 0)).toBe(5);
     expect(s.awards.longestRoad).toBe(0);
+    // Seafarers names the card the Longest Trade Route (rules doc §3.5).
+    expect(s.log.at(-1)?.text).toMatch(/took Longest Trade Route$/);
+    expect(longestRoadName(s)).toBe('Longest Trade Route');
   });
 });
 

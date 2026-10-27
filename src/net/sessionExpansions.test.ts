@@ -4,7 +4,8 @@
  * intent guard only lets a seat send the kinds of moves legalActions offers it.
  */
 import { describe, expect, it } from 'vitest';
-import { viewFor, type Action } from '../engine';
+import { viewFor, type Action, type EdgeId, type VertexId } from '../engine';
+import { topologyOf } from '../engine/topology';
 import { DEFAULT_ROOM_CONFIG, type RoomConfig } from './protocol';
 import { GameSession } from './session';
 import { fakeDeps, LocalNet } from './testHarness';
@@ -129,5 +130,35 @@ describe('GameSession: expansion modes online', () => {
     net.send('host', { type: 'intent', action: { type: 'ck/teleport', player: 0 }, seq });
     expect(net.last('host', 'error')?.code).toBe('bad_message');
     expect(net.last('host', 'game')).toBeUndefined();
+  });
+
+  it('T&B Traders: a spoke road (e:q,r,C<corner>) is accepted over the wire', () => {
+    const { net, session } = started({ mode: 'tb', scenario: 'tb/traders' });
+    const topo = topologyOf(session.state!);
+    const spokes = Object.keys(topo.edge).filter((e) => /,C/.test(e)) as EdgeId[];
+    const spokeEnds = new Set(spokes.flatMap((e) => topo.edge[e]!.vertices));
+    const isSpoke = (a: Action) => 'edge' in a && /,C/.test(String(a.edge));
+    let sent: Action | null = null;
+    for (let i = 0; i < 400 && !sent; i++) {
+      const conn = ['host', 'bob'].find((c) => legalOf(net, c).length > 0);
+      if (!conn) {
+        net.advance(500);
+        continue;
+      }
+      const legal = legalOf(net, conn);
+      // Settle on a plaza corner so a spoke road becomes legal; take it as soon as it is.
+      const pick =
+        legal.find(isSpoke) ??
+        legal.find((a) => 'vertex' in a && spokeEnds.has(a.vertex as VertexId)) ??
+        legal[0]!;
+      if (isSpoke(pick)) sent = pick;
+      const seq = net.last(conn, 'game')!.seq;
+      net.send(conn, { type: 'intent', action: pick, seq });
+      expect(net.messages(conn, 'error')).toEqual([]);
+      net.advance(100);
+    }
+    expect(sent).not.toBeNull();
+    const edge = (sent as { edge: EdgeId }).edge;
+    expect(session.state!.pieces.roads[edge]).toBe(sent!.player);
   });
 });
