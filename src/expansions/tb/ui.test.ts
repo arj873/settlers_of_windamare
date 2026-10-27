@@ -12,6 +12,7 @@ import {
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import {
@@ -60,7 +61,7 @@ describe('T&B setup screen', () => {
 
   it('offers the five scenarios and the variants, 2-6 seats, Harbormaster adds 1 VP', () => {
     const screen = make();
-    q(screen, `mode-${TB}`)?.click();
+    expect(pickMode(screen.element, TB)).toBe(true);
     expect(screen.state.mode).toBe(TB);
     for (const id of [SC_FISH, SC_RIVERS, SC_CARAVANS, SC_BA, SC_TRADERS, 'tb/variants']) {
       expect(q(screen, `scenario-${id}`)).not.toBeNull();
@@ -82,7 +83,7 @@ describe('T&B setup screen', () => {
 
   it('refuses the robber variants in Barbarian Attack: the reason shows, Start is off', () => {
     const screen = make();
-    q(screen, `mode-${TB}`)?.click();
+    expect(pickMode(screen.element, TB)).toBe(true);
     q(screen, `scenario-${SC_BA}`)?.click();
     // Rush mode switches the friendly robber on.
     q(screen, 'rule-rushMode')?.click();
@@ -130,10 +131,26 @@ describe('T&B HUD', () => {
   it('gold buys a card: the resource buttons send tb/buyResource', () => {
     const s = main(SC_TRADERS);
     show(s);
-    const buy = root.querySelector<HTMLButtonElement>('.tb-act .tb-resbtn[aria-label="Ore"]');
+    const buy = root.querySelector<HTMLButtonElement>(
+      '.tb-act .tb-resbtn[aria-label="Buy 1 Ore for 2 gold"]',
+    );
     expect(buy).not.toBeNull();
     buy?.click();
     expect(actions.at(-1)).toEqual({ type: 'tb/buyResource', player: 0, resource: 'ore' });
+  });
+
+  it('buy and sell buttons for one resource have different names', () => {
+    const s = main(SC_TRADERS);
+    s.players[0]!.resources.brick = 5;
+    show(s);
+    const names = [...root.querySelectorAll('.tb-act .tb-resbtn')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    const brick = names.filter((n) => n?.includes('Brick'));
+    expect(brick).toEqual([
+      'Buy 1 Brick for 2 gold',
+      expect.stringMatching(/^Sell \d Brick for 1 gold$/),
+    ]);
   });
 
   it('Fishermen: own fish values are shown, others only as a count; fish actions', () => {

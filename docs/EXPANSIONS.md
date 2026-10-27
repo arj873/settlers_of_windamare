@@ -32,6 +32,8 @@ Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tb
 `tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
 pair's rules (§11). C2: `tbsea` (mode `tb+seafarers`), each T&B scenario on Heading for New
 Shores, through the `playsAs` / `basedOn` seam (§11). E5b added `epck` (mode `ep+ck`) and `eptb` (mode `ep+tb`).
+C4: the six other T&B × T&B sheets in `tb+tb` (static sheet rules on the board, `TbSheetRules`).
+C5 added `back` (mode `ba+ck`, Barbarian Attack + C&K) and `twock` (mode `two+ck`, Catan for Two and C&K): every C&K combination catan.com publishes is now a mode.
 
 ---
 
@@ -135,6 +137,7 @@ version where the slice is read (or add a migration step in your module and ask 
 interface ExpansionModule {
   id;
   name;
+  icon?: string; // one emoji for the setup screen's expansion chip (modules that play alone)
   requires?;
   conflicts?;
   before?: ExpansionId[]; // composition order: run (and wrap) before these modules (§11)
@@ -156,6 +159,7 @@ interface ExpansionModule {
   changesRoads?: ['<id>/...' | baseType]; // actions that change road lengths / occupancy (C2: base types too)
   actors?(state): PlayerId[] | undefined; // who acts in your phases
   hooks?: ExpansionHooks; // §5
+  terms?: { longestRoad?; route? }; // your words for base things in log / HUD (Seafarers: 'Longest Trade Route', 'road or ship')
 }
 ```
 
@@ -253,7 +257,7 @@ length, a hand its size), sharing the unchanged parts, mutating nothing. Rules:
   Master Merchant reveals), Seafarers `seafarers/engine/mask.ts` (fog stacks, face-down Forgotten
   Tribe dev-card gifts), T&B `tb/engine/mask.ts` (fish hands and pool, BA deck, commodity stacks,
   Swift Journeys), E&P `ep/engine/mask.ts` (face-down hexes, disc stacks, lair tokens). Oil, Crop,
-  demo, seack, tbck, epck, eptb hold no secrets of their own (their tests run the C&K, T&B and
+  demo, seack, tbck, epck, eptb, back, twock hold no secrets of their own (their tests run the C&K, T&B and
   E&P masks in the combos; gold offers and fish uses are public).
 
 Online actions: `parseAction` (src/net/protocol.ts) accepts any registered `<id>/<name>` type
@@ -345,6 +349,7 @@ interface HudExtension {
     costItem?;
     left?(s, p);
     total?(s, p);
+    blocker?(s, p): string | null; // disabled reason besides missing resources ('No coastal settlement to upgrade')
   }[];
   dialog?(state, view, legal, send): { key; title; body; modal } | null; // after base forced dialogs
   hint?(state, view): string | null; // turn pill text in your phases
@@ -375,9 +380,15 @@ interface HudExtension {
   viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
-- **Setup screen** (generated from the registry): mode tiles from `listModes()` (`status: 'ready'`
-  always; `'wip'` / `'demo'` with `?modes=all`), base first and default; an expansion mode shows its
-  scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
+- **Setup screen** (generated from the registry, U7 `src/ui/setup/modePicker.ts`): modes from
+  `listModes()` (`status: 'ready'` always; `'wip'` / `'demo'` with `?modes=all`) are picked with
+  expansion chips, none on = base. A mode's chips are the modules it activates that have no
+  `requires` (combo modules drop out: `tb+ck` = C&K + T&B), so a new combo module appears by
+  itself. A chip is disabled when no offered mode has the resulting chips (reason: its
+  `conflicts`, else "no official combination"). Modes with the same chips (`tb+ck`, `ba+ck`,
+  `two+ck`) share one selection: the scenario picker lists every scenario of each, grouped by
+  mode, with seats and VP. Give a standalone module an `icon` (emoji) for its chip. An expansion
+  mode shows its scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
   selects (int / choice), and clamps seats to the mode's range. `NewGameConfig` carries
   `{ mode, scenario?, options? }`. Dev: `?mode=<id>` starts a game at once.
 
@@ -468,14 +479,16 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module   | Composes          | Scenarios (VP)                                                                                                                                                |
-| -------------- | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                                                                                    |
-| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                                                                               |
-| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2); 18 pairs on the other Seafarers scenarios (C3, combos.md §2d) |
-| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                                                                                 |
-| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                                                                                         |
-| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                                                                                       |
+| Mode           | Module   | Composes          | Scenarios (VP)                                                                                                                                                  |
+| -------------- | -------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                                                                                      |
+| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                                                                                 |
+| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2); 18 pairs on the other Seafarers scenarios (C3, combos.md §2d)   |
+| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + BA 12, + Caravans 12 (C2); BA + T&B 14, Caravans + BA 12, Caravans + T&B 15, Rivers + BA 12, + Caravans 12, + T&B 13 (C4); 3-4 |
+| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                                                                                           |
+| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                                                                                         |
+| `ba+ck`        | `back`   | `ck`, `tb`        | Barbarian Attack 13; 3-6 (C5: C&K knights on paths, no barbarian ship)                                                                                          |
+| `two+ck`       | `twock`  | `ck`, `tb`        | Catan for Two on the base board 13; 2 players (C5: neutral knights)                                                                                             |
 
 How a combination is built:
 
@@ -514,7 +527,9 @@ seafarers]`).
 - **Sea paths for road pieces.** On a map with open sea T&B's wagons, camels and barbarians also
   use sea edges (`tb/engine/paths.ts`); the pieces that carry a wagon like a road (ships) come
   from the `routeEdges` hook, so T&B never imports Seafarers.
-- **Seams in the composed modules** (small, generic, listed in `docs/rules/combos.md` §7-8): E&P
+- **Seams in the composed modules** (small, generic, listed in `docs/rules/combos.md` §7-8, §11):
+  C5: C&K `shipSails` (a mode without the barbarian ship), T&B `prisonersPerVp` / `baCardsInPlay`
+  / `BaSlice.safe`; C&K routes treat other modules' `blocksRoute` pieces as foreign. E&P
   `citiesInPlay` / `isHarborStep` (C&K joins: cities, the setup rounds swap), C&K `besideFog`
   (no knight next to an unexplored hex), T&B `MODE_FEATURES` (a combination mode switches a T&B
   feature on for another expansion's scenarios: `'ep+tb': ['fish']`).
@@ -555,10 +570,10 @@ seafarers]`).
 - ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
 - **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
-  built (§11), T&B + Seafarers on the other Seafarers scenarios too (C3) except Barbarian Attack
-  with the Forgotten Tribe, Pirate Islands and Wonders. Not built: Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
-  Fishing pairs are mode `tb+tb`). Details in
-  `docs/rules/combos.md` §2b, §3.
+  built (§11), and Barbarian Attack + C&K, Catan for Two + C&K (C5), the T&B × T&B sheets (mode
+  `tb+tb`, C2 + C4), T&B + Seafarers on the other Seafarers scenarios (C3). Not built: Barbarian
+  Attack + Seafarers on the Forgotten Tribe, Pirate Islands and Wonders (diagrams decoded). Details
+  in `docs/rules/combos.md` §2b, §2d, §3.
 - ~~E&P combinations~~ — done (E5b): `ep+ck`, `ep+tb` (§11), player trades with gold
   (`ep/offerTrade`; in `ep+ck` one `epck/offerTrade` carries resources, commodities and gold).
 

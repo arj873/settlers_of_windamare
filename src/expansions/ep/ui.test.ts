@@ -6,6 +6,7 @@ import { actionForClick, boardActions } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { bestRatios } from '../../ui/model';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { A } from './engine/actions';
@@ -22,7 +23,7 @@ describe('E&P setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-ep')?.click();
+    expect(pickMode(screen.element, 'ep')).toBe(true);
     expect(screen.state.mode).toBe('ep');
     for (const s of ['landHo', 'pirateLairs', 'fish', 'spices', 'full']) {
       expect(q(screen, `scenario-ep/${s}`), s).not.toBeNull();
@@ -38,7 +39,7 @@ describe('E&P setup screen', () => {
   it('refuses unofficial combinations with a message: setup variants, balance rules', () => {
     const screen = new SetupScreen({ onStart: () => undefined, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-ep')?.click();
+    expect(pickMode(screen.element, 'ep')).toBe(true);
     expect(setupError(screen.state)).toBeNull();
     expect(setupError({ ...screen.state, eventCards: true })).toBeNull();
   });
@@ -72,6 +73,37 @@ describe('E&P HUD', () => {
     expect(text).toMatch(/Action phase/);
     byText('Start Movement phase')?.click();
     expect(actions).toEqual([{ type: A.startMovement, player: 0 }]);
+  });
+
+  it('player rows: the extra-VP stat names its parts (a harbor is not mission VP)', () => {
+    const s = blank('pirateLairs');
+    settle(s, 0, COAST, true);
+    show(s);
+    const vpStat = (i: number) =>
+      [
+        ...(root.querySelectorAll('.ep-row')[i]?.querySelectorAll<HTMLElement>('.ep-stat') ?? []),
+      ].at(-1)!;
+    expect(vpStat(0).textContent).toBe('+1');
+    expect(vpStat(0).title).toMatch(/Harbors \+1/);
+    expect(vpStat(0).title).not.toMatch(/mission VP/);
+    expect(vpStat(1).title).toMatch(/none yet/);
+  });
+
+  it('a disabled Harbor card says why when resources are not the problem', () => {
+    const s = blank('full');
+    give(s, 0, { grain: 2, ore: 2 });
+    show(s);
+    const harbor = () =>
+      [...root.querySelectorAll<HTMLButtonElement>('.bcard')].find(
+        (b) => b.querySelector('.bcard-label')?.textContent === 'Harbor',
+      )!;
+    expect(harbor().disabled).toBe(true);
+    expect(harbor().dataset['why']).toBe('No coastal settlement to upgrade');
+    give(s, 0, { grain: -2, ore: -2 });
+    show(s);
+    expect(harbor().dataset['why']).toBe(
+      'Missing 2 grain, 2 ore; No coastal settlement to upgrade',
+    );
   });
 
   it('build bar: Harbor, Ship, Settler and Crew cards; no City card', () => {

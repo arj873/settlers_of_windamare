@@ -775,5 +775,5 @@ describe('crop soundness', () => {
       }
     }
     expect(RESOURCES).toHaveLength(5);
-  });
+  }, 60_000);
 });

@@ -6,7 +6,15 @@
  * the hands but not the stacks; the log names no secret card; the HUD renders a masked view.
  */
 import { describe, expect, it } from 'vitest';
-import { legalActions, viewFor, type Action, type GameState, type PlayerId } from '../../engine';
+import {
+  cardsInHand,
+  handCount,
+  legalActions,
+  viewFor,
+  type Action,
+  type GameState,
+  type PlayerId,
+} from '../../engine';
 import { Hud } from '../../ui/hud';
 import { canary, canaryNumber, expectNoLeak, sampleStates, type Plant } from '../maskTestkit';
 import type { GameSetup } from '../../bots/runner';
@@ -26,6 +34,8 @@ import { V, build, ckMain, giveCards, setGoods } from './engine/testkit';
 import { SEACK_MODE } from '../seack/engine';
 import { TBCK_MODE } from '../tbck/engine';
 import { EPCK_MODE } from '../epck/engine';
+import { BACK_MODE } from '../back/engine';
+import { TWOCK_MODE } from '../twock/engine';
 
 const withSlice = (state: GameState, s: CkSlice): GameState => ({
   ...state,
@@ -135,6 +145,14 @@ describe('C&K online views: secrets in bot games', () => {
   it('E&P + C&K: the C&K mask runs (hands, commodities, stacks)', () => {
     checkGame({ seed: 41, players: 4, mode: EPCK_MODE, scenario: 'ep/pirateLairs' }, 3000, 60);
   }, 60_000);
+
+  it('Barbarian Attack + C&K: the C&K mask runs (hands, commodities, stacks)', () => {
+    checkGame({ seed: 51, players: 4, mode: BACK_MODE, scenario: 'tb/barbarianAttack' }, 3000, 60);
+  }, 60_000);
+
+  it('Catan for Two + C&K: the C&K mask runs (neutral knights are no seat)', () => {
+    checkGame({ seed: 61, players: 2, mode: TWOCK_MODE, scenario: 'tb/variants' }, 3000, 60);
+  }, 60_000);
 });
 
 describe('C&K online views: shape and reveals', () => {
@@ -176,6 +194,17 @@ describe('C&K online views: shape and reveals', () => {
     expect(ckSlice(viewFor(s, 1)).players[1]).toEqual(full.players[1]);
     expect(JSON.stringify(s)).toBe(before); // input untouched
     expect(ckSlice(s).commodityCounts).toBeUndefined();
+  });
+
+  it('hand counts (players panel, steal dialog) include commodities, also on a view', () => {
+    const s = hands();
+    // Seat 1 holds 3 cloth + 2 ore: 5 cards toward the 7 rule (CK §3.6), resources or not.
+    expect(handCount(s, 1)).toBe(5);
+    expect(cardsInHand(s, 1)).toBe(5);
+    for (const viewer of [0, 1, 2, 'spectator'] as const) {
+      expect(handCount(viewFor(s, viewer), 1)).toBe(5);
+      expect(handCount(viewFor(s, viewer), 0)).toBe(3);
+    }
   });
 
   it('Spy: the spy player sees the victim’s progress cards, nobody else does', () => {

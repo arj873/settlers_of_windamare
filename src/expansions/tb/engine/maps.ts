@@ -46,25 +46,25 @@ import {
   type TradeKind,
 } from './state';
 
-const isRes = (t: Terrain) =>
+export const isRes = (t: Terrain) =>
   t === 'brick' || t === 'lumber' || t === 'wool' || t === 'grain' || t === 'ore';
-const fill = (t: Terrain, n: number): Terrain[] => Array<Terrain>(n).fill(t);
+export const fill = (t: Terrain, n: number): Terrain[] => Array<Terrain>(n).fill(t);
 // prettier-ignore
 const TOKENS_30: readonly number[] = [2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12];
-const PORTS_19: readonly PortKind[] = PORT_KINDS;
+export const PORTS_19: readonly PortKind[] = PORT_KINDS;
 const PORTS_30: readonly PortKind[] = MAPS.base56.harbors;
 const PORTS_37: readonly PortKind[] = MAPS.base78.harbors;
 
 const withExt = (board: Board, ext: TbBoard): Board => ({ ...board, ext: { [TB]: ext } });
 
 /** Hexes of `topo` with all 6 neighbours on land (not on the coast). */
-const innerHexes = (topo: Topology): HexId[] =>
+export const innerHexes = (topo: Topology): HexId[] =>
   topo.landHexes.filter((h) => (topo.hex[h]?.neighbors.length ?? 0) === 6);
 const coastalHexes = (topo: Topology): HexId[] =>
   topo.landHexes.filter((h) => (topo.hex[h]?.neighbors.length ?? 0) < 6);
 
 /** Coastal hexes clockwise around the board centre, starting with `first`. */
-function clockwiseCoast(topo: Topology, first: HexId): HexId[] {
+export function clockwiseCoast(topo: Topology, first: HexId): HexId[] {
   const angle = (h: HexId) => {
     const c = topo.hex[h] as { x: number; y: number };
     return Math.atan2(c.y - topo.center.y, c.x - topo.center.x);
@@ -75,7 +75,7 @@ function clockwiseCoast(topo: Topology, first: HexId): HexId[] {
 }
 
 /** Shuffle `pool` into the free positions of `fixed` (landHexes order; undefined = free). */
-function placeTerrains(
+export function placeTerrains(
   rng: Rng,
   topo: Topology,
   fixed: ReadonlyMap<HexId, Terrain>,
@@ -401,7 +401,7 @@ export const TB_CARAVANS30: CustomMapDef = {
 // Barbarian Attack (§2.5)
 // ---------------------------------------------------------------------------
 
-interface BaLayout {
+export interface BaLayout {
   castles: readonly HexId[];
   deserts: readonly HexId[];
   /** Fixed number tokens (castles and deserts have none). */
@@ -410,7 +410,7 @@ interface BaLayout {
   innerPool: readonly Terrain[];
 }
 
-const BA_19: BaLayout = {
+export const BA_19: BaLayout = {
   castles: ['h:-2,2'],
   deserts: ['h:2,-2'],
   numbers: {
@@ -542,14 +542,14 @@ export const TB_BA30: CustomMapDef = {
 // Traders & Barbarians (§2.6)
 // ---------------------------------------------------------------------------
 
-interface TradeSpot {
+export interface TradeSpot {
   hex: HexId;
   kind: TradeKind;
   /** Settlement corners (spokes lead there); the others touch only this hex and the sea. */
   corners: readonly Corner[];
 }
 
-const TRADE_19: readonly TradeSpot[] = [
+export const TRADE_19: readonly TradeSpot[] = [
   { hex: 'h:-2,0', kind: 'castle', corners: ['N', 'NE', 'SE', 'S'] },
   { hex: 'h:2,-2', kind: 'quarry', corners: ['SE', 'S', 'SW', 'NW'] },
   { hex: 'h:0,2', kind: 'glassworks', corners: ['NW', 'N', 'NE', 'SW'] },
@@ -565,7 +565,7 @@ const TRADE_37: readonly TradeSpot[] = [
   { hex: 'h:-3,0', kind: 'glassworks', corners: CORNERS },
 ];
 
-const TRADE_TERRAIN: Readonly<Record<TradeKind, Terrain>> = {
+export const TRADE_TERRAIN: Readonly<Record<TradeKind, Terrain>> = {
   castle: TRADE_CASTLE,
   quarry: QUARRY,
   glassworks: GLASSWORKS,
@@ -621,7 +621,7 @@ const TRADERS_37_NUMBERS: Readonly<Record<HexId, number>> = {
 };
 
 /** Corners of a trade hex nobody may settle (sea-only) and its sides nobody may build roads on. */
-function tradeBans(
+export function tradeBans(
   topo: Topology,
   spots: readonly TradeSpot[],
 ): { noBuild: VertexId[]; noRoad: EdgeId[] } {

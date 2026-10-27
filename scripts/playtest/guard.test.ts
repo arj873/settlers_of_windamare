@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { legalActions, type GameState, type PlayerId } from '../../src/engine';
+import {
+  applyAction,
+  createGame,
+  legalActions,
+  PLAYER_COLORS,
+  type Action,
+  type GameState,
+  type PlayerId,
+} from '../../src/engine';
 import {
   discardGame,
   freshGame,
@@ -47,6 +55,9 @@ describe('online snapshots (own legal actions only)', () => {
     seats: [],
     chat: [],
     timerLeftMs: null,
+    sent: 0,
+    lastSent: null,
+    errors: [],
     banner: null,
     notice: null,
   });
@@ -180,6 +191,31 @@ describe('wakeReason / mustDo', () => {
     const m = midGame();
     expect(mustDo(m, 1, legalActions(m))).toMatch(/End turn/);
     expect(mustDo(m, 0, legalActions(m))).toBe('Nothing to do right now.');
+  });
+
+  it('follows the screen in an expansion step of the main phase (E&P Movement)', () => {
+    const m = midGame();
+    const legal = [
+      { type: 'endTurn', player: 1 },
+      { type: 'ep/selectShip', player: 1, ship: 0, edge: 'e:0,0,E' },
+    ] as unknown as Action[];
+    const hint = 'Movement: click one of your ships to sail it';
+    expect(mustDo(m, 1, legal, hint)).toMatch(/^"Movement: click one.*ep\/selectShip.*End turn/);
+    // The base prompt keeps the base sentence (C&K main phase with only its own trades legal).
+    expect(mustDo(m, 1, legal, 'build, trade or end your turn')).toMatch(/^Your turn: build/);
+  });
+
+  it('names the setup city (C&K round 2) and other setup pieces', () => {
+    let s = createGame({ seed: 'ck-guard', players: PLAYER_COLORS.slice(0, 3), mode: 'ck' });
+    while (s.phase.kind === 'setup' && s.phase.index < s.players.length) {
+      const r = applyAction(s, legalActions(s)[0] as Action);
+      if (!r.ok) throw new Error(r.error);
+      s = r.state;
+    }
+    expect(mustDo(s, s.turn.current, legalActions(s))).toMatch(/^Place your setup city/);
+    const f = freshGame(3);
+    const ship = { type: 'seafarers/placeSetupShip', player: 0, edge: 'e:0,0,E' } as unknown;
+    expect(mustDo(f, 0, [...legalActions(f), ship as Action])).toMatch(/or another piece/);
   });
 });
 

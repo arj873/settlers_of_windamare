@@ -4,7 +4,8 @@
  * intent guard only lets a seat send the kinds of moves legalActions offers it.
  */
 import { describe, expect, it } from 'vitest';
-import { viewFor, type Action } from '../engine';
+import { viewFor, type Action, type EdgeId, type VertexId } from '../engine';
+import { topologyOf } from '../engine/topology';
 import { DEFAULT_ROOM_CONFIG, type RoomConfig } from './protocol';
 import { GameSession } from './session';
 import { fakeDeps, LocalNet } from './testHarness';
@@ -22,6 +23,7 @@ function started(patch: Partial<RoomConfig>) {
   net.send('bob', { type: 'hello', token: null, name: 'Bob' });
   net.connect('spec');
   net.send('spec', { type: 'hello', token: null, name: 'Sue' });
+  net.send('spec', { type: 'leaveSeat' }); // she sat down on joining (L1); she only watches
   net.send('host', {
     type: 'configure',
     config: { ...DEFAULT_ROOM_CONFIG, seatCount: 4, turnTimerSec: null, ...patch },
@@ -44,6 +46,8 @@ function playUntil(net: LocalNet, until: () => boolean, maxSteps = 3000): void {
       const legal = legalOf(net, conn).filter((a) => !/offerTrade$/.test(a.type));
       const pick = legal[i % 3 === 0 ? legal.length - 1 : 0] ?? legalOf(net, conn)[0]!;
       net.send(conn, { type: 'intent', action: pick, seq: net.last(conn, 'game')!.seq });
+      // Time passes between moves (10 intents a second; a 2-seat game has no bots to wait for).
+      net.advance(100);
     } else {
       net.advance(500);
     }
@@ -61,6 +65,8 @@ describe('GameSession: expansion modes online', () => {
     { mode: 'ep+tb', scenario: 'ep/fish' },
     { mode: 'tb+seafarers', scenario: 'tbsea/riversDesert' },
     { mode: 'tb+seafarers', scenario: 'tbsea/tradersDesert' },
+    { mode: 'ba+ck', scenario: 'tb/barbarianAttack' },
+    { mode: 'two+ck', scenario: 'tb/variants', seatCount: 2 },
   ])('$mode $scenario: humans and bots play; each seat gets its own view', (patch) => {
     const { net, session } = started(patch);
     expect(session.state!.settings.mode).toBe(patch.mode);
@@ -69,7 +75,8 @@ describe('GameSession: expansion modes online', () => {
       const s = session.state!;
       return s.turn.number >= 10 || session.phase !== 'playing';
     });
-    expect(session.state!.turn.number >= 10 || session.phase === 'over').toBe(true);
+    const at = `${session.phase} turn ${session.state!.turn.number} ${session.state!.phase.kind}`;
+    expect(session.state!.turn.number >= 10 || session.phase === 'over', at).toBe(true);
     for (const conn of ['host', 'bob', 'spec']) {
       expect(net.messages(conn, 'error')).toEqual([]);
       const games = net.messages(conn, 'game');
@@ -80,7 +87,9 @@ describe('GameSession: expansion modes online', () => {
       expect(last.view).toEqual(JSON.parse(JSON.stringify(viewFor(session.state!, seat))));
       for (const g of games) for (const a of g.legal) types.add(a.type);
     }
-    expect([...types].some((t) => t.startsWith(`${patch.mode.split('+')[0]}/`))).toBe(true);
+    // An expansion's own move was offered (the combination modes: one of the composed ones).
+    const ids = session.state!.settings.expansions;
+    expect([...types].some((t) => ids.some((id) => t.startsWith(`${id}/`)))).toBe(true);
   });
 
   it('refuses unknown modes / scenarios and settings createGame would refuse', () => {
@@ -124,5 +133,35 @@ describe('GameSession: expansion modes online', () => {
     net.send('host', { type: 'intent', action: { type: 'ck/teleport', player: 0 }, seq });
     expect(net.last('host', 'error')?.code).toBe('bad_message');
     expect(net.last('host', 'game')).toBeUndefined();
+  });
+
+  it('T&B Traders: a spoke road (e:q,r,C<corner>) is accepted over the wire', () => {
+    const { net, session } = started({ mode: 'tb', scenario: 'tb/traders' });
+    const topo = topologyOf(session.state!);
+    const spokes = Object.keys(topo.edge).filter((e) => /,C/.test(e)) as EdgeId[];
+    const spokeEnds = new Set(spokes.flatMap((e) => topo.edge[e]!.vertices));
+    const isSpoke = (a: Action) => 'edge' in a && /,C/.test(String(a.edge));
+    let sent: Action | null = null;
+    for (let i = 0; i < 400 && !sent; i++) {
+      const conn = ['host', 'bob'].find((c) => legalOf(net, c).length > 0);
+      if (!conn) {
+        net.advance(500);
+        continue;
+      }
+      const legal = legalOf(net, conn);
+      // Settle on a plaza corner so a spoke road becomes legal; take it as soon as it is.
+      const pick =
+        legal.find(isSpoke) ??
+        legal.find((a) => 'vertex' in a && spokeEnds.has(a.vertex as VertexId)) ??
+        legal[0]!;
+      if (isSpoke(pick)) sent = pick;
+      const seq = net.last(conn, 'game')!.seq;
+      net.send(conn, { type: 'intent', action: pick, seq });
+      expect(net.messages(conn, 'error')).toEqual([]);
+      net.advance(100);
+    }
+    expect(sent).not.toBeNull();
+    const edge = (sent as { edge: EdgeId }).edge;
+    expect(session.state!.pieces.roads[edge]).toBe(sent!.player);
   });
 });

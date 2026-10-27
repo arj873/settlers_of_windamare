@@ -12,8 +12,9 @@ import { ckDrawer } from '../expansions/ck/render';
 import { seafarersDrawer } from '../expansions/seafarers/render';
 import { tbDrawer } from '../expansions/tb/render';
 import { epDrawer } from '../expansions/ep/render';
-import { tbseaDrawer } from '../expansions/tbsea/render';
-import type { ExpansionId, GameState, PlayerId, Point, Topology } from '../engine';
+import { backDrawer } from '../expansions/back/render';
+import { twockDrawer } from '../expansions/twock/render';
+import type { ExpansionId, GameState, HexId, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 
 export interface DrawContext {
@@ -43,6 +44,26 @@ export interface BoardDrawer {
   /** Painters for namespaced terrains: fill + motif of one hex centred at (cx, cy), in px. */
   terrain?: Readonly<Record<string, (g: Graphics, cx: number, cy: number, S: number) => void>>;
   layers?: readonly DrawerLayer[];
+  /**
+   * Where a hex's number token sits when not at its centre: offset and scale in hex sizes (T&B's
+   * numbered trade hexes keep the centre for the plaza). Read from static board data only.
+   */
+  tokenAt?(state: GameState, hex: HexId): TokenPlace | undefined;
+}
+
+export interface TokenPlace {
+  dx: number;
+  dy: number;
+  scale: number;
+}
+
+/** The first active drawer's token place for `hex`, or undefined (the hex centre). */
+export function tokenPlace(state: GameState, hex: HexId): TokenPlace | undefined {
+  for (const d of drawersFor(state)) {
+    const at = d.tokenAt?.(state, hex);
+    if (at) return at;
+  }
+  return undefined;
 }
 
 export const BOARD_DRAWERS: readonly BoardDrawer[] = [
@@ -53,7 +74,8 @@ export const BOARD_DRAWERS: readonly BoardDrawer[] = [
   seafarersDrawer,
   tbDrawer,
   epDrawer,
-  tbseaDrawer,
+  backDrawer,
+  twockDrawer,
   // new modules go here, one per line
 ];
 

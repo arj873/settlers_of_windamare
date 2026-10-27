@@ -1,0 +1,32 @@
+/* Barbarian Attack + C&K HUD (classes are prefixed back-). Colours come from the theme tokens. */
+.back-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.back-goal {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.back-fact,
+.back-warn {
+  margin: 0;
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--edge);
+}
+.back-warn {
+  border-left-color: var(--danger, #b4472f);
+}
+.back-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

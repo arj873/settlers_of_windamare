@@ -15,7 +15,7 @@ import { rulesOf, seaSlice } from '../../seafarers/engine/state';
 import { cloneState } from '../../../engine/clone';
 import { featuresOf, fishOf, goldOf, tbBoard } from '../../tb/engine';
 import { LAKE, OASIS, SWAMP } from '../../tb/engine/state';
-import { SEA_PAIRS, tbseaBoard, tbseaModule, TBSEA_SCENARIOS } from '.';
+import { SEA_PAIRS, tbseaModule, TBSEA_SCENARIOS } from '.';
 import { act, fails, game, legalOf, main, run } from './testkit';
 
 const cell = (s: string): HexId => cellHex(parseCell(s));
@@ -205,14 +205,14 @@ describe('Fishing on Catan with the Seafarers scenarios', () => {
     expect(s.board.hexes[lake]?.token).toBeNull();
     expect(tbBoard(s).lakes).toEqual([{ hex: lake, numbers: [2, 3, 11, 12] }]);
     // The 2025 map prints 12 on the 5,9 pasture (our 5th-edition map: 11).
-    expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('5,9'), number: 2 }]);
+    expect(tbBoard(s).alsoOn).toEqual([{ hex: cell('5,9'), number: 2 }]);
     expect(s.board.hexes[cell('5,9')]).toMatchObject({ terrain: 'wool', token: 12 });
   });
 
   it('Through the Desert (4): the lake replaces the 11 hill; the 11 joins the 2 hill', () => {
     const s = game('tbsea/fishermenDesert', 4);
     expect(s.board.hexes[cell('3,5')]?.terrain).toBe(LAKE);
-    expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('4,12'), number: 11 }]);
+    expect(tbBoard(s).alsoOn).toEqual([{ hex: cell('4,12'), number: 11 }]);
     expect(s.board.hexes[cell('4,12')]).toMatchObject({ terrain: 'brick', token: 2 });
   });
 
@@ -312,10 +312,10 @@ describe('Merchant Trains with the Seafarers scenarios', () => {
   it('Through the Desert: the watering hole replaces the 2 field (3) / the 11 hill (4)', () => {
     const s3 = game('tbsea/caravansDesert', 3);
     expect(s3.board.hexes[cell('2,4')]?.terrain).toBe(OASIS);
-    expect(tbseaBoard(s3.board).extraTokens).toEqual([{ hex: cell('5,9'), number: 2 }]);
+    expect(tbBoard(s3).alsoOn).toEqual([{ hex: cell('5,9'), number: 2 }]);
     const s4 = game('tbsea/caravansDesert', 4);
     expect(s4.board.hexes[cell('3,5')]?.terrain).toBe(OASIS);
-    expect(tbseaBoard(s4.board).extraTokens).toEqual([{ hex: cell('4,12'), number: 11 }]);
+    expect(tbBoard(s4).alsoOn).toEqual([{ hex: cell('4,12'), number: 11 }]);
     for (const s of [s3, s4]) {
       const starts = tbBoard(s).caravanStarts ?? [];
       expect(starts).toHaveLength(3);
@@ -327,7 +327,7 @@ describe('Merchant Trains with the Seafarers scenarios', () => {
     const s = game('tbsea/caravansTribe');
     const oasis = cell('3,7');
     expect(s.board.hexes[oasis]?.terrain).toBe(OASIS);
-    expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('3,11'), number: 12 }]);
+    expect(tbBoard(s).alsoOn).toEqual([{ hex: cell('3,11'), number: 12 }]);
     expect(s.board.hexes[cell('3,11')]).toMatchObject({ terrain: 'wool', token: 2 });
   });
 
@@ -426,7 +426,7 @@ describe('Rivers of Catan with the Seafarers scenarios', () => {
         expect(h.token === null, h.id).toBe(h.terrain === SWAMP);
         expect([2, 12]).not.toContain(h.token);
       }
-      const extra = tbseaBoard(s.board).extraTokens ?? [];
+      const extra = tbBoard(s).alsoOn ?? [];
       expect(extra.map((x) => x.number)).toEqual([2, 12]);
       const pips = (n: number) => 6 - Math.abs(7 - n);
       const fields = main.filter((h) => h.terrain === 'wool' || h.terrain === 'grain');

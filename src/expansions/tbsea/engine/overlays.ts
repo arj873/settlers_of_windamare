@@ -5,7 +5,7 @@
  *
  * - `lake` / `oasis`: the hex holding that terrain and number becomes T&B's lake / watering hole;
  * - `disc`: the replaced hex's number disc joins another hex, which then produces on either number
- *   (`board.ext.tbsea.extraTokens`, paid by the `production` hook);
+ *   (T&B's `alsoOn`, which T&B pays and draws);
  * - `grounds`: where the six fishing grounds go (the sheets: "according to your preference");
  * - `rivers`: T&B's two rivers on a variable set-up (Forgotten Tribe) or a random one (New World).
  *
@@ -68,13 +68,9 @@ import {
 } from '../../tb/engine/state';
 
 const TB = 'tb';
-export const TBSEA_EXT = 'tbsea';
 
-/** Static data of a C3 board (`board.ext.tbsea`). */
-export interface TbseaBoard {
-  /** Number discs moved onto a hex that already has one: it produces on either number. */
-  extraTokens?: { hex: HexId; number: number }[];
-}
+/** A number disc moved onto a hex that already has one (T&B's `TbBoard.alsoOn`). */
+type AlsoOn = { hex: HexId; number: number };
 
 /** A printed hex, found by its terrain and number. */
 export interface Pick {
@@ -124,8 +120,6 @@ export interface Plan {
   /** The robber may go back onto the watering hole (Merchant Trains + Forgotten Tribe). */
   robberOnOasis?: boolean;
   layout?: Layout;
-  /** Traders & Barbarians: the board prints a 2 and a 12 (no re-roll). */
-  keep212?: boolean;
   /** Barbarian Attack: the castle, the coast and the knights on the main island (region M). */
   ba?: boolean;
 }
@@ -419,7 +413,7 @@ const tileAt = (h: HexId, terrain: Terrain, token: number | null = null): HexTil
 function tribeRivers(
   rng: Rng,
   base: GeneratedBoard,
-): { hexes: Record<HexId, HexTile>; tb: TbBoard; extra: TbseaBoard } {
+): { hexes: Record<HexId, HexTile>; tb: TbBoard } {
   const hexes = { ...base.board.hexes };
   const sea = base.board.ext?.[SEAFARERS] as SeaBoard;
   const main = (Object.keys(hexes) as HexId[]).sort(byId).filter((h) => sea.region[h] === 'M');
@@ -440,9 +434,9 @@ function tribeRivers(
   const twelve = lowestRanking(rng, hexes, fields, new Set([two]));
   return {
     hexes,
-    tb: riverData(rivers),
-    extra: {
-      extraTokens: [
+    tb: {
+      ...riverData(rivers),
+      alsoOn: [
         { hex: two, number: 2 },
         { hex: twelve, number: 12 },
       ],
@@ -617,11 +611,11 @@ export function layoutFrame(
 function applyLayout(
   layout: Layout,
   hexes: Record<HexId, HexTile>,
-): { tb: TbBoard; ports: Port[] | null; extraTokens: { hex: HexId; number: number }[] } {
-  const extraTokens: { hex: HexId; number: number }[] = [];
+): { tb: TbBoard; ports: Port[] | null; alsoOn: AlsoOn[] } {
+  const alsoOn: AlsoOn[] = [];
   for (const c of laidCells(layout)) {
     hexes[c.hex] = tileAt(c.hex, c.terrain, c.token);
-    if (c.extra !== null) extraTokens.push({ hex: c.hex, number: c.extra });
+    if (c.extra !== null) alsoOn.push({ hex: c.hex, number: c.extra });
   }
   let tb: TbBoard = {};
   if (layout.rivers) {
@@ -643,7 +637,7 @@ function applyLayout(
         waterHex: s.water,
       }))
     : null;
-  return { tb, ports, extraTokens };
+  return { tb, ports, alsoOn };
 }
 
 /** Traders & Barbarians: the trade hexes, the corners nobody settles and the sides nobody builds on. */
@@ -745,7 +739,7 @@ export function planBoard(
 ): GeneratedBoard {
   let gb: GeneratedBoard;
   let tb: TbBoard = {};
-  let own: TbseaBoard = {};
+  const alsoOn: AlsoOn[] = [];
   let oasisHex: HexId | null = null;
   if (key === 'newworld' && plan.rivers === 'newWorld') {
     const inside = new Set(prepared(key).inside);
@@ -762,22 +756,22 @@ export function planBoard(
   if (plan.rivers === 'variableTribe') {
     const r = tribeRivers(rng, gb);
     Object.assign(hexes, r.hexes);
-    tb = r.tb;
-    own = r.extra;
+    const { alsoOn: also, ...rest } = r.tb;
+    tb = rest;
+    alsoOn.push(...(also ?? []));
   }
   const layout = plan.layout;
   const laid = layout ? applyLayout(layout, hexes) : null;
   if (laid) {
     tb = { ...tb, ...laid.tb };
-    if (laid.extraTokens.length > 0) own = { extraTokens: laid.extraTokens };
+    alsoOn.push(...laid.alsoOn);
   }
   // The lake or the watering hole replaces a printed hex; its number may join another hex.
   const replace = (pick: Pick, terrain: Terrain): HexId => {
     const h = findHex(hexes, pick);
     hexes[h] = tileAt(h, terrain);
     if (plan.disc) {
-      const to = findHex(hexes, plan.disc);
-      own = { extraTokens: [...(own.extraTokens ?? []), { hex: to, number: pick.token }] };
+      alsoOn.push({ hex: findHex(hexes, plan.disc), number: pick.token });
     }
     return h;
   };
@@ -826,7 +820,7 @@ export function planBoard(
     }
     if (plan.ba) tb = { ...tb, ...baData(hexes, seaExt) };
   }
-  if (plan.keep212) tb = { ...tb, keep212: true };
+  if (alsoOn.length > 0) tb = { ...tb, alsoOn };
   if (oasisHex !== null) {
     const h = oasisHex;
     tb = { ...tb, caravanStarts: ARROWS.map((c) => seaCaravanStart(h, c)) };
@@ -852,11 +846,5 @@ export function planBoard(
   } else if (plan.robber === 'oasis' && oasisHex !== null) {
     robber = oasisHex;
   }
-  const ext: Record<string, unknown> = { ...gb.board.ext, [TB]: tb };
-  if (own.extraTokens) ext[TBSEA_EXT] = own;
-  return { board: { ...gb.board, hexes, ext }, robber };
+  return { board: { ...gb.board, hexes, ext: { ...gb.board.ext, [TB]: tb } }, robber };
 }
-
-/** The extra numbers of a board (`board.ext.tbsea`). */
-export const tbseaBoard = (board: { ext?: Record<string, unknown> }): TbseaBoard =>
-  (board.ext?.[TBSEA_EXT] as TbseaBoard | undefined) ?? {};

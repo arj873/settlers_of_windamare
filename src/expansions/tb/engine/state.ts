@@ -73,7 +73,17 @@ const MODE_FEATURES: Readonly<Record<string, readonly Feature[]>> = {
   'ep+tb': ['fish'],
 };
 
+/** Prisoners per VP in Barbarian Attack: 2, or what a combination mode prints (BA + C&K: 3). */
+const MODE_PRISONERS_PER_VP: Readonly<Record<string, number>> = {
+  'ba+ck': 3,
+};
+
 type S = Pick<GameState, 'settings'>;
+export const prisonersPerVp = (state: S): number => MODE_PRISONERS_PER_VP[state.settings.mode] ?? 2;
+/** Combination modes without BA's own knights and development cards (BA + C&K: C&K's knights). */
+const NO_BA_CARDS_MODES: readonly string[] = ['ba+ck'];
+export const baCardsInPlay = (state: S): boolean =>
+  has(state, 'ba') && !NO_BA_CARDS_MODES.includes(state.settings.mode);
 export const has = (state: S, f: Feature): boolean =>
   featuresOf(state.settings.scenario).includes(f) ||
   (MODE_FEATURES[state.settings.mode]?.includes(f) ?? false);
@@ -149,14 +159,55 @@ export interface TbBoard {
   noRoad?: EdgeId[];
   /** T&B: the barbarians' start paths when the map moves them (absent = the X marks of §2.6). */
   barbarians?: EdgeId[];
-  /** T&B: the board prints a 2 and a 12, so they are not re-rolled (as on the 5-6 board; C3). */
-  keep212?: boolean;
   /** Barbarian Attack: knights only on paths touching these hexes (the main island; C3). */
   knightArea?: HexId[];
+  /**
+   * More numbers on a hex besides its token (Rivers + Merchant Trains: the 2 and 12 on the 3s;
+   * T&B + Seafarers, C3: the number of the hex a lake or watering hole replaced).
+   */
+  alsoOn?: { hex: HexId; number: number }[];
+  /** A 2025 T&B × T&B sheet's rule changes (module tbpair); absent in the box's scenarios. */
+  rules?: TbSheetRules;
+}
+
+/** Rule changes of the T&B × T&B sheets (docs/rules/combos.md §2c) that T&B's features read. */
+export interface TbSheetRules {
+  /** Gold each player starts with (Rivers + T&B: 3, not T&B's 5). */
+  startGold?: number;
+  /** Gold for building a bridge (Rivers + T&B: 2, not 3). */
+  bridgeGold?: number;
+  /** A settlement or city beside a river pays its gold only during set-up (Rivers + T&B). */
+  riverGoldSetupOnly?: boolean;
+  /** The Poor Settler loses no VP (Rivers + BA, Rivers + T&B). */
+  noPoorVp?: boolean;
+  /** A wagon crossing a river (a bridge site): MP without a bridge, gold toll over another's. */
+  riverCrossing?: { mp: number; toll: number };
+  /** Barbarian Attack: the hexes of the start barbarians (default: the coastal 2 and 12). */
+  baStart?: HexId[];
+  /**
+   * BA + T&B: a barbarian on a hex also stands by one of its paths (`BaSlice.paths`), where it
+   * acts as a T&B barbarian; barbarians may stand on any hex.
+   */
+  barbarianPaths?: boolean;
 }
 
 export const tbBoard = (state: Pick<GameState, 'board'>): TbBoard =>
   (state.board.ext?.[TB] as TbBoard | undefined) ?? {};
+
+export const sheetRules = (state: Pick<GameState, 'board'>): TbSheetRules =>
+  tbBoard(state).rules ?? {};
+
+/** Numbers hexes carry besides their tokens: Rivers' 2 on the 12 hex, a sheet's `alsoOn`. */
+export function extraNumbers(state: Pick<GameState, 'board'>): { hex: HexId; number: number }[] {
+  const b = tbBoard(state);
+  const out = b.twoOnTwelve ? [{ hex: b.twoOnTwelve, number: 2 }] : [];
+  return b.alsoOn ? [...out, ...b.alsoOn] : out;
+}
+
+/** Hex `h` carries number `n` (its token or an extra number). */
+export const hexHasNumber = (state: Pick<GameState, 'board'>, h: HexId, n: number): boolean =>
+  state.board.hexes[h]?.token === n ||
+  extraNumbers(state).some((x) => x.hex === h && x.number === n);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -312,6 +363,13 @@ export interface BaSlice {
   discard: BaCard[];
   /** Edges of knights that moved this turn (where they stopped). */
   moved: EdgeId[];
+  /** Buildings that are never conquered (BA + C&K: cities with a metropolis). */
+  safe?: VertexId[];
+  /**
+   * BA + T&B (`rules.barbarianPaths`): the path each barbarian stands by, and its hex; the rest
+   * of a hex's barbarians stand at its centre. These are the T&B barbarians of that game.
+   */
+  paths?: Record<EdgeId, HexId>;
 }
 
 export interface TradersSlice {
@@ -403,6 +461,12 @@ export function twoOf(state: Pick<GameState, 'ext'>): TwoSlice {
   const s = tbSlice(state).two;
   if (!s) throw new Error('not a game for two');
   return s;
+}
+/** Paths with a T&B barbarian: the wagons' barbarians, or BA + T&B's barbarians by a path. */
+export function barbarianEdges(state: Pick<GameState, 'ext'>): readonly EdgeId[] {
+  const s = tbSlice(state);
+  const paths = s.ba?.paths;
+  return paths ? (Object.keys(paths) as EdgeId[]) : (s.traders?.barbarians ?? []);
 }
 export const bridgesOf = (state: Pick<GameState, 'ext'>): Record<EdgeId, PlayerId> =>
   tbSlice(state).rivers?.bridges ?? {};

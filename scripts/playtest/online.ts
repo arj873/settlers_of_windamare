@@ -4,7 +4,7 @@
  * Pure Playwright / node; the command handlers live in serve.ts.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
+import { closeSync, openSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
 import { REPO_ROOT, PLAYTEST_DIR } from './protocol';
@@ -22,6 +22,16 @@ export async function serverUp(origin: string): Promise<boolean> {
     return res.status === 404 || res.ok;
   } catch {
     return false;
+  }
+}
+
+/** Does `origin` serve this checkout's freshly built client (same index.html, same asset hashes)? */
+async function servesThisCheckout(origin: string): Promise<boolean> {
+  try {
+    const served = await (await fetch(`${origin}/`, { signal: AbortSignal.timeout(5000) })).text();
+    return served === readFileSync(join(REPO_ROOT, 'dist', 'index.html'), 'utf8');
+  } catch {
+    return true; // cannot tell: do not cry wolf
   }
 }
 
@@ -47,6 +57,13 @@ export async function roomServer(
   if (await serverUp(LOCAL_ORIGIN)) {
     console.log(`Reusing the room server on ${LOCAL_ORIGIN}; rebuilding dist/ for it…`);
     await rebuild();
+    if (!(await servesThisCheckout(LOCAL_ORIGIN))) {
+      console.log(
+        `NOTE: the server on ${LOCAL_ORIGIN} serves another checkout's client (its index.html differs from ` +
+          `this checkout's dist/). Client changes made here are not in this game. To test them, run ` +
+          '`nice -n 19 pnpm dev:server --port 8788 --inspector-port 9239` here and pass `--remote http://localhost:8788`.',
+      );
+    }
     return { origin: LOCAL_ORIGIN, started: false, stop: () => Promise.resolve() };
   }
   const logFile = join(PLAYTEST_DIR, 'server.log');

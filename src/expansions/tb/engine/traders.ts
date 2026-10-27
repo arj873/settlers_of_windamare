@@ -30,6 +30,9 @@ import {
   START_GOLD,
   SWIFT_JOURNEYS,
   WAGON_GRAIN_MP,
+  barbarianEdges,
+  has,
+  sheetRules,
   tbBoard,
   tbSlice,
   tradersOf,
@@ -55,11 +58,13 @@ export function initTraders(state: GameState, rng: Rng): TradersSlice {
     commodity: state.players.map(() => null),
     stacks,
     delivered: state.players.map(() => 0),
-    barbarians: [
-      ...(tbBoard(state).barbarians ?? (big ? TRADERS_BARBARIANS_37 : TRADERS_BARBARIANS_19)),
-    ],
+    // BA + T&B: Barbarian Attack's barbarians stand by the paths (BaSlice.paths) instead.
+    barbarians: sheetRules(state).barbarianPaths
+      ? []
+      : [...(tbBoard(state).barbarians ?? (big ? TRADERS_BARBARIANS_37 : TRADERS_BARBARIANS_19))],
     swift: {
-      deck: SWIFT_JOURNEYS,
+      // BA + T&B plays with Barbarian Attack's deck: no T&B cards, so no Swift Journey.
+      deck: has(state, 'ba') ? 0 : SWIFT_JOURNEYS,
       held: state.players.map(() => 0),
       fresh: state.players.map(() => 0),
     },
@@ -109,17 +114,30 @@ function roadOn(state: GameState, e: EdgeId): PlayerId | 'neutral' | null {
   return routeOwner(state, e);
 }
 
-/** MP and toll of entering edge `e` for `p`. */
+/**
+ * MP and toll of entering edge `e` for `p`. Rivers + T&B: crossing a river without a bridge
+ * costs `rules.riverCrossing.mp` (`tollGold`: the gold over another player's bridge).
+ */
 export function stepCost(
   state: GameState,
   p: PlayerId,
   e: EdgeId,
 ): { mp: number; toll: PlayerId | 'neutral' | null } {
   const road = roadOn(state, e);
-  const barbarian = tradersOf(state).barbarians.includes(e) ? BARBARIAN_MP : 0;
-  if (road === null) return { mp: NO_ROAD_MP + barbarian, toll: null };
+  const barbarian = barbarianEdges(state).includes(e) ? BARBARIAN_MP : 0;
+  if (road === null) {
+    const river = crossing(state, e) ? sheetRules(state).riverCrossing?.mp : undefined;
+    return { mp: (river ?? NO_ROAD_MP) + barbarian, toll: null };
+  }
   return { mp: ROAD_MP + barbarian, toll: road === p ? null : road };
 }
+
+const crossing = (state: GameState, e: EdgeId): boolean =>
+  sheetRules(state).riverCrossing !== undefined && (tbBoard(state).bridgeSites ?? []).includes(e);
+
+/** Gold paid as toll on `e` (1; Rivers + T&B: `rules.riverCrossing.toll` over a bridge). */
+export const tollGold = (state: GameState, e: EdgeId): number =>
+  crossing(state, e) ? (sheetRules(state).riverCrossing?.toll ?? 1) : 1;
 
 /** Vertices the wagon of `p` may move to next, with the edge used. */
 export function wagonSteps(state: GameState, p: PlayerId): { vertex: VertexId; edge: EdgeId }[] {
@@ -130,7 +148,7 @@ export function wagonSteps(state: GameState, p: PlayerId): { vertex: VertexId; e
   for (const e of pathsAt(state, from)) {
     const c = stepCost(state, p, e);
     if (c.mp > s.move.mp) continue;
-    if (c.toll !== null && goldOf(state, p) < 1) continue;
+    if (c.toll !== null && goldOf(state, p) < tollGold(state, e)) continue;
     out.push({ vertex: pathOther(state, e, from), edge: e });
   }
   return out;
@@ -160,12 +178,13 @@ export function wagonStep(draft: GameState, p: PlayerId, to: VertexId): void {
   s.move.mp -= c.mp;
   s.move.steps += 1;
   if (c.toll !== null) {
-    addGold(draft, p, -1);
-    if (c.toll !== 'neutral') addGold(draft, c.toll, 1);
+    const gold = tollGold(draft, step.edge);
+    addGold(draft, p, -gold);
+    if (c.toll !== 'neutral') addGold(draft, c.toll, gold);
     log(
       draft,
       p,
-      `${pn(draft, p)} paid 1 gold toll${c.toll === 'neutral' ? '' : ` to ${pn(draft, c.toll)}`}`,
+      `${pn(draft, p)} paid ${gold} gold toll${c.toll === 'neutral' ? '' : ` to ${pn(draft, c.toll)}`}`,
     );
   }
   s.wagons[p] = to;
@@ -227,7 +246,8 @@ export function driveOffTargets(state: GameState, p: PlayerId): EdgeId[] {
   const s = tradersOf(state);
   const at = s.wagons[p];
   if (!at || s.move.over || BAGGAGE[(s.level[p] ?? 1) - 1]?.driveOff == null) return [];
-  return pathsAt(state, at).filter((e) => s.barbarians.includes(e) && !s.move.tried.includes(e));
+  const barbarians = barbarianEdges(state);
+  return pathsAt(state, at).filter((e) => barbarians.includes(e) && !s.move.tried.includes(e));
 }
 
 /** Roll to drive a barbarian off: in range, its new path is picked next. Returns success. */
@@ -296,7 +316,7 @@ export function upgradeWagon(draft: GameState, p: PlayerId): void {
  * Catan for Two's token action). On a Seafarers map sea paths too (T&B + Seafarers).
  */
 export function barbarianSpots(state: GameState, noRoad = false): EdgeId[] {
-  const taken = new Set(tradersOf(state).barbarians);
+  const taken = new Set(barbarianEdges(state));
   return pathEdges(state).filter(
     (e) => !taken.has(e) && !(noRoad && state.pieces.roads[e] !== undefined),
   );

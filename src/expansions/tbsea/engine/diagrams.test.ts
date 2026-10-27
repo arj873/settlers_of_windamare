@@ -15,8 +15,8 @@ import { seaSlice } from '../../seafarers/engine/state';
 import { baOf, tbBoard, tbModule, tradersOf } from '../../tb/engine';
 import { knightSpots } from '../../tb/engine/ba';
 import { CASTLE, OASIS, SWAMP } from '../../tb/engine/state';
-import { tbseaBoard } from '.';
-import { game, legalOf, main } from './testkit';
+import { createGame } from '../../../engine/createGame';
+import { game, legalOf, main, players } from './testkit';
 
 const cell = (s: string): HexId => cellHex(parseCell(s));
 const edge = (s: string): EdgeId => {
@@ -35,7 +35,7 @@ describe('Rivers on the Fog Islands', () => {
     expect(b.bridgeSites).toHaveLength(7);
     expect(b.bridgeSites).toContain(edge('0,4 NW'));
     expect(b.bridgeSites).toContain(edge('4,12 S'));
-    expect(tbseaBoard(s.board).extraTokens).toEqual([
+    expect(tbBoard(s).alsoOn).toEqual([
       { hex: cell('2,2'), number: 11 },
       { hex: cell('5,11'), number: 12 },
     ]);
@@ -57,7 +57,7 @@ describe('Rivers on the Fog Islands', () => {
     const s = game('tbsea/riversFog', 4);
     expect(s.board.ports).toHaveLength(8);
     expect(s.board.ports.find((p) => p.kind === 'grain')?.edge).toBe(edge('6,10 NE'));
-    expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('5,11'), number: 12 }]);
+    expect(tbBoard(s).alsoOn).toEqual([{ hex: cell('5,11'), number: 12 }]);
   });
 });
 
@@ -81,7 +81,7 @@ describe('Rivers Through the Desert', () => {
     for (const c of ['4,2', '5,3', '6,4']) expect(s.board.hexes[cell(c)]?.terrain).toBe('desert');
     expect(tbBoard(s).rivers?.slice(0, 3)).toEqual(['6,2', '5,1', '4,0'].map(cell));
     expect(s.board.hexes[cell('4,0')]?.terrain).toBe(SWAMP);
-    expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('2,4'), number: 12 }]);
+    expect(tbBoard(s).alsoOn).toEqual([{ hex: cell('2,4'), number: 12 }]);
     expect(Object.values(s.board.hexes).filter((h) => h.terrain === 'gold')).toHaveLength(1);
   });
 
@@ -188,10 +188,10 @@ describe('Traders & Barbarians Through the Desert', () => {
   it('the board prints a 2 and a 12, so they are not re-rolled', () => {
     const s = game('tbsea/tradersDesert', 4);
     expect(tokenOf(s, '4,12')).toBe(2);
-    expect(tbBoard(s).keep212).toBe(true);
-    // T&B's dice hook stands aside (plain dice); on New Shores it re-rolls 2 and 12.
+    // T&B's dice hook stands aside (plain dice); on T&B's own 19-hex board it re-rolls them.
     expect(tbModule.hooks?.rollDice?.(cloneState(s))).toBeUndefined();
-    expect(tbModule.hooks?.rollDice?.(cloneState(game('tbsea/traders', 4)))).toBeDefined();
+    const own = createGame({ seed: 3, players: players(4), mode: 'tb', scenario: 'tb/traders' });
+    expect(tbModule.hooks?.rollDice?.(own)).toBeDefined();
   });
 });
 

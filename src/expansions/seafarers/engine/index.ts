@@ -377,7 +377,10 @@ function clothSetupOrder(state: GameState): SetupOrder | undefined {
 export const seafarersModule: ExpansionModule = {
   id: SEAFARERS,
   name: 'Seafarers',
+  icon: '⛵',
   players: { min: 3, max: 6 },
+  // Rules doc §3.5 (the card) and §3.6 (settlements connect by road or ship).
+  terms: { longestRoad: 'Longest Trade Route', route: 'road or ship' },
   maps: SEA_MAPS,
   scenarios: scenarioDefs,
   modes: [

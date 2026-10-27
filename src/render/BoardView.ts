@@ -11,7 +11,7 @@
  * Pan (drag) / zoom (wheel, pinch) are built in; double-click refits. The view refits on every
  * renderer resize, and on inset changes until the user pans or zooms.
  */
-import { Color, Container, Graphics, Text, type Application } from 'pixi.js';
+import { Color, Container, EventsTicker, Graphics, Text, Ticker, type Application } from 'pixi.js';
 import {
   TOPOLOGY,
   edgeInfo,
@@ -39,7 +39,7 @@ import {
   shade,
 } from './art';
 import * as art from './art';
-import { drawersFor, terrainPainter, type DrawContext } from './expansions';
+import { drawersFor, terrainPainter, tokenPlace, type DrawContext } from './expansions';
 import {
   HEX_SIZE as S,
   backdropRadius,
@@ -53,6 +53,7 @@ import {
   type PickCandidates,
   type ViewTransform,
 } from './geometry';
+import { FrameScheduler } from './frames';
 import { BEACH, HIGHLIGHT, INK, SEA, TOKEN, portColor, terrainPalette } from './theme';
 import { Viewport, type Insets } from './viewport';
 
@@ -163,13 +164,22 @@ export class BoardView {
   private unwatchDpr: (() => void) | null = null;
 
   private clock = 0;
+  /** False: animations jump to their end and glows hold still (headless playtest pages). */
+  private animated = true;
+  private readonly frames: FrameScheduler;
   private readonly onResize = () => {
     this.resize();
     this.wantTextRes = this.textResFor(this.viewport.view.scale);
+    this.frames.invalidate();
   };
-  private readonly tick = (ticker: { deltaMS: number }) => this.update(ticker.deltaMS);
+  private readonly tick = (ticker: { deltaMS: number }) => {
+    Ticker.system.update();
+    this.update(this.animated ? ticker.deltaMS : 1e6);
+    this.frames.endFrame(this.animated && this.animating());
+  };
 
   constructor(private readonly app: Application) {
+    this.frames = new FrameScheduler(app.ticker);
     this.world.addChild(
       this.seaLayer,
       this.landLayer,
@@ -200,6 +210,20 @@ export class BoardView {
       onTap: (p) => this.handleTap(p),
       onHover: (p) => this.handleHover(p),
     });
+
+    // The board reads its own pointer input (Viewport). Pixi's event system would hit-test the
+    // stage on every pointer move and, through the system ticker, on every animation frame.
+    Object.assign(app.renderer.events.features, {
+      move: false,
+      globalMove: false,
+      click: false,
+      wheel: false,
+    });
+    EventsTicker.removeTickerListener();
+    // What is left on the system ticker is housekeeping (texture GC), which only matters after
+    // a change: run it in the board's frames rather than on an endless animation-frame loop.
+    Ticker.system.autoStart = false;
+    Ticker.system.stop();
 
     app.renderer.on('resize', this.onResize);
     app.ticker.add(this.tick);
@@ -234,6 +258,7 @@ export class BoardView {
     this.syncPieces(state);
     this.syncRobber(state);
     this.syncExtLayers(state);
+    this.frames.invalidate();
   }
 
   /** Mark legal spots (they pulse and become hoverable/clickable); `{}` clears. */
@@ -242,6 +267,15 @@ export class BoardView {
     this.buildGlows();
     this.hover = null;
     this.drawHover();
+  }
+
+  /**
+   * The board draws only when something changed or moves. `false` also stops the motion: pop-ins
+   * and robber travel jump to their end and glows hold still (headless playtest pages).
+   */
+  setAnimated(on: boolean): void {
+    this.animated = on;
+    this.frames.invalidate();
   }
 
   on<K extends keyof BoardEvents>(type: K, cb: Listener<K>): () => void {
@@ -295,6 +329,7 @@ export class BoardView {
   /** Redraw the sea and frame after `setFrameColors` (a UI theme change). */
   retheme(): void {
     this.buildSea();
+    this.frames.invalidate();
   }
 
   /** Resolution board text is currently rasterized at (texels per design px; tests, harness). */
@@ -306,6 +341,8 @@ export class BoardView {
     this.unwatchDpr?.();
     this.app.renderer.off('resize', this.onResize);
     this.app.ticker.remove(this.tick);
+    Ticker.system.autoStart = true;
+    Ticker.system.start();
     this.viewport.dispose();
     this.root.destroy({ children: true });
   }
@@ -358,6 +395,7 @@ export class BoardView {
     this.world.scale.set(v.scale / S);
     this.wantTextRes = this.textResFor(v.scale);
     this.viewChangedAt = this.clock;
+    this.frames.invalidate();
   }
 
   private textResFor(pxPerUnit: number): number {
@@ -562,7 +600,9 @@ export class BoardView {
       if (!tile || !info || tile.token === null) continue;
       const hot = tile.token === 6 || tile.token === 8;
       const c = new Container();
-      c.position.set(info.x * S, info.y * S);
+      const at = tokenPlace(state, id);
+      c.position.set((info.x + (at?.dx ?? 0)) * S, (info.y + (at?.dy ?? 0)) * S);
+      if (at) c.scale.set(at.scale);
       const g = new Graphics();
       const R = 0.36 * S;
       g.circle(1.5, 3, R).fill({ color: 0x000000, alpha: 0.32 });
@@ -817,6 +857,7 @@ export class BoardView {
   }
 
   private drawHover() {
+    this.frames.invalidate();
     const g = this.hoverLayer;
     g.clear();
     const hit = this.hover;
@@ -856,12 +897,24 @@ export class BoardView {
   // Animation
   // -------------------------------------------------------------------------
 
+  /** Whether the next frame differs from this one with no further change. */
+  private animating(): boolean {
+    const r = this.robberPos;
+    const t = this.robberTarget;
+    return (
+      this.glows.length > 0 ||
+      this.pops.length > 0 ||
+      this.wantTextRes !== this.textRes ||
+      (r !== null && (r.x !== t.x || r.y !== t.y))
+    );
+  }
+
   private update(dtMs: number) {
     this.clock += dtMs;
     if (this.wantTextRes !== this.textRes && this.clock - this.viewChangedAt >= RETEXT_DELAY) {
       this.retext();
     }
-    const pulse = 0.5 + 0.5 * Math.sin(this.clock / 260);
+    const pulse = this.animated ? 0.5 + 0.5 * Math.sin(this.clock / 260) : 1;
     for (const g of this.glows) {
       g.glow.alpha = 0.55 + 0.45 * pulse;
       if (g.kind !== 'hex') g.node.scale.set(1 + 0.12 * pulse);

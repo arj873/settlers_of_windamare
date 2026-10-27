@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join, relative } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { build, preview } from 'vite';
-import type { GameState, PlayerId } from '../../src/engine';
+import type { Action, GameState, PlayerId } from '../../src/engine';
 import { formatLogEntry, formatStatus } from './format';
 import { actingVerdict, newLogEntries, staleTradeHint, wakeReason, waitingOn } from './guard';
 import {
@@ -31,19 +31,30 @@ import {
   SHOTS_DIR,
   type CommandRequest,
   type CommandResponse,
+  type Control,
   type SessionInfo,
   type Snapshot,
 } from './protocol';
 import { onlineOptions, serveOptions } from './options';
+import { onlineOutcome, outcomeHeadline, type Outcome } from './outcome';
 import { createAndStart, dropNetwork, restoreNetwork, roomServer, type RoomServer } from './online';
-import { describeId, listSpots, SPOT_VERB } from './spots';
-import { matchChoice, parseFlags, slugify } from './text';
+import { actionForClick, type BoardClick } from '../../src/game/logic';
+import {
+  actionName,
+  describeId,
+  formatSpots,
+  listSpots,
+  movesBehindButtons,
+  spotKey,
+  type Spot,
+} from './spots';
+import { matchChoice, matchControl, parseFlags, slugify } from './text';
 
 const SEVERITIES = ['blocker', 'major', 'minor', 'visual'] as const;
 const OUT_DIR = join(PLAYTEST_DIR, 'dist');
 const SETTLE_MS = 350;
-/** Online: longest wait for the server to answer a click with a new `game` message. */
-const ONLINE_ANSWER_MS = 800;
+/** Online: longest wait for the server to answer a move (a busy machine can take seconds). */
+const ONLINE_ANSWER_MS = 15_000;
 const VIEWPORT = { width: 1600, height: 1000 };
 
 // ---------------------------------------------------------------------------
@@ -167,28 +178,35 @@ function nowLine(snap: Snapshot, seat: PlayerId): string {
 }
 
 /**
- * Let the UI settle after a click. Online, a click that submits an action is answered by a new
- * `game` message a moment later: give the server up to ONLINE_ANSWER_MS before reading.
+ * Let the UI settle after a click. Online, a click that sent a move (the page counts what its
+ * RoomClient sent) waits for the server's answer — a new game state or an error — for up to
+ * ONLINE_ANSWER_MS; a click that sent nothing only settles. Null for hotseat.
  */
-async function settle(seat: PlayerId, before: Snapshot): Promise<void> {
-  if (!isOnline) {
+async function settle(seat: PlayerId, before: Snapshot): Promise<Outcome | null> {
+  if (!isOnline || !before.online) {
     await sleep(SETTLE_MS);
-    return;
+    return null;
   }
   const until = Date.now() + ONLINE_ANSWER_MS;
-  while (Date.now() < until) {
+  let outcome: Outcome = { kind: 'local' };
+  for (;;) {
     const now = await snapshot(seat);
-    if (now.online?.seq !== before.online?.seq) break;
-    await sleep(80);
+    outcome = now.online ? onlineOutcome(before.online, now.online) : outcome;
+    if (outcome.kind !== 'pending' || Date.now() >= until) break;
+    await sleep(150);
   }
-  await sleep(200);
+  // A refusal can trail a state change by a moment; screen-only clicks need a re-render.
+  await sleep(outcome.kind === 'pending' ? 0 : 250);
+  const last = await snapshot(seat);
+  return last.online ? onlineOutcome(before.online, last.online) : outcome;
 }
 
 /** Wait for the UI to settle after a click, then describe what changed. */
 async function afterAction(before: Snapshot, seat: PlayerId, did: string): Promise<string> {
-  await settle(seat, before);
+  const outcome = await settle(seat, before);
   const after = await snapshot(seat);
-  const lines = [`OK: ${did}`];
+  if (after.state) seenLog.set(seat, after.state.log);
+  const lines = [outcomeHeadline(outcome, did, ONLINE_ANSWER_MS / 1000)];
   const prev = before.state;
   const next = after.state;
   if (prev && next) {
@@ -230,6 +248,82 @@ async function guarded(seat: PlayerId, cmd: 'act' | 'pass'): Promise<Snapshot | 
   return v.ok ? snap : v.reason;
 }
 
+interface ClickPoint {
+  x: number;
+  y: number;
+  ok: boolean;
+  cover: string | null;
+}
+
+/**
+ * Click a tagged HUD element the way a player does: the real mouse at its centre, after
+ * checking nothing covers that point. One page round trip plus the click, so it also works on a
+ * slow, busy machine (Playwright's `locator.click` makes several round trips and timed out
+ * there, sometimes after the click had already gone through). If the HUD re-rendered since the
+ * scan (tags gone), `refind` rescans and returns the same element's new tag, or null if it is
+ * gone. Returns an error text, or null once the click went out.
+ */
+async function press(
+  seat: PlayerId,
+  id: string,
+  what: string,
+  refind: () => Promise<string | null>,
+): Promise<string | null> {
+  const { page } = ctxOf(seat);
+  let tag: string | null = id;
+  for (let attempt = 0; attempt < 3 && tag; attempt++) {
+    const p = (await page.evaluate(
+      `window.__pt.pointFor(${JSON.stringify(tag)})`,
+    )) as ClickPoint | null;
+    if (p && !p.ok) {
+      return `${what} is covered by ${p.cover}, so a player could not click it. Take a \`shot\`; this may be a bug.`;
+    }
+    if (p) return mouseClick(seat, p.x, p.y, what);
+    tag = await refind();
+  }
+  return `${what} is gone: the screen changed before the click. Run \`status\`.`;
+}
+
+/** Longest wait for one mouse click to be delivered (a starved page can take seconds). */
+const CLICK_MS = 30_000;
+
+/**
+ * The real mouse at (x, y). Resolves once the page has handled the click. On a page so busy
+ * that even that times out, look before retrying: if a move went out or the game moved on, the
+ * click landed; only an unchanged page gets one more click. Returns an error text or null.
+ */
+async function mouseClick(
+  seat: PlayerId,
+  x: number,
+  y: number,
+  what: string,
+): Promise<string | null> {
+  const { page } = ctxOf(seat);
+  const before = await snapshot(seat);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const done = page.mouse.click(x, y).then(() => true);
+    const late = sleep(CLICK_MS).then(() => false);
+    if (await Promise.race([done, late])) return null;
+    const now = await snapshot(seat);
+    const changed =
+      now.online?.sent !== before.online?.sent ||
+      now.online?.seq !== before.online?.seq ||
+      JSON.stringify(now.state) !== JSON.stringify(before.state);
+    if (changed) return null;
+  }
+  return `the page did not take the click on ${what} within ${(2 * CLICK_MS) / 1000} s (it is very busy). Run \`status\`, then try again.`;
+}
+
+/** `press` a button from a scan; on a re-render finds it again by label (and position among equal labels). */
+function pressControl(seat: PlayerId, snap: Snapshot, c: Control): Promise<string | null> {
+  const same = (x: Control) => x.label === c.label && x.inDialog === c.inDialog;
+  const nth = snap.ui.controls.filter(same).indexOf(c);
+  return press(seat, c.id, `[${c.label}]`, async () => {
+    const again = (await snapshot(seat)).ui.controls.filter(same)[nth];
+    return again?.enabled ? again.id : null;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -242,6 +336,10 @@ type Handler = (
 
 /** Spot ids last listed per seat; click-spot refuses if the list changed since. */
 const lastSpots = new Map<PlayerId, string[]>();
+
+/** Per seat: the log as of its last command, so `wait` can tell what happened meanwhile. */
+const seenLog = new Map<PlayerId, GameState['log']>();
+const MAX_WAKE_LOG = 30;
 
 async function clickBoardId(before: Snapshot, seat: PlayerId, id: string, what: string) {
   const { page } = ctxOf(seat);
@@ -261,7 +359,8 @@ async function clickBoardId(before: Snapshot, seat: PlayerId, id: string, what: 
         'If a dialog is open, close it; otherwise this may be a bug worth reporting (take a `shot`).',
     );
   }
-  await page.mouse.click(pos.x, pos.y);
+  const err = await mouseClick(seat, pos.x, pos.y, id);
+  if (err) return refuse(err);
   return {
     out: await afterAction(
       before,
@@ -271,13 +370,40 @@ async function clickBoardId(before: Snapshot, seat: PlayerId, id: string, what: 
   };
 }
 
+/** " (spot N)" for the listed spot of an action, if any. */
+function spotOf(spots: readonly Spot[], a: Action): string {
+  const s = spots.find((x) => JSON.stringify(x.action) === JSON.stringify(a));
+  return s ? ` (spot ${s.n})` : '';
+}
+
+/** The page URL with the playtest hook on (`?debug=1`), as a reload target. */
+function withDebug(url: string): string {
+  const u = new URL(url);
+  u.searchParams.set('debug', '1');
+  return u.toString();
+}
+
 const onlineOnly = (what: string) => refuse(`\`${what}\` only exists in online games.`);
 
 const commands: Record<string, Handler> = {
   async probe(seat) {
     const snap = await snapshot(seat);
     const why = wakeReason(snap, seat);
-    return { out: why ?? waitingOn(snap), ready: why !== null };
+    if (why === null || !snap.state) return { out: waitingOn(snap), ready: false };
+    // What happened while waiting (a barbarian attack, a robbery...): `status` shows only 8 lines.
+    const state = snap.state;
+    const seen = seenLog.get(seat);
+    const fresh = seen ? newLogEntries(seen, state.log) : [];
+    seenLog.set(seat, state.log);
+    const lines = [why];
+    if (fresh.length > 0) {
+      const shown = fresh.slice(-MAX_WAKE_LOG);
+      lines.push(
+        `Since your last command${fresh.length > shown.length ? ` (last ${shown.length} of ${fresh.length})` : ''}:`,
+      );
+      for (const e of shown) lines.push(formatLogEntry(state, e));
+    }
+    return { out: lines.join('\n'), ready: true };
   },
 
   async status(seat) {
@@ -292,21 +418,9 @@ const commands: Record<string, Handler> = {
     if (!state) return refuse('The game has not loaded yet.');
     if (snap.viewer !== seat) return refuse(`Not your moment: ${waitingOn(snap)}.`);
     const spots = listSpots(state, snap.targets, seat);
-    lastSpots.set(
-      seat,
-      spots.map((s) => s.id),
-    );
-    if (spots.length === 0) {
-      return {
-        out:
-          'No board spots to click right now. To build, first click a build button ' +
-          '(`click Road`, `click Settlement`, `click City`), then run `spots` again.',
-      };
-    }
-    const verb = SPOT_VERB[snap.targets[0]?.type ?? 'endTurn'] ?? 'click';
-    const lines = [`${spots.length} spot(s) to ${verb}. Use \`click-spot N\`:`];
-    for (const s of spots) lines.push(`  ${s.n}. ${s.id}  ${s.text}`);
-    return { out: lines.join('\n') };
+    lastSpots.set(seat, spots.map(spotKey));
+    const behind = movesBehindButtons(state, snap.legal, snap.targets, snap.ui.controls, seat);
+    return { out: formatSpots(state, spots, behind) };
   },
 
   async 'click-spot'(seat, args) {
@@ -316,12 +430,41 @@ const commands: Record<string, Handler> = {
     const state = snap.state as GameState;
     const spots = listSpots(state, snap.targets, seat);
     const listed = lastSpots.get(seat);
-    if (!listed || listed.join() !== spots.map((s) => s.id).join()) {
+    if (!listed || listed.join() !== spots.map(spotKey).join()) {
       return refuse('The spot list changed (or you have not run `spots` yet). Run `spots` again.');
     }
     const spot = spots[n - 1];
     if (!Number.isInteger(n) || !spot) return refuse(`Pick a number from 1 to ${spots.length}.`);
-    return clickBoardId(snap, seat, spot.id, `spot ${n} (${spot.id}: ${spot.text})`);
+    const what = `spot ${n} (${spot.id}: ${spot.does})`;
+    const at = { kind: spot.kind, id: spot.id } as BoardClick;
+    const now = actionForClick(snap.targets, at);
+    if (now && JSON.stringify(now) === JSON.stringify(spot.action)) {
+      return clickBoardId(snap, seat, spot.id, what);
+    }
+    if (now?.type === spot.type) {
+      // Same move, other piece (two ships on one edge): the board click takes the first.
+      return refuse(
+        `A click on ${spot.id} makes "${actionName(state, now)}${spotOf(spots, now)}", not this one: two pieces share the spot. Use the panel's buttons for it (see \`status\`).`,
+      );
+    }
+    // Two moves on one spot (Seafarers setup: road or ship): a board click makes the first; the
+    // other needs its build card on, as a player would click it.
+    const card = snap.ui.controls.find((c) => c.enabled && c.actions?.includes(spot.type));
+    if (!card) {
+      return refuse(
+        `A click on ${spot.id} would make "${now ? actionName(state, now) : 'nothing'}", and no button switches it to "${spot.does}". Take a \`shot\`; this may be a bug.`,
+      );
+    }
+    const err = await pressControl(seat, snap, card);
+    if (err) return refuse(err);
+    await sleep(SETTLE_MS);
+    const mode = await snapshot(seat);
+    if (actionForClick(mode.targets, at)?.type !== spot.type) {
+      return refuse(
+        `Clicked [${card.label}] to switch to "${spot.does}", but ${spot.id} still does not take it. Run \`status\`.`,
+      );
+    }
+    return clickBoardId(snap, seat, spot.id, `[${card.label}], then ${what}`);
   },
 
   async 'click-board'(seat, args) {
@@ -344,47 +487,37 @@ const commands: Record<string, Handler> = {
   },
 
   async click(seat, args) {
-    const { page } = ctxOf(seat);
     const query = args.join(' ').trim();
     if (!query) return refuse('Say which button, e.g. `click Roll dice`.');
     const snap = await guarded(seat, 'act');
     if (typeof snap === 'string') return refuse(snap);
     const controls = snap.ui.controls;
-    const enabled = controls.filter((c) => c.enabled);
-    const m = matchChoice(
-      query,
-      enabled.map((c) => c.label),
-      (i) => enabled[i]?.inDialog === true,
-    );
+    // All buttons first: a better-matching disabled button is refused, never swapped for a
+    // looser enabled match ("Ship" must not press "Move ship").
+    const m = matchControl(query, controls);
     if (m.kind === 'many') {
-      const list = m.indices.map((i) => `[${enabled[i]?.label}]`).join(' ');
+      const list = m.indices.map((i) => `[${controls[i]?.label}]`).join(' ');
       return refuse(`"${query}" matches several buttons: ${list}. Use the full label.`);
     }
-    if (m.kind === 'none') {
-      const off = matchChoice(
-        query,
-        controls.filter((c) => !c.enabled).map((c) => c.label),
+    if (m.kind === 'disabled') {
+      const why = controls[m.index]?.why;
+      return refuse(
+        `[${controls[m.index]?.label}] is disabled right now${why ? ` (${why})` : ''}. ${listButtons(snap)}`,
       );
-      if (off.kind !== 'none')
-        return refuse(`That button is disabled right now. ${listButtons(snap)}`);
+    }
+    if (m.kind === 'none') {
       const stale = snap.state ? staleTradeHint(snap.state, query) : null;
       if (stale) return refuse(`${stale} ${listButtons(snap)}`);
       return refuse(`No button matches "${query}". ${listButtons(snap)}`);
     }
-    const c = enabled[m.index];
+    const c = controls[m.index];
     if (!c) return refuse('internal: match out of range');
-    try {
-      await page.locator(`[data-pt="${c.id}"]`).click({ timeout: 3000 });
-    } catch (e) {
-      return refuse(
-        `Could not click [${c.label}]: ${String(e).split('\n')[0]}. It may be covered by something — take a \`shot\`; this may be a bug.`,
-      );
-    }
+    const err = await pressControl(seat, snap, c);
+    if (err) return refuse(err);
     return { out: await afterAction(snap, seat, `clicked [${c.label}]`) };
   },
 
   async set(seat, args) {
-    const { page } = ctxOf(seat);
     const target = Number(args.at(-1));
     const query = args.slice(0, -1).join(' ').trim();
     if (!query || !Number.isInteger(target) || target < 0) {
@@ -414,22 +547,72 @@ const commands: Record<string, Handler> = {
           out: `${res}\nNOTE: the ${up ? '+' : '−'} button is disabled at ${s.value}, so ${target} is not allowed here.`,
         };
       }
-      await page.locator(`[data-pt="${id}"]`).click({ timeout: 3000 });
+      const err = await press(seat, id, `the ${label} ${up ? '+' : '−'} button`, async () => {
+        const again = (await snapshot(seat)).ui.steppers.find((x) => x.label === label);
+        return (up ? again?.incId : again?.decId) ?? null;
+      });
+      if (err) return refuse(err);
       snap = await snapshot(seat);
+      // Module steppers clamp instead of disabling their button: stop when it did not move.
+      if (snap.ui.steppers.find((x) => x.label === label)?.value === s.value) {
+        const res = await afterAction(first, seat, `${label} stopped at ${s.value}`);
+        return { out: `${res}\nNOTE: ${label} did not go past ${s.value} here.` };
+      }
     }
     const after = snap.ui.steppers.find((x) => x.label === label);
     return { out: await afterAction(first, seat, `${label} = ${after?.value ?? '?'}`) };
   },
 
+  async choose(seat, args) {
+    const line = args.join(' ');
+    const eq = line.lastIndexOf('=');
+    const query = eq < 0 ? '' : line.slice(0, eq).trim();
+    const want = eq < 0 ? '' : line.slice(eq + 1).trim();
+    if (!query || !want) {
+      return refuse('Usage: `choose <dropdown> = <option>`, e.g. `choose Bank: give = Grain`.');
+    }
+    const snap = await guarded(seat, 'act');
+    if (typeof snap === 'string') return refuse(snap);
+    const drops = snap.ui.dropdowns ?? [];
+    if (drops.length === 0) return refuse('No dropdowns are showing. Run `status`.');
+    const m = matchChoice(
+      query,
+      drops.map((d) => d.label),
+    );
+    const names = drops.map((d) => d.label).join(', ');
+    if (m.kind === 'many') {
+      return refuse(
+        `"${query}" matches several: ${m.indices.map((i) => drops[i]?.label).join(', ')}.`,
+      );
+    }
+    if (m.kind === 'none') return refuse(`No dropdown "${query}". Dropdowns: ${names}.`);
+    const d = drops[m.index];
+    if (!d) return refuse('internal: match out of range');
+    if (!d.enabled) return refuse(`[${d.label}] is disabled right now.`);
+    const o = matchChoice(want, d.options);
+    if (o.kind !== 'one') {
+      return refuse(
+        `[${d.label}] has no single option "${want}". Options: ${d.options.join(' | ')}.`,
+      );
+    }
+    const label = d.options[o.index] as string;
+    try {
+      await ctxOf(seat).page.selectOption(`[data-pt="${d.id}"]`, { label }, { timeout: 5000 });
+    } catch {
+      return refuse(`[${d.label}] is gone: the screen changed. Run \`status\`.`);
+    }
+    return { out: await afterAction(snap, seat, `${d.label} = ${label}`) };
+  },
+
   async pass(seat) {
-    const { page } = ctxOf(seat);
     if (isOnline) return refuse('There is no pass-the-device cover online; just act.');
     const snap = await guarded(seat, 'pass');
     if (typeof snap === 'string') return refuse(snap);
     const btn = snap.ui.controls.find((c) => c.enabled && /show my cards/i.test(c.label));
     if (!btn)
       return refuse('The cover is up but its button was not found. Take a `shot` and report this.');
-    await page.locator(`[data-pt="${btn.id}"]`).click({ timeout: 3000 });
+    const err = await pressControl(seat, snap, btn);
+    if (err) return refuse(err);
     return { out: await afterAction(snap, seat, `dismissed the cover ("${snap.ui.cover}")`) };
   },
 
@@ -535,7 +718,9 @@ const commands: Record<string, Handler> = {
       await ctx.context.setOffline(false);
       ctx.dropped = false;
     }
-    await ctx.page.reload();
+    // Creating / joining a room rewrites the URL to the bare invite link (`?room=CODE`), which
+    // drops `?debug=1`: a plain reload would come back without the state hook the CLI reads.
+    await ctx.page.goto(withDebug(ctx.page.url()));
     try {
       await ctx.page.waitForFunction(
         'window.__catanDebug && window.__catanDebug.state() !== null',
@@ -656,6 +841,8 @@ async function screenshot(
   const { page } = ctxOf(seat);
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${base}.png`);
+  // Draw the current board first (headless: harmless, the board already draws on change).
+  await page.evaluate('window.__pt && window.__pt.render()');
   if (mode === 'board') {
     await page.evaluate(`document.getElementById('ui').style.visibility = 'hidden'`);
     try {
@@ -696,6 +883,9 @@ async function newSeatCtx(browser: Browser): Promise<SeatCtx> {
   // Same page size headed or not, so screenshots and click positions match what a watcher sees.
   const context = await browser.newContext({ viewport: VIEWPORT });
   await context.addInitScript({ path: join(REPO_ROOT, 'scripts', 'playtest', 'inpage.js') });
+  // Headless has no GPU: a pulsing highlight is drawn in software every frame and starves the
+  // page (and the machine, with several sessions). Watchers of a headed window keep the motion.
+  if (!headed) await context.addInitScript('window.__pt.renderOnDemand()');
   const page = await context.newPage();
   const ctx: SeatCtx = { page, context, consoleLog: [], dropped: false };
   watchConsole(ctx);

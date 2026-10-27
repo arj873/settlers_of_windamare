@@ -1,8 +1,15 @@
 /**
- * T&B scenario pairs (the 2025 sheets, docs/rules/traders-barbarians.md §8.1): Fishing on Catan
- * with Rivers, Traders & Barbarians, Barbarian Attack or the Caravans, on T&B's own boards
- * (maps.ts). Each scenario plays as two T&B scenarios (`playsAs`), so T&B switches both features
- * on; this module adds only the sheets' changes:
+ * T&B scenario pairs (the ten 2025 sheets, docs/rules/traders-barbarians.md §8.1). Each scenario
+ * plays as two T&B scenarios (`playsAs`), so T&B switches both features on; this module adds the
+ * boards (maps.ts: Fishing with another; sheets.ts: the six others) and the sheets' changes.
+ *
+ * The six sheets without Fishing (docs/rules/combos.md §2d): T&B reads their static changes from
+ * the board (`TbSheetRules`: start and bridge gold, no Poor Settler penalty, the wagon's river
+ * crossing, BA's start hexes, barbarians by paths); this module adds the trade hexes' production
+ * (quarry brick, glassworks lumber, castle wool), Barbarian Attack + T&B's barbarians
+ * (barbarians.ts) and, there, knights and the wagon at the end of the turn in either order.
+ *
+ * Fishing pairs:
  * - Fishing + Rivers: 6 fish pay for a bridge;
  * - Fishing + T&B: no robber to chase, so 2 fish give the wagon 2 more MP (as 1 grain does);
  * - Fishing + BA: 2 fish let a knight move up to 5 paths (as 1 grain does); conquered buildings
@@ -11,10 +18,18 @@
  * Engine status per rule: docs/rules/combos.md §2c.
  */
 import { fail, isCurrent, log, ok } from '../../../engine/actions/common';
-import type { ExpansionModule, ExtHandler, ScenarioDef } from '../../../engine/expansions/types';
+import type {
+  ExpansionModule,
+  ExtHandler,
+  ExtWrap,
+  ScenarioDef,
+} from '../../../engine/expansions/types';
 import { playerName } from '../../../engine/rules/text';
-import type { Action, EdgeId, GameState, PlayerId } from '../../../engine/types';
-import { knightReach, knightTargets } from '../../tb/engine/ba';
+import { hexVertices, topologyOf } from '../../../engine/topology';
+import type { Action, EdgeId, GameState, PlayerId, Resource } from '../../../engine/types';
+import { canSelectKnight, knightReach, knightTargets, knightsOf } from '../../tb/engine/ba';
+import { isConqueredHex } from '../../tb/engine/conquest';
+import { wagonSteps } from '../../tb/engine/traders';
 import { addGold } from '../../tb/engine/common';
 import { fishPayment } from '../../tb/engine/fish';
 import { bridgeSiteBlocker } from '../../tb/engine/rivers';
@@ -30,14 +45,39 @@ import {
   tbSlice,
   tradersOf,
   WAGON_GRAIN_MP,
+  hexHasNumber,
   type TbPhase,
+  type TradeKind,
 } from '../../tb/engine/state';
+import {
+  barbarianHex,
+  barbarianLegal,
+  barbarianPath,
+  isBarbarianPhase,
+  landOnRoll,
+  pickBarbarian,
+  withLanding,
+  wrapBuyCard,
+  wrapDriveOff,
+  type BarbarianAction,
+} from './barbarians';
 import { FISH_PAIRS, mapIdOf, TBPAIR, TBPAIR_MAPS } from './maps';
+import { SHEET_MAPS, SHEETS, sheetMapId } from './sheets';
 
 export { TBPAIR, FISH_PAIRS } from './maps';
+export { SHEETS, sheetMapId, type Sheet } from './sheets';
+export {
+  barbarianRefs,
+  centreBarbarians,
+  freePaths,
+  hexPaths,
+  pathBarbarians,
+  type BarbarianAction,
+  type BarbarianPhase,
+} from './barbarians';
 
 export const TBPAIR_MODE = 'tb+tb';
-export const TBPAIR_SCENARIOS = FISH_PAIRS.map((p) => p.id);
+export const TBPAIR_SCENARIOS = [...FISH_PAIRS.map((p) => p.id), ...SHEETS.map((s) => s.id)];
 export const FISH_BRIDGE = 6;
 export const FISH_WAGON = 2;
 export const FISH_KNIGHT = 2;
@@ -45,7 +85,8 @@ export const FISH_KNIGHT = 2;
 export type TbpairAction =
   | { type: 'tbpair/fishBridge'; player: PlayerId; edge: EdgeId }
   | { type: 'tbpair/fishWagon'; player: PlayerId }
-  | { type: 'tbpair/fishKnight'; player: PlayerId; edge: EdgeId };
+  | { type: 'tbpair/fishKnight'; player: PlayerId; edge: EdgeId }
+  | BarbarianAction;
 
 const pn = playerName;
 const fishOfPlayer = (s: GameState, p: PlayerId) => fishTotal(fishOf(s).hands[p] ?? []);
@@ -150,6 +191,49 @@ const fishKnight: ExtHandler = (draft, action) => {
 };
 
 // ---------------------------------------------------------------------------------------------
+// The six other sheets: trade hexes that produce; BA + T&B's end of the turn
+// ---------------------------------------------------------------------------------------------
+
+/** What a trade hex produces on the sheets that number them. */
+export const TRADE_YIELD: Readonly<Record<TradeKind, Resource>> = {
+  quarry: 'brick',
+  glassworks: 'lumber',
+  castle: 'wool',
+};
+
+export const sheetOf = (state: GameState) => SHEETS.find((x) => x.id === state.settings.scenario);
+
+/** Barbarian Attack + T&B: knights and the wagon both move at the end of the turn. */
+const bothEndSteps = (state: GameState) => has(state, 'ba') && has(state, 'traders');
+
+/** Start the other end-of-turn step from `kind` (knights after the wagon, or the other way). */
+const fromEndStep =
+  (kind: string): ExtWrap =>
+  (draft, action, next) => {
+    if (bothEndSteps(draft) && draft.phase.kind === kind && isCurrent(draft, action.player)) {
+      draft.phase = { kind: 'main' };
+    }
+    return next(draft, action);
+  };
+
+function endStepLegal(state: GameState, out: Action[]): void {
+  if (!bothEndSteps(state)) return;
+  const p = state.turn.current;
+  const k = state.phase.kind;
+  if (k === 'tb/wagon') {
+    for (const e of knightsOf(state, p)) {
+      if (canSelectKnight(state, p, e)) {
+        out.push({ type: 'tb/startKnights', player: p, edge: e } as unknown as Action);
+      }
+    }
+  } else if (k === 'tb/knights' && tradersOf(state).move.steps === 0) {
+    for (const x of wagonSteps(state, p)) {
+      out.push({ type: 'tb/startWagon', player: p, vertex: x.vertex } as unknown as Action);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // The module
 // ---------------------------------------------------------------------------------------------
 
@@ -157,6 +241,8 @@ function legal(state: GameState): Action[] {
   const p = state.turn.current;
   const out: Action[] = [];
   const act = (a: Record<string, unknown>) => out.push({ player: p, ...a } as unknown as Action);
+  if (isBarbarianPhase(state.phase.kind)) return barbarianLegal(state);
+  endStepLegal(state, out);
   if (!has(state, 'fish')) return out;
   if (has(state, 'rivers') && state.phase.kind === 'main') {
     for (const e of tbBoard(state).bridgeSites ?? []) {
@@ -168,16 +254,28 @@ function legal(state: GameState): Action[] {
   return out;
 }
 
-const scenarios: ScenarioDef[] = FISH_PAIRS.map((pair) => ({
-  id: pair.id,
-  name: pair.name,
-  blurb: pair.blurb,
-  players: { min: 3, max: 4 },
-  maps: [mapIdOf(pair)],
-  mapFor: () => mapIdOf(pair),
-  vpToWin: pair.vp,
-  playsAs: { [TB]: ['tb/fishermen', pair.other] },
-}));
+const scenarios: ScenarioDef[] = [
+  ...FISH_PAIRS.map((pair) => ({
+    id: pair.id,
+    name: pair.name,
+    blurb: pair.blurb,
+    players: { min: 3, max: 4 },
+    maps: [mapIdOf(pair)],
+    mapFor: () => mapIdOf(pair),
+    vpToWin: pair.vp,
+    playsAs: { [TB]: ['tb/fishermen', pair.other] },
+  })),
+  ...SHEETS.map((sheet) => ({
+    id: sheet.id,
+    name: sheet.name,
+    blurb: sheet.blurb,
+    players: { min: 3, max: 4 },
+    maps: [sheetMapId(sheet)],
+    mapFor: () => sheetMapId(sheet),
+    vpToWin: sheet.vp,
+    playsAs: { [TB]: sheet.pair },
+  })),
+];
 
 export const tbpairModule: ExpansionModule = {
   id: TBPAIR,
@@ -185,13 +283,13 @@ export const tbpairModule: ExpansionModule = {
   requires: [TB],
   before: [TB],
   players: { min: 3, max: 4 },
-  maps: TBPAIR_MAPS,
+  maps: [...TBPAIR_MAPS, ...SHEET_MAPS],
   scenarios,
   modes: [
     {
       id: TBPAIR_MODE,
       name: 'T&B scenario pairs',
-      blurb: 'Fishing on Catan with Rivers, the wagons, Barbarian Attack or the camels',
+      blurb: 'The ten 2025 sheets: two T&B scenarios on one board',
       status: 'ready',
       expansions: [TBPAIR],
       scenarios: TBPAIR_SCENARIOS,
@@ -209,7 +307,40 @@ export const tbpairModule: ExpansionModule = {
     'tbpair/fishBridge': fishBridge,
     'tbpair/fishWagon': fishWagon,
     'tbpair/fishKnight': fishKnight,
+    'tbpair/barbarianPath': barbarianPath,
+    'tbpair/barbarianHex': barbarianHex,
+    'tbpair/pickBarbarian': pickBarbarian,
+  },
+  wraps: {
+    'tb/buyCard': wrapBuyCard,
+    'tb/driveOff': wrapDriveOff,
+    'tb/startKnights': fromEndStep('tb/wagon'),
+    'tb/startWagon': fromEndStep('tb/knights'),
+  },
+  overrides: {
+    buildSettlement: (draft, action, next) => withLanding(draft, () => next(draft, action)),
+    buildCity: (draft, action, next) => withLanding(draft, () => next(draft, action)),
   },
   legal,
   changesRoads: ['tbpair/fishBridge'],
+  actors: (state) => (state.phase.kind.startsWith('tbpair/') ? [state.turn.current] : undefined),
+
+  hooks: {
+    onRoll: (draft, roll) => landOnRoll(draft, roll),
+
+    production(state, roll, owed, ctx) {
+      if (!sheetOf(state)?.tradeYield) return;
+      const t = topologyOf(state);
+      for (const x of tbBoard(state).tradeHexes ?? []) {
+        if (!hexHasNumber(state, x.hex, roll) || x.hex === ctx.blocked) continue;
+        if (isConqueredHex(state, x.hex)) continue;
+        const r = TRADE_YIELD[x.kind];
+        for (const v of hexVertices(t, x.hex)) {
+          const b = state.pieces.buildings[v];
+          const hand = b && owed[b.owner];
+          if (hand) hand[r] += b.kind === 'city' ? ctx.cityYield : 1;
+        }
+      }
+    },
+  },
 };

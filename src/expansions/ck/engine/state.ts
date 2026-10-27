@@ -17,6 +17,15 @@ import type {
 
 export const CK = 'ck';
 
+/**
+ * Combination modes without C&K's barbarian ship (Barbarian Attack + C&K, module `back`: a ship
+ * on the event die lands a T&B barbarian instead; its knights stand on paths). The ship never
+ * sails there, so it never attacks; the HUD hides the track and C&K's own knight cards.
+ */
+const NO_SHIP_MODES: readonly string[] = ['ba+ck'];
+export const shipSails = (state: Pick<GameState, 'settings'>): boolean =>
+  !NO_SHIP_MODES.includes(state.settings.mode);
+
 // ---------------------------------------------------------------------------
 // Goods
 // ---------------------------------------------------------------------------

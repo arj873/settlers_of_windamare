@@ -24,7 +24,9 @@ export {
   costOf,
   expansionVictoryParts,
   expansionVictoryPoints,
+  longestRoadName,
   pieceLimit,
+  routeName,
   terrainKind,
   type BaseCostItem,
 } from './expansions/hooks';
@@ -48,6 +50,7 @@ export * from './clock';
 export { EVENT_CARDS, EVENT_INFO, facesFor, type EventCard } from './rules/events';
 export { MAP_VETO_CANDIDATES, vetoOrder } from './actions/veto';
 export { secondSettlerFor } from './actions/turn';
+export { setupRoundAt } from './actions/setup';
 export { canRepairRoad } from './actions/build';
 export {
   createGame,

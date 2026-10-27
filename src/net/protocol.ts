@@ -335,8 +335,11 @@ export type Parsed<T> = { ok: true; msg: T } | { ok: false; code: ErrorCode; mes
 const PLAYER_ID = int(0, 7);
 const COORD = '-?\\d{1,2}';
 const HEX = str(16, { pattern: new RegExp(`^h:${COORD},${COORD}$`) }) as Check<HexId>;
-const VERTEX = str(16, { pattern: new RegExp(`^v:${COORD},${COORD},(N|S)$`) }) as Check<VertexId>;
-const EDGE = str(16, { pattern: new RegExp(`^e:${COORD},${COORD},(NE|E|SE)$`) }) as Check<EdgeId>;
+// `C` vertices / `C<corner>` edges: T&B plaza centres and their spokes (F2, engine/types.ts).
+const VERTEX = str(16, { pattern: new RegExp(`^v:${COORD},${COORD},(N|S|C)$`) }) as Check<VertexId>;
+const EDGE = str(16, {
+  pattern: new RegExp(`^e:${COORD},${COORD},(NE|E|SE|C(N|NE|SE|S|SW|NW))$`),
+}) as Check<EdgeId>;
 const RESOURCE = oneOf(RESOURCES);
 
 const BUNDLE: Check<ResourceBundle> = (x, path) => {
@@ -573,14 +576,43 @@ function parseMode(o: Record<string, unknown>, path: string) {
   return { mode, scenario, options };
 }
 
+/** Seats a room allows: the base map's player range, or the mode + scenario's. */
+export function roomSeatRange(config: Pick<RoomConfig, 'mode' | 'map' | 'scenario'>): {
+  min: number;
+  max: number;
+} {
+  const mode = modeById(config.mode) ?? BASE_MODE;
+  if (mode.id === 'base') {
+    return { min: MAPS[config.map].minPlayers, max: MAPS[config.map].maxPlayers };
+  }
+  return playerRange({ mode: mode.id, scenario: config.scenario ?? mode.scenarios[0] ?? null });
+}
+
+/** L1: the most seats a room can grow to (the base game moves to a bigger board, up to 8). */
+export function roomSeatCap(config: RoomConfig): number {
+  return config.mode === 'base' ? MAPS.base78.maxPlayers : roomSeatRange(config).max;
+}
+
+/**
+ * L1: the config with one more seat, or null at the cap. Like the lobby's Add bot: the base game
+ * moves to the smallest board that fits (5-6 players, then 7-8).
+ */
+export function grownConfig(config: RoomConfig): RoomConfig | null {
+  const seatCount = config.seatCount + 1;
+  if (seatCount > roomSeatCap(config)) return null;
+  let map = config.map;
+  if (config.mode === 'base' && seatCount > MAPS[map].maxPlayers) {
+    map = seatCount <= MAPS.base56.maxPlayers ? 'base56' : 'base78';
+  }
+  const grown = { ...config, map, seatCount };
+  return roomConfigError(grown) === null ? grown : null;
+}
+
 export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
   const o = record(x, path);
   const { mode, scenario, options } = parseMode(o, path);
   const map = field(o, 'map', oneOf(MAP_IDS), path) as BaseMapId;
-  const range =
-    mode.id === 'base'
-      ? { min: MAPS[map].minPlayers, max: MAPS[map].maxPlayers }
-      : playerRange({ mode: mode.id, scenario: scenario ?? mode.scenarios[0] ?? null });
+  const range = roomSeatRange({ mode: mode.id, map, scenario });
   const rules = record(o.rules, `${path}.rules`);
   const timer = field(o, 'turnTimerSec', nullable(int(1, 3600)), path);
   if (timer !== null && !TIMER_STEPS.includes(timer)) {

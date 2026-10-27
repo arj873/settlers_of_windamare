@@ -17,6 +17,8 @@ import { tbseaHud } from '../expansions/tbsea/ui';
 import { tbpairHud } from '../expansions/tbpair/ui';
 import { epckHud } from '../expansions/epck/ui';
 import { eptbHud } from '../expansions/eptb/ui';
+import { backHud } from '../expansions/back/ui';
+import { twockHud } from '../expansions/twock/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -58,6 +60,11 @@ export interface ExtBuildCard {
   /** Pieces left / total for the counter (omit for no counter). */
   left?(state: GameState, player: PlayerId): number;
   total?(state: GameState, player: PlayerId): number;
+  /**
+   * Why the card is off besides missing resources (no spot, none left), shown with them in the
+   * disabled reason; null = no such reason. Default: none ("Not possible right now").
+   */
+  blocker?(state: GameState, player: PlayerId): string | null;
 }
 
 export interface HudExtension {
@@ -102,6 +109,8 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   tbpairHud,
   epckHud,
   eptbHud,
+  backHud,
+  twockHud,
   // new modules go here, one per line
 ];
 

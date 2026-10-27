@@ -342,6 +342,21 @@ const EXPANSION_GAMES: ExpansionGame[] = [
     },
   },
   {
+    label: 'T&B × T&B: Barbarian Attack + Traders & Barbarians',
+    config: { mode: 'tb+tb', scenario: 'tbpair/baTraders', vpToWin: 5 },
+    hidden: (view) => {
+      const tb = view.ext['tb'] as {
+        ba?: { deck: string[] };
+        traders?: { stacks: Record<string, string[]> };
+      };
+      if (!tb.ba || !tb.traders) return 'no BA or wagons';
+      // The masked placeholders (tb/engine/mask.ts): every card / commodity reads the same.
+      if (new Set(tb.ba.deck).size > 1) return 'the BA deck is visible';
+      if (new Set(Object.values(tb.traders.stacks).flat()).size > 1) return 'a stack is visible';
+      return null;
+    },
+  },
+  {
     label: 'Explorers & Pirates: Land Ho!',
     config: { mode: 'ep', scenario: 'ep/landHo', vpToWin: 5 },
     hidden: epHidden,
@@ -355,6 +370,16 @@ const EXPANSION_GAMES: ExpansionGame[] = [
     label: 'E&P + Traders & Barbarians: Fish for Catan',
     config: { mode: 'ep+tb', scenario: 'ep/fish', vpToWin: 5 },
     hidden: (view) => fishHidden(view) ?? epHidden(view),
+  },
+  {
+    label: 'Barbarian Attack + Cities & Knights',
+    config: { mode: 'ba+ck', scenario: 'tb/barbarianAttack', vpToWin: 6 },
+    hidden: ckHidden,
+  },
+  {
+    label: 'Catan for Two + Cities & Knights',
+    config: { mode: 'two+ck', scenario: 'tb/variants', vpToWin: 5, seatCount: 2 },
+    hidden: ckHidden,
   },
 ];
 

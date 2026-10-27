@@ -762,8 +762,9 @@ official rules for the Traders & Barbarians mix were found**):
 
 ### 8.3 Other
 
-- Not found: any official rule for C&K with Traders & Barbarians (only PROD's one-line compatibility),
-  or a 7-8 player C&K.
+- T&B and E&P combinations: the 2025 catan.com sheets, all built as modes (docs/rules/combos.md:
+  `tb+ck` §2, `ep+ck` §7, `ba+ck` §10, `two+ck` §11). E&P + C&K at 5-6 players: no official text
+  (§12). Not found: a 7-8 player C&K.
 
 ---
 

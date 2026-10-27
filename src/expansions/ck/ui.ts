@@ -39,19 +39,25 @@ import {
   WALLS_PER_PLAYER,
   activeStrength,
   barbarianStrength,
+  canChase,
   choiceOf,
   ckSlice,
   commodityCount,
   defenderStrength,
+  displaceTargets,
+  giveRatio,
   improvementCost,
   isCommodity,
+  knightActionBlocker,
   knightsInSupply,
   knightsOf,
   metropolisesOf,
+  moveTargets,
   phaseOf,
   promptFor,
   redDieDraws,
   wallsOf,
+  shipSails,
   type Choice,
   type CkAction,
   type Commodity,
@@ -131,6 +137,15 @@ export function commodityFace(c: Commodity, w: number, ...extra: Child[]): HTMLE
     svg(COMMODITY_SVG[c], Math.round(w * 0.72)),
     ...extra,
   );
+}
+
+/** A card face standing for "commodity cards" of any type (players' public totals). */
+function anyCommodityFace(w: number): HTMLElement {
+  return h('span', {
+    class: 'card-face ck-cf ck-cf-any',
+    style: { '--cw': `${w}px` },
+    attrs: { 'aria-hidden': 'true' },
+  });
 }
 
 export function goodFace(g: Good, w: number): HTMLElement {
@@ -276,6 +291,9 @@ function trackRows(state: GameState, view: HudView, send: Send): HTMLElement {
               class: 'btn btn-sm ck-improve',
               disabled: !can,
               title: `${IMPROVEMENT_NAMES[t][level]} (level ${level + 1}): ${cost} ${TRACK_COMMODITY[t]}`,
+              attrs: {
+                'aria-label': `Improve ${t} to level ${level + 1} (${IMPROVEMENT_NAMES[t][level]}): ${cost} ${TRACK_COMMODITY[t]}`,
+              },
               on: { click: () => can && send(can) },
             },
             `${cost}×`,
@@ -313,7 +331,8 @@ function playerRows(state: GameState): HTMLElement {
         h(
           'span',
           { class: 'ck-stat', title: 'Commodity cards' },
-          commodityFace('coin', 11),
+          // Not a coin face: online, other seats' split is hidden and only the total is known.
+          anyCommodityFace(11),
           String(commodities),
         ),
         h(
@@ -351,8 +370,8 @@ function playerRows(state: GameState): HTMLElement {
   );
 }
 
-function select(opts: readonly [string, string][]): HTMLSelectElement {
-  const el = h('select', { class: 'ck-select' });
+function select(opts: readonly [string, string][], label: string): HTMLSelectElement {
+  const el = h('select', { class: 'ck-select', attrs: { 'aria-label': label } });
   for (const [value, label] of opts) {
     const o = document.createElement('option');
     o.value = value;
@@ -362,13 +381,24 @@ function select(opts: readonly [string, string][]): HTMLSelectElement {
   return el;
 }
 
-function bankForm(view: HudView, send: Send): HTMLElement | null {
+function bankForm(state: GameState, view: HudView, send: Send): HTMLElement | null {
   const trades = mine(view, 'ck/bankTrade');
   if (trades.length === 0) return null;
   const gives = [...new Set(trades.map((a) => field(a, 'give') as Good))];
-  const give = select(gives.map((g) => [g, goodLabel(g)]));
-  const receive = select([]);
+  const give = select(
+    gives.map((g) => [g, goodLabel(g)]),
+    'Bank: give',
+  );
+  const receive = select([], 'Bank: receive');
   const go = h('button', { class: 'btn btn-sm' }, 'Trade');
+  // The button states the price: one click trades at once (no dialog).
+  const price = () => {
+    const n = giveRatio(state, view.viewer, give.value as Good);
+    go.textContent = `Trade ${n}:1`;
+    const got = goodLabel(receive.value as Good);
+    go.setAttribute('aria-label', `Give ${n} ${goodLabel(give.value as Good)} for 1 ${got}`);
+  };
+  receive.addEventListener('change', price);
   const sync = () => {
     const options = trades.filter((a) => field(a, 'give') === give.value);
     receive.replaceChildren(
@@ -379,6 +409,7 @@ function bankForm(view: HudView, send: Send): HTMLElement | null {
         return o;
       }),
     );
+    price();
   };
   give.addEventListener('change', sync);
   go.addEventListener('click', () => {
@@ -395,10 +426,22 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
   if (mine(view, 'ck/offerTrade').length === 0) return null;
   const me = view.viewer;
   const goods = [...RESOURCES, ...COMMODITIES] as Good[];
-  const counts = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const give = select(goods.map((g) => [g, goodLabel(g)]));
-  const wantN = select([1, 2, 3].map((n) => [String(n), String(n)]));
-  const want = select(goods.map((g) => [g, goodLabel(g)]));
+  const counts = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: give count',
+  );
+  const give = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: give',
+  );
+  const wantN = select(
+    [1, 2, 3].map((n) => [String(n), String(n)]),
+    'Offer: want count',
+  );
+  const want = select(
+    goods.map((g) => [g, goodLabel(g)]),
+    'Offer: want',
+  );
   want.value = 'coin';
   const go = h('button', { class: 'btn btn-sm' }, 'Offer');
   const others = state.players.filter((p) => p.id !== me).map((p) => p.id);
@@ -429,8 +472,8 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
 function alchemistForm(view: HudView, send: Send): HTMLElement | null {
   if (mine(view, 'ck/alchemist').length === 0) return null;
   const faces = [1, 2, 3, 4, 5, 6].map((n): [string, string] => [String(n), String(n)]);
-  const yellow = select(faces);
-  const red = select(faces);
+  const yellow = select(faces, 'Alchemist: yellow die');
+  const red = select(faces, 'Alchemist: red die');
   return h(
     'div',
     { class: 'ck-form' },
@@ -484,11 +527,25 @@ function progressList(state: GameState, view: HudView, send: Send): HTMLElement 
         { class: `ck-card ck-card-${CARD_TRACK[c]}` },
         h('span', { class: 'ck-card-name', title: CARD_TEXT[c] }, CARD_NAMES[c], n > 1 && ` ×${n}`),
         h('span', { class: 'muted ck-card-text' }, CARD_TEXT[c]),
-        play && h('button', { class: 'btn btn-sm', on: { click: () => send(play) } }, 'Play'),
+        // Named per card: two cards' "Play" buttons must not share a name.
+        play &&
+          h(
+            'button',
+            {
+              class: 'btn btn-sm',
+              attrs: { 'aria-label': `Play ${CARD_NAMES[c]}` },
+              on: { click: () => send(play) },
+            },
+            'Play',
+          ),
         drop &&
           h(
             'button',
-            { class: 'btn btn-sm btn-ghost', on: { click: () => send(drop) } },
+            {
+              class: 'btn btn-sm btn-ghost',
+              attrs: { 'aria-label': `Discard ${CARD_NAMES[c]}` },
+              on: { click: () => send(drop) },
+            },
             'Discard',
           ),
       );
@@ -513,6 +570,7 @@ function stepper(g: Good, max: number, onChange: () => void): HTMLElement {
     'div',
     { class: 'ck-step' },
     goodFace(g, 22),
+    h('span', { class: 'ck-step-name' }, goodLabel(g)),
     h(
       'button',
       {
@@ -767,6 +825,80 @@ function promptDialog(state: GameState, view: HudView, send: Send): HudDialog | 
   };
 }
 
+/** Sentence-case list: "move, displace or chase". */
+const orList = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`;
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * What the selected knight (phase ck/knight) can do, for the turn pill (`pill`) and the knight
+ * dialog (`text`): both say the same, from the engine's own reason when it cannot act.
+ */
+export function knightStatus(state: GameState, view: HudView): { pill: string; text: string } {
+  const phase = phaseOf(state);
+  if (phase.kind !== 'ck/knight') return { pill: '', text: '' };
+  const p = view.viewer;
+  const v = phase.vertex;
+  const tidy = [
+    mine(view, 'ck/activateKnight').length > 0 && 'activate',
+    mine(view, 'ck/promoteKnight').length > 0 && 'promote',
+  ].filter((x): x is string => typeof x === 'string');
+  const orTidy = tidy.length > 0 ? `: ${orList(tidy)} it, or close` : ': close';
+  if (phase.resume === 'specialBuild') {
+    return {
+      pill: `Special build${orTidy}`,
+      text: 'In the special build phase a knight can only be activated or promoted.',
+    };
+  }
+  const blocker = knightActionBlocker(state, p, v);
+  if (blocker === null) {
+    const moves = moveTargets(state, p, v).length > 0;
+    const displaces = displaceTargets(state, p, v).length > 0;
+    const chases = canChase(state, p, v);
+    const verbs = [
+      moves && 'move',
+      displaces && 'displace a weaker knight',
+      chases && 'chase the robber',
+    ].filter((x): x is string => typeof x === 'string');
+    const click = [
+      moves && 'click a highlighted spot to move there',
+      displaces && 'click a weaker knight to displace it',
+    ].filter((x): x is string => typeof x === 'string');
+    return {
+      pill: `Knight: ${orList(verbs)}`,
+      text:
+        click.length > 0
+          ? `${capital(orList(click))}${chases ? ', or chase the robber' : ''}.`
+          : 'This knight can chase the robber away.',
+    };
+  }
+  if (phase.resume === 'preRoll') {
+    return {
+      pill: 'Before the roll a knight can only chase the robber',
+      text: `Before the roll a knight can only chase the robber, and ${blocker}.`,
+    };
+  }
+  if (blocker === 'only an active knight can act') {
+    return {
+      pill: `Inactive knight${orTidy}`,
+      text: 'An inactive knight cannot move, displace or chase. Once activated it can act from your next turn.',
+    };
+  }
+  if (blocker === 'a knight activated this turn cannot act yet') {
+    return {
+      pill: `Knight activated this turn${orTidy}`,
+      text: 'This knight was activated this turn: it can act from your next turn.',
+    };
+  }
+  if (blocker === 'that knight has nowhere to go') {
+    return {
+      pill: `Knight has nowhere to go${orTidy}`,
+      text: 'This active knight has nowhere to go: no free spot along your roads, no weaker knight in reach, and the robber is not on a hex next to it.',
+    };
+  }
+  return { pill: `Your knight cannot act${orTidy}`, text: `This knight cannot act: ${blocker}.` };
+}
+
 function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | null {
   const phase = phaseOf(state);
   if (phase.kind !== 'ck/knight' || state.turn.current !== view.viewer) return null;
@@ -774,7 +906,6 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
   const cancel = mine(view, 'ck/cancel')[0];
   const activate = mine(view, 'ck/activateKnight')[0];
   const promote = mine(view, 'ck/promoteKnight')[0];
-  const targets = mine(view, 'ck/pickVertex').length;
   const k = ckSlice(state).knights[phase.vertex];
   const costFaces = (item: string) =>
     RESOURCES.flatMap((r) =>
@@ -793,15 +924,7 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
     title: k ? `${KNIGHT_TITLE[k.level]} knight (${k.active ? 'active' : 'inactive'})` : 'Knight',
     modal: false,
     body: [
-      h(
-        'p',
-        {},
-        targets > 0
-          ? 'Click a highlighted spot to move there, or onto a weaker knight to displace it.'
-          : chase
-            ? 'This knight can chase the robber away.'
-            : 'This knight cannot act now (it must be active, and not activated this turn).',
-      ),
+      h('p', {}, knightStatus(state, view).text),
       h(
         'div',
         { class: 'ck-choices' },
@@ -822,13 +945,18 @@ export const ckHud: HudExtension = {
   id: CK,
 
   panel(state, view, send) {
-    const body = h('div', { class: 'ck-panel' }, barbarianTrack(state));
+    // Barbarian Attack + C&K has no barbarian ship (its barbarians land on the coast).
+    const body = h(
+      'div',
+      { class: 'ck-panel' },
+      ...(shipSails(state) ? [barbarianTrack(state)] : []),
+    );
     if (!view.spectator && state.players[view.viewer]) {
       body.append(trackRows(state, view, send));
       const extra = [
         alchemistForm(view, send),
         progressList(state, view, send),
-        bankForm(view, send),
+        bankForm(state, view, send),
         offerForm(state, view, send),
       ].filter((x): x is HTMLElement => x !== null);
       if (extra.length > 0) body.append(h('div', { class: 'ck-actions' }, ...extra));
@@ -853,6 +981,8 @@ export const ckHud: HudExtension = {
       actionType: 'ck/buildKnight',
       glyph: 'knight',
       costItem: KNIGHT_ITEM,
+      // Barbarian Attack + C&K: knights stand on paths (that module's own cards).
+      available: shipSails,
       left: (state, p) => knightsInSupply(state, p, 1),
       total: () => KNIGHTS_PER_LEVEL,
     },
@@ -863,6 +993,7 @@ export const ckHud: HudExtension = {
       actionType: 'ck/selectKnight',
       glyph: 'knight',
       costItem: 'ck/none',
+      available: shipSails,
     },
     {
       mode: 'ck/wall',
@@ -888,9 +1019,10 @@ export const ckHud: HudExtension = {
   hint(state, view) {
     const phase = phaseOf(state);
     const prompt = promptFor(state);
-    if (prompt && prompt.actor === view.viewer) return promptText(state).text;
+    // (The knight phase is a prompt too, with no prompt text: the dialog says the same.)
     if (phase.kind === 'ck/knight' && state.turn.current === view.viewer)
-      return 'Move, displace or chase the robber';
+      return knightStatus(state, view).pill;
+    if (prompt && prompt.actor === view.viewer) return promptText(state).text;
     if (
       (phase.kind === 'ck/sabotage' || phase.kind === 'ck/wedding') &&
       (phase.pending[view.viewer] ?? 0) > 0

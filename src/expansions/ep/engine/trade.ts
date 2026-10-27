@@ -6,6 +6,7 @@
  */
 import { MAX_TRADE_OFFERS_PER_TURN, RESOURCES } from '../../../engine/constants';
 import { fail, log, ok } from '../../../engine/actions/common';
+import { extendTradeLog } from '../../../engine/actions/trade';
 import type { Override } from '../../../engine/expansions/types';
 import { playerName } from '../../../engine/rules/text';
 import { hasResources, isValidBundle, toCounts, totalResources } from '../../../engine/resources';
@@ -171,6 +172,9 @@ export const tradeOverrides: {
       const net = g.want - g.give;
       gold[action.player] = (gold[action.player] ?? 0) + net;
       gold[action.partner] = (gold[action.partner] ?? 0) - net;
+      // The base line names the resources only ("traded  to X for "): add the gold.
+      const part = (n: number) => (n > 0 ? `${n} gold` : '');
+      extendTradeLog(draft, action.player, action.partner, part(g.give), part(g.want));
     }
     return r;
   },

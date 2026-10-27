@@ -18,6 +18,8 @@ import {
 } from '../engine';
 import {
   discardAction,
+  discardRows,
+  discardStatus,
   draftToAction,
   emptyDraft,
   stepDiscard,
@@ -36,6 +38,7 @@ import {
   availability,
   bestRatios,
   blockReasons,
+  tradeBlockReason,
   buildCards,
   devCardRows,
   DEV_CARD_INFO,
@@ -76,6 +79,13 @@ const BUILD_LABEL: Record<BuildKind, string> = {
   road: 'Road',
   settlement: 'Settlement',
   city: 'City',
+};
+
+/** The board action each base build card's place mode submits. */
+const BUILD_ACTION: Record<Exclude<BuildKind, 'dev'>, string> = {
+  road: 'buildRoad',
+  settlement: 'buildSettlement',
+  city: 'buildCity',
 };
 
 const BUILD_COST: Record<BuildKind, Partial<Record<Resource, number>>> = {
@@ -787,18 +797,27 @@ export class Hud {
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
+    // The CSS sizes the narrowest fan from these (hud.css, `.hand`).
+    hand.style.setProperty('--hand-n', String(hand.querySelectorAll(':scope > .hcard').length));
+    hand.style.setProperty(
+      '--hand-seps',
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
 
-    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: Dialog) =>
-      h(
+    const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: 'trade' | 'bank') => {
+      const why = enabled && !over ? null : tradeBlockReason(state, view.viewer, d);
+      return h(
         'button',
         {
           class: `act tbtn${this.dialog === d ? ' is-active' : ''}`,
           disabled: !enabled || over,
           on: { click: () => this.open(d) },
+          ...(why ? { attrs: { 'data-why': why } } : {}),
         },
         glyph(label === 'Trade' ? 'trade' : 'bank', 20),
         h('span', {}, label),
       );
+    };
     const trade = h(
       'div',
       { class: 'trade-col wood' },
@@ -814,14 +833,20 @@ export class Hud {
         .filter((c) => !hiddenBaseCards(state).has(c.kind))
         .map((c) => {
           const why = blockReasons(state, view.viewer, over ? { ...c, enabled: false } : c);
+          // What the card's place mode submits on the board (the playtest CLI reads it).
+          const actionsAttr: Record<string, string> =
+            c.kind === 'dev' ? {} : { 'data-actions': BUILD_ACTION[c.kind] };
           const button = h(
             'button',
             {
               class: `act bcard${c.kind !== 'dev' && this.placeMode === c.kind ? ' is-active' : ''}${c.left === 0 ? ' is-out' : ''}`,
               disabled: !c.enabled || over,
               ...(why.length > 0
-                ? { attrs: { 'data-why': why.map((w) => w.text).join('; ') } }
-                : { title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}` }),
+                ? { attrs: { 'data-why': why.map((w) => w.text).join('; '), ...actionsAttr } }
+                : {
+                    title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
+                    attrs: actionsAttr,
+                  }),
               on: {
                 click:
                   c.kind === 'dev'
@@ -887,6 +912,16 @@ export class Hud {
         const cost = costOf(state, c.costItem ?? c.mode);
         const left = c.left?.(state, view.viewer);
         const total = c.total?.(state, view.viewer);
+        const hand = state.players[view.viewer]?.resources;
+        const short =
+          cost && hand
+            ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
+            : [];
+        const reasons = [
+          short.length > 0 ? `Missing ${short.join(', ')}` : null,
+          over ? null : (c.blocker?.(state, view.viewer) ?? null),
+        ].filter((x): x is string => x !== null);
+        const why = reasons.length > 0 ? reasons.join('; ') : 'Not possible right now';
         build.append(
           h(
             'span',
@@ -897,7 +932,11 @@ export class Hud {
                 class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
                 disabled: !enabled,
                 title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
-                attrs: enabled ? {} : { 'data-why': 'Not possible right now' },
+                // data-actions: what the card's place mode submits on the board (playtest CLI).
+                attrs: {
+                  'data-actions': [c.actionType, ...(c.alsoActions ?? [])].join(' '),
+                  ...(enabled ? {} : { 'data-why': why }),
+                },
                 on: { click: toggleMode(c.mode) },
               },
               h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),
@@ -919,6 +958,7 @@ export class Hud {
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
+    build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
   }
 
@@ -1306,15 +1346,17 @@ export class Hud {
     value: number,
     onDelta: (d: number) => void,
     max: number,
+    held?: number,
   ): HTMLElement {
     return h(
       'div',
       {
-        class: `step${value > 0 ? ' has-value' : ''}`,
+        class: `step${value > 0 ? ' has-value' : ''}${held === 0 ? ' is-none' : ''}`,
         style: { '--rc': `var(--res-${resource})` },
       },
       resourceIcon(resource, 26),
       h('span', { class: 'step-name' }, RESOURCE_LABEL[resource]),
+      held === undefined ? null : h('span', { class: 'step-have' }, `you have ${held}`),
       h(
         'div',
         { class: 'step-ctl' },
@@ -1635,6 +1677,8 @@ export class Hud {
   private discardDialog(view: HudView, hand: ResourceCounts, required: number) {
     const sel = this.discardSel;
     const error = validateDiscard(hand, required, sel);
+    const status = discardStatus(hand, required, sel);
+    const rows = discardRows(hand, sel, required);
     return {
       key: `discard-${view.viewer}`,
       title: `Discard ${required} cards`,
@@ -1648,25 +1692,23 @@ export class Hud {
         h(
           'div',
           { class: 'col wide-col' },
-          ...RESOURCES.filter((r) => hand[r] > 0).map((r) =>
+          ...rows.map((row) =>
             this.stepper(
-              r,
-              sel[r],
+              row.resource,
+              row.picked,
               (d) => {
-                this.discardSel = stepDiscard(sel, r, d, hand, required);
+                this.discardSel = stepDiscard(sel, row.resource, d, hand, required);
                 this.refresh();
               },
-              Math.min(
-                hand[r],
-                required - (Object.values(sel).reduce((a, b) => a + b, 0) - sel[r]),
-              ),
+              row.max,
+              row.held,
             ),
           ),
         ),
         h(
           'p',
-          { class: `summary${error ? '' : ' is-ok'}` },
-          error ?? `Discarding ${required} of ${required}`,
+          { class: `discard-status${status.ok ? ' is-ok' : ''}`, attrs: { role: 'status' } },
+          status.text,
         ),
         h(
           'div',

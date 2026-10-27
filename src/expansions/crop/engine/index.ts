@@ -520,6 +520,7 @@ export const cropLegal: LegalGenerator = (state) => {
 export const cropModule: ExpansionModule = {
   id: CROP,
   name: 'Crop Trust',
+  icon: '🌱',
   players: { min: 3, max: 4 },
   maps: [CROP_FIRST19, CROP_RANDOM19],
   scenarios: [

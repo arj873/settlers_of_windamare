@@ -22,6 +22,7 @@ import {
   levelOf,
   mainTurn,
   moveGood,
+  ownerName,
   promoteBlocker,
   returnCard,
   stealRandom,
@@ -532,7 +533,7 @@ export function applyCardChoice(draft: GameState, phase: CardPhase, choice: Card
       const k = s.knights[choice.id];
       if (!k) return main();
       Reflect.deleteProperty(s.knights, choice.id);
-      log(draft, p, `${pn(draft, p)} drove off a knight of ${pn(draft, k.owner)}`);
+      log(draft, p, `${pn(draft, p)} drove off a knight of ${ownerName(draft, k.owner)}`);
       draft.phase = (displaced(draft, k, choice.id) as Phase | null) ?? { kind: 'main' };
       return;
     }

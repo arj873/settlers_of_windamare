@@ -26,6 +26,20 @@ For card E5b the two Explorers & Pirates sheets were read in full (text and diag
 and, to check them, the E&P Mission Guide (`2025-04/CN3085 … Missions.pdf`: VP targets, the
 Land Ho! board) and Rulebook.
 
+For card C5 (the remaining C&K combinations) the two T&B + C&K sheets not built before were read in
+full (text extracted from the PDFs, 2026-10-26; both are 2 pages of text, no set-up diagrams):
+
+- `2025-07/Barbarian Attack w CnK.pdf` (§10 below)
+- `2025-07/CATAN for 2 w CnK.pdf` (§11 below)
+
+and, for E&P + C&K at 5-6 players (§12): the E&P 5-6 rules (`2025-04/CN3086 … E&P 5-6 Expansion
+Rules.pdf`), both E&P + C&K documents on catan.com (`2025-08/ExplorersPirates w CnK.pdf` and the
+older "rules suggestion" `2025-08/ExplorersPirates w CnK_0.pdf`), the E&P and C&K FAQs
+(https://www.catan.com/faq/explorer-pirates, /faq/cities-knights), the T&B FAQ (BA entries 1-11)
+and the 5-6 player page (/explore-catan/catan-basegame-expansions/play-catan-5-6-players). With
+these, every C&K combination catan.com publishes is built: Seafarers (product page), the six T&B
+sheets (Fishing, Rivers, Merchant Trains, T&B, Barbarian Attack, Catan for Two) and E&P.
+
 **Status legend:** OK = implemented as written and tested; ours = our ruling where the sources
 are silent; — = not implemented.
 
@@ -50,6 +64,8 @@ Composition order per mode (tested in each combo's `the mode` test):
 | `tb+seafarers` | `tbsea`, `seafarers`, `tb` | `afterProduction`: T&B fish (a ground under the pirate pays nothing), then Seafarers gold. `roadLength` (chained): `tbsea` (Caravans: camel-weighted trade route; Barbarian Attack: cut at a conquered settlement), Seafarers' max, T&B last (Traders & Barbarians: 0; Caravans: max with camel roads). `onSeven`, `rollDice`: T&B only. |
 | `ep+ck`        | `epck`, `ck`, `ep`         | `setupBuilding` / `setupOrder`: city first (pays), harbor second. `afterProduction`: C&K commodities + Aqueduct, then E&P gold. `onSeven`: E&P's pirate is awake from the first 7 (C&K's sleeping robber is skipped), the Aqueduct pays 1 gold at once and 1 resource after the 7.                                                       |
 | `ep+tb`        | `eptb`, `tb`, `ep`         | None shared: T&B's and E&P's `afterProduction` both return nothing (fish, then gold).                                                                                                                                                                                                                                                    |
+| `ba+ck`        | `back`, `ck`, `tb`         | `onRoll`: C&K's event die (no ship: `shipSails`). `afterProduction`: the ship's barbarian, C&K's commodities (none from conquered hexes) + Aqueduct, then T&B's. `onSeven`: discards, then BA's steal from any player (no robber; C&K's sleeping robber is skipped).                                                                     |
+| `two+ck`       | `twock`, `ck`, `tb`        | `rollDice`: T&B only (the second roll's production dice differ from the first; C&K's event die is rolled in both Roll Dice phases). `afterProduction`, `onSeven`: C&K's (T&B's Catan for Two has none).                                                                                                                                  |
 
 C2 added one more framework seam, so a combination scenario can be a T&B scenario on a
 Seafarers map (neither module knew the other's scenario ids):
@@ -251,9 +267,9 @@ are §2b's and apply unchanged. Per scenario:
 | Fishing: the lake only where surrounded by land; no lake on Four Islands, Fog, Cloth, Wonders, New World                                                                                                                                                                                          | OK       | `overlays.ts` `Plan.lake` (Desert, Tribe: inner hexes).                                                                                                                                                                                                                                     |
 | Fishing, Four Islands: 4 + 8 by one small island, 6 + 10 by the other, 5 and 9 by one big island each                                                                                                                                                                                             | OK, ours | Which small / big island gets which pair: at random. Grounds: a notch of two land hexes and one water hex (the ground lies on that water hex), never sharing a corner, away from harbours when possible.                                                                                    |
 | Fishing, Fog / Desert / Tribe / Wonders: grounds "according to your preference" (face-up islands; main island + unexplored regions; main island; large and small islands)                                                                                                                         | ours     | Random notches in the named area, spread out (a far notch first).                                                                                                                                                                                                                           |
-| Fishing, Desert 3p: the lake replaces the 2 field, the 2 disc joins the 12 pasture                                                                                                                                                                                                                | OK       | 2,4 → lake; the 2025 map prints 12 on the 5,9 pasture (every 2025 Desert diagram; ours had 11), so the pair uses 12 there and the 2 joins it (`extraTokens`).                                                                                                                               |
+| Fishing, Desert 3p: the lake replaces the 2 field, the 2 disc joins the 12 pasture                                                                                                                                                                                                                | OK       | 2,4 → lake; the 2025 map prints 12 on the 5,9 pasture (every 2025 Desert diagram; ours had 11), so the pair uses 12 there and the 2 joins it (T&B's `alsoOn`).                                                                                                                              |
 | Fishing, Desert 4p: the lake replaces the 11 hill, the 11 joins the 2 hill                                                                                                                                                                                                                        | OK       | 3,5 → lake; 4,12 produces on 2 and 11.                                                                                                                                                                                                                                                      |
-| A hex with two discs produces on either number                                                                                                                                                                                                                                                    | OK       | `board.ext.tbsea.extraTokens`, paid by tbsea's `production` hook (the robber blocks it); drawn by `tbsea/render.ts`.                                                                                                                                                                        |
+| A hex with two discs produces on either number                                                                                                                                                                                                                                                    | OK       | T&B's `TbBoard.alsoOn` (C4's seam): T&B pays it (not with the robber on it, nor conquered) and draws the second disc.                                                                                                                                                                       |
 | Fishing, Tribe: the lake replaces the 12 field; the robber only on the large island                                                                                                                                                                                                               | OK       | 3,7 → lake; Seafarers' Tribe already bans the robber from the outer islands.                                                                                                                                                                                                                |
 | Fishing, Cloth: 3 + 3 grounds by the two large islands; 2 fish remove the pirate only with a route to a small-island village                                                                                                                                                                      | OK       | `fishPirateBlocker` reads Cloth's village links.                                                                                                                                                                                                                                            |
 | Fishing, Wonders: no pirate in the scenario, so the 2-fish pirate action never comes up                                                                                                                                                                                                           | OK       |                                                                                                                                                                                                                                                                                             |
@@ -267,7 +283,7 @@ are §2b's and apply unchanged. Per scenario:
 | Rivers, Fog: the diagrams (rivers on both home islands, second discs on the hills); robber on a swamp; gold fields produce resource cards                                                                                                                                                         | OK       | `RIVERS_FOG3/4`; 4p has 8 harbours (the sheet drops 6,10 S). Gold in Seafarers is a resource choice, never T&B coins (pinned by a test).                                                                                                                                                    |
 | Rivers, Desert: two diagram versions per player count (v1: swamps in the desert belt, the mouths open onto the middle desert and the strip's gold field; v2: the 3-hex river replaces the strip)                                                                                                  | OK       | Two scenarios. A mouth on land is a bridge site like any river crossing (ours: no text). Bridge sites are not printed at the sheets' resolution: the river's crossings + the mouth, 7 (as T5).                                                                                              |
 | T&B, Desert: castle on 1,1, quarry beyond the desert (5,1), glassworks on 3,7 (3p: a sea cell, its harbour gone); barbarians on 5,3 NW, 3,5 SW, 2,2 SW; no robber, no pirate                                                                                                                      | OK       | `TRADERS_DESERT3/4`; plazas spoke to the trade hexes' corners on other land; their sea corners and sides are closed (T&B's `noBuild` / `noRoad`, the red X marks).                                                                                                                          |
-| T&B, Desert: the board prints a 2 and a 12                                                                                                                                                                                                                                                        | OK, ours | Not re-rolled (T&B seam `keep212`, as T&B's own 5-6 board).                                                                                                                                                                                                                                 |
+| T&B, Desert: the board prints a 2 and a 12                                                                                                                                                                                                                                                        | OK, ours | Not re-rolled: T&B re-rolls a 2 or 12 only when no hex carries them (C4's rule, also T&B's 5-6 board).                                                                                                                                                                                      |
 | BA, Desert: the castle (3p 2,0, 4p 3,3), the diagram's numbers; barbarians and knights only on the main island; attacks after building there or on an unexplored region                                                                                                                           | OK, ours | Coast = the main island's coastal hexes (deserts count as land), check order clockwise from the castle. Knights: T&B seam `knightArea`. "Unexplored region" read as every other land: attacks after every building, as in T&B (ours). The 4p coast has two 9s: both get a barbarian on a 9. |
 | BA, Desert: start barbarians on the coastal 2 and 12; 14 VP                                                                                                                                                                                                                                       | OK       | T&B's own start.                                                                                                                                                                                                                                                                            |
 
@@ -311,11 +327,10 @@ pirate, although the BA sheet's general rule says neither is used: we follow the
 
 Seafarers `maps.ts`: `boardWith`, `dealTokens`, `tokenRule`, `randomHarbors` exported. T&B:
 `maps.ts` exports `ARROWS`, `sharedEdge`, `RIVERS_19` (+ its type); `TbBoard.robberOnOasis`,
-`keep212`, `knightArea` (state.ts, read in index.ts and ba.ts); `render.ts` exports `disc`;
+`knightArea` (state.ts, read in index.ts and ba.ts); second discs use C4's `alsoOn`;
 `bots.ts`: the dev-card count stands aside when Seafarers is composed (Seafarers' own count
 includes the Tribe's gifts), wagons are checked after the set-up (a gold choice may open in
-it), the robber may stand on an oasis the board allows. `src/render/expansions.ts`: the tbsea
-drawer (one line). Tests: `src/net/sessionExpansions.test.ts` (two C3 scenarios),
+it), the robber may stand on an oasis the board allows. Tests: `src/net/sessionExpansions.test.ts` (two C3 scenarios),
 `scripts/e2e-server.ts` (Fishermen on the Fog Islands online, fish and fog masked),
 `scripts/shots-tbsea.mjs --c3`.
 
@@ -385,17 +400,95 @@ fishing grounds. 3-4 players. Tests: `src/expansions/tbpair/engine/tbpair.test.t
 | Fishing + Merchant Trains (our Caravans): 12 VP; the lake replaces a forest next to the watering hole; the 12 shares the 2's hex | OK, ours | The lake on a forest beside the oasis (red numbers never move: its number takes the 2's hex); `twoOnTwelve` now works outside Rivers too.            |
 
 Our T&B is the 5th edition: the boards are T&B's T5 boards, the sheets are written for T6 (same
-counts where it matters). The other six T&B × T&B sheets are listed in §3.
+counts where it matters). The other six T&B × T&B sheets: §2d.
+
+## 2d. T&B scenario pairs: the six sheets without Fishing — module `tbpair`, mode `tb+tb`
+
+Card C4. The six other 2025 sheets, read 2026-10-26 (one page each, two with a board diagram;
+under https://www.catan.com/sites/default/files/2025-07/: `Barbarian Attack w TradersnBarbarians.pdf`,
+`Merchant Trains w Barbarian Attack.pdf`, `Merchant Trains w Traders&Barbarians.pdf`,
+`RiversOfCatan w BarbarianAttack.pdf`, `Rivers of Catan w Merchant Trains.pdf`,
+`Rivers of Catan w TradersnBarbarians.pdf`). Same seam as §2c: each scenario plays as its two T&B
+scenarios (`playsAs`). Boards: `tbpair/engine/sheets.ts`. Rule changes T&B's features read sit on
+the board (`board.ext.tb.rules`, `TbSheetRules`); the rest is the module's. 3-4 players (the sheets
+are for the 3-4 box). Merchant Trains = our Caravans (camels), the watering hole = our oasis, "Poor
+Catanian" = our Poor Settler. Tests: `tbpair/engine/sheets.test.ts`, `tbpair/mask.test.ts`,
+`tbpair/ui.test.ts`; soundness for every scenario in `tbpair.test.ts`.
+
+**What the sheets say (our words).** Barbarian Attack + T&B (14 VP): the BA board; the 3 trade
+hexes and the 9 X markers in their places, BA's castle in its place; without 1 forest, 1 pasture
+and the desert; coast 2 hills, 1 forest, 2 pastures, 2 fields, 1 mountain; inner 1 hill, 1 forest,
+1 pasture, 2 fields, 2 mountains; the discs as shown, the castle trade hex takes the 12, the
+glassworks the 2 [img: every other disc is BA's; the quarry, on BA's desert spot, has none]; no
+Longest Route, Largest Army or robber; BA's development cards (not T&B's); one barbarian on the
+castle trade hex and one on the glassworks, no others. A barbarian placed on a coastal hex is also
+tied to one of the hex's edges or interior paths, one barbarian a path; when all are taken it goes
+to the centre; the two start barbarians stand at the centres. A conquered trade hex: disc face
+down, no more barbarians, no production; deliveries and pick-ups go on. Treason: the 2 barbarians
+may go to any unconquered hex, inland too, each tied to a path. A 2 or 12: no re-roll, a barbarian
+on the coastal hex with that number. A 7: no production, discards, no barbarian moves, steal 1
+random card from another player. A drive-off puts the barbarian on any unconquered hex, by a path.
+Merchant Trains + BA (12): the BA board, the watering hole instead of the desert (on the coast,
+so 2 start locations); barbarians do not affect the wagons. Merchant Trains + T&B (15): without 1
+hill, 1 forest, 1 pasture and the desert; trade hexes and X markers in place; the watering hole in
+the centre; the rest random; every disc, on the trade hexes too, none on the watering hole; no
+Longest Route, no robber; trade hexes produce (quarry brick, glassworks lumber/"wood", castle
+wool); barbarians do not affect the wagons. Rivers + BA (12): without 2 hills, 1 forest, 2
+pastures, 2 mountains and the desert; castle and river tiles as shown; coast 1 hill, 2 forests, 2
+pastures, 2 fields; inner 1 forest, 2 fields, 1 mountain; discs and start barbarians as shown
+[img: BA's discs, the swamps none, the 2 beside the 12; barbarians on the 2/12 hex and the 11];
+no negative VP for the Poor Catanian; the 2/12 hex produces and takes a barbarian on either
+number. Rivers + Merchant Trains (12): without 2 hills, 2 pastures, 1 field, 2 mountains and the
+desert; rivers as in Rivers of Catan; the watering hole in the centre; the 2 and 12 set aside,
+the rest dealt skipping the swamps, then the 2 on one 3 hex and the 12 on the other (both
+numbers produce); wagons may stand on bridge sites, bridge or not, and treat bridges as roads.
+Rivers + T&B (13): without 2 hills, 1 forest, 3 pastures, 1 field, 2 mountains and the desert;
+trade hexes and X markers in place, the river tiles not touching each other; the 2 set aside, the
+rest dealt (on the trade hexes too, not the swamps), the 2 on the 12 hex; 3 gold each plus set-up
+gold (a settlement or city on a river pays 1 gold only during set-up; a road on a river 1 gold);
+trade hexes produce as above; a bridge pays 2 gold; no negative VP for the Poor Catanian; a wagon
+across a river: 3 MP without a bridge, 1 over your bridge, 1 + 2 gold to the owner over
+another's.
+
+| Rule (sheet)                                                                                         | Status   | Engine                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BA + T&B: board, pools, discs (castle 12, glassworks 2, quarry none), BA castle                      | OK       | `sheets.ts` `baTraders` on the T&B frame (plazas): T&B's BA numbers, the trade hexes on BA's 12, 2 and desert spots.                                                                    |
+| BA + T&B: no Longest Route / Largest Army / robber; BA's deck only                                   | OK       | T&B: no road length, no robber, BA's `supply`; no Swift Journey with Barbarian Attack (`initTraders`).                                                                                  |
+| BA + T&B: start barbarians at the centre of the castle trade hex and the glassworks; no X barbarians | OK       | `rules.baStart`; `rules.barbarianPaths`: T&B's wagon barbarians start empty, BA's slice gets `paths`.                                                                                   |
+| BA + T&B: a barbarian on a hex is tied to one of its paths (one a path; the centre when full)        | OK, ours | `BaSlice.paths` (path → hex); a path barbarian is T&B's (`barbarianEdges`: +2 MP, drive-offs). Paths of a hex = its 6 sides + its spokes. The current player picks (`tbpair/landPath`). |
+| BA + T&B: a 2 or 12: no re-roll, a barbarian on that coastal hex                                     | OK       | T&B re-rolls 2 / 12 only when no hex carries them; `onRoll` lands the barbarian, the path is picked, then the roll goes on (`continueRoll`).                                            |
+| BA + T&B: a 7: discards, steal from another player, no barbarian moves                               | OK       | T&B's `sevenPhase`: Barbarian Attack's steal wins over T&B's barbarian move.                                                                                                            |
+| BA + T&B: drive-off → any unconquered hex, by a path                                                 | OK       | `tbpair/moveBarbarian` (from the wrapped `tb/driveOff`): hex, then path; back to the wagon move.                                                                                        |
+| BA + T&B: Treason → any unconquered hex, by a path                                                   | OK, ours | Wrapped `tb/buyCard`: pick a barbarian (by its path or a hex centre), a hex, a path; T&B's Q11 (two different destinations, not the source), and two different barbarians.              |
+| BA + T&B: Intrigue (not on the sheet)                                                                | OK, ours | Pick the barbarian taken (its path is free again).                                                                                                                                      |
+| BA + T&B: conquered trade hex: no production; deliveries go on                                       | OK       | The production hook skips conquered trade hexes; plazas never check conquest. Battles and Treason reach inland hexes (`barbarianHexes`).                                                |
+| BA + T&B: knights and the wagon both at the end of the turn                                          | OK, ours | Either order: from the wagon move to the knights and back (`tb/startKnights` / `tb/startWagon` wrapped); a wagon move once left is over.                                                |
+| Trade hexes produce (MT + T&B, Rivers + T&B; BA + T&B castle / glassworks)                           | OK       | `production` hook: quarry brick, glassworks lumber, castle wool (city 2), on their token and any extra number.                                                                          |
+| MT + BA: oasis on BA's desert, 2 starts; barbarians never stop a camel                               | OK       | `caravansBa`: the oasis's arrows that lead onto land; `camelOptions` never looked at barbarians. Oasis left out of BA's coast.                                                          |
+| MT + T&B: oasis in the centre, every disc (trade hexes too), no robber / Longest Route               | OK       | `caravansTraders`; with discs for 2 and 12 on the board T&B does not re-roll them.                                                                                                      |
+| Rivers + BA: the diagram (castle, rivers, discs), 2/12 hex, start barbarians on 2/12 and 11          | OK       | `riversBa`: T6's two rivers as drawn (mouths at the swamps' sea sides: ours), `twoOnTwelve`, `rules.baStart`.                                                                           |
+| Rivers + BA: the 2/12 hex produces and takes barbarians on both                                      | OK       | `hexHasNumber` in BA's landing; conquered, it pays nothing on the extra number either.                                                                                                  |
+| Rivers + BA, Rivers + T&B: no Poor Settler penalty                                                   | OK       | `rules.noPoorVp`.                                                                                                                                                                       |
+| Rivers + MT: the 2 and the 12 on the two 3 hexes                                                     | OK       | `board.ext.tb.alsoOn`; drawn as a small second disc (also Rivers' 2 on the 12).                                                                                                         |
+| Rivers + MT: camels on bridge sites, bridges as roads                                                | OK       | Camels never looked at bridge sites; a bridge is a road piece (camel-doubled road length).                                                                                              |
+| Rivers + T&B: rivers apart                                                                           | OK, ours | T&B's two rivers in their fixed places (apart, off the trade hexes); the sheet places them freely.                                                                                      |
+| Rivers + T&B: 3 gold; river settlement gold only in set-up; road gold; bridges 2                     | OK       | `rules.startGold`, `riverGoldSetupOnly`, `bridgeGold`.                                                                                                                                  |
+| Rivers + T&B: a wagon across a river 3 MP / 1 own bridge / 1 + 2 gold                                | OK       | `rules.riverCrossing` in `stepCost` / `tollGold`.                                                                                                                                       |
+
+T&B seams (small, additive): `TbBoard.alsoOn` / `rules`, `extraNumbers` / `hexHasNumber` /
+`sheetRules` / `barbarianEdges` (state.ts), `BaSlice.paths`, `barbarianHexes` and an exported
+`setBarbarians` (ba.ts), `tollGold` (traders.ts), the map helpers exported from maps.ts, the
+`extraNumbers` render layer. One behaviour change outside the sheets: T&B 5-6 (37 hexes, the 2 and
+12 on the board) no longer re-rolls them, as §2.6 of traders-barbarians.md says.
 
 ## 3. Not built (listed for follow-up cards)
 
-| Combination                                    | Why / what it needs                                                                                                                                                                                                                                                                                               |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Barbarian Attack + C&K (13 VP)                 | A redesign (barbarians land by a 3-dice rule, metropolis conquest, knight actions at turn end, special progress cards); scenarios-and-combos.md C4.                                                                                                                                                               |
-| Catan for Two + C&K (13 VP)                    | 2 players (C&K's module is 3-6), neutral knights, two-version forced trade.                                                                                                                                                                                                                                       |
-| T&B + Seafarers, the other Seafarers scenarios | Built (C3, §2d): every pair the five sheets set up, except Barbarian Attack with the Forgotten Tribe, the Pirate Islands and the Wonders (diagrams decoded in §2d; each needs a new rule seam).                                                                                                                   |
-| T&B × T&B, the six non-Fishing sheets          | The four Fishing pairs are built (§2c). Left: Barbarian Attack + T&B (14), Merchant Trains + BA / + T&B (12 / 15), Rivers + BA / + Merchant Trains / + T&B (12 / 12 / 13): T6 boards (watering hole, commodity hexes that produce, barbarians tied to hex paths) and per-pair rules (traders-barbarians.md §8.1). |
-| Explorers & Pirates + C&K / + T&B              | Built (E5b): §7 and §8. E&P + Seafarers is officially impossible (`conflicts`).                                                                                                                                                                                                                                   |
+| Combination                                    | Why / what it needs                                                                                                                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T&B + Seafarers, the other Seafarers scenarios | Built (C3, §2d): every pair the five sheets set up, except Barbarian Attack with the Forgotten Tribe, the Pirate Islands and the Wonders (diagrams decoded in §2d; each needs a new rule seam). |
+| Explorers & Pirates + C&K / + T&B              | Built (E5b): §7 and §8. E&P + Seafarers is officially impossible (`conflicts`).                                                                                                                 |
+| Barbarian Attack + C&K, Catan for Two + C&K    | Built (C5): §10 and §11.                                                                                                                                                                        |
+| E&P + C&K at 5-6 players                       | No official text (§12): refused.                                                                                                                                                                |
 
 ## 4. Variants with the combined modes
 
@@ -445,6 +538,20 @@ failures, 0 errors, 0 stalls, 0 capped; average turns of a finished game in brac
 | `tb+tb` Fishing + Traders & Barbarians | 300 (198)         | 50 (165)         |
 | `tb+tb` Fishing + Barbarian Attack     | 300 (360)         | 50 (365)         |
 | `tb+tb` Fishing + Caravans             | 300 (276)         | 50 (274)         |
+
+C4, the six other `tb+tb` sheets (same flags). Every run: 0 invariant failures, 0 errors, 0
+stalls, 0 capped. Spot runs after the T&B seams (20 games each, all clean): `tb` Traders &
+Barbarians 6p and Barbarian Attack 4p, `tb+seafarers` Barbarian Attack, `tb+tb` Fishing + BA,
+`tb+ck` Traders & Barbarians.
+
+| Mode / scenario                                 | 4p (300) finished | 3p (50) finished |
+| ----------------------------------------------- | ----------------- | ---------------- |
+| `tb+tb` Barbarian Attack + Traders & Barbarians | 300 (285)         | 50 (225)         |
+| `tb+tb` Caravans + Barbarian Attack             | 300 (341)         | 50 (333)         |
+| `tb+tb` Caravans + Traders & Barbarians         | 300 (264)         | 50 (219)         |
+| `tb+tb` Rivers + Barbarian Attack               | 300 (332)         | 50 (339)         |
+| `tb+tb` Rivers + Caravans                       | 300 (319)         | 50 (341)         |
+| `tb+tb` Rivers + Traders & Barbarians           | 300 (218)         | 50 (188)         |
 
 The first C2 runs found Rivers stalls (Road Building with only bridge-site ship spots) and a
 Barbarian Attack award lag (a Treason conquest cut the trade route without a recompute); both fixed
@@ -520,7 +627,7 @@ and E&P leak tests run this mode (`ck/mask.test.ts`, `ep/mask.test.ts`).
 | Commodity trades with the supply                                      | ours     | C&K's rates (4:1, Trading House 2:1); E&P's 3:1 is for resource cards. Resources keep E&P's 3:1 or better (merchant, Merchant Fleet: E&P's `bankTradeRatio` keeps a better rate).                      |
 | Player offers with commodities and gold                               | OK       | One form, `epck/offerTrade` (resources, commodities, gold; C&K's and E&P's offer overrides move their parts).                                                                                          |
 | Land Ho!                                                              | ours     | Not offered: its printed starting pieces leave no city placement, and it has no pirate.                                                                                                                |
-| 5-6 players                                                           | —        | Not offered: no official text (the sheet is 3-4; C&K 5-6 + E&P 5-6 paired turns would need a ruling for C&K actions in player 2's part).                                                               |
+| 5-6 players                                                           | —        | Not offered: no official text (§12: searched for C5; the sheet is 3-4; C&K 5-6 + E&P 5-6 paired turns would need a ruling for C&K actions in player 2's part).                                         |
 
 ## 8. Explorers & Pirates + Traders & Barbarians — module `eptb`, mode `ep+tb`
 
@@ -601,3 +708,176 @@ server bots, every view checked for masked C&K hands, fish tokens and face-down 
 `src/net/sessionExpansions.test.ts` runs both modes. Browser check:
 `node scripts/shots-ep-combos.mjs <preview url> <dir>` (setup tiles; bot games mid-game in three
 themes, no page errors).
+
+## 10. Barbarian Attack + Cities & Knights — module `back`, mode `ba+ck`
+
+Source: `Barbarian Attack w CnK.pdf` (catan.com, 2025-07), read in full. Its text, section by
+section:
+
+- **Setup.** "Set up the game according to the Barbarian Attack scenario instructions." Not used:
+  C&K's sea frame with the barbarian track and the barbarian ship; Barbarian Attack's knights and
+  development cards. "Except where noted, the rules for both Cities & Knights and the Barbarian
+  Attack scenario apply."
+- **Roll Dice phase.** Roll C&K's 3 dice. A ship on the event die places a barbarian on the
+  coastal hex whose number matches the production dice (fewer than 3 there; none on a 7). Walled
+  cities are conquered as normal. A city with a metropolis is not conquered: still 4 VP, but it
+  produces no resources or commodities, and no city improvements on that metropolis's track while
+  it touches only conquered hexes and the frame.
+- **Action phase.** Coins buy resource cards only. Each city improvement: roll the 2 production
+  dice at once and place a barbarian on the matching coastal hex (fewer than 3). A metropolis
+  cannot be conquered. Recruited knights go on free edges of the castle hex.
+- **End of Turn phase.** Knight actions move here. Move: each active knight up to 5 paths, each
+  inactive one up to 3, along any path (not only your routes); an active knight that moved lies
+  down. Displace: an active knight displaces an opponent's knight within 3 paths; both lie down.
+  Expel the barbarians as in T&B, with: barbarian strength = barbarians on the hex; defenders =
+  the active knights' strength on the hex (basic 1, strong 2, mighty 3); a prisoner left over goes
+  to the highest total strength; losses: basic → supply, strong → basic (else supply), mighty →
+  strong (else basic, else supply), 3 gold per knight removed or downgraded. Every 3 prisoners =
+  1 VP; barbarians are unlimited: "If you run out, return 3 prisoners to the supply and take 1 VP
+  token."
+- **Winning.** 13 VP during your turn.
+- **Progress cards.** Intrigue: remove 1 barbarian from a hex of your choice as a prisoner.
+  Invention: swap 2 of the 5 number discs at the island's centre. Merchant: lost (removed) when
+  its hex is conquered. Taxation: pick a hex; steal 1 random resource / commodity from each player
+  with an unconquered settlement or city on it. Treason: your knight goes on the edge where the
+  opponent's knight was removed.
+
+Scenario: Barbarian Attack at 13 VP; 3-6 players (the 5-6 BA board with its two castles: **ours**,
+the sheet names no player count). Tests: `src/expansions/back/engine/back.test.ts`, `bots.test.ts`,
+`ui.test.ts`; the C&K leak test runs this mode (`ck/mask.test.ts`).
+
+| Rule (sheet)                                                      | Status   | Engine                                                                                                                                                                                                     |
+| ----------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BA set-up; no barbarian track / ship; no BA knights or cards      | OK       | ck `shipSails` (mode table): the ship face never advances the track, no attack ever; tb `baCardsInPlay`: no BA deck.                                                                                       |
+| Ship face: a barbarian on the coastal hex of the roll; not on a 7 | OK       | `onRoll` clears C&K's face; `afterProduction` lands it (`landingHexes`: fewer than 3, supply); the 7 has no production.                                                                                    |
+| … the hex it conquers produces nothing on that roll               | OK       | `production` hook removes what that hex would pay (the landing itself follows production).                                                                                                                 |
+| Walled cities are conquered as normal                             | OK       | T&B's conquest ignores walls.                                                                                                                                                                              |
+| A metropolis is never conquered; 4 VP; produces nothing           | OK       | tb seam `BaSlice.safe` (synced each action); its hexes are conquered, so they pay nothing.                                                                                                                 |
+| … no improvements on its track while surrounded                   | OK       | `trackCut`: `ck/improve` wrapped and filtered.                                                                                                                                                             |
+| No commodities from conquered hexes                               | OK       | C&K's commodities are paid with the conquered hexes' numbers hidden (`withoutConquered`).                                                                                                                  |
+| Coins buy resources only                                          | OK       | T&B's `tb/buyResource`.                                                                                                                                                                                    |
+| Each city improvement lands a barbarian (2 production dice)       | OK       | `wraps['ck/improve']`.                                                                                                                                                                                     |
+| Settlements / cities still land barbarians (BA)                   | OK       | T&B's override; Medicine's city too (ours: it is a city built).                                                                                                                                            |
+| Knights recruited on free castle edges (C&K's cost)               | OK       | `back/recruit`; C&K's vertex knight actions are filtered and refused. Activate / promote (Fortress for mighty, once a turn) as C&K: `back/activate`, `back/promote`.                                       |
+| End of turn: active 5 paths (lies down), inactive 3, any path     | OK       | `back/startKnights` ends the building (`back/knights`), `back/moveKnight`; once per knight per turn; passing every piece (T&B FAQ 5); never ending on the castle (BA).                                     |
+| … a knight activated this turn                                    | ours     | Cannot act (C&K: no action the turn it is activated): it neither moves nor displaces.                                                                                                                      |
+| … knights on the castle must leave it (BA FAQ 11)                 | OK       | `endTurn` refused / not offered while one can move.                                                                                                                                                        |
+| Displace within 3 paths; both lie down                            | OK       | `back/displace`; the target must be weaker (C&K). The displaced knight: "his owner places him on the next free path" (T&B FAQ 2): the nearest free paths, owner's choice (`back/relocate`, actor = owner). |
+| Expulsion by strength; leftover prisoner to the highest strength  | OK       | `expel` (knights.ts): BA's order and dice ties; only active knights fight (**ours**: inactive knights do not count, so they do not fight).                                                                 |
+| Losses step down a level, 3 gold each                             | OK       | BA's loss die picks the orientation; a wounded knight fights no second battle that turn (FAQ 8).                                                                                                           |
+| Knights stay active after a battle                                | ours     | The sheet is silent (C&K deactivates after a ship attack, which never happens here).                                                                                                                       |
+| 3 prisoners = 1 VP; unlimited barbarians, VP tokens               | OK, ours | tb `prisonersPerVp` (3). When the supply drops under 3 (a landing's worth), players with 3+ prisoners (current player first) swap 3 for a VP token (`refill`): the same VP, barbarians keep landing.       |
+| The 7                                                             | OK       | C&K discards (commodities, walls), then BA's steal from any player with cards (commodities count).                                                                                                         |
+| Intrigue: a barbarian prisoner                                    | OK       | `back/intrigue` → `back/intrigueHex`.                                                                                                                                                                      |
+| Invention: the 5 centre numbers                                   | OK       | C&K's Inventor on non-coastal hexes only. Our T5 board has 7 inner numbered hexes; without C&K's 2/6/8/12 those are exactly 5 (4, 5, 10, 9, 3).                                                            |
+| Merchant: removed when its hex is conquered                       | OK       | `afterAction`; never placed on a conquered hex (ours: it would be removed at once).                                                                                                                        |
+| Taxation: rob each player with an unconquered building on the hex | OK       | `back/taxation` → `back/taxHex` (opponents only; one random resource or commodity each).                                                                                                                   |
+| Treason: your knight on the removed knight's edge                 | OK       | `back/deserter`: the opponent picks the knight (C&K); yours of the same level (else basic) takes that path.                                                                                                |
+| Smith, Warlord                                                    | OK       | Work on the path knights (`back/smith`; Warlord activates them all).                                                                                                                                       |
+| Medicine                                                          | OK, ours | Never on a conquered settlement (BA: no upgrade); playable only with an unconquered settlement.                                                                                                            |
+| Win at 13                                                         | OK       | `scenarioVp`.                                                                                                                                                                                              |
+
+## 11. Catan for Two + Cities & Knights — module `twock`, mode `two+ck`
+
+Source: `CATAN for 2 w CnK.pdf` (catan.com, 2025-07), read in full:
+
+- **Setup.** C&K's set-up; Catan for Two's starting pieces and trade tokens.
+- **Rules.** Both rule sets with these changes. **Two full Roll Dice and Production phases** before
+  the Action phase; in the second, re-roll the production dice (red and yellow) until the result
+  differs from the first.
+- **Recruit a knight:** each recruit also recruits 1 knight for either neutral player at no cost,
+  by the normal placement rules; no valid placement → a neutral road instead. **Promote:** each
+  basic → strong promotion also promotes a neutral knight basic → strong if possible; neutral
+  knights are never mighty. **Activate:** neutral knights are never activated and do not defend.
+  **Knight actions:** neutral knights are "another player's knight".
+- **Trade tokens.** The supply is limited (spend before acquiring more). Besides settling on the
+  desert / coast, remove one of your knights for 1 / 2 / 3 tokens (basic / strong / mighty).
+  **Forced Trade** splits in two (declared first): resource cards only (the opponent sets the
+  commodities aside; Catan for Two's price), or resources and / or commodities (twice the price,
+  2 or 4 tokens).
+- **Winning.** 13 VP during your turn.
+- **Progress cards.** Alchemy only before the first Roll Dice phase. Road Building: a neutral road
+  after each of the 2 roads. Diplomacy: no neutral road when you remove and rebuild your own road.
+  Treason: your opponent's or a neutral knight (the weakest of the chosen colour); placing your own
+  knight then is no Recruit (no neutral knight).
+
+Scenario: T&B's variants scenario (the base board with Catan for Two's neutral starts) at 13 VP;
+2 players. Tests: `src/expansions/twock/engine/twock.test.ts`, `bots.test.ts`, `ui.test.ts`; the
+C&K leak test runs this mode.
+
+| Rule (sheet)                                                        | Status   | Engine                                                                                                                                           |
+| ------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C&K set-up (city second); neutral starts and 5 tokens each          | OK       | C&K's `setupBuilding`; T&B's Catan for Two (ck module players now 2-6, its own mode 3-6).                                                        |
+| Two Roll Dice + Production phases; the second's dice differ         | OK       | T&B's two rolls (`rollDice`, `secondRoll`); C&K's event die is rolled in both.                                                                   |
+| Recruit → a free neutral knight on the neutral's roads              | OK, ours | `twock/neutral` (`twock/neutralKnight`): an empty land intersection on one of that neutral's roads (its network); 2 basic knights per neutral.   |
+| … no spot → a neutral road                                          | OK       | T&B's neutral road step.                                                                                                                         |
+| Basic → strong promotion → a neutral one too; never mighty          | OK       | `wraps['ck/promoteKnight']` and the Smith's picks (ours: the Smith promotes too); `twock/neutralPromote` (2 strong per neutral).                 |
+| Neutral knights: never active, no defence                           | OK       | Owners 2 and 3 (no seat): never activated; C&K's defence counts active knights only.                                                             |
+| Neutral knights are "another player's knight"                       | OK       | C&K knights of another owner: they block routes and Longest Road, stronger knights displace them, Intrigue targets them.                         |
+| … a displaced neutral knight retreats                               | OK, ours | Along the neutral's roads (`routeEdges`); the current player picks the spot for it (`twock/relocate`; C&K would ask the owner, who has no seat). |
+| Neutral settlements block knights                                   | OK       | ck routes seam: other modules' route blockers count as foreign pieces and occupied spots (no knight on a neutral settlement).                    |
+| Remove a knight for 1 / 2 / 3 tokens; limited supply                | OK, ours | `twock/knightForTokens` (once a turn, like T&B's Knight-card trade-in; what the supply still has; none from an empty supply).                    |
+| Forced Trade, resources only                                        | OK       | T&B's own Forced Trade: it takes and gives resource cards only, at Catan for Two's price.                                                        |
+| Forced Trade, resources and / or commodities, twice the price       | OK       | `twock/forcedTrade` → `twock/forcedGive` (any 2 of your cards back).                                                                             |
+| Alchemy before the first roll only                                  | OK       | `ck/alchemist` wrapped and filtered after the first roll.                                                                                        |
+| Road Building: a neutral road after each road                       | OK       | T&B's `placeFreeRoad` override.                                                                                                                  |
+| Diplomacy: no neutral road for a rebuilt own road                   | OK       | C&K's Diplomat places the road itself (no build action, no neutral road).                                                                        |
+| Treason vs a neutral: its weakest knight; no neutral knight follows | OK       | `twock/deserterNeutral` in C&K's Treason step; your knight goes where C&K's Treason puts it (not a Recruit).                                     |
+| Win at 13                                                           | OK       | `scenarioVp`.                                                                                                                                    |
+| Neutral roads and the Diplomat                                      | ours     | Neutral roads are T&B pieces, not players' roads: the Diplomat never takes them.                                                                 |
+
+Edits to other modules (additive, listed for the merge): C&K (`shipSails` mode table: the event
+die's ship never sails, the HUD hides the track and the vertex-knight cards; routes count other
+modules' `blocksRoute` pieces as foreign / occupied; the module allows 2 players; its renderer
+skips knights of no seat), T&B (`prisonersPerVp`, `baCardsInPlay` mode tables, `BaSlice.safe`,
+exported BA helpers `setBarbarians`, `rankByDice`, `edgeDistances`, `rollLossFamily`; the HUD
+words the prisoner ratio and hides BA's knight card / count without BA cards).
+
+## 12. Explorers & Pirates + Cities & Knights at 5-6 players
+
+**No official answer exists** (searched 2026-10-26): the E&P + C&K sheet (both versions on
+catan.com) gives 3-4 player rules only; the E&P 5-6 rules (CN3086) describe the paired players'
+turn for E&P alone and never mention C&K (the "C&K 5-6" strings in its component pictures are
+print labels); the E&P, C&K and T&B FAQs and the 5-6 player page say nothing about combining two
+expansions at 5-6, nor about C&K actions in the second player's part of a paired turn. So `ep+ck`
+keeps refusing 5-6 players (§7 table, unchanged).
+
+Note: catan.com also serves an older E&P + C&K "rules suggestion" (`ExplorersPirates w CnK_0.pdf`,
+Klaus Teuber's text: Mining / Irrigation also pay harbor settlements, Inventor swaps every number
+except 2, 6, 8, 12 across islands and lairs, a Bishop placing your pirate ship, 22 VP for scenario
+4). §7 follows the 2025 sheet; the differences are listed as a follow-up card.
+
+## 13. C5: bots and sims
+
+`back` bots: invariants (path knights on land paths within C&K's limits, no BA knights or cards,
+no barbarian ship, no C&K vertex knight, metropolises never conquered, VP tokens) and a steer
+that recruits, activates and promotes knights and sends them to the barbarians. `twock` bots:
+invariants (neutral knights never active or mighty, within their limits) and a steer that builds
+what scores and keeps the random bot from turning its knights in for tokens every turn (the first
+runs, without it, averaged 838 turns: knights recruited and traded in at once).
+
+`pnpm sim --mode <mode> --scenario <s> --players <n> --games <g> --bias 0.5 --max-steps 20000`:
+
+Final code, every run: **0 invariant failures, 0 errors, 0 stalls** (finished / games, average
+turns of a finished game; "capped" = unfinished at the step cap, random bots at 13 VP):
+
+| Mode / scenario                  | Players | Games | Finished (capped) | Avg turns |
+| -------------------------------- | ------- | ----- | ----------------- | --------- |
+| `ba+ck` Barbarian Attack         | 4       | 300   | 300               | 362       |
+| `ba+ck` Barbarian Attack         | 3       | 50    | 50                | 379       |
+| `ba+ck` Barbarian Attack         | 5       | 50    | 50                | 245       |
+| `ba+ck` Barbarian Attack         | 6       | 50    | 50                | 228       |
+| `ba+ck` with Event Cards         | 4       | 20    | 20                | 288       |
+| `ba+ck` with balanced dice       | 4       | 20    | 20                | 268       |
+| `two+ck` Catan for Two (2 seats) | 2       | 300   | 294 (6)           | 586       |
+| `two+ck` with Event Cards        | 2       | 20    | 20                | 553       |
+
+The runs found two bugs, both fixed with a test: Medicine was playable when every settlement of
+the player was conquered (a stall: no target left); and in any Catan for Two game T&B's neutral
+road after a Road Building road could take the card's last spot, leaving Road Building with
+nothing to place (sim seed 72; T&B now ends the card then, `two.test.ts`).
+
+Online: `e2e:server` plays one `ba+ck` and one `two+ck` game over the room server (2 clients; 2
+server bots in `ba+ck`), every view checked for masked C&K hands; `src/net/sessionExpansions.test.ts`
+runs both modes (its harness now lets 100 ms pass per human move: a 2-seat game has no bots to wait
+for and hit the intent rate limit).

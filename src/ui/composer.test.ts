@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { emptyResources } from '../engine';
 import {
   discardAction,
+  discardRows,
+  discardStatus,
   draftToAction,
   emptyDraft,
   stepDiscard,
@@ -119,5 +121,34 @@ describe('discard validation', () => {
     });
     sel = stepDiscard(sel, 'ore', -3, h, 5);
     expect(sel.ore).toBe(0);
+  });
+});
+
+describe('discard dialog model', () => {
+  const hand = { ...emptyResources(), lumber: 3, wool: 2, grain: 2, ore: 1 }; // 8 cards, no brick
+
+  it('has a row per resource with held counts, brick included at 0', () => {
+    const rows = discardRows(hand, emptyResources(), 4);
+    expect(rows.map((r) => r.resource)).toEqual(['brick', 'lumber', 'wool', 'grain', 'ore']);
+    expect(rows.map((r) => r.held)).toEqual([0, 3, 2, 2, 1]);
+    expect(rows[0]?.max).toBe(0);
+  });
+
+  it('caps "+" at the held count and at what is still owed', () => {
+    const rows = discardRows(hand, emptyResources(), 4);
+    expect(rows.find((r) => r.resource === 'lumber')?.max).toBe(3);
+    const picked = { ...emptyResources(), lumber: 3 };
+    const after = discardRows(hand, picked, 4);
+    expect(after.find((r) => r.resource === 'lumber')?.max).toBe(3);
+    expect(after.find((r) => r.resource === 'wool')?.max).toBe(1);
+    expect(after.find((r) => r.resource === 'lumber')?.left).toBe(0);
+  });
+
+  it('status counts down, then confirms', () => {
+    expect(discardStatus(hand, 4, emptyResources())).toEqual({ text: 'Choose 4 more', ok: false });
+    expect(discardStatus(hand, 4, { ...emptyResources(), lumber: 3, ore: 1 })).toEqual({
+      text: 'Discarding 4 of 4',
+      ok: true,
+    });
   });
 });

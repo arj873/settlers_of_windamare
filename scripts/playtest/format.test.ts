@@ -51,6 +51,28 @@ describe('formatStatus', () => {
     expect(out).toContain('Console: 2 new');
   });
 
+  it('shows expansion panels and extra hand cards to the viewing seat only', () => {
+    const ui = {
+      handExtras: ['Gold: 2'],
+      extPanels: [{ title: 'Pirate Lairs', lines: ['Seat1 Gold: 2', 'Ship 1 settler'] }],
+    };
+    const out = formatStatus(snap(midGame(), 1, ui), 1, 0);
+    expect(out).toContain('Also in hand: Gold: 2');
+    expect(out).toMatch(/Panel "Pirate Lairs":\n {2}Seat1 Gold: 2\n {2}Ship 1 settler/);
+    const other = formatStatus(snap(midGame(), 1, ui), 0, 0);
+    expect(other).not.toContain('Gold');
+  });
+
+  it('says to reload when the page shows the game but lost its hook', () => {
+    const s: Snapshot = { ...snap(midGame(), 1), state: null };
+    expect(formatStatus(s, 1, 0)).toMatch(/not loaded yet/);
+    const online = {
+      ...s,
+      online: { roomPhase: 'playing' } as Snapshot['online'],
+    } as Snapshot;
+    expect(formatStatus(online, 1, 0)).toMatch(/Run `reload`/);
+  });
+
   it('tells a covered seat to pass', () => {
     const out = formatStatus(snap(freshGame(3), 0, { cover: 'Pass to Red' }), 0, 0);
     expect(out).toContain('run `pass` first');

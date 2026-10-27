@@ -20,11 +20,10 @@ import type {
   ExtWrap,
   ScenarioDef,
 } from '../../../engine/expansions/types';
-import { isResource } from '../../../engine/resources';
 import { canPlaceRoad } from '../../../engine/rules/placement';
 import { playerName } from '../../../engine/rules/text';
 import { piecesLeft } from '../../../engine/selectors';
-import { hexVertices, topologyOf } from '../../../engine/topology';
+import { topologyOf } from '../../../engine/topology';
 import { roadsBlocked } from '../../../engine/variants';
 import type { Action, EdgeId, GameState, PlayerId, VertexId } from '../../../engine/types';
 import { seafarersModule, SEAFARERS, seaSlice, type MoveShipPhase } from '../../seafarers/engine';
@@ -38,10 +37,8 @@ import { fishBlocker, fishPayment, payFish } from '../../tb/engine/fish';
 import { edgeOnRiver, isBridgeSite } from '../../tb/engine/rivers';
 import { caravansOf, FISH_COST, fishOf, fishTotal, has, TB } from '../../tb/engine/state';
 import { mapIdOf, PAIRS, SEA_PAIRS, seaMapIdOf, TBSEA, TBSEA_MAPS } from './maps';
-import { tbseaBoard } from './overlays';
 
 export { TBSEA, PAIRS, SEA_PAIRS, pairOf, seaPairOf, shiftId, BASE_MAP } from './maps';
-export { tbseaBoard, type TbseaBoard } from './overlays';
 
 export const TBSEA_MODE = 'tb+seafarers';
 export const TBSEA_SCENARIOS = [...PAIRS.map((p) => p.id), ...SEA_PAIRS.map((p) => p.id)];
@@ -246,28 +243,6 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
 // Production and the trade route
 // ---------------------------------------------------------------------------------------------
 
-/**
- * A hex carrying a second number disc (the lake's or watering hole's number, Rivers' 2 and 12)
- * produces on either number, unless the robber stands on it.
- */
-const extraProduction: NonNullable<NonNullable<ExpansionModule['hooks']>['production']> = (
-  state,
-  roll,
-  owed,
-  ctx,
-) => {
-  for (const x of tbseaBoard(state.board).extraTokens ?? []) {
-    const tile = state.board.hexes[x.hex];
-    if (x.number !== roll || x.hex === ctx.blocked || !tile || !isResource(tile.terrain)) continue;
-    const r = tile.terrain;
-    for (const v of hexVertices(topologyOf(state), x.hex)) {
-      const b = state.pieces.buildings[v];
-      const hand = b && owed[b.owner];
-      if (hand) hand[r] += b.kind === 'city' ? ctx.cityYield : 1;
-    }
-  }
-};
-
 /** T&B's fish (the pirate blocks the fishing ground it lies on), then Seafarers' gold. */
 const afterProduction: NonNullable<NonNullable<ExpansionModule['hooks']>['afterProduction']> = (
   draft,
@@ -416,7 +391,6 @@ export const tbseaModule: ExpansionModule = {
   filterLegal,
 
   hooks: {
-    production: extraProduction,
     afterProduction,
     roadLength,
     // Wagons travel on ships like on roads (T&B + Seafarers, FAQ 65).

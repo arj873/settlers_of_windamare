@@ -5,6 +5,7 @@ import {
   applyAction,
   createGame,
   legalActions,
+  viewFor,
   type Action,
   type GameState,
   type VertexId,
@@ -12,6 +13,7 @@ import {
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import { CK, ckSlice } from './engine';
@@ -56,7 +58,7 @@ describe('C&K setup screen', () => {
 
   it('offers C&K with its two scenarios, 3-6 seats and a 13 VP target', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     expect(screen.state.mode).toBe(CK);
     expect(q(screen, 'scenario-ck/classic')).not.toBeNull();
     expect(q(screen, 'scenario-ck/starter')).not.toBeNull();
@@ -68,7 +70,7 @@ describe('C&K setup screen', () => {
 
   it('refuses Rush mode with C&K: the reason is shown and Start is off', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     q(screen, 'rule-rushMode')?.click();
     expect(setupError(screen.state)).toMatch(/Rush/);
     expect(screen.element.querySelector('.su-error')?.textContent).toMatch(/Rush/);
@@ -112,6 +114,55 @@ describe('C&K HUD', () => {
     expect(byText('Buy card')).toBeUndefined();
   });
 
+  it('player rows show commodity totals as commodities, not as one type (online view)', () => {
+    const s = main();
+    setGoods(s, 2, { paper: 2 });
+    setGoods(s, 1, { cloth: 1 });
+    show(viewFor(s, 0) as GameState);
+    const rows = [...root.querySelectorAll('.sec-ext-ck .ck-row')];
+    const stat = (p: number) =>
+      [...rows[p]!.querySelectorAll<HTMLElement>('.ck-stat')].find((e) =>
+        e.title.startsWith('Commodity'),
+      )!;
+    expect(stat(2).textContent).toBe('2');
+    expect(stat(1).textContent).toBe('1');
+    for (const row of rows) {
+      const labels = [...row.querySelectorAll('[aria-label]')].map((e) =>
+        e.getAttribute('aria-label'),
+      );
+      expect(labels).not.toContain('Coin');
+      expect(labels).not.toContain('Paper');
+      expect(labels).not.toContain('Cloth');
+    }
+  });
+
+  it('the commodity Bank form states the price on its button', () => {
+    const s = main();
+    setGoods(s, 0, { grain: 4, coin: 4 });
+    show(s);
+    const form = [...root.querySelectorAll('.sec-ext-ck .ck-form')].find((f) =>
+      f.textContent?.startsWith('Bank'),
+    )!;
+    const [give, receive] = [...form.querySelectorAll('select')];
+    const go = form.querySelector('button')!;
+    give!.value = 'grain';
+    give!.dispatchEvent(new Event('change'));
+    receive!.value = 'paper';
+    receive!.dispatchEvent(new Event('change'));
+    expect(go.textContent).toBe('Trade 4:1');
+    expect(go.getAttribute('aria-label')).toBe('Give 4 Grain for 1 Paper');
+    go.click();
+    expect(actions.at(-1)).toEqual({
+      type: 'ck/bankTrade',
+      player: 0,
+      give: 'grain',
+      receive: 'paper',
+    });
+    give!.value = 'coin';
+    give!.dispatchEvent(new Event('change'));
+    expect(go.getAttribute('aria-label')).toMatch(/^Give 4 Coin for 1 /);
+  });
+
   it('Improve buttons send ck/improve; progress cards have Play buttons', () => {
     const s = main();
     build(s, 0, V(0, 0, 'S'), 'city');
@@ -121,10 +172,25 @@ describe('C&K HUD', () => {
     show(s);
     const improve = root.querySelector<HTMLButtonElement>('.ck-trk-trade .ck-improve');
     expect(improve?.disabled).toBe(false);
+    // Named for what it buys, not just its price ("1× Cloth" read like a trade).
+    expect(improve?.getAttribute('aria-label')).toBe('Improve trade to level 1 (Market): 1 cloth');
     improve?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/improve', player: 0, track: 'trade' });
     byText('Play')?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'irrigation' });
+  });
+
+  it('each progress card Play button names its card', () => {
+    const s = main();
+    build(s, 0, V(0, 0, 'S'), 'city');
+    giveCards(s, 0, 'irrigation', 'mining');
+    show(s);
+    const names = [...root.querySelectorAll('.ck-card button')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(names).toEqual(expect.arrayContaining(['Play Irrigation', 'Play Mining']));
+    root.querySelector<HTMLButtonElement>('.ck-card button[aria-label="Play Mining"]')?.click();
+    expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'mining' });
   });
 
   it('the hand bar shows commodities and the progress stack', () => {
@@ -158,6 +224,39 @@ describe('C&K HUD', () => {
     expect(root.textContent).toContain('Basic knight (inactive)');
     byText('Activate')?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/activateKnight', player: 0, vertex: V(0, 0, 'N') });
+  });
+
+  describe('knight dialog and turn pill say the same, and what is true', () => {
+    const selected = (active: boolean, withRoad: boolean) => {
+      const s = main();
+      build(s, 0, V(0, 0, 'SW'));
+      roads(s, 0, E(0, 0, 'W'), ...(withRoad ? [E(0, 0, 'NW')] : []));
+      setGoods(s, 0, { grain: 1, wool: 1, ore: 1 }); // activate or promote: selectable
+      knight(s, 0, V(0, 0, 'NW'), 1, active, active ? 1 : null);
+      return applyOk(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') } as Action);
+    };
+    const pill = () => root.querySelector('.hint')?.textContent ?? '';
+    const say = () => root.querySelector('.dialog p')?.textContent ?? '';
+
+    it('an active knight with a free spot: move', () => {
+      show(selected(true, true));
+      expect(pill()).toBe('Knight: move');
+      expect(say()).toBe('Click a highlighted spot to move there.');
+    });
+
+    it('an active knight with nowhere to go says so (not "must be active")', () => {
+      show(selected(true, false));
+      expect(pill()).toBe('Knight has nowhere to go: promote it, or close');
+      expect(say()).toContain('This active knight has nowhere to go');
+      expect(root.textContent).not.toContain('must be active');
+      expect(pill()).not.toBe('Your move');
+    });
+
+    it('an inactive knight: activate it', () => {
+      show(selected(false, true));
+      expect(pill()).toBe('Inactive knight: activate or promote it, or close');
+      expect(say()).toContain('An inactive knight cannot move');
+    });
   });
 
   it('discarding on a 7 counts commodities', () => {

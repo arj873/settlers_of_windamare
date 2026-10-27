@@ -10,7 +10,7 @@ import type { HudExtension } from '../../ui/expansions';
 import type { HudView } from '../../ui/types';
 import { seaSlice } from '../seafarers/engine';
 import { has, tbBoard } from '../tb/engine';
-import { FISH_PIRATE, FISH_SHIP, TBSEA, tbseaBoard } from './engine';
+import { FISH_PIRATE, FISH_SHIP, TBSEA } from './engine';
 import './tbsea.css';
 
 type Send = (a: Action) => void;
@@ -44,7 +44,7 @@ export function pairRules(state: GameState): string[] {
         : 'Ships catch no fish.',
     );
   }
-  for (const x of tbseaBoard(state.board).extraTokens ?? []) {
+  for (const x of tbBoard(state).alsoOn ?? []) {
     const own = state.board.hexes[x.hex]?.token;
     out.push(`The hex with ${own} and ${x.number} produces on either number.`);
   }

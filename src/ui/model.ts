@@ -19,8 +19,11 @@ import {
   piecesLeft,
   portsOf,
   publicVictoryPoints,
+  setupRoundAt,
   topologyOf,
+  MAX_TRADE_OFFERS_PER_TURN,
   RESOURCES,
+  routeName,
   victoryPoints,
   visibleSpecialBuildQueue,
   type Action,
@@ -352,10 +355,40 @@ export function blockReasons(state: GameState, viewer: PlayerId, card: BuildCard
           ? 'No settlement to upgrade'
           : kind === 'road'
             ? 'No free edge next to your roads or buildings'
-            : 'No legal spot (needs your road, no building next to it)',
+            : `No legal spot (needs your ${routeName(state)}, no building next to it)`,
     });
   }
   return out.length > 0 ? out : [{ text: 'Not possible right now' }];
+}
+
+/**
+ * Why the Trade / Bank button is off (data-why, like the build cards), or null when no rule
+ * explains it (the module's own limits): the turn and phase first, then the hand.
+ */
+export function tradeBlockReason(
+  state: GameState,
+  viewer: PlayerId,
+  kind: 'trade' | 'bank',
+): string | null {
+  const phase = state.phase.kind;
+  if (phase === 'gameOver') return 'The game is over';
+  if (state.turn.current !== viewer) return 'Not your turn';
+  if (phase === 'preRoll') return 'Roll the dice first';
+  if (phase === 'setup') return 'Place your starting pieces first';
+  if (phase === 'specialBuild') return 'No trading in the special building phase';
+  if (phase !== 'main') return 'Finish the current step first';
+  const hand = getPlayer(state, viewer).resources;
+  if (kind === 'trade') {
+    if (state.turn.tradeOffers >= MAX_TRADE_OFFERS_PER_TURN) {
+      return `At most ${MAX_TRADE_OFFERS_PER_TURN} trade offers per turn`;
+    }
+    return RESOURCES.every((r) => hand[r] === 0) ? 'No cards to offer' : null;
+  }
+  const ratios = bestRatios(state, viewer);
+  if (RESOURCES.every((r) => hand[r] < ratios[r])) {
+    return `Need ${RESOURCES.map((r) => `${ratios[r]} ${r}`).join(' or ')}`;
+  }
+  return null;
 }
 
 /** Dark or light text for a player colour (`#rgb` / `#rrggbb`; anything else gets light text). */
@@ -447,16 +480,19 @@ export function hintFor(state: GameState, view: HudView, placeMode: PlaceMode | 
   if (ext) return { text: ext, tone: 'action' };
 
   switch (phase.kind) {
-    case 'setup':
+    case 'setup': {
+      // C&K, T&B and the setup variants make some setup buildings cities.
+      const building = setupRoundAt(state, phase.index).building;
       return {
         text:
           phase.step === 'settlement'
-            ? 'Place a settlement'
+            ? `Place a ${building}`
             : placeMode
               ? placeText(placeMode) // a module's build card in setup (the Seafarers Ship)
-              : 'Place a road next to your new settlement',
+              : `Place a road next to your new ${building}`,
         tone: 'action',
       };
+    }
     case 'preRoll':
       return { text: 'Roll the dice', tone: 'action' };
     case 'main':

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Action, GameState, VertexId } from '../engine';
-import { cornerVertex, createGame, legalActions, PLAYER_COLORS, TOPOLOGY } from '../engine';
+import {
+  applyAction,
+  cornerVertex,
+  createGame,
+  legalActions,
+  PLAYER_COLORS,
+  RESOURCES,
+  TOPOLOGY,
+} from '../engine';
 import {
   discardGame,
   freshGame,
@@ -15,6 +23,7 @@ import {
   bankView,
   bestRatios,
   blockReasons,
+  tradeBlockReason,
   boardPrompt,
   buildCards,
   inkFor,
@@ -248,6 +257,25 @@ describe('why a build button is disabled', () => {
       'No settlement to upgrade',
     ]);
   });
+
+  it('Bank and Trade say why they are off', () => {
+    const s = midGame();
+    s.turn.current = 1;
+    s.phase = { kind: 'main' };
+    const ratios = bestRatios(s, 1);
+    s.players[1]!.resources = { brick: 1, lumber: 0, wool: 1, grain: 1, ore: 0 };
+    const need = RESOURCES.map((r) => `${ratios[r]} ${r}`).join(' or ');
+    expect(tradeBlockReason(s, 1, 'bank')).toBe(`Need ${need}`);
+    expect(tradeBlockReason(s, 1, 'trade')).toBeNull();
+    s.players[1]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(tradeBlockReason(s, 1, 'trade')).toBe('No cards to offer');
+    s.turn.tradeOffers = 3;
+    s.players[1]!.resources.ore = 1;
+    expect(tradeBlockReason(s, 1, 'trade')).toBe('At most 3 trade offers per turn');
+    expect(tradeBlockReason(s, 0, 'bank')).toBe('Not your turn');
+    s.phase = { kind: 'preRoll' };
+    expect(tradeBlockReason(s, 1, 'bank')).toBe('Roll the dice first');
+  });
 });
 
 describe('special building phase pill', () => {
@@ -293,6 +321,25 @@ describe('hints and board prompt', () => {
     ]);
     expect(hintFor(s, v, null)?.text).toBe('Place a settlement');
     expect(boardPrompt(v)).toBe('setupSettlement');
+  });
+
+  it('names the city when the setup step places one (C&K round 2)', () => {
+    let s = createGame({ seed: 'ck-hint', players: PLAYER_COLORS.slice(0, 3), mode: 'ck' });
+    // Round 1: three settlements + roads, first legal spot each.
+    while (s.phase.kind === 'setup' && s.phase.index < s.players.length) {
+      const a = legalActions(s)[0] as Action;
+      const r = applyAction(s, a);
+      if (!r.ok) throw new Error(r.error);
+      s = r.state;
+    }
+    const p = s.turn.current;
+    const v = view(p, legalActions(s));
+    expect(hintFor(s, v, null)?.text).toBe('Place a city');
+    const placed = applyAction(s, legalActions(s)[0] as Action);
+    if (!placed.ok) throw new Error(placed.error);
+    expect(hintFor(placed.state, view(p, legalActions(placed.state)), null)?.text).toBe(
+      'Place a road next to your new city',
+    );
   });
 
   it('shows the active build mode', () => {

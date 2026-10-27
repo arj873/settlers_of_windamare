@@ -5,6 +5,7 @@ import {
   handCount,
   piecesLeft,
   publicVictoryPoints,
+  longestRoadName,
   RESOURCES,
   victoryPoints,
   type Action,
@@ -104,6 +105,12 @@ export function formatControls(ui: UiScan): string[] {
     lines.push(`  buttons: ${on.map(btn).join(' ') || 'none'}`);
     if (off.length > 0) lines.push(`  disabled: ${off.map(btn).join(' ')}`);
   }
+  const drops = ui.dropdowns ?? [];
+  if (drops.length > 0) {
+    const one = (d: (typeof drops)[number]) =>
+      `[${d.label} = ${d.value}${d.enabled ? '' : ', disabled'}; options: ${d.options.join(' | ')}]`;
+    lines.push(`Dropdowns (use \`choose <label> = <option>\`): ${drops.map(one).join(' ')}`);
+  }
   const rest = ui.controls.filter((c) => !c.inDialog);
   const on = rest.filter((c) => c.enabled);
   const off = rest.filter((c) => !c.enabled);
@@ -133,7 +140,12 @@ export function formatOnline(o: OnlineScan): string[] {
 
 export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number): string {
   const state = snap.state;
-  if (!state) return 'The game has not loaded yet. Is `pnpm pt:serve` running?';
+  if (!state) {
+    if (snap.online?.roomPhase === 'playing') {
+      return 'The page shows the game, but the CLI cannot read its state (the page lost its `?debug=1` hook). Run `reload`.';
+    }
+    return 'The game has not loaded yet. Is `pnpm pt:serve` running?';
+  }
   const me = state.players[seat];
   if (!me) return `There is no seat ${seat + 1} in this game.`;
   const ui = snap.ui;
@@ -148,7 +160,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   if (phase.kind === 'gameOver') {
     lines.push(`GAME OVER: ${ui.winnerText ?? state.players[state.winner ?? -1]?.name ?? '?'}`);
   } else if (mine && snap.legal.some((a) => a.player === seat)) {
-    lines.push(`YOU MUST: ${mustDo(state, seat, snap.legal)}`);
+    lines.push(`YOU MUST: ${mustDo(state, seat, snap.legal, snap.ui.hint)}`);
     if (ui.cover) lines.push(`Screen: covered ("${ui.cover}") — run \`pass\` first.`);
   } else {
     lines.push(`NOT YOUR MOMENT: ${waitingOn(snap)}. Run \`wait\`.`);
@@ -158,7 +170,17 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   lines.push(`Hand: ${hand} (${handCount(state, seat)} cards)`);
   const ratios = RESOURCES.map((r) => `${r} ${bankTradeRatio(state, seat, r)}:1`).join(', ');
   lines.push(`Bank ratios: ${ratios}`);
-  lines.push(`Dev cards: ${devLine(state, seat)}`);
+  // Expansion dev cards (T&B Swift Journey) live in the module's slice, not in devCards.
+  const baseDev = Object.values(me.devCards).reduce((a, b) => a + b, 0);
+  const freshDev = Object.values(me.newDevCards).reduce((a, b) => a + b, 0);
+  const extDev = devCardCount(state, seat) - baseDev - freshDev;
+  lines.push(
+    `Dev cards: ${devLine(state, seat)}${extDev > 0 ? ` (+${extDev} expansion card(s): see the panel lines below)` : ''}`,
+  );
+  const screenMine = mine && !ui.cover;
+  if (screenMine && ui.handExtras && ui.handExtras.length > 0) {
+    lines.push(`Also in hand: ${ui.handExtras.join(' | ')}`);
+  }
   const left = piecesLeft(state, seat);
   lines.push(
     `VP: ${victoryPoints(state, seat)} (public ${publicVictoryPoints(state, seat)}) of ${state.settings.vpToWin} | pieces left: roads ${left.road}, settlements ${left.settlement}, cities ${left.city}`,
@@ -171,7 +193,7 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
   lines.push(`Others: ${others.join(' | ')}`);
   const award = (p: PlayerId | null) => (p === null ? 'nobody' : (state.players[p]?.name ?? p));
   lines.push(
-    `Longest Road: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
+    `${longestRoadName(state)}: ${award(state.awards.longestRoad)} | Largest Army: ${award(state.awards.largestArmy)} | robber on ${state.robber} (${hexLabel(state, state.robber)})${state.dice ? ` | last roll ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : ''}`,
   );
 
   if (ui.timer) {
@@ -179,7 +201,13 @@ export function formatStatus(snap: Snapshot, seat: PlayerId, newConsole: number)
       `Turn timer: ${ui.timer} left${ui.timerLow ? ' (HURRY)' : ''}; at 0 the minimum moves are made for whoever is on the clock`,
     );
   }
-  if (mine && !ui.cover) {
+  if (screenMine) {
+    for (const p of ui.extPanels ?? []) {
+      lines.push(`Panel "${p.title}":`);
+      for (const l of p.lines) lines.push(`  ${l.slice(0, 160)}`);
+    }
+  }
+  if (screenMine) {
     if (ui.turnTitle) lines.push(`Turn: "${ui.turnTitle}"`);
     if (ui.hint) lines.push(`Prompt: "${ui.hint}"`);
     lines.push(...formatControls(ui));

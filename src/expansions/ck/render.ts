@@ -158,6 +158,8 @@ export const ckDrawer: BoardDrawer = {
       draw: (state, ctx) =>
         layer((g) => {
           for (const [v, k] of Object.entries(ckSlice(state).knights) as [VertexId, Knight][]) {
+            // Knights of no seat are Catan for Two's neutral knights: `twock` draws them.
+            if (!state.players[k.owner]) continue;
             // A knight may stand on a sea vertex (on its owner's ship, Seafarers + C&K).
             const info = ctx.topo.vertex[v] ?? ctx.topo.seaVertex[v];
             if (!info) continue;

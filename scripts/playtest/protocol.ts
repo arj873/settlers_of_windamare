@@ -53,6 +53,19 @@ export interface Control {
   inDialog: boolean;
   /** Disabled build buttons: why ("Missing 1 brick"), from the button's `data-why`. */
   why?: string | null;
+  /** Build cards: the board action types their place mode submits (`data-actions`). */
+  actions?: string[] | null;
+}
+
+/** A dropdown (`<select>`), e.g. the C&K panel's "Bank: give". Set with `choose`. */
+export interface Dropdown {
+  id: string;
+  /** Its aria-label, else its row / section name and position ("Oil 2"). */
+  label: string;
+  /** The text of the chosen option. */
+  value: string;
+  options: string[];
+  enabled: boolean;
 }
 
 /** A − value + stepper (discard / trade composer). */
@@ -82,9 +95,14 @@ export interface UiScan {
   dialogText: string[];
   controls: Control[];
   steppers: Stepper[];
+  dropdowns?: Dropdown[];
   toasts: string[];
   /** Resource counts shown in the HUD hand (lowercase resource -> count); null if hidden. */
   hand: Record<string, number> | null;
+  /** Other hand-bar cards by their tooltip ("Cloth: 1", "Progress cards: Smith"). */
+  handExtras?: string[];
+  /** Expansion sidebar sections, as text lines (gold, commodities, knights, wagons...). */
+  extPanels?: { title: string; lines: string[] }[];
   /** Player panels as shown: name, VP, card counts. */
   panels: { name: string; vp: number; cards: number; dev: number; knights: number }[];
   diceTotal: number | null;
@@ -109,6 +127,11 @@ export interface OnlineScan {
   chat: { id: number; line: string }[];
   /** Server turn clock for the seat on it, ms left (counted down locally). */
   timerLeftMs: number | null;
+  /** Game moves this page has sent since the scanner was installed, and the last one's type. */
+  sent: number;
+  lastSent: string | null;
+  /** Newest server error messages (`n` counts up), e.g. a move refused as stale. */
+  errors: { n: number; code: string; message: string }[];
   /** Text of the reconnect banner / full-screen notice if showing. */
   banner: string | null;
   notice: string | null;

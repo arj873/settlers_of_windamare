@@ -318,8 +318,8 @@ export const SEA_PAIRS: readonly SeaPair[] = [
     name: 'Traders & Barbarians Through the Desert',
     blurb: 'Castle, quarry beyond the desert and glassworks; wagons cross sea and sand',
     maps: [
-      { key: 'desert3', players: [3, 3], plan: { layout: TRADERS_DESERT3, keep212: true } },
-      { key: 'desert4', players: [4, 4], plan: { layout: TRADERS_DESERT4, keep212: true } }] },
+      { key: 'desert3', players: [3, 3], plan: { layout: TRADERS_DESERT3 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: TRADERS_DESERT4 } }] },
   { id: 'tbsea/barbarianAttackDesert', tb: 'tb/barbarianAttack', sea: 'seafarers/throughTheDesert', vp: 14,
     name: 'Barbarian Attack Through the Desert',
     blurb: 'The barbarians land on the main island only; knights guard it',
