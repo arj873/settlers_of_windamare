@@ -333,6 +333,12 @@ button.ol-choice:hover {
   margin: 0 0 0 52px;
   flex-wrap: wrap;
 }
+/* The setup screen's phone rule (flex: 1 0 100%) would make them as tall as this column card. */
+.ol-seat > .su-swatches {
+  order: 0;
+  flex: none;
+  justify-content: flex-start;
+}
 .ol-seat-foot {
   display: flex;
   align-items: center;

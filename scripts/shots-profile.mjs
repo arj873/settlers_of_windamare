@@ -115,7 +115,8 @@ for (const theme of themes) {
       await ann.locator('[data-k="profile-save"]').click();
       await ann.locator('[data-k="create"]').click();
       await ann.waitForSelector('[data-k="invite"]', { timeout: 30_000 });
-      await ann.locator('[data-k="sit-0"]').click();
+      // L1: naming yourself seats you (the host in seat 1).
+      await ann.waitForSelector('.ol-seat.is-mine', { timeout: 30_000 });
       const invite = await ann.locator('[data-k="invite"]').inputValue();
 
       const upload = await ann.evaluate(makeUpload);
@@ -133,8 +134,7 @@ for (const theme of themes) {
       );
       await bob.goto(invite);
       await bob.locator('[data-k="join"]').click();
-      await bob.waitForSelector('[data-k="sit-1"]', { timeout: 30_000 });
-      await bob.locator('[data-k="sit-1"]').click();
+      await bob.waitForSelector('.ol-seat.is-mine', { timeout: 30_000 });
       await ann.bringToFront();
       await ann.waitForTimeout(1800);
       await ann.evaluate(() => document.querySelector('.ol-lobby .su-scroll')?.scrollTo(0, 0));
