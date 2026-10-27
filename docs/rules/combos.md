@@ -329,6 +329,37 @@ coast could leave no notch for a ground (seed "7"). Online: `e2e:server` plays F
 Fog Islands (fish and fog stacks masked in every view); `sessionExpansions.test.ts` plays
 Rivers Through the Desert and T&B Through the Desert.
 
+**Sims** (`pnpm sim --mode tb+seafarers --scenario <s> --players <n> --games <g> --bias 0.5
+--max-steps 20000`; 3-4 players only). Every run: **0 invariant failures, 0 errors, 0 stalls**.
+Finished / capped (average turns of a finished game, random bots):
+
+| Scenario                      | 4p (300)      | 3p (50)      |
+| ----------------------------- | ------------- | ------------ |
+| `tbsea/fishermenFour`         | 300 / 0 (418) | 50 / 0 (452) |
+| `tbsea/fishermenFog`          | 300 / 0 (351) | 50 / 0 (364) |
+| `tbsea/fishermenDesert`       | 300 / 0 (340) | 50 / 0 (378) |
+| `tbsea/fishermenTribe`        | 300 / 0 (321) | 50 / 0 (339) |
+| `tbsea/fishermenCloth`        | 300 / 0 (213) | 50 / 0 (231) |
+| `tbsea/fishermenWonders`      | 294 / 6 (404) | 46 / 4 (499) |
+| `tbsea/fishermenNewWorld`     | 300 / 0 (445) | 50 / 0 (458) |
+| `tbsea/caravansDesert`        | 300 / 0 (387) | 50 / 0 (465) |
+| `tbsea/caravansTribe`         | 300 / 0 (398) | 50 / 0 (366) |
+| `tbsea/caravansNewWorld`      | 300 / 0 (541) | 50 / 0 (562) |
+| `tbsea/caravansFour`          | not run (\*)  | 50 / 0 (576) |
+| `tbsea/riversTribe`           | 300 / 0 (341) | 50 / 0 (390) |
+| `tbsea/riversNewWorld`        | 299 / 1 (532) | 50 / 0 (542) |
+| `tbsea/riversFog`             | 300 / 0 (445) | 50 / 0 (438) |
+| `tbsea/riversDesert`          | 300 / 0 (358) | 50 / 0 (445) |
+| `tbsea/riversDesert2`         | not run (\*)  | 50 / 0 (483) |
+| `tbsea/tradersDesert`         | 300 / 0 (357) | 50 / 0 (317) |
+| `tbsea/barbarianAttackDesert` | 300 / 0 (397) | 50 / 0 (429) |
+
+(\*) The two 4-player runs were stopped by the host for low memory before they finished (the
+machine was shared with other agents' playtests); both scenarios pass the soundness walk at 4
+players and the 3-player sim. Capped games are not violations: plain Seafarers Wonders caps
+too with random bots (2 of 50 at 3 players, 491 turns on average), a wonder or the highest
+level at 10 VP being hard to reach at random.
+
 Tests: `tbsea/engine/overlays.test.ts` (text set-ups), `diagrams.test.ts` (diagram set-ups),
 `sound.test.ts` (every scenario), `mask.test.ts` (T&B and Seafarers secrets in five C3
 scenarios), `ui.test.ts`.
