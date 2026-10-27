@@ -77,6 +77,32 @@ describe('neutral builds', () => {
     expect(next.phase).toMatchObject({ kind: 'tb/neutral', piece: 'road' });
   });
 
+  it('regression (two+ck sim seed 72): Road Building ends when the neutral road took the last spot', () => {
+    const s = tbMain('variants', 2);
+    const v: VertexId = 'v:0,0,S';
+    build(s, 0, v);
+    s.phase = { kind: 'roadBuilding', remaining: 2, resume: 'main' };
+    const first = roadFrom(s, v);
+    let next = ok(s, { type: 'placeFreeRoad', player: 0, edge: first });
+    expect(next.phase).toMatchObject({ kind: 'tb/neutral', piece: 'road' });
+    // Every other spot of player 0 is taken by roads of player 1 before the neutral builds.
+    const t = topologyOf(next);
+    for (const e of t.edges) {
+      if (
+        next.pieces.roads[e] === undefined &&
+        legalOf(
+          { ...next, phase: { kind: 'roadBuilding', remaining: 1, resume: 'main' } },
+          'placeFreeRoad',
+        ).some((x) => (x as { edge?: string }).edge === e)
+      ) {
+        next.pieces.roads[e] = 1;
+      }
+    }
+    const a = legalOf(next, 'tb/neutralRoad')[0] as unknown as { edge: EdgeId; neutral: 0 | 1 };
+    next = ok(next, { type: 'tb/neutralRoad', player: 0, edge: a.edge, neutral: a.neutral });
+    expect(next.phase.kind).toBe('main');
+  });
+
   it('neutral buildings cut your road and can hold Longest Road', () => {
     const s = tbMain('variants', 2);
     const t = topologyOf(s);

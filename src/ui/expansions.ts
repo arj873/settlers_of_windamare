@@ -18,6 +18,7 @@ import { tbpairHud } from '../expansions/tbpair/ui';
 import { epckHud } from '../expansions/epck/ui';
 import { eptbHud } from '../expansions/eptb/ui';
 import { backHud } from '../expansions/back/ui';
+import { twockHud } from '../expansions/twock/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
@@ -104,6 +105,7 @@ export const HUD_EXTENSIONS: readonly HudExtension[] = [
   epckHud,
   eptbHud,
   backHud,
+  twockHud,
   // new modules go here, one per line
 ];
 

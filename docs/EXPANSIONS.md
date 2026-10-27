@@ -32,6 +32,9 @@ Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tb
 `tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
 pair's rules (§11). C2: `tbsea` (mode `tb+seafarers`), each T&B scenario on Heading for New
 Shores, through the `playsAs` / `basedOn` seam (§11). E5b added `epck` (mode `ep+ck`) and `eptb` (mode `ep+tb`).
+C5 added `back` (mode `ba+ck`, Barbarian Attack + C&K) and `twock` (mode `two+ck`, Catan for Two
+
+- C&K): every C&K combination catan.com publishes is now a mode.
 
 ---
 
@@ -253,7 +256,7 @@ length, a hand its size), sharing the unchanged parts, mutating nothing. Rules:
   Master Merchant reveals), Seafarers `seafarers/engine/mask.ts` (fog stacks, face-down Forgotten
   Tribe dev-card gifts), T&B `tb/engine/mask.ts` (fish hands and pool, BA deck, commodity stacks,
   Swift Journeys), E&P `ep/engine/mask.ts` (face-down hexes, disc stacks, lair tokens). Oil, Crop,
-  demo, seack, tbck, epck, eptb hold no secrets of their own (their tests run the C&K, T&B and
+  demo, seack, tbck, epck, eptb, back, twock hold no secrets of their own (their tests run the C&K, T&B and
   E&P masks in the combos; gold offers and fish uses are public).
 
 Online actions: `parseAction` (src/net/protocol.ts) accepts any registered `<id>/<name>` type
@@ -476,6 +479,8 @@ engine status per rule in `docs/rules/combos.md`):
 | `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                  |
 | `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                          |
 | `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                        |
+| `ba+ck`        | `back`   | `ck`, `tb`        | Barbarian Attack 13; 3-6 (C5: C&K knights on paths, no barbarian ship)                         |
+| `two+ck`       | `twock`  | `ck`, `tb`        | Catan for Two on the base board 13; 2 players (C5: neutral knights)                            |
 
 How a combination is built:
 
@@ -511,7 +516,9 @@ seafarers]`).
 - **Sea paths for road pieces.** On a map with open sea T&B's wagons, camels and barbarians also
   use sea edges (`tb/engine/paths.ts`); the pieces that carry a wagon like a road (ships) come
   from the `routeEdges` hook, so T&B never imports Seafarers.
-- **Seams in the composed modules** (small, generic, listed in `docs/rules/combos.md` §7-8): E&P
+- **Seams in the composed modules** (small, generic, listed in `docs/rules/combos.md` §7-8, §11):
+  C5: C&K `shipSails` (a mode without the barbarian ship), T&B `prisonersPerVp` / `baCardsInPlay`
+  / `BaSlice.safe`; C&K routes treat other modules' `blocksRoute` pieces as foreign. E&P
   `citiesInPlay` / `isHarborStep` (C&K joins: cities, the setup rounds swap), C&K `besideFog`
   (no knight next to an unexplored hex), T&B `MODE_FEATURES` (a combination mode switches a T&B
   feature on for another expansion's scenarios: `'ep+tb': ['fish']`).
@@ -552,8 +559,8 @@ seafarers]`).
 - ~~Secret expansion state online~~ — done (X1): the `maskFor` hook (§5 "Online views").
 - **Statistics** count resources only; expansion goods (commodities, oil, crops, gold, fish) have none.
 - **Combinations (C1, C2):** Seafarers + C&K, T&B + C&K and T&B + Seafarers (on New Shores) are
-  built (§11). Not built: T&B + Seafarers on the other Seafarers scenarios (per-scenario maps),
-  Barbarian Attack + C&K, Catan for Two + C&K, the six non-Fishing T&B × T&B sheets (T6; the four
+  built (§11), and Barbarian Attack + C&K, Catan for Two + C&K (C5). Not built: T&B + Seafarers
+  on the other Seafarers scenarios (per-scenario maps), the six non-Fishing T&B × T&B sheets (T6; the four
   Fishing pairs are mode `tb+tb`). Details in
   `docs/rules/combos.md` §2b, §3.
 - ~~E&P combinations~~ — done (E5b): `ep+ck`, `ep+tb` (§11), player trades with gold

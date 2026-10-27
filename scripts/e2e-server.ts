@@ -336,6 +336,16 @@ const EXPANSION_GAMES: ExpansionGame[] = [
     config: { mode: 'ep+tb', scenario: 'ep/fish', vpToWin: 5 },
     hidden: (view) => fishHidden(view) ?? epHidden(view),
   },
+  {
+    label: 'Barbarian Attack + Cities & Knights',
+    config: { mode: 'ba+ck', scenario: 'tb/barbarianAttack', vpToWin: 6 },
+    hidden: ckHidden,
+  },
+  {
+    label: 'Catan for Two + Cities & Knights',
+    config: { mode: 'two+ck', scenario: 'tb/variants', vpToWin: 5, seatCount: 2 },
+    hidden: ckHidden,
+  },
 ];
 
 async function playExpansionGame(base: string, game: ExpansionGame): Promise<void> {
