@@ -73,6 +73,8 @@ Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) (the contract, read first), [EXPANSIO
 
 Issues are welcome. Pull requests are squash-merged; before opening one, run `pnpm typecheck`, `pnpm lint` and `pnpm test`.
 
-## Legal
+## License
 
-Unofficial fan project. Not affiliated with or endorsed by CATAN GmbH or Catan Studio. "Catan" is a trademark of its owners. No license has been chosen yet.
+The code is under the [GNU AGPL v3 or later](LICENSE). Anyone who runs a modified version as an online service must offer its source to that service's users. Third-party assets (fonts, packages) keep their own licenses; there is no separate credits file yet.
+
+Unofficial fan project. Not affiliated with or endorsed by CATAN GmbH or Catan Studio. "Catan" is a trademark of its owners.
