@@ -14,6 +14,8 @@
  * settings.seatOrder (the seating is visible at the table anyway).
  *  - rng                                          -> 0
  *  - settings.seed and the seed in the "Game created" log line -> HIDDEN_SEED / removed
+ *  - log entries' private texts (#32, `LogEntry.secret`: which card a steal took) -> only the
+ *    ones naming the viewer (kept for good: the stats reveal the totals at game over anyway)
  *  - stats (UX2: stolen card types, dev cards bought, hidden VP over time) -> absent
  * Once the game is over every hand and dev card is revealed (final scores show VP cards), and
  * so are the stats; decks, rng and seed stay hidden.
@@ -65,7 +67,13 @@ const unplayedDevCards = (p: Player) => totalDevCards(p.devCards) + totalDevCard
 /** "Game created (Base map, seed 42)" -> "Game created (Base map)". */
 const SEED_IN_LOG = /, seed .*\)$/;
 
-function maskLogEntry(e: LogEntry): LogEntry {
+function maskLogEntry(e: LogEntry, seat: PlayerId | null): LogEntry {
+  if (e.secret) {
+    // #32: only the private texts naming the viewer (a spectator reads none).
+    const { secret, ...rest } = e;
+    const own = seat === null ? [] : secret.filter((s) => s.to.includes(seat));
+    return own.length > 0 ? { ...rest, secret: own } : rest;
+  }
   if (e.turn !== 0 || e.player !== null || !e.text.startsWith('Game created (')) return e;
   return { ...e, text: e.text.replace(SEED_IN_LOG, ')') };
 }
@@ -104,7 +112,7 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
     devDeck: state.devDeck.map(() => HIDDEN_DEV_CARD),
     diceDeck: state.diceDeck.map(() => HIDDEN_DICE_CARD),
     ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => HIDDEN_EVENT_CARD) } : {}),
-    log: state.log.map(maskLogEntry),
+    log: state.log.map((e) => maskLogEntry(e, seat)),
     rng: 0,
     view: {
       viewer: seat,

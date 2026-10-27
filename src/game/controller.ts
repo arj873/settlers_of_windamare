@@ -21,9 +21,19 @@ import { createRandomBot, DEFAULT_BOT_LEVEL, type Bot, type BotLevel } from '../
 import { botForLevel } from '../bots/byLevel';
 import type { BoardView } from '../render';
 import type { Hud, NewGameConfig, PlaceMode } from '../ui';
-import { gameConfigOf, isStalled, nextBot, pickViewer, type BoardClick, type Seats } from './logic';
+import {
+  autoSteal,
+  gameConfigOf,
+  isStalled,
+  nextBot,
+  pickViewer,
+  type BoardClick,
+  type Seats,
+} from './logic';
+import { emitGameNotice, gameNotices, type NoticeSink } from './notices';
 import { SpotPicker, type SpotPromptLike } from './spotPicker';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
+import { TurnRecap } from './recap';
 import type { SoundObserver } from './sounds';
 import {
   IDLE_CLOCK,
@@ -40,7 +50,7 @@ import {
 } from './turnTimer';
 
 export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'> &
-  Partial<Pick<BoardView, 'screenPos'>>;
+  Partial<Pick<BoardView, 'markSince' | 'screenPos'>>;
 export type HudLike = Pick<Hud, 'render' | 'on' | 'isCovered' | 'setTurnTimer'>;
 export type ToastKind = 'error' | 'info';
 
@@ -58,6 +68,8 @@ export interface ControllerOptions {
   onRender?: () => void;
   /** Wall clock in ms for the game duration (UX2 stats); default Date.now. */
   wallClock?: () => number;
+  /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
+  notice?: NoticeSink;
   /** The popover a click on a board spot opens (issue #28); absent = a click acts at once. */
   prompt?: SpotPromptLike | null;
   /** The "Confirm before building" setting; default on. */
@@ -91,10 +103,14 @@ export class GameController {
   private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
+  private readonly notice: NoticeSink;
   private readonly sounds: SoundObserver | null;
   private speedMs: number;
 
   private current: GameState | null = null;
+  /** The state last rendered: notices describe what changed since (null after `start`). */
+  private shown: GameState | null = null;
+  private readonly recap = new TurnRecap();
   private seatList: Seats = [];
   /** Bot level per seat (B1); absent entries play DEFAULT_BOT_LEVEL. */
   private levels: BotLevel[] = [];
@@ -133,6 +149,7 @@ export class GameController {
     this.bot = opts.bot ?? null;
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
+    this.notice = opts.notice ?? ((n) => this.toast(n.text, 'info'));
     this.sounds = opts.sounds ?? null;
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
     const board = this.board;
@@ -216,6 +233,8 @@ export class GameController {
     this.cancelTimer();
     this.stopClock();
     this.current = state;
+    this.shown = null;
+    this.recap.clear();
     this.seatList = [...seats];
     this.levels = seats.map((_, i) => opts.botLevels?.[i] ?? DEFAULT_BOT_LEVEL);
     this.viewerId = opts.viewer ?? null;
@@ -348,7 +367,22 @@ export class GameController {
     if (!state) return;
     this.legal = legalActions(state);
     this.viewerId = pickViewer(state, this.seatList, this.legal, this.viewerId);
+    // #34: robbing the only player who can be robbed needs no "Steal from whom?" dialog.
+    const steal =
+      this.viewerId !== null && this.seatList[this.viewerId] === 'human'
+        ? autoSteal(this.legal, this.viewerId)
+        : null;
+    if (steal && this.apply(steal)) {
+      this.refresh();
+      return;
+    }
     this.spots.sync({ legal: this.legal, viewer: this.viewerId, placeMode: this.placeMode });
+    const prev = this.shown;
+    this.shown = state;
+    // A bot "viewer" (all-bot game) is a spectator: no private texts.
+    const reader =
+      this.viewerId !== null && this.seatList[this.viewerId] === 'human' ? this.viewerId : null;
+    const notices = prev ? gameNotices(prev, state, reader) : [];
     if (state.phase.kind === 'gameOver' && this.durationMs === null && this.startedAt !== null) {
       this.durationMs = this.wallClock() - this.startedAt;
     }
@@ -373,6 +407,13 @@ export class GameController {
     this.updateHighlights();
     this.persist();
     this.onRender();
+    for (const n of notices) {
+      this.notice(n, state, reader);
+      emitGameNotice(n);
+    }
+    // #33: your turn again: briefly mark what the others built since your last one.
+    const since = this.recap.update(prev, state, reader);
+    if (since) this.board.markSince?.(since);
 
     if (isStalled(state, this.legal)) {
       if (!this.stallReported) {

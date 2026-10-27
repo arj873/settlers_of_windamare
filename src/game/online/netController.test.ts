@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState } from '../../engine';
+import { viewFor, type Action, type GameState } from '../../engine';
+import { moveRobberGame } from '../../engine/fixtures';
 import {
   DEFAULT_ROOM_CONFIG,
   FakeClock,
@@ -261,6 +262,30 @@ describe('NetGameController', () => {
     const left = t.ann.timerLeftMs()!;
     expect(left).toBeLessThanOrEqual(30_000);
     expect(a.net.hudView()!.turnTimer!.totalSec).toBe(30);
+  });
+
+  it('sends the only steal at once and never shows its dialog (#34)', () => {
+    const view = viewFor(moveRobberGame(), 1);
+    view.phase = { kind: 'steal', candidates: [0], resume: 'preRoll' };
+    const steal: Action = { type: 'steal', player: 1, victim: 0 };
+    const sent: Action[] = [];
+    let listener: ((e: { type: string }) => void) | null = null;
+    const client = {
+      game: { seq: 1, view, legal: [steal], timer: null, receivedAt: 0 },
+      room: null,
+      on: (fn: (e: { type: string }) => void) => {
+        listener = fn;
+        return () => undefined;
+      },
+      intent: (a: Action) => sent.push(a) > 0,
+      timerLeftMs: () => null,
+    } as unknown as RoomClient;
+    const c = controller(client);
+    expect(sent).toEqual([steal]);
+    expect(c.renders.at(-1)!.view.legal).toEqual([]);
+    // The same view again (e.g. a room update): not sent twice.
+    listener!({ type: 'room' });
+    expect(sent).toHaveLength(1);
   });
 
   it('away flag while a player is disconnected; stop() ignores further events', () => {

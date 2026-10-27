@@ -8,6 +8,7 @@ import type {
   Phase,
   PlayerId,
   ResumePhase,
+  SecretText,
 } from '../types';
 
 /**
@@ -39,9 +40,22 @@ export function notImplemented(): ActionResult {
   return fail('not implemented');
 }
 
-/** Append a log line for the current turn. */
-export function log(draft: GameState, player: PlayerId | null, text: string): void {
-  draft.log.push({ turn: draft.turn.number, player, text });
+/**
+ * Append a log line for the current turn. `secret`: private versions for some players (#32,
+ * e.g. `stealSecret`); `text` stays public, so it must not name a hidden card.
+ */
+export function log(
+  draft: GameState,
+  player: PlayerId | null,
+  text: string,
+  secret: SecretText[] = [],
+): void {
+  draft.log.push({
+    turn: draft.turn.number,
+    player,
+    text,
+    ...(secret.length > 0 ? { secret } : {}),
+  });
 }
 
 /**

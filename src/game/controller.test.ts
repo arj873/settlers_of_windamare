@@ -12,11 +12,13 @@ import {
   discardGame,
   freshGame,
   midGame,
+  moveRobberGame,
   tradeOfferGame,
 } from '../engine/fixtures';
 import type { BoardEvents, Highlights } from '../render';
 import type { HudEvents, HudView, NewGameConfig } from '../ui';
 import { GameController, type BoardLike, type HudLike } from './controller';
+import type { GameNotice } from './notices';
 import { SAVE_KEY, loadSession, type KeyValueStore } from './persist';
 import type { SpotPromptLike } from './spotPicker';
 import type { SpotPromptRequest } from '../ui/spotPrompt';
@@ -25,6 +27,10 @@ import type { SpotPromptRequest } from '../ui/spotPrompt';
 
 class FakeBoard implements BoardLike {
   renders = 0;
+  recaps: GameState[] = [];
+  markSince(since: GameState): void {
+    this.recaps.push(since);
+  }
   highlights: Highlights = {};
   private handlers = new Map<string, ((id: never) => void)[]>();
   render(): void {
@@ -88,6 +94,7 @@ let board: FakeBoard;
 let hud: FakeHud;
 let store: MemoryStore;
 let toasts: string[];
+let notices: GameNotice[];
 
 function make(speed = 500): GameController {
   return new GameController({
@@ -96,6 +103,7 @@ function make(speed = 500): GameController {
     storage: store,
     speed,
     toast: (m) => toasts.push(m),
+    notice: (n) => notices.push(n),
   });
 }
 
@@ -104,6 +112,7 @@ beforeEach(() => {
   hud = new FakeHud();
   store = new MemoryStore();
   toasts = [];
+  notices = [];
   vi.useFakeTimers();
 });
 afterEach(() => {
@@ -129,6 +138,43 @@ describe('GameController: rendering and actions', () => {
     expect(hud.last.viewer).toBe(0);
     expect(hud.last.isBotTurn).toBe(false);
     expect(hud.last.legal.length).toBeGreaterThan(0);
+  });
+
+  it('announces an award changing hands (#36), once', () => {
+    const c = make();
+    // Nobody holds Longest Road yet, though Red has 5 roads: the next road change awards it.
+    c.start({ ...richMidGame(), awards: { longestRoad: null, largestArmy: 2 } }, humans4);
+    expect(notices).toEqual([]);
+    const road = c.legalActions.find((a) => a.type === 'buildRoad' && a.player === 1)!;
+    hud.emit('action', road);
+    expect(notices).toEqual([
+      expect.objectContaining({
+        kind: 'award',
+        award: 'longestRoad',
+        to: 0,
+        from: null,
+        text: 'Red took Longest Road',
+      }),
+    ]);
+    hud.emit('action', { type: 'endTurn', player: 1 });
+    expect(notices).toHaveLength(1);
+  });
+
+  it('marks what the others built when the viewer’s turn comes back (#33)', () => {
+    const c = make(0);
+    // Blue (1) is the human; the bots play their turns at instant speed.
+    c.start(midGame(), ['bot', 'human', 'bot', 'bot']);
+    hud.emit('action', { type: 'endTurn', player: 1 });
+    const ended = c.state!;
+    for (let i = 0; i < 400 && c.state!.turn.current !== 1; i++) {
+      // Blue answers what the bots ask of them (trade offers, discards on a 7).
+      const owed = c.legalActions.filter((a) => a.player === 1);
+      const reply = owed.find((a) => a.type === 'rejectTrade') ?? owed[0];
+      if (reply) hud.emit('action', reply);
+      vi.advanceTimersByTime(20);
+    }
+    expect(c.state!.turn.current).toBe(1);
+    expect(board.recaps).toEqual([ended]);
   });
 
   it('applies HUD actions through applyAction and re-renders', () => {
@@ -388,6 +434,37 @@ describe('GameController: viewer and hotseat', () => {
     hud.emit('action', discard(3));
     expect(c.state?.phase.kind).toBe('moveRobber');
     expect(c.viewer).toBe(1);
+  });
+
+  it('robs the only player who can be robbed without asking (#34)', () => {
+    const s = moveRobberGame(); // Blue (1) played a knight
+    const moves = legalActions(s).filter((a) => a.type === 'moveRobber');
+    const victimsAt = (a: Action) => {
+      const r = applyAction(s, a);
+      return r.ok && r.state.phase.kind === 'steal' ? r.state.phase.candidates : [];
+    };
+    const one = moves.find((a) => victimsAt(a).length === 1)!;
+    const two = moves.find((a) => victimsAt(a).length > 1)!;
+    expect(one && two).toBeTruthy();
+
+    const c = make();
+    c.start(s, humans4);
+    const before = c.state!.players[1]!.resources;
+    hud.emit('action', one);
+    expect(c.state?.phase.kind).toBe('preRoll');
+    expect(hud.views.some((v) => v.legal.some((a) => a.type === 'steal'))).toBe(false);
+    const total = (r: typeof before) => Object.values(r).reduce((n, k) => n + k, 0);
+    expect(total(c.state!.players[1]!.resources)).toBe(total(before) + 1);
+    // #32: the thief is told which card.
+    expect(notices).toEqual([
+      { kind: 'steal', text: expect.stringMatching(/^You stole 1 \w+ from \w+$/) },
+    ]);
+
+    // Two victims: the dialog asks.
+    c.start(moveRobberGame(), humans4);
+    hud.emit('action', two);
+    expect(c.state?.phase.kind).toBe('steal');
+    expect(hud.last.legal.filter((a) => a.type === 'steal').length).toBeGreaterThan(1);
   });
 
   it('lets a pending human trade responder view before the offerer', () => {

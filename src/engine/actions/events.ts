@@ -14,7 +14,7 @@ import { hookAfterProduction } from '../expansions/hooks';
 import { isResource } from '../resources';
 import { EVENT_INFO, drawEventCard, facesFor } from '../rules/events';
 import { produce } from '../rules/production';
-import { describeBundle, playerName } from '../rules/text';
+import { describeBundle, playerName, stealSecret } from '../rules/text';
 import { Rng } from '../rng';
 import { handSize, portsOf, publicVictoryPoints, roadsOf } from '../selectors';
 import { topologyOf } from '../topology';
@@ -280,6 +280,7 @@ export const eventHandlers: HandlerMap<
       draft,
       player,
       `${playerName(draft, player)} stole from ${playerName(draft, victim)} (${eventName(t.phase)})`,
+      stealSecret(draft, player, victim, [r], ` (${eventName(t.phase)})`),
     );
     done(draft, t.phase, player);
     return ok(draft);

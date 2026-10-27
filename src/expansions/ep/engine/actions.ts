@@ -23,7 +23,7 @@ import { Rng } from '../../../engine/rng';
 import { hasResources, isResource } from '../../../engine/resources';
 import { canPlaceRoad, isVertexOpen, touchesLand } from '../../../engine/rules/placement';
 import { checkVictory } from '../../../engine/rules/victory';
-import { playerName } from '../../../engine/rules/text';
+import { playerName, stealSecret } from '../../../engine/rules/text';
 import { piecesLeft, setupOrderOf } from '../../../engine/selectors';
 import { edgeInfo, topologyOf, vertexInfo } from '../../../engine/topology';
 import type {
@@ -1180,7 +1180,12 @@ export const HANDLERS: Record<EpActionType, H> = {
       const r = rng.pick(cards);
       hand[r] -= 1;
       mine[r] += 1;
-      log(draft, a.player, `${name(draft, a.player)}’s pirates robbed ${name(draft, victim)}`);
+      log(
+        draft,
+        a.player,
+        `${name(draft, a.player)}’s pirates robbed ${name(draft, victim)}`,
+        stealSecret(draft, a.player, victim, [r], ' (pirates)'),
+      );
     } else if ((s.gold[victim] ?? 0) > 0) {
       s.gold[victim] = (s.gold[victim] ?? 0) - 1;
       s.gold[a.player] = gold(draft, a.player) + 1;

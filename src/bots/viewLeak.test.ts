@@ -3,7 +3,7 @@
  * no view carries secret data, the public counts match, and a view does not change when only
  * secret data changes (so it cannot leak it).
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   DEV_CARD_TYPES,
   emptyStats,
@@ -80,11 +80,20 @@ function scramble(state: GameState, viewer: Viewer, rng: Rng): GameState {
     rng: rng.int(2 ** 32),
     // Stats (stolen card types, dev cards bought, hidden VP history) are secret until game over.
     ...(revealAll ? {} : { stats: emptyStats(state.players.length, false, rng.int(99)) }),
-    log: state.log.map((e) =>
-      e.text.startsWith('Game created (')
-        ? { ...e, text: e.text.replace(/seed .*\)$/, `seed ${seed})`) }
-        : e,
-    ),
+    log: state.log.map((e) => {
+      if (e.text.startsWith('Game created ('))
+        return { ...e, text: e.text.replace(/seed .*\)$/, `seed ${seed})`) };
+      // #32: other players' private texts (which card a steal took).
+      if (!e.secret) return e;
+      return {
+        ...e,
+        secret: e.secret.map((s) =>
+          typeof viewer === 'number' && s.to.includes(viewer)
+            ? s
+            : { ...s, text: `${s.text} ${rng.pick(RESOURCES)}` },
+        ),
+      };
+    }),
   };
 }
 
@@ -109,6 +118,11 @@ const GAMES = [
 ];
 
 describe('online views leak nothing (property test over simulated games)', () => {
+  let secretsSeen = 0;
+  afterAll(() => {
+    // The games above do steal: the private-text checks ran on real entries.
+    expect(secretsSeen).toBeGreaterThan(0);
+  });
   for (const game of GAMES) {
     it(`game ${JSON.stringify(game)}`, () => {
       const states = sampleStates(game);
@@ -129,6 +143,17 @@ describe('online views leak nothing (property test over simulated games)', () =>
           expect((v.eventDeck ?? []).every((c) => c === HIDDEN_EVENT_CARD)).toBe(true);
           expect(v.eventDeck?.length).toBe(state.eventDeck?.length);
           expect(v.log.some((e) => /seed/.test(e.text))).toBe(false);
+          // #32: private log texts only for the players they name; none for spectators.
+          for (const e of v.log) {
+            for (const s of e.secret ?? []) {
+              expect(viewer !== 'spectator' && s.to.includes(viewer)).toBe(true);
+            }
+          }
+          if (typeof viewer === 'number') {
+            const own = state.log.filter((e) => e.secret?.some((s) => s.to.includes(viewer)));
+            expect(v.log.filter((e) => e.secret).length).toBe(own.length);
+            secretsSeen += own.length;
+          }
           expect(v.stats).toEqual(revealAll ? state.stats : undefined);
           for (const p of v.players) {
             const own = revealAll || p.id === viewer;

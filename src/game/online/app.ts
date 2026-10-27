@@ -26,6 +26,7 @@ import type { SoundObserver } from '../sounds';
 import type { Backend } from './backend';
 import type { SpotPromptLike } from '../spotPicker';
 import { NetGameController } from './netController';
+import type { NoticeSink } from '../notices';
 
 export interface OnlineEnv {
   board: BoardLike;
@@ -37,6 +38,8 @@ export interface OnlineEnv {
   tokens: KeyStore;
   clock: Clock;
   toast: (message: string, kind: ToastKind) => void;
+  /** Shows a game notice (steal, award); default: a toast. */
+  notice?: NoticeSink;
   onRender?: () => void;
   /** Where full-screen pages go (document.body). */
   layer: HTMLElement;
@@ -168,6 +171,7 @@ export class OnlineApp {
       hud: env.hud,
       client,
       toast: env.toast,
+      ...(env.notice ? { notice: env.notice } : {}),
       ...(env.onRender ? { onRender: env.onRender } : {}),
       ...(env.prompt ? { prompt: env.prompt } : {}),
       ...(env.confirmBuild ? { confirmBuild: env.confirmBuild } : {}),

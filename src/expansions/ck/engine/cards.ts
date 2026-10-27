@@ -8,7 +8,7 @@ import { stealCandidates } from '../../../engine/actions/robber';
 import { terrainKind } from '../../../engine/expansions/hooks';
 import { hasResources, isResource } from '../../../engine/resources';
 import { canPlaceRoad } from '../../../engine/rules/placement';
-import { playerName } from '../../../engine/rules/text';
+import { playerName, stealSecret } from '../../../engine/rules/text';
 import { buildingsOf, piecesLeft, publicVictoryPoints } from '../../../engine/selectors';
 import { topologyOf, vertexHexes } from '../../../engine/topology';
 import type { EdgeId, GameState, HexId, Phase, PlayerId, VertexId } from '../../../engine/types';
@@ -522,8 +522,14 @@ export function applyCardChoice(draft: GameState, phase: CardPhase, choice: Card
       draft.robber = choice.id;
       log(draft, p, `${pn(draft, p)} moved the robber`);
       for (const q of stealCandidates(draft, p, choice.id)) {
-        if (stealRandom(draft, p, q) !== null) {
-          log(draft, p, `${pn(draft, p)} stole from ${pn(draft, q)}`);
+        const card = stealRandom(draft, p, q);
+        if (card !== null) {
+          log(
+            draft,
+            p,
+            `${pn(draft, p)} stole from ${pn(draft, q)}`,
+            stealSecret(draft, p, q, [card], ' (Bishop)'),
+          );
         }
       }
       return main();
@@ -619,7 +625,13 @@ export function applyCardChoice(draft: GameState, phase: CardPhase, choice: Card
       const i = from.indexOf(choice.id);
       if (i >= 0) from.splice(i, 1);
       ckPlayer(draft, p).progress.push(choice.id);
-      log(draft, p, `${pn(draft, p)} took a progress card from ${pn(draft, phase.victim)}`);
+      // Spy and victim both saw the card (#32); the table did not.
+      log(draft, p, `${pn(draft, p)} took a progress card from ${pn(draft, phase.victim)}`, [
+        {
+          to: [p, phase.victim],
+          text: `${pn(draft, p)} took ${CARD_NAMES[choice.id] ?? choice.id} from ${pn(draft, phase.victim)} (Spy)`,
+        },
+      ]);
       return main();
     }
     case 'masterMerchant': {
@@ -629,7 +641,12 @@ export function applyCardChoice(draft: GameState, phase: CardPhase, choice: Card
       }
       if (choice.kind !== 'good') return;
       moveGood(draft, phase.victim, p, choice.id);
-      log(draft, p, `${pn(draft, p)} took a card from ${pn(draft, phase.victim)}`);
+      log(draft, p, `${pn(draft, p)} took a card from ${pn(draft, phase.victim)}`, [
+        {
+          to: [p, phase.victim],
+          text: `${pn(draft, p)} took 1 ${choice.id} from ${pn(draft, phase.victim)} (Master Merchant)`,
+        },
+      ]);
       const left = phase.left - 1;
       return left > 0 && cardsOf(draft, phase.victim) > 0 ? stay({ ...phase, left }) : main();
     }

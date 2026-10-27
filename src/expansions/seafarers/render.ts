@@ -415,4 +415,13 @@ export const seafarersDrawer: BoardDrawer = {
     { key: 'chits', z: 'pieces', sig: (s) => JSON.stringify(slice(s).chits), draw: chitLayer },
     { key: 'pirate', z: 'top', sig: pirateSig, draw: pirateLayer },
   ],
+  // #33: a new or moved ship gets the "just built" mark.
+  sites: (s) =>
+    Object.entries(slice(s).ships).map(
+      ([e, ship]) =>
+        [
+          `sea:${e}`,
+          { at: e as EdgeId, owner: ship.owner, kind: ship.warship ? 'warship' : 'ship' },
+        ] as const,
+    ),
 };
