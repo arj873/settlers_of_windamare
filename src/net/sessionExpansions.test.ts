@@ -23,6 +23,7 @@ function started(patch: Partial<RoomConfig>) {
   net.send('bob', { type: 'hello', token: null, name: 'Bob' });
   net.connect('spec');
   net.send('spec', { type: 'hello', token: null, name: 'Sue' });
+  net.send('spec', { type: 'leaveSeat' }); // she sat down on joining (L1); she only watches
   net.send('host', {
     type: 'configure',
     config: { ...DEFAULT_ROOM_CONFIG, seatCount: 4, turnTimerSec: null, ...patch },
