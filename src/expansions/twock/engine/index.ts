@@ -14,6 +14,7 @@
  */
 import { RESOURCES } from '../../../engine/constants';
 import { fail, isCurrent, log, ok } from '../../../engine/actions/common';
+import { stealSecret } from '../../../engine/rules/text';
 import { cloneJson } from '../../../engine/expansions/ext';
 import type { ExpansionModule, ExtHandler, ExtWrap } from '../../../engine/expansions/types';
 import { touchesLand } from '../../../engine/rules/placement';
@@ -322,12 +323,13 @@ const forcedTrade: ExtHandler = (draft, action) => {
   two.tokens[p] = (two.tokens[p] ?? 0) - price;
   two.supply += price;
   two.tokenUsed = true;
-  let taken = 0;
-  for (let i = 0; i < 2; i++) if (stealRandom(draft, p, 1 - p) !== null) taken += 1;
+  const cards = [stealRandom(draft, p, 1 - p), stealRandom(draft, p, 1 - p)];
+  const taken = cards.filter((c) => c !== null).length;
   log(
     draft,
     p,
     `${pn(draft, p)} forced a trade (resources and commodities): took ${taken} card${taken === 1 ? '' : 's'}`,
+    stealSecret(draft, p, 1 - p, cards, ' (forced trade)'),
   );
   const count = Math.min(2, cardsInHand(draft, p));
   const resume = draft.phase.kind === 'preRoll' ? 'preRoll' : 'main';

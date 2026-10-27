@@ -17,11 +17,18 @@ import { inviteUrl } from './ui/online/lobbyModel';
 import { OnlineApp } from './game/online/app';
 import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
 import { DEFAULT_SPEED, GameController } from './game/controller';
+import { isHeadless, sfx } from './audio';
+import { GameSounds } from './game/sounds';
+import { extensionSoundRecipes, extensionSounds } from './ui/expansions';
+import { sfxPanel } from './ui/sfxPanel';
 import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
+import { showNotice } from './game/noticeView';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
+import { SpotPrompt } from './ui/spotPrompt';
 import {
+  CONFIRM_BUILD_KEY,
   LONGEST_ROAD_KEY,
   SPEED_KEY,
   browserStorage,
@@ -91,6 +98,14 @@ async function boot() {
   const storage = dev ? null : browserStorage();
   const prefs = browserStorage();
 
+  // Sound effects (A1): synthesized; the AudioContext starts on the first gesture. Silent in
+  // the playtest harness / automation (`?debug=1`, navigator.webdriver, `?mute=1`).
+  sfx.register(extensionSoundRecipes());
+  sfx.suppress(isHeadless(location.search, navigator));
+  sfx.installUnlock(window);
+  const sounds = new GameSounds({ play: (id, g) => sfx.play(id, g), extensions: extensionSounds });
+  if (new URLSearchParams(location.search).get('sfx') === '1') document.body.append(sfxPanel());
+
   const app = new Application();
   await app.init({
     // Transparent: the page background (a theme token) shows around the board.
@@ -115,6 +130,19 @@ async function boot() {
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
   wireLongestRoad(board, hud, prefs);
+  // A click on a board spot asks before building (issue #28), unless switched off in the menu.
+  const prompt = new SpotPrompt(uiRoot);
+  let confirmOn = loadNumber(prefs, CONFIRM_BUILD_KEY) !== 0;
+  hud.setBuildConfirm({
+    value: confirmOn,
+    onChange: (on) => {
+      confirmOn = on;
+      saveNumber(prefs, CONFIRM_BUILD_KEY, on ? 1 : 0);
+    },
+  });
+  const spots = { prompt, confirmBuild: () => confirmOn };
+  // Production cards (issue #29) fly from the hexes: hotseat and online share the HUD.
+  hud.setHexLocator((id) => board.screenPos(id));
 
   const fitBoard = () => {
     const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
@@ -138,7 +166,9 @@ async function boot() {
           tokens: tokenStoreFor(backend.kind),
           clock: realClock,
           toast: showToast,
+          notice: showNotice,
           onRender: fitBoard,
+          sounds,
           layer: document.body,
           href: location.href,
           goHome: () => location.assign(homeUrl()),
@@ -146,6 +176,7 @@ async function boot() {
             history.replaceState(null, '', homeUrl());
             offline(null);
           },
+          ...spots,
         },
         roomId,
       );
@@ -162,7 +193,7 @@ async function boot() {
 
   // Hotseat: everything below is the offline game, unchanged.
   const offline = (dev: { state: GameState; seats: Controller[] } | null) =>
-    startOffline({ board, hud, params, dev, storage, prefs, fitBoard });
+    startOffline({ board, hud, params, dev, storage, prefs, fitBoard, spots, sounds });
   if (dev) {
     offline(dev);
     return;
@@ -243,8 +274,10 @@ function startOffline(o: {
   storage: KeyValueStore | null;
   prefs: KeyValueStore | null;
   fitBoard: () => void;
+  spots: { prompt: SpotPrompt; confirmBuild: () => boolean };
+  sounds: GameSounds;
 }): void {
-  const { board, hud, params, dev, storage, prefs, fitBoard } = o;
+  const { board, hud, params, dev, storage, prefs, fitBoard, spots, sounds } = o;
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,
@@ -252,7 +285,10 @@ function startOffline(o: {
     storage,
     speed,
     toast: showToast,
+    notice: showNotice,
     onRender: fitBoard,
+    ...spots,
+    sounds,
   });
   // Bot speed lives in the HUD menu (shown while any seat is a bot).
   hud.setBotSpeed({

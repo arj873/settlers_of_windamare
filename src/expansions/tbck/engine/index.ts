@@ -19,7 +19,7 @@ import { cloneJson } from '../../../engine/expansions/ext';
 import type { ExpansionModule, ExtHandler, ExtWrap } from '../../../engine/expansions/types';
 import { isCentreVertex } from '../../../engine/hex';
 import type { Rng } from '../../../engine/rng';
-import { playerName } from '../../../engine/rules/text';
+import { playerName, stealSecret } from '../../../engine/rules/text';
 import { topologyOf } from '../../../engine/topology';
 import type { Action, EdgeId, GameState, HexId, PlayerId, VertexId } from '../../../engine/types';
 import {
@@ -378,6 +378,7 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
       draft,
       p,
       `${pn(draft, p)} paid fish to steal from ${pn(draft, v)}${card ? '' : ' (no cards)'}`,
+      stealSecret(draft, p, v, [card], ' (fish)'),
     );
     return ok(draft);
   },
@@ -413,6 +414,7 @@ const wraps: Record<`${string}/${string}`, ExtWrap> = {
         draft,
         action.player,
         `${pn(draft, action.player)} stole from ${pn(draft, owner)}${card ? '' : ' (no cards)'}`,
+        stealSecret(draft, action.player, owner, [card]),
       );
     }
     return ok(draft);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState } from '../../engine';
+import { viewFor, type Action, type GameState } from '../../engine';
+import { moveRobberGame } from '../../engine/fixtures';
 import {
   DEFAULT_ROOM_CONFIG,
   FakeClock,
@@ -13,7 +14,10 @@ import {
 } from '../../net';
 import { fakeDeps } from '../../net/testHarness';
 import type { HudEvents, HudView } from '../../ui';
+import type { SpotPromptRequest } from '../../ui/spotPrompt';
 import type { BoardLike, HudLike } from '../controller';
+import { locationOf } from '../logic';
+import type { SpotPromptLike } from '../spotPicker';
 import { NetGameController, seatFlags } from './netController';
 
 type Handlers = { [K in keyof HudEvents]?: (p: HudEvents[K]) => void };
@@ -85,7 +89,7 @@ function table(config = {}) {
   return { clock, host, ann, bob, mk };
 }
 
-function controller(client: RoomClient) {
+function controller(client: RoomClient, prompt: SpotPromptLike | null = null) {
   const h = fakeHud();
   const b = fakeBoard();
   let tick: (() => void) | null = null;
@@ -93,6 +97,7 @@ function controller(client: RoomClient) {
     board: b.board,
     hud: h.hud,
     client,
+    prompt,
     every: (fn) => {
       tick = fn;
       return () => (tick = null);
@@ -173,6 +178,64 @@ describe('NetGameController', () => {
     expect(mover.client.game!.seq).toBeGreaterThan(seq);
   });
 
+  it('build by clicking a spot: setup clicks act at once, main-phase builds ask first', () => {
+    const t = table({ seatCount: 3 });
+    const reqs: SpotPromptRequest[] = [];
+    const prompt: SpotPromptLike = {
+      show: (r) => void reqs.push(r),
+      hide: () => undefined,
+    };
+    const ctl = [
+      { c: controller(t.ann, prompt), client: t.ann },
+      { c: controller(t.bob, prompt), client: t.bob },
+    ];
+    const mine = () => ctl.find((x) => x.c.net.boardActions.length > 0);
+    // Setup: placements are prompts, a click places at once (no question).
+    for (let i = 0; i < 200 && t.ann.game!.view.phase.kind !== 'main'; i++) {
+      const m = mine();
+      const legal = ctl.flatMap((x) => x.c.renders.at(-1)?.view.legal ?? []);
+      if (m && t.ann.game!.view.turn.number === 0) {
+        const a = m.c.net.boardActions[0]!;
+        const at = locationOf(a)!;
+        m.c.clicks[`${at.kind}Click`]!(at.id);
+      } else {
+        const roll = legal.find((a) => a.type === 'rollDice' || a.type === 'endTurn');
+        const who = ctl.find((x) => x.c.renders.at(-1)?.view.legal.includes(roll as Action));
+        if (roll && who) who.c.handlers.action!(roll);
+      }
+      t.clock.advance(150);
+      t.clock.flush();
+    }
+    expect(reqs).toEqual([]);
+    // Find a human in the main phase with something to build anywhere.
+    for (let i = 0; i < 400; i++) {
+      const m = mine();
+      if (m && m.client.game!.view.phase.kind === 'main') {
+        const a = m.c.net.boardActions[0]!;
+        expect(m.c.highlights.at(-1)).toMatchObject({ hoverOnly: true });
+        const at = locationOf(a)!;
+        const seq = m.client.game!.seq;
+        m.c.clicks[`${at.kind}Click`]!(at.id);
+        expect(reqs.at(-1)?.choices).toContainEqual(a);
+        t.clock.flush();
+        expect(m.client.game!.seq).toBe(seq); // nothing sent before Build
+        reqs.at(-1)!.onPick(a);
+        t.clock.flush();
+        expect(m.client.game!.seq).toBeGreaterThan(seq);
+        return;
+      }
+      const legal = ctl.flatMap((x) => x.c.renders.at(-1)?.view.legal ?? []);
+      const next = legal.find((x) =>
+        ['rollDice', 'endTurn', 'discard', 'moveRobber', 'steal', 'rejectTrade'].includes(x.type),
+      );
+      const who = ctl.find((x) => next && x.c.renders.at(-1)?.view.legal.includes(next));
+      if (next && who) who.c.handlers.action!(next);
+      t.clock.advance(150);
+      t.clock.flush();
+    }
+    throw new Error('no main-phase build for a human');
+  });
+
   it('spectators get the public view, no legal actions, the spectator flag', () => {
     const t = table();
     const eve = t.mk('Eve');
@@ -199,6 +262,30 @@ describe('NetGameController', () => {
     const left = t.ann.timerLeftMs()!;
     expect(left).toBeLessThanOrEqual(30_000);
     expect(a.net.hudView()!.turnTimer!.totalSec).toBe(30);
+  });
+
+  it('sends the only steal at once and never shows its dialog (#34)', () => {
+    const view = viewFor(moveRobberGame(), 1);
+    view.phase = { kind: 'steal', candidates: [0], resume: 'preRoll' };
+    const steal: Action = { type: 'steal', player: 1, victim: 0 };
+    const sent: Action[] = [];
+    let listener: ((e: { type: string }) => void) | null = null;
+    const client = {
+      game: { seq: 1, view, legal: [steal], timer: null, receivedAt: 0 },
+      room: null,
+      on: (fn: (e: { type: string }) => void) => {
+        listener = fn;
+        return () => undefined;
+      },
+      intent: (a: Action) => sent.push(a) > 0,
+      timerLeftMs: () => null,
+    } as unknown as RoomClient;
+    const c = controller(client);
+    expect(sent).toEqual([steal]);
+    expect(c.renders.at(-1)!.view.legal).toEqual([]);
+    // The same view again (e.g. a room update): not sent twice.
+    listener!({ type: 'room' });
+    expect(sent).toHaveLength(1);
   });
 
   it('away flag while a player is disconnected; stop() ignores further events', () => {

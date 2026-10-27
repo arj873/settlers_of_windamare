@@ -136,6 +136,19 @@ function layer(draw: (g: Graphics, ctx: DrawContext) => void) {
 
 export const ckDrawer: BoardDrawer = {
   id: CK,
+  // #33: new / moved / promoted knights and new city walls get the "just built" mark.
+  sites: (state) => {
+    const ck = ckSlice(state);
+    return [
+      ...Object.entries(ck.knights).map(
+        ([v, k]) =>
+          [`ck:k:${v}`, { at: v as VertexId, owner: k.owner, kind: `knight${k.level}` }] as const,
+      ),
+      ...Object.entries(ck.walls).map(
+        ([v, owner]) => [`ck:w:${v}`, { at: v as VertexId, owner, kind: 'wall' }] as const,
+      ),
+    ];
+  },
   layers: [
     {
       key: 'walls',

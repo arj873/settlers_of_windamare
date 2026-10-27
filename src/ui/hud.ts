@@ -4,6 +4,7 @@
  */
 import {
   costOf,
+  devDeckCounts,
   emptyResources,
   EVENT_INFO,
   getPlayer,
@@ -32,6 +33,7 @@ import {
 import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
+import { costLabel, costTip, missingCards, type Cost } from './costView';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
@@ -57,8 +59,12 @@ import { bankPanel, logList, playersList } from './sidebar';
 import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
+import { loadAnimations, saveAnimations } from './motion';
+import { ProductionFx, type HexLocator } from './production/fx';
+import { soundControl } from './sound';
 import type {
   BotSpeedControl,
+  BuildConfirmControl,
   HudEventName,
   HudEvents,
   HudView,
@@ -115,6 +121,8 @@ const SECTION_TITLE: Record<'log' | 'bank' | 'players' | 'chat', string> = {
 
 /** How long a tapped "why is this disabled" bubble stays open. */
 const WHY_MS = 3500;
+/** A touch held this long on a build button opens its cost tooltip instead of clicking (#35). */
+const LONG_PRESS_MS = 450;
 
 /** Regions emptied while a full-screen cover is up. */
 const GAME_REGIONS = ['menu', 'turn', 'side', 'drawer', 'bottom', 'controls', 'dialog'] as const;
@@ -162,13 +170,20 @@ export class Hud {
   private botSpeed: BotSpeedControl | null = null;
   /** #51: "Show longest road on the board" in the menu (null hides it). */
   private longestRoadToggle: ToggleControl | null = null;
+  private buildConfirm: BuildConfirmControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
   private chatSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
-  private whyKind: BuildKind | null = null;
+  /** Build slot whose tooltip a tap / long-press opened (BuildKind or an expansion mode). */
+  private whyKind: string | null = null;
+  /** A touch long-press is pending on a build button (#35); fired = swallow its click. */
+  private pressTimer: ReturnType<typeof setTimeout> | null = null;
+  private pressFired = false;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Issue #29: cards flying from the producing hexes after a roll, gain badges on the rows. */
+  private readonly fx: ProductionFx;
   private onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.menuOpen) {
@@ -198,6 +213,7 @@ export class Hud {
       overlay: mk('hud-overlay-layer'),
     };
     root.replaceChildren(...Object.values(this.regions));
+    this.fx = new ProductionFx(root);
     document.addEventListener('keydown', this.onKey);
     document.addEventListener('click', this.onDocClick, true);
   }
@@ -205,6 +221,7 @@ export class Hud {
   /** Remove listeners and DOM. */
   destroy(): void {
     if (this.whyTimer !== null) clearTimeout(this.whyTimer);
+    this.fx.destroy();
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('click', this.onDocClick, true);
     this.root.replaceChildren();
@@ -220,6 +237,12 @@ export class Hud {
   /** #51: show the "Show longest road on the board" setting in the menu (null hides it). */
   setLongestRoadToggle(control: ToggleControl | null): void {
     this.longestRoadToggle = control;
+    this.refresh();
+  }
+
+  /** Show the "Confirm before building" switch in the menu (null hides it). */
+  setBuildConfirm(control: BuildConfirmControl | null): void {
+    this.buildConfirm = control;
     this.refresh();
   }
 
@@ -266,6 +289,12 @@ export class Hud {
     this.view = view;
     this.syncLocalState(state, view);
     this.refresh();
+    this.fx.update(state, view, this.isCovered());
+  }
+
+  /** Where board hexes are on screen (`BoardView.screenPos`): the production cards start there. */
+  setHexLocator(locate: HexLocator | null): void {
+    this.fx.setLocator(locate);
   }
 
   /** The hotseat cover or the new-game screen hides the game (the controller pauses the turn timer). */
@@ -337,8 +366,57 @@ export class Hud {
     if (this.view) this.refresh();
   }
 
-  /** Tap on a disabled build button: show its reason for a few seconds. */
-  private showWhy(kind: BuildKind): void {
+  /**
+   * A build bar slot with its cost tooltip (#35): hover shows it; on touch, a tap on a disabled
+   * button or a long-press on an enabled one opens it for a few seconds. A disabled button gets
+   * no pointer events (CSS), so the slot takes them.
+   */
+  private buildSlot(key: string, button: HTMLElement, tip: HTMLElement, blocked: boolean) {
+    const cancel = () => {
+      if (this.pressTimer !== null) clearTimeout(this.pressTimer);
+      this.pressTimer = null;
+    };
+    return h(
+      'span',
+      {
+        class: `bslot${blocked ? ' is-blocked' : ''}${this.whyKind === key ? ' is-why' : ''}`,
+        on: blocked
+          ? { click: () => this.showWhy(key) }
+          : {
+              pointerdown: (e: Event) => {
+                cancel();
+                this.pressFired = false;
+                if ((e as PointerEvent).pointerType !== 'touch') return;
+                this.pressTimer = setTimeout(() => {
+                  this.pressTimer = null;
+                  this.pressFired = true;
+                  this.showWhy(key);
+                }, LONG_PRESS_MS);
+              },
+              pointerup: cancel,
+              pointercancel: cancel,
+              pointerleave: cancel,
+              contextmenu: (e: Event) => e.preventDefault(),
+            },
+      },
+      button,
+      tip,
+    );
+  }
+
+  /** A build button's click, skipped right after a long-press opened its tooltip. */
+  private unlessLongPress(fn: () => void): () => void {
+    return () => {
+      if (this.pressFired) {
+        this.pressFired = false;
+        return;
+      }
+      fn();
+    };
+  }
+
+  /** Tap on a disabled build button (or long-press): show its tooltip for a few seconds. */
+  private showWhy(kind: string): void {
     if (this.whyTimer !== null) clearTimeout(this.whyTimer);
     this.whyKind = this.whyKind === kind ? null : kind;
     this.whyTimer = this.whyKind
@@ -398,12 +476,18 @@ export class Hud {
     const legal = viewerLegal(view);
     const av = availability(legal);
 
-    r.menu.replaceChildren(...this.menu(view));
+    // Don't rebuild the open menu under a dragged volume slider (bot moves re-render often).
+    const sliding =
+      this.menuOpen &&
+      r.menu.contains(document.activeElement) &&
+      document.activeElement instanceof HTMLInputElement;
+    if (!sliding) r.menu.replaceChildren(...this.menu(view));
     r.turn.replaceChildren(...this.turnPill(state, view));
     this.renderSidebar(state, view);
     if (view.spectator) {
-      // Public info only: no hand, no buttons, no dialogs; the dice stay visible.
-      r.bottom.replaceChildren();
+      // Public info only: no hand, no buttons, no dialogs; the dice stay visible. The build
+      // costs stay readable (#35: a read-only bar with the cost tooltips).
+      r.bottom.replaceChildren(this.costBar(state));
       r.controls.replaceChildren(this.diceBox(state));
       r.dialog.replaceChildren();
       this.lastDialogKey = '';
@@ -560,7 +644,10 @@ export class Hud {
               ),
             ),
           ),
+        this.animationsToggle(),
+        this.buildConfirmSec(),
         this.longestRoadMenu(),
+        h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
@@ -608,6 +695,73 @@ export class Hud {
             on ? 'On' : 'Off',
           ),
         ),
+      ),
+    );
+  }
+
+  /** Animations on / off (saved like the theme): off = no flying cards, badges only. */
+  private animationsToggle(): HTMLElement {
+    const on = loadAnimations();
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Animations'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Animations' } },
+        ...[true, false].map((v) =>
+          h(
+            'button',
+            {
+              class: `seg-btn${v === on ? ' is-on' : ''}`,
+              attrs: { 'aria-pressed': String(v === on), 'data-animations': v ? 'on' : 'off' },
+              on: {
+                click: () => {
+                  saveAnimations(v);
+                  if (!v) this.fx.clear();
+                  this.refresh();
+                },
+              },
+            },
+            v ? 'On' : 'Off',
+          ),
+        ),
+      ),
+    );
+  }
+
+  /** Menu: "Confirm before building" On / Off (off: a click on a spot with one build builds). */
+  private buildConfirmSec(): HTMLElement | null {
+    const c = this.buildConfirm;
+    if (!c) return null;
+    const option = (on: boolean) =>
+      h(
+        'button',
+        {
+          class: `seg-btn${c.value === on ? ' is-on' : ''}`,
+          attrs: {
+            'aria-pressed': String(c.value === on),
+            'data-k': `confirm-${on ? 'on' : 'off'}`,
+          },
+          on: {
+            click: () => {
+              this.buildConfirm = { ...c, value: on };
+              c.onChange(on);
+              this.refresh();
+            },
+          },
+        },
+        on ? 'On' : 'Off',
+      );
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Confirm before building'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Confirm before building' } },
+        option(true),
+        option(false),
       ),
     );
   }
@@ -688,7 +842,7 @@ export class Hud {
     const wasAtBottom = !old || old.scrollTop + old.clientHeight >= old.scrollHeight - 8;
     const prevTop = old ? old.scrollTop : 0;
 
-    const list = logList(state);
+    const list = logList(state, view.viewer);
     side.classList.toggle('is-open', this.drawerOpen);
     const extPanels = hudExtensionsFor(state).flatMap((x) => {
       const p = x.panel?.(state, view, (a) => this.send(a));
@@ -796,6 +950,7 @@ export class Hud {
         {
           class: `hcard rcard rc-${r}${stackCls(n)}`,
           title: `${RESOURCE_LABEL[r]}: ${n} (bank ${ratios[r]}:1)`,
+          attrs: { 'data-card': r },
         },
         resCardFace(r, 46),
         ratios[r] < 4 && h('span', { class: `ratio-tag r${ratios[r]}` }, `${ratios[r]}:1`),
@@ -869,6 +1024,7 @@ export class Hud {
     );
 
     const toggleMode = (m: PlaceMode) => () => this.setPlaceMode(this.placeMode === m ? null : m);
+    const myHand = me.resources;
     const build = h(
       'div',
       { class: 'build-bar wood', style: playerStyle(me.color) },
@@ -887,14 +1043,17 @@ export class Hud {
               ...(why.length > 0
                 ? { attrs: { 'data-why': why.map((w) => w.text).join('; '), ...actionsAttr } }
                 : {
-                    title: `${BUILD_LABEL[c.kind]} — cost: ${costText(c.kind)}`,
-                    attrs: actionsAttr,
+                    attrs: {
+                      'aria-label': `${BUILD_LABEL[c.kind]}, cost ${costText(c.kind)}`,
+                      ...actionsAttr,
+                    },
                   }),
               on: {
-                click:
+                click: this.unlessLongPress(
                   c.kind === 'dev'
                     ? () => this.send({ type: 'buyDevCard', player: view.viewer })
                     : toggleMode(c.kind),
+                ),
               },
             },
             h(
@@ -912,36 +1071,14 @@ export class Hud {
               ),
             ),
           );
-          if (why.length === 0) return h('span', { class: 'bslot' }, button);
-          // A disabled button gets no pointer events (CSS): the slot shows why on hover and tap.
-          return h(
-            'span',
-            {
-              class: `bslot is-blocked${this.whyKind === c.kind ? ' is-why' : ''}`,
-              on: { click: () => this.showWhy(c.kind) },
-            },
-            button,
-            h(
-              'span',
-              { class: 'why', attrs: { role: 'tooltip' } },
-              h('b', {}, BUILD_LABEL[c.kind]),
-              ...why.map((w) =>
-                h(
-                  'span',
-                  { class: 'why-line' },
-                  w.text,
-                  w.missing &&
-                    h(
-                      'span',
-                      { class: 'why-cards' },
-                      ...Object.entries(w.missing).flatMap(([r, n]) =>
-                        Array.from({ length: n }, () => resCardFace(r as Resource, 16)),
-                      ),
-                    ),
-                ),
-              ),
-            ),
+          // #35: the cost tooltip (hover, long-press); the "Missing …" line comes from costTip.
+          const tip = costTip(
+            BUILD_LABEL[c.kind],
+            BUILD_COST[c.kind],
+            myHand,
+            why.filter((w) => !w.missing).map((w) => h('span', { class: 'why-line' }, w.text)),
           );
+          return this.buildSlot(c.kind, button, tip, why.length > 0);
         }),
     );
 
@@ -955,32 +1092,35 @@ export class Hud {
         const cost = costOf(state, c.costItem ?? c.mode);
         const left = c.left?.(state, view.viewer);
         const total = c.total?.(state, view.viewer);
-        const hand = state.players[view.viewer]?.resources;
-        const short =
-          cost && hand
-            ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
-            : [];
+        const missing = cost ? missingCards(cost, myHand) : {};
+        const blocker = over ? null : (c.blocker?.(state, view.viewer) ?? null);
         const reasons = [
-          short.length > 0 ? `Missing ${short.join(', ')}` : null,
-          over ? null : (c.blocker?.(state, view.viewer) ?? null),
+          Object.keys(missing).length > 0 ? `Missing ${costLabel(missing)}` : null,
+          blocker,
         ].filter((x): x is string => x !== null);
         const why = reasons.length > 0 ? reasons.join('; ') : 'Not possible right now';
+        const tip = costTip(c.label, cost ?? null, myHand, [
+          !enabled && blocker === null && reasons.length === 0
+            ? h('span', { class: 'why-line' }, why)
+            : null,
+          blocker === null ? null : h('span', { class: 'why-line' }, blocker),
+        ]);
         build.append(
-          h(
-            'span',
-            { class: 'bslot' },
+          this.buildSlot(
+            c.mode,
             h(
               'button',
               {
                 class: `act bcard ext-card${this.placeMode === c.mode ? ' is-active' : ''}${left === 0 ? ' is-out' : ''}`,
                 disabled: !enabled,
-                title: `${c.label}${cost ? ` — cost: ${describeCost(cost)}` : ''}`,
                 // data-actions: what the card's place mode submits on the board (playtest CLI).
                 attrs: {
                   'data-actions': [c.actionType, ...(c.alsoActions ?? [])].join(' '),
-                  ...(enabled ? {} : { 'data-why': why }),
+                  ...(enabled
+                    ? { 'aria-label': `${c.label}${cost ? `, cost ${describeCost(cost)}` : ''}` }
+                    : { 'data-why': why }),
                 },
-                on: { click: toggleMode(c.mode) },
+                on: { click: this.unlessLongPress(toggleMode(c.mode)) },
               },
               h('span', { class: 'bcard-art' }, glyph(c.glyph ?? 'settlement', 30)),
               h('span', { class: 'bcard-label' }, c.label),
@@ -994,6 +1134,8 @@ export class Hud {
                   ),
                 ),
             ),
+            tip,
+            !enabled,
           ),
         );
       }
@@ -1003,6 +1145,54 @@ export class Hud {
     // CSS `order` shows hand | trade | build from left to right.
     build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
+  }
+
+  /**
+   * Spectators (#35): the build cards as a read-only price list, each with its cost tooltip
+   * (hover / tap), base and expansion cards alike.
+   */
+  private costBar(state: GameState): HTMLElement {
+    const hidden = hiddenBaseCards(state);
+    const card = (key: string, label: string, art: HTMLElement, cost: Cost | null) =>
+      this.buildSlot(
+        key,
+        h(
+          'button',
+          { class: 'act bcard', disabled: true, attrs: { 'data-why': 'Spectating' } },
+          h('span', { class: 'bcard-art' }, art),
+          h('span', { class: 'bcard-label' }, label),
+          cost &&
+            h(
+              'span',
+              { class: 'cost', attrs: { 'aria-hidden': 'true' } },
+              ...RESOURCES.flatMap((r) =>
+                Array.from({ length: cost[r] ?? 0 }, () => resCardFace(r, 16)),
+              ),
+            ),
+        ),
+        costTip(label, cost, null, [h('span', { class: 'why-line' }, 'You are watching')]),
+        true,
+      );
+    const base = (['dev', 'road', 'settlement', 'city'] as const)
+      .filter((k) => !hidden.has(k) && (k !== 'dev' || devDeckCounts(state).total > 0))
+      .map((k) =>
+        card(k, BUILD_LABEL[k], k === 'dev' ? devCardFace(null, 26) : glyph(k, 30), BUILD_COST[k]),
+      );
+    const ext = hudExtensionsFor(state).flatMap((x) =>
+      (x.buildCards ?? [])
+        .filter((c) => !c.available || c.available(state))
+        .map((c) =>
+          card(
+            c.mode,
+            c.label,
+            glyph(c.glyph ?? 'settlement', 30),
+            costOf(state, c.costItem ?? c.mode) ?? null,
+          ),
+        ),
+    );
+    const bar = h('div', { class: 'build-bar wood is-costs' }, ...base, ...ext);
+    bar.style.setProperty('--build-n', String(bar.childElementCount));
+    return bar;
   }
 
   // --- bottom-right: dice, roll, end turn ------------------------------------
@@ -1056,6 +1246,7 @@ export class Hud {
   private diceBox(state: GameState): HTMLElement {
     const d = state.dice;
     if (!d) {
+      this.lastDice = 'stale'; // the first roll of the game animates
       return h(
         'div',
         { class: 'dice dice-empty', title: 'No roll yet' },
@@ -1063,8 +1254,12 @@ export class Hud {
         h('span', { class: 'die die-blank' }),
       );
     }
-    const key = `${state.turn.number}:${d[0]}:${d[1]}`;
-    const fresh = key !== this.lastDice;
+    // Animate only for a roll made this turn. Before the roll (preRoll, special build, setup)
+    // the faces are last turn's, so End turn must not re-tumble them; a reload or reconnect
+    // (first render) shows the faces still.
+    const stale = ['preRoll', 'specialBuild', 'setup', 'mapVeto'].includes(state.phase.kind);
+    const key = stale ? 'stale' : `${state.turn.number}:${d[0]}:${d[1]}`;
+    const fresh = !stale && this.lastDice !== '' && key !== this.lastDice;
     this.lastDice = key;
     const total = diceTotal(d);
     // Event Cards: the card's event is shown under the dice.
@@ -1133,7 +1328,8 @@ export class Hud {
     }
     if (phase.kind === 'steal') {
       const victims = ofType(legal, 'steal');
-      // Always show the picker: the engine needs an explicit steal action even with one victim.
+      // The engine needs an explicit steal action even with one victim; the controllers submit
+      // that one on their own (#34, `autoSteal`), so the picker shows for a real choice.
       if (victims.length > 0)
         return this.stealDialog(
           state,

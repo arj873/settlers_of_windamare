@@ -242,6 +242,19 @@ export interface TurnState {
 export interface LogEntry {
   turn: number;
   player: PlayerId | null;
+  /** Public text: everyone reads it (online too), so it never names a hidden card. */
+  text: string;
+  /**
+   * #32: private versions of `text` (e.g. which card a steal took), each for the players in
+   * `to`; a player reads the first one naming them. `viewFor` keeps only the viewer's own
+   * (none for spectators). Absent on most entries.
+   */
+  secret?: SecretText[];
+}
+
+/** A log text only `to` may read (`LogEntry.secret`). */
+export interface SecretText {
+  to: PlayerId[];
   text: string;
 }
 
@@ -491,8 +504,13 @@ export interface PlayerStats {
   tradesAsPartner: number;
   /** 4:1 trades with the bank. */
   bankTrades: number;
-  /** 3:1 and 2:1 harbor trades. */
+  /** 3:1 and 2:1 harbor trades (any ratio below 4). */
   portTrades: number;
+  /**
+   * Bank / harbor trades by ratio, keyed "4:1", "3:1", "2:1". Absent in saves from before it
+   * existed: read it with `tradesByRatio(p)` (stats.ts), which also folds in the old counters.
+   */
+  tradesByRatio?: Record<string, number>;
   robberMoves: number;
   /** Cards stolen (robber and event steals). */
   steals: number;

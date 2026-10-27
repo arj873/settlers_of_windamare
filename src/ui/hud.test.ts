@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { legalActions, type Action } from '../engine';
-import { discardGame, midGame, moveRobberGame, tradeOfferGame } from '../engine/fixtures';
+import {
+  discardGame,
+  freshGame,
+  midGame,
+  moveRobberGame,
+  tradeOfferGame,
+} from '../engine/fixtures';
 import { fakeLegal } from './devLegal';
 import { Hud } from './hud';
 import type { NewGameConfig, PlaceMode } from './types';
@@ -288,6 +294,29 @@ describe('Hud', () => {
     expect(bars[1]!.textContent).toContain('You');
   });
 
+  it('dice tumble only for a real roll, not on first render or End turn', () => {
+    const rolling = () => root.querySelector('.dice')!.classList.contains('rolling');
+    const view = { viewer: 1, legal: [], isBotTurn: false };
+    const s = midGame();
+    s.dice = [3, 4];
+    s.phase = { kind: 'main' };
+    hud.render(s, view);
+    expect(rolling()).toBe(false); // reload / reconnect
+    // End turn: next turn, same stale faces, waiting for the roll.
+    const next = {
+      ...s,
+      phase: { kind: 'preRoll' as const },
+      turn: { ...s.turn, number: s.turn.number + 1 },
+    };
+    hud.render(next, view);
+    expect(rolling()).toBe(false);
+    hud.render({ ...next }, view);
+    expect(rolling()).toBe(false);
+    // The roll with the very same faces still animates.
+    hud.render({ ...next, phase: { kind: 'main' } }, view);
+    expect(rolling()).toBe(true);
+  });
+
   it('renders the log with player names and icons', () => {
     const s = midGame();
     hud.render(s, { viewer: 1, legal: [], isBotTurn: false });
@@ -327,10 +356,84 @@ describe('Hud', () => {
     (slot as HTMLElement).click();
     const open = root.querySelector('.bslot.is-why .why')!;
     expect(open.textContent).toContain('Missing 1 brick');
-    expect(open.querySelectorAll('.why-cards > .card-face[aria-label="Brick"]')).toHaveLength(1);
-    // Enabled buttons have no reason and keep the cost tooltip.
-    expect(byText('City')!.closest('.bslot')!.classList.contains('is-blocked')).toBe(false);
-    expect(byText('City')!.title).toMatch(/cost/);
+    expect(open.querySelectorAll('.cost-have .card-face[aria-label="Brick"]')).toHaveLength(1);
+    // #35: the cost as card faces, the missing brick marked.
+    const cost = open.querySelector('.cost-line .cost-cards')!;
+    expect(cost.getAttribute('aria-label')).toBe('Cost: 1 brick, 1 lumber');
+    expect(
+      [...cost.querySelectorAll('.is-missing')].map((c) => c.getAttribute('aria-label')),
+    ).toEqual(['Brick']);
+    // Enabled buttons have no reason, but the same cost tooltip.
+    const city = byText('City')!.closest('.bslot')!;
+    expect(city.classList.contains('is-blocked')).toBe(false);
+    const tip = city.querySelector('.why.cost-tip')!;
+    expect(tip.querySelector('.cost-cards')!.getAttribute('aria-label')).toBe(
+      'Cost: 2 grain, 3 ore',
+    );
+    expect(tip.textContent).toContain('You have the cards');
+    expect(tip.querySelector('.is-missing')).toBeNull();
+  });
+
+  it('cost tooltips work at any time: another player’s turn, setup, spectating (#35)', () => {
+    const tipOf = (label: string) =>
+      [...root.querySelectorAll('.bslot')]
+        .find((s) => s.querySelector('.bcard-label')?.textContent === label)
+        ?.querySelector('.cost-tip');
+    const s = midGame(); // Blue's turn; Red (0) watches their hand
+    hud.render(s, { viewer: 0, legal: legalActions(s, 0), isBotTurn: false });
+    for (const label of ['Road', 'Settlement', 'City']) {
+      expect(tipOf(label)?.querySelector('.cost-cards')).not.toBeNull();
+    }
+    expect(tipOf('Road')!.textContent).toMatch(/not your turn/i);
+
+    const setup = freshGame(4);
+    hud.render(setup, { viewer: 0, legal: legalActions(setup, 0), isBotTurn: false });
+    expect(tipOf('City')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
+      'Cost: 2 grain, 3 ore',
+    );
+  });
+
+  it('a spectator has no hand but a read-only bar with the cost tooltips (#35)', () => {
+    const tipOf = (label: string) =>
+      [...root.querySelectorAll('.bslot')]
+        .find((s) => s.querySelector('.bcard-label')?.textContent === label)
+        ?.querySelector('.cost-tip');
+    hud.render(midGame(), { viewer: -1, legal: [], isBotTurn: false, spectator: true });
+    expect(root.querySelector('.hand')).toBeNull();
+    const bar = root.querySelector('.build-bar.is-costs')!;
+    expect([...bar.querySelectorAll('.bcard-label')].map((l) => l.textContent)).toEqual([
+      'Buy card',
+      'Road',
+      'Settlement',
+      'City',
+    ]);
+    expect(tipOf('Settlement')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
+      'Cost: 1 brick, 1 lumber, 1 wool, 1 grain',
+    );
+    expect(tipOf('Settlement')?.querySelector('.cost-have')).toBeNull();
+    expect(bar.querySelectorAll('button:not([disabled])')).toHaveLength(0);
+  });
+
+  it('a long-press on an enabled build button opens its cost tooltip instead of clicking (#35)', () => {
+    vi.useFakeTimers();
+    try {
+      const s = midGame(); // Blue can build a city
+      const modes: unknown[] = [];
+      hud.on('placeMode', (m) => modes.push(m));
+      hud.render(s, { viewer: 1, legal: legalActions(s, 1), isBotTurn: false });
+      const slot = byText('City')!.closest('.bslot')!;
+      const press = new Event('pointerdown') as Event & { pointerType: string };
+      Object.defineProperty(press, 'pointerType', { value: 'touch' });
+      slot.dispatchEvent(press);
+      vi.advanceTimersByTime(500);
+      expect(root.querySelector('.bslot.is-why .cost-tip b')!.textContent).toBe('City');
+      byText('City')!.click(); // the click that ends the long-press
+      expect(modes).toEqual([]);
+      byText('City')!.click(); // a normal tap still works
+      expect(modes).toEqual(['city']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('turn timer: updates the pill in place and warns in the last 10 s', () => {

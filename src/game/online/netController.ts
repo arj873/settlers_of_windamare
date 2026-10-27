@@ -8,13 +8,11 @@ import type { Action, GameState, PlayerId } from '../../engine';
 import type { RoomClient, RoomInfo } from '../../net';
 import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
-import {
-  actionForClick,
-  boardActions,
-  highlightsFor,
-  tradeEndNotice,
-  type BoardClick,
-} from '../logic';
+import { autoSteal, tradeEndNotice, type BoardClick } from '../logic';
+import { emitGameNotice, gameNotices, type NoticeSink } from '../notices';
+import { TurnRecap } from '../recap';
+import { SpotPicker, type SpotPromptLike } from '../spotPicker';
+import type { SoundObserver } from '../sounds';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -22,8 +20,16 @@ export interface NetControllerOptions {
   client: RoomClient;
   toast?: (message: string, kind: ToastKind) => void;
   onRender?: () => void;
+  /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
+  notice?: NoticeSink;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
+  /** The popover a click on a board spot opens (issue #28); absent = a click acts at once. */
+  prompt?: SpotPromptLike | null;
+  /** The "Confirm before building" setting; default on. */
+  confirmBuild?: () => boolean;
+  /** Sound effects (A1): told about every rendered view and the turn timer. */
+  sounds?: SoundObserver;
 }
 
 export const NET_TIMER_TICK_MS = 250;
@@ -56,15 +62,21 @@ export class NetGameController {
   private readonly client: RoomClient;
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly onRender: () => void;
+  private readonly notice: NoticeSink;
   private readonly every: (fn: () => void, ms: number) => () => void;
+  private readonly sounds: SoundObserver | null;
   private active = false;
   private placeMode: PlaceMode | null = null;
+  private readonly spots: SpotPicker;
   private stopTimer: (() => void) | null = null;
   private shownSec = -1;
   /** The last rendered view, to notice an ended trade offer (`tradeEndNotice`). */
   private shown: GameState | null = null;
+  private readonly recap = new TurnRecap();
   /** The last action this seat sent (a cancel / confirm / reject ends offers on purpose). */
   private lastSent: Action['type'] | null = null;
+  /** The steal phase whose only steal this seat already sent on its own (#34). */
+  private autoKey: string | null = null;
   private readonly offs: (() => void)[] = [];
 
   constructor(opts: NetControllerOptions) {
@@ -73,7 +85,17 @@ export class NetGameController {
     this.client = opts.client;
     this.toast = opts.toast ?? ((m) => console.info(m));
     this.onRender = opts.onRender ?? (() => undefined);
+    this.notice = opts.notice ?? ((n) => this.toast(n.text, 'info'));
     this.every = opts.every ?? defaultEvery;
+    const board = this.board;
+    this.spots = new SpotPicker({
+      prompt: opts.prompt ?? null,
+      screenPos: (id) => board.screenPos?.(id) ?? null,
+      confirm: opts.confirmBuild ?? (() => true),
+      submit: (a) => this.send(a),
+      rehighlight: () => this.updateHighlights(),
+    });
+    this.sounds = opts.sounds ?? null;
 
     // The HUD has no unsubscribe: these stay registered and check `active`.
     this.hud.on('action', (a) => {
@@ -82,6 +104,7 @@ export class NetGameController {
     this.hud.on('placeMode', (m) => {
       if (!this.active) return;
       this.placeMode = m;
+      this.spots.close();
       this.updateHighlights();
     });
     this.offs.push(
@@ -100,11 +123,13 @@ export class NetGameController {
     return this.client.game?.view.view.viewer ?? null;
   }
 
-  /** Board actions a click may submit right now. */
+  /** Board actions a click may lead to right now (GameController.boardActions). */
   get boardActions(): Action[] {
     const g = this.client.game;
     const v = this.viewer;
-    return g && v !== null ? boardActions(g.legal, v, this.placeMode) : [];
+    return g && v !== null
+      ? this.spots.targets({ legal: g.legal, viewer: v, placeMode: this.placeMode })
+      : [];
   }
 
   start(): void {
@@ -117,6 +142,7 @@ export class NetGameController {
 
   stop(): void {
     this.active = false;
+    this.spots.close();
     this.stopTimer?.();
     this.stopTimer = null;
     this.board.setHighlights({});
@@ -155,21 +181,51 @@ export class NetGameController {
   }
 
   private click(click: BoardClick): void {
-    if (!this.active) return;
-    const action = actionForClick(this.boardActions, click);
-    if (action) this.send(action);
+    const g = this.client.game;
+    const v = this.viewer;
+    if (!this.active || !g || v === null) return;
+    this.spots.click(
+      { state: g.view, legal: g.legal, viewer: v, placeMode: this.placeMode },
+      click,
+    );
   }
 
   private render(): void {
     const g = this.client.game;
     const hv = this.hudView();
     if (!g || !hv) return;
+    this.spots.sync({ legal: g.legal, viewer: this.viewer, placeMode: this.placeMode });
+    const prev = this.shown;
+    const notices = prev ? gameNotices(prev, g.view, hv.viewer) : [];
     this.noticeTradeEnd(g.view, hv.viewer);
+    // #34: rob the only player who can be robbed at once; the dialog never opens for it.
+    const steal = autoSteal(g.legal, hv.viewer);
+    if (steal) {
+      hv.legal = g.legal.filter((a) => a !== steal);
+      const key = JSON.stringify([g.view.turn.number, g.view.phase, steal]);
+      if (key !== this.autoKey) {
+        this.autoKey = key;
+        this.send(steal);
+      }
+    }
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
     this.board.render(g.view);
     this.hud.render(g.view, hv);
+    const seat = this.viewer;
+    this.sounds?.observe(g.view, {
+      viewer: seat,
+      local: g.view.players.map((_, i) => i === seat),
+      bots: hv.bots ?? [],
+    });
     this.updateHighlights();
     this.onRender();
+    for (const n of notices) {
+      this.notice(n, g.view, hv.viewer < 0 ? null : hv.viewer);
+      emitGameNotice(n);
+    }
+    // #33: your turn again: briefly mark what the others built since your last one.
+    const since = this.recap.update(prev, g.view, hv.viewer);
+    if (since) this.board.markSince?.(since);
   }
 
   /** Toast how a trade offer this seat took part in ended, unless the seat ended it itself. */
@@ -193,7 +249,14 @@ export class NetGameController {
       this.board.setHighlights({});
       return;
     }
-    this.board.setHighlights(highlightsFor(this.boardActions, g.view.players[v]?.color));
+    this.board.setHighlights(
+      this.spots.highlights({
+        state: g.view,
+        legal: g.legal,
+        viewer: v,
+        placeMode: this.placeMode,
+      }),
+    );
   }
 
   private timerView(): HudView['turnTimer'] {
@@ -210,5 +273,7 @@ export class NetGameController {
     if (shown === this.shownSec) return;
     this.shownSec = shown;
     this.hud.setTurnTimer(t);
+    const owner = this.client.game.timer?.player;
+    this.sounds?.timer(t ? t.remainingSec : null, owner !== undefined && owner === this.viewer);
   }
 }

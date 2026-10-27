@@ -41,7 +41,7 @@ import {
   shade,
 } from './art';
 import * as art from './art';
-import { drawersFor, terrainPainter, tokenPlace, type DrawContext } from './expansions';
+import { allSites, drawersFor, terrainPainter, tokenPlace, type DrawContext } from './expansions';
 import {
   HEX_SIZE as S,
   backdropRadius,
@@ -56,12 +56,25 @@ import {
   type ViewTransform,
 } from './geometry';
 import { FrameScheduler } from './frames';
+import {
+  MAX_LIVE_MARKS,
+  MAX_RECAP_MARKS,
+  markFrame,
+  newSites,
+  type PieceSite,
+  type Sites,
+} from './marks';
 import { BEACH, HIGHLIGHT, INK, SEA, TOKEN, portColor, terrainPalette } from './theme';
 import { Viewport, type Insets } from './viewport';
 
 export interface Highlights extends PickCandidates {
   /** Tint for the glow (CSS colour), e.g. the acting player's colour. Default: warm white. */
   color?: string;
+  /**
+   * The spots are clickable and hoverable as usual, but only the one under the pointer glows
+   * (build-anywhere targets: no build mode on, issue #28).
+   */
+  hoverOnly?: boolean;
 }
 
 export interface BoardEvents {
@@ -84,6 +97,21 @@ interface Glow {
   glow: Graphics;
   kind: 'vertex' | 'edge' | 'hex';
 }
+
+/** #33: a fading ring over a just-built piece, in the builder's colour. */
+interface Mark {
+  g: Graphics;
+  t0: number;
+  color: number;
+  /** Ring radius at rest, design px. */
+  r: number;
+  /** The turn-start recap: fainter, one ring. */
+  soft: boolean;
+}
+
+/** How long a "just built" mark lasts (ms); the recap's is shorter. */
+const MARK_MS = 1700;
+const RECAP_MS = 1300;
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = '"Trebuchet MS", "Segoe UI", Helvetica, Arial, sans-serif';
@@ -145,6 +173,13 @@ export class BoardView {
   /** `${expansion}:${key}` -> what is drawn and its signature. */
   private readonly extNodes = new Map<string, PieceNode>();
   private readonly glowLayer = new Container();
+  /** #33: rings over just-built pieces. */
+  private readonly markLayer = new Container();
+  private marks: Mark[] = [];
+  /** The pieces of the last rendered state (null before the first): new ones get a mark. */
+  private sites: Sites | null = null;
+  /** The last rendered state (marks take the builder's colour from it). */
+  private shown: GameState | null = null;
   private readonly hoverLayer = new Graphics();
 
   private readonly viewport: Viewport;
@@ -199,6 +234,7 @@ export class BoardView {
       this.jointLayer,
       this.buildingLayer,
       this.extPiecesLayer,
+      this.markLayer,
       this.robberLayer,
       this.extTopLayer,
       this.glowLayer,
@@ -245,6 +281,7 @@ export class BoardView {
 
   /** Draw `state`. Cheap to call after every action: only what changed is rebuilt. */
   render(state: GameState): void {
+    this.shown = state;
     const topo = topologyOf(state);
     if (topo !== this.topo) {
       // A different board frame: new sea, new fit bounds. (Big boards get proper art in T12.)
@@ -263,12 +300,15 @@ export class BoardView {
       this.buildLand(state);
       this.buildPorts(state);
       this.buildTokens(state);
+      // Another board: its pieces are a position, not builds.
+      this.sites = null;
     }
     this.syncPieces(state);
     this.syncRobber(state);
     this.syncExtLayers(state);
     this.routeState = state;
     this.syncRoute();
+    this.markNewPieces(state);
     this.frames.invalidate();
   }
 
@@ -287,11 +327,22 @@ export class BoardView {
     this.syncRoute();
   }
 
+  /**
+   * #33 recap: briefly mark the pieces of `state` that `since` (an earlier state of this game,
+   * e.g. at the end of the viewer's last turn) did not have. Fainter than a live build mark.
+   */
+  markSince(since: GameState): void {
+    if (!this.sites) return;
+    const added = newSites(allSites(since), this.sites);
+    if (added.length === 0 || added.length > MAX_RECAP_MARKS) return;
+    for (const s of added) this.addMark(s, true);
+  }
+
   /** Mark legal spots (they pulse and become hoverable/clickable); `{}` clears. */
   setHighlights(h: Highlights): void {
     this.highlights = h;
-    this.buildGlows();
     this.hover = null;
+    this.buildGlows();
     this.drawHover();
   }
 
@@ -408,6 +459,7 @@ export class BoardView {
     if (same) return;
     this.hover = hit;
     this.app.canvas.style.cursor = hit && this.candidates() ? 'pointer' : '';
+    if (this.highlights.hoverOnly) this.buildGlows();
     this.drawHover();
     this.emit('hover', hit);
   }
@@ -844,6 +896,34 @@ export class BoardView {
     drawRouteHalo(this.routeLayer, pts, color, this.routeHover);
   }
 
+  /** #33: a ring in the builder's colour over every piece built (or moved) since the last render. */
+  private markNewPieces(state: GameState) {
+    const sites = allSites(state);
+    const before = this.sites;
+    this.sites = sites;
+    if (!before) return;
+    const added = newSites(before, sites);
+    if (added.length > MAX_LIVE_MARKS) return;
+    for (const s of added) this.addMark(s, false);
+  }
+
+  private addMark(site: PieceSite, soft: boolean) {
+    const at =
+      vertexInfo(this.topo, site.at as VertexId) ??
+      edgeInfo(this.topo, site.at as EdgeId) ??
+      this.topo.hex[site.at as HexId] ??
+      this.topo.water[site.at as HexId];
+    if (!at) return;
+    const g = new Graphics();
+    g.position.set(...pt(at));
+    this.markLayer.addChild(g);
+    const css = this.shown?.players[site.owner]?.color ?? '#ffffff';
+    const color = new Color(css).toNumber();
+    const r = (site.kind === 'road' || /ship/.test(site.kind) ? 0.36 : 0.42) * S;
+    this.marks.push({ g, t0: this.clock, color, r, soft });
+    this.frames.invalidate();
+  }
+
   private syncRobber(state: GameState) {
     // settings.robberMode 'none': there is no robber piece; NO_ROBBER (off the board, e.g. the
     // Seafarers robber waiting beside the board, T&B without a robber): hidden.
@@ -883,7 +963,12 @@ export class BoardView {
       this.glows.push({ node, glow, kind });
     };
 
-    for (const id of this.highlights.hexes ?? []) {
+    // Hover-only spots: just the hovered one glows (hover hits only highlighted spots).
+    const only = this.highlights.hoverOnly ? this.hover : undefined;
+    const shown = (kind: Glow['kind'], ids: readonly string[] | undefined): readonly string[] =>
+      only === undefined ? (ids ?? []) : only?.kind === kind ? [only.id] : [];
+
+    for (const id of shown('hex', this.highlights.hexes) as HexId[]) {
       const info = this.topo.hex[id] ?? this.topo.water[id];
       if (!info) continue;
       add('hex', info, (g) => {
@@ -892,7 +977,7 @@ export class BoardView {
           .stroke({ width: 5, color, alpha: 0.95, join: 'round' });
       });
     }
-    for (const id of this.highlights.edges ?? []) {
+    for (const id of shown('edge', this.highlights.edges) as EdgeId[]) {
       const info = edgeInfo(this.topo, id);
       const a = info && vertexInfo(this.topo, info.vertices[0]);
       const b = info && vertexInfo(this.topo, info.vertices[1]);
@@ -911,7 +996,7 @@ export class BoardView {
           .stroke({ width: 0.08 * S, color, alpha: 0.95, cap: 'round' });
       });
     }
-    for (const id of this.highlights.vertices ?? []) {
+    for (const id of shown('vertex', this.highlights.vertices) as VertexId[]) {
       const info = vertexInfo(this.topo, id);
       if (!info) continue;
       add('vertex', info, (g) => {
@@ -970,6 +1055,7 @@ export class BoardView {
     return (
       this.glows.length > 0 ||
       this.pops.length > 0 ||
+      this.marks.length > 0 ||
       this.wantTextRes !== this.textRes ||
       (r !== null && (r.x !== t.x || r.y !== t.y))
     );
@@ -993,6 +1079,26 @@ export class BoardView {
         p.node.scale.set(0.2 + 0.8 * easeOutBack(t));
         if (t >= 1) p.node.scale.set(1);
         return t < 1;
+      });
+    }
+
+    if (this.marks.length > 0) {
+      this.marks = this.marks.filter((m) => {
+        const t = (this.clock - m.t0) / (m.soft ? RECAP_MS : MARK_MS);
+        const { rings, glow } = markFrame(t, m.soft);
+        m.g.clear();
+        if (t >= 1) {
+          m.g.destroy();
+          return false;
+        }
+        if (glow > 0) m.g.circle(0, 0, m.r * 0.8).fill({ color: m.color, alpha: glow });
+        for (const ring of rings) {
+          const r = m.r * ring.scale;
+          // A dark under-stroke keeps light colours (white, yellow) visible on any terrain.
+          m.g.circle(0, 0, r).stroke({ width: 0.1 * S, color: 0x1a1208, alpha: ring.alpha * 0.35 });
+          m.g.circle(0, 0, r).stroke({ width: 0.06 * S, color: m.color, alpha: ring.alpha });
+        }
+        return true;
       });
     }
 

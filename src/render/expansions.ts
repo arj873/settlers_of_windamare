@@ -16,6 +16,7 @@ import { backDrawer } from '../expansions/back/render';
 import { twockDrawer } from '../expansions/twock/render';
 import type { ExpansionId, GameState, HexId, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
+import { pieceSites, type PieceSite } from './marks';
 
 export interface DrawContext {
   topo: Topology;
@@ -49,6 +50,11 @@ export interface BoardDrawer {
    * numbered trade hexes keep the centre for the plaza). Read from static board data only.
    */
   tokenAt?(state: GameState, hex: HexId): TokenPlace | undefined;
+  /**
+   * #33: the module's pieces as [unique key, site] (ships, knights, walls...), so a newly built
+   * or moved one gets the same "just built" mark as base pieces. Optional.
+   */
+  sites?(state: GameState): readonly (readonly [string, PieceSite])[];
 }
 
 export interface TokenPlace {
@@ -84,6 +90,14 @@ export function drawersFor(state: Pick<GameState, 'settings'>): BoardDrawer[] {
   const ids = state.settings.expansions as readonly ExpansionId[] | undefined;
   if (!ids || ids.length === 0) return [];
   return ids.flatMap((id) => BOARD_DRAWERS.filter((d) => d.id === id));
+}
+
+/** Every piece of `state`: base pieces plus the active modules' `sites` (#33). */
+export function allSites(state: GameState): Map<string, PieceSite> {
+  return pieceSites(
+    state,
+    drawersFor(state).flatMap((d) => d.sites?.(state) ?? []),
+  );
 }
 
 /** The painter for a terrain among the active drawers, or undefined (core palette). */

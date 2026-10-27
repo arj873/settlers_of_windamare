@@ -142,7 +142,7 @@ GameState {
   dice:    [d1, d2] | null           // last roll
   diceDeck: number[]                 // balanced dice: undrawn cards 0..35 = (d1-1)*6+(d2-1); [] otherwise
   awards:  { longestRoad: PlayerId|null, largestArmy: PlayerId|null }
-  log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
+  log:     { turn, player, text, secret? }[]  // newest LOG_LIMIT (200) entries only; secret: #32
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
   ext:     Record<ExpansionId, Json> // v5 (F1): one slice per active expansion; {} in base games
@@ -496,7 +496,8 @@ files (a selector, a constant) are fine — mention them in your report.
 ```ts
 const view = new BoardView(app);          // adds itself to app.stage; app must already be init'd
 view.render(state);                       // cheap; call after every state change
-view.setHighlights({ vertices, edges, hexes, color? });   // legal spots; {} clears
+view.setHighlights({ vertices, edges, hexes, color?, hoverOnly? });   // legal spots; {} clears
+                                          // hoverOnly: clickable as usual, but only the spot under the pointer glows
 view.on('vertexClick' | 'edgeClick' | 'hexClick', (id) => …);   // returns an unsubscribe fn
 view.on('hover', (hit | null) => …);
 view.resize(); view.fit(); view.destroy();
@@ -508,7 +509,17 @@ setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board fram
 view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
 view.setLongestRoad(show);                // #51: outline the Longest Road holder's counted route (longestRoadPath)
 view.setLongestRoadHover(on);             // #51: stronger outline while the badge is pointed at (shown even when off)
+view.markSince(earlierState);             // #33 recap: faint rings on the pieces built since then
 ```
+
+- Just-built marks (#33, `render/marks.ts`): every `render` diffs the board's pieces (`allSites`:
+  buildings, roads, and each active drawer's `sites` hook: Seafarers ships, C&K knights / walls)
+  with the last render's and puts two expanding, fading rings in the builder's colour on each new
+  or changed one (a city upgrade, a moved ship, a promoted knight), ~1.7 s, on top of the pop-in.
+  More than `MAX_LIVE_MARKS` (6) new pieces at once (a loaded game, another board) mark nothing.
+  Both controllers call `markSince` with the state the viewer's last turn ended in when their next
+  turn starts (`game/recap.ts`, `TurnRecap`): one fainter ring per piece built meanwhile (at most
+  16). Marks keep the ticker running while they fade; `setAnimated(false)` drops them at once.
 
 - Render on demand (`render/frames.ts`): the view stops `app.ticker` after the first frame with
   nothing moving and restarts it on any change (state, highlights, hover, pan/zoom, resize,
@@ -545,6 +556,7 @@ const hud = new Hud(document.getElementById('ui')!);          // overlay; only i
 hud.render(state, { viewer, legal, isBotTurn, bots?, turnTimer? }); // call after every state change / viewer change
                                                               // bots: boolean[] by PlayerId (bot marker); turnTimer: { remainingSec, totalSec } | null (T14)
 hud.setBotSpeed({ value, presets, onChange } | null);         // bot-speed picker inside the HUD menu (main.ts wires it)
+hud.setBuildConfirm({ value, onChange } | null);              // "Confirm before building" On/Off in the menu (main.ts saves it: catan:confirmBuild)
 hud.on('action', (a: Action) => …);                           // controller applies it via applyAction
 hud.on('newGame', (cfg: NewGameConfig) => …);                 // setup screen (src/ui/setup): { mode, scenario?, options?, map:'base'|'baseRandom'|'base56'|'base78', players:{name,color,controller}[], rules:{balancedDice,hideBankCards}, turnTimerSec:number|null, vpToWin, discardLimit, seed? }
 hud.on('placeMode', (m: PlaceMode|null) => …);                // 'road'|'settlement'|'city' or an expansion build card's '<id>/<x>'; board shows targets
@@ -561,10 +573,26 @@ hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders
   brick" (+ card faces), no legal spot. Each button sits in a `.bslot`; a disabled one has
   `pointer-events: none`, so the slot gets hover (`.why` bubble) and tap (opens it for 3.5 s). The
   reason is also in the button's `data-why` (playtest harness).
+- Cost tooltips (#35): every build-bar slot (base and expansion cards, prices from `BUILD_COST` /
+  `costOf`) has a `.why.cost-tip` bubble: title, the cost as card faces (cards the hand lacks
+  dimmed, `.is-missing`), "You have the cards" or "Missing …", then the block reasons. It works
+  at any time: on other players' turns, in setup, at game over, and for spectators (a read-only
+  bar of disabled cards, `Hud.costBar`). Hover
+  opens it; on touch a tap on a disabled card or a 450 ms long-press on an enabled one (the
+  click that ends the press is swallowed). The cost pieces are the shared component
+  `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other
+  place that shows a price.
 
+- Production animation (#29, `ui/production/`): after a roll, cards fly (DOM, Web Animations)
+  from each producing hex to the player's row (your own: your hand), then a "+2 grain" badge
+  pops on the row. `plan.ts` (pure, tested) reads the public log ("received" / "caught" / gold
+  "took" lines after "rolled N"), so it works on online views and every module. A new roll cancels
+  the running one; rolls < 900 ms apart (fast bots) and the menu's Animations off / reduced
+  motion show badges only. `Hud.setHexLocator(id => board.screenPos(id))`; the board draws nothing for it.
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
-  hand bar (`handCards`) and items in the trade offer rows (`offerExtras`). The setup
+  hand bar (`handCards`), items in the trade offer rows (`offerExtras`) and card art for the
+  production animation (`cardFace`). The setup
   screen's expansion chips (U7: chip set -> mode, `ExpansionModule.icon`), scenario tiles
   (grouped by mode when one chip set stands for several) and option tiles come from the engine
   registry (`ready` modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
@@ -652,6 +680,16 @@ c.destroy();
   pending trade replies — first, then the current human; previous viewer kept during bot turns;
   all-bot = spectator viewer 0), `boardActions`/`highlightsFor`/`actionForClick` (implied prompts
   or HUD place mode), `nextBot` (bots owing a response first; a bot offerer waits for human replies).
+- Build by clicking a spot (issue #28): with no prompt and no place mode, `clickTargets` offers
+  `spotBuildActions` (the viewer's base builds and every module build card's `actionType`,
+  wherever legal), highlighted `hoverOnly`. `resolveClick(targets, click, confirm)` → `none` /
+  `act` / `choose`: several action types at one spot always ask (road or ship on a coast edge,
+  settlement or knight, also in setup / Road Building); a lone build-anywhere action asks while
+  "Confirm before building" is on; prompts and place modes act at once. `game/spotPicker.ts`
+  (shared by `GameController` and `NetGameController`) opens `ui/spotPrompt.ts` `SpotPrompt`
+  (anchored at `board.screenPos`, label + cost per choice, Build / Cancel; Esc or a press
+  elsewhere cancels) and closes it when its choices stop being legal, the viewer changes or a
+  place mode starts. Controllers take `prompt` and `confirmBuild` options (absent: act at once).
 - Bots (B1): each bot seat plays its level (`SeatConfig.botLevel`, the setup screen's per-seat
   difficulty picker; `start(…, { botLevels })`, saved as `SavedSession.botLevels`, absent =
   Normal): `botForLevel` (`src/bots/byLevel.ts`) → Easy = `defaultBot` =
@@ -704,10 +742,18 @@ c.destroy();
 - Special building phase (T13 engine, T14 controller): `turn.current` is the builder, so `pickViewer`
   hands the screen to a human builder (the cover shows when it changes humans), `nextBot` runs bot
   builders, and the timer gives each human step its own slot.
+- Game notices (`game/notices.ts`, #32 / #36): after each render both controllers diff the last
+  rendered state (view) with the new one, `gameNotices(prev, next, reader)`: `steal` (the
+  reader's private log texts, "You stole 1 wool from Blue") and `award` (Longest Road / Largest
+  Army changing hands, with the expansions' names; C&K metropolis, Defender, T&B Harbormaster from
+  their log lines). `ControllerOptions.notice` / `OnlineEnv.notice` show them (default: a
+  toast); every notice also goes to `onGameNotice` listeners (generic hook, e.g. sounds). The
+  hotseat reader is the human viewer (a bot viewer in an all-bot game reads no secrets).
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
   timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
-  mode), `?modes=all` (setup screen also offers wip / demo modes). `window.catan` = `{ controller, board, hud }`.
+  mode), `?modes=all` (setup screen also offers wip / demo modes), `?sfx=1` (sound audition
+  panel, §13d), `?mute=1` (no sound). `window.catan` = `{ controller, board, hud }`.
 - Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
@@ -743,6 +789,55 @@ near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`
 - **Benchmark:** `pnpm bench --hero normal --field easy --games 200 [--players N] [--mode M]`
   (one hero seat rotated over the table, every step checked by the sim invariants).
 
+## 13d. Sound effects (`src/audio`, `src/game/sounds.ts`, A1)
+
+All sounds are **synthesized** with the Web Audio API from small declarative recipes: no audio
+files, no third-party assets, nothing to license (the repo is public).
+
+- `src/audio/` (no DOM at import, no engine imports): `types.ts` (`SoundCue {id, level}`,
+  `CueLevel` high / normal / low with `LEVEL_GAIN` 1 / 0.6 / 0.32, `SoundRecipe` = voices: `tone`
+  (wave, freq, glide, partials) or `noise`, each with attack / hold / dur / gain / filter),
+  `voices.ts` (building blocks: bell, ting, pluck, knock, thud, horn, noise, tick, swish),
+  `recipes.ts` (`BASE_SOUNDS`), `synth.ts` (`playRecipe`: every voice gets a gain envelope 0 →
+  linear attack ≥ 2 ms → exponential decay → 0 before its source stops, so nothing clicks),
+  `limiter.ts`, `settings.ts`, `engine.ts` (`SoundEngine`: registry, settings, AudioContext,
+  master gain → soft compressor), `index.ts` (the page's engine `sfx`).
+- **Mapping** (`game/sounds.ts`, pure, unit-tested): `soundCues(prev, next, seats, ext)` →
+  cues, one per id, most important first. Reads only public state (pieces, robber, awards,
+  phase, the log via `newLogEntries`), so a hotseat state and an online `GameView` sound the
+  same. `SoundSeats = { viewer, local[], bots[] }`: `local` = seats played on this screen (all
+  hotseat humans; online the own seat). Level: something a local seat did or that hits it
+  (stolen from, offer to you, your offer answered, award gained / lost, must discard on a 7) →
+  high; a bot's action → low; a remote human's → normal. Silent for the first state, an unchanged
+  one and a different game (seed / mode / players / turn going back).
+- Base ids: `dice`, `seven` (after the dice), `yourTurn`, `road`, `settlement`, `city`,
+  `devBuy`, `devPlay`, `robber`, `steal`, `discard`, `tradeOffer`, `tradeAccept`,
+  `tradeReject`, `trade` (player or bank trade done), `longestRoad`, `largestArmy`, `victory`
+  (local winner; spectators too), `defeat` (someone else won), `chat` (online message from
+  someone else, `OnlineApp`), `timerWarn` / `timerUrgent` (own turn timer, once per second for
+  the last 10 / 3 s).
+- **Modules:** `HudExtension.sounds = { recipes, cues(prev, next, ctx) }` (EXPANSIONS.md §8);
+  `extensionSoundRecipes()` registers all at boot, `extensionSounds(state)` gives the active
+  hooks. C&K: `ck/barbarianAdvance`, `ck/barbarianAttack`; Seafarers: `seafarers/shipBuild`,
+  `seafarers/shipMove`; E&P: `ep/shipSail`, `ep/shipBuild`; T&B: `tb/wagonMove`.
+- **Wiring:** `GameSounds` (game/sounds.ts) keeps the previous state, runs `soundCues` and the
+  `SoundLimiter`, and plays. Both controllers take `sounds?: SoundObserver` (`observe(state,
+seats)` after each render, `timer(remainingSec, mine)` when the shown second changes, `cue(id)`
+  for chat); `OnlineEnv.sounds` passes it to `NetGameController`. main.ts builds one for the page.
+- **Limiter** (`SoundLimiter`, unit-tested): coalesce per update, per-id cooldown (150 ms;
+  dice 600, your turn 1 s), at most 3 cues per update, normal / low cues share a budget of
+  4 / 2 per second, high cues only obey cooldown and cap. Instant bot play stays a quiet trickle.
+- **Settings:** master volume (default 0.6, gain = volume²) + mute, `localStorage['catan:sound']`
+  (try/catch). `soundControl()` (`ui/sound.ts`) in the HUD menu ("Sound") and, compact, the setup
+  footer (so also the online lobby). The HUD does not rebuild the open menu while its slider has
+  focus (bot renders would cut a drag).
+- **Autoplay / headless:** the AudioContext is created on the first pointer / key gesture
+  (`sfx.installUnlock(window)`). `isHeadless`: `?debug=1` (playtest harness),
+  `navigator.webdriver` (Playwright, e2e) and `?mute=1` suppress all sound. Tests have no
+  AudioContext, so nothing plays there.
+- **Audition:** `?sfx=1` adds a panel (`ui/sfxPanel.ts`) with a button per registered sound
+  (base + modules), the level (you / others / bots), Play all and the volume control.
+
 ## 14. Decisions and open questions
 
 - **Port positions:** the 9 ports sit on every other water hex of the ring (starting top-left); a water hex touching two land hexes faces the one that is not a corner of the land hexagon. That gives 2,3,2 free coastal edges between ports, 3-fold symmetric. Verified (T8) against the 5th-edition rulebook's beginner map; the frame's harbors are fixed, so the random layout uses the same positions. Details + sources: `docs/RULES.md` §12. The 37-hex frame uses the same rule (ties: the clockwise hex); the 30-hex frame lists its 11 spots explicitly, read from the 5-6 rulebook (RULES.md §16.B).
@@ -756,10 +851,21 @@ near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`
   tests, `?first=`).
 - **Dev cards pre-roll:** official rules allow any one dev card at any time on your turn, incl. before rolling. The phase design supports all of them in `preRoll`.
 - **Steal:** a separate `steal` action even with one candidate (uniform for UI/bots); skipped when nobody can be robbed.
+  Both controllers submit a human's only steal on their own (#34, `autoSteal` in `game/logic.ts`:
+  the viewer's only legal move is a `…steal…` action with a victim), so the "Steal from whom?"
+  dialog opens only for a real choice. Engine, bots and sims are unchanged.
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
 - **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup or the special building phase. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
-- **Steal log:** says who stole from whom, never which card (the log is public).
+- **Steal log:** the public `text` says who stole from whom, never which card. Since #32 the entry
+  also carries `secret: SecretText[]` (`{ to: PlayerId[], text }`): "Red stole 1 wool from Blue"
+  for thief and victim (`stealSecret` in `rules/text.ts`; `log(draft, p, text, secret)`). Every
+  hidden-card steal writes one: robber / knight, event card, C&K (+ Bishop, Spy, Master Merchant),
+  Seafarers and E&P pirates, T&B traders / fish / forced trade (+ C&K combos), BA Taxation (the
+  collector reads all cards, each victim their own). `viewFor` keeps only the viewer's own secrets
+  (spectators none; tested in `bots/viewLeak.test.ts`). The Game Events panel shows the viewer's
+  secret instead of the text, their name as "You" (`groupLog(log, players, viewer)`), and the
+  controllers toast it (`game/notices.ts`).
 - **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
 - **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
 - **Player trade details (T3):** `to` = distinct other players, non-empty. Only `'pending'` responders may respond (no changing your mind). Acceptor must hold `want` when accepting; both sides are re-checked at confirm. Offer auto-closes to `main` when every addressee rejected. The legal sample of `offerTrade` = 1-for-1 offers to all opponents for each held resource.

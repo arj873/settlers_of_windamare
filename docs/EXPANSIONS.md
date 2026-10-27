@@ -326,6 +326,7 @@ interface BoardDrawer {
   id;
   terrain?: Record<'<id>/<t>', (g: Graphics, cx, cy, S) => void>;   // fill + motif of one hex (px)
   layers?: { key; z: 'board' | 'pieces' | 'top'; sig(state): string; draw(state, ctx): Container }[];
+  sites?(state): [key, { at: VertexId | EdgeId | HexId; owner; kind }][];  // #33: your pieces, for "just built" marks
 }
 DrawContext { topo, S, colorOf(owner), pt(point), art }   // art = base painters (drawRoad, drawSettlement, ...)
 ```
@@ -335,6 +336,10 @@ slots: `board` (above number tokens, below roads), `pieces` (above buildings), `
 robber). A layer is rebuilt only when `sig(state)` changes. Highlights, hover and clicks work on
 any id the topology knows, sea vertices/edges and water hexes included. Core palette entries exist
 for `gold`, `sea`, `fog`; other terrains without a painter are grey.
+`sites` (optional, #33) lists the module's pieces with a key unique across modules (prefix it with
+your id); a key that appears, or whose `owner` / `kind` changes, gets the same fading ring in the
+owner's colour as a new base building or road. Seafarers (ships) and C&K (knights by level, city
+walls) implement it.
 
 ## 8. HUD and setup extension (`src/ui/expansions.ts`)
 
@@ -357,8 +362,19 @@ interface HudExtension {
   impliedActions?: string[]; // clicked on the board, no button
   handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
   offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
+  cardFace?(kind, w): HTMLElement | null; // art for a card kind the log names ('paper', 'gold', 'fish'): production animation
+  sounds?: {
+    // A1 sound effects (ARCHITECTURE.md §13d)
+    recipes?: Record<'<id>/<name>', SoundRecipe>; // synthesized, registered at boot for every module
+    cues?(prev, next, ctx): SoundCue[]; // one state change → cues; ctx.levelOf(actor) / isLocal(p)
+  };
 }
 ```
+
+- Sounds (A1): put them in `src/expansions/<id>/sounds.ts` (C&K barbarians, Seafarers ships,
+  E&P ships, T&B wagons are examples). Read your slice defensively (`Partial<…>`, absent fields)
+  from public state only, so online views sound the same; levels come from `ctx.levelOf(player)`.
+  Build recipes from `src/audio/voices.ts`; audition them with `?sfx=1`.
 
 - Expansion-only goods in a player trade: put your part of the offer in your slice and show it
   with `offerExtras` (C&K: `ck/offerTrade` + overrides of acceptTrade / confirmTrade).
@@ -379,6 +395,10 @@ interface HudExtension {
   and Road Building's free ship); with the mode on, a click prefers them over the implied prompts
   (a coast edge could otherwise only take the road). A module's `hint` may word any phase the
   viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
+- A plain board click (no place mode) also offers every build card's `actionType` at the clicked
+  spot, in the spot prompt (issue #28, docs/ARCHITECTURE.md "Build by clicking a spot"), labelled
+  with the card's `label`, `glyph` and cost. Give a card's action a board location (`vertex`,
+  `edge` or `hex`) and it works there with no extra code.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
 - **Setup screen** (generated from the registry, U7 `src/ui/setup/modePicker.ts`): modes from

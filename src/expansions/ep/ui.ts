@@ -43,6 +43,7 @@ import {
   type PirateStealPhase,
   type Ship,
 } from './engine/state';
+import { epSounds } from './sounds';
 import './ep.css';
 
 type Send = (a: Action) => void;
@@ -522,6 +523,9 @@ const left = (item: string) => (state: GameState, p: PlayerId) =>
 
 export const epHud: HudExtension = {
   id: 'ep',
+  sounds: epSounds,
+
+  cardFace: (kind, w) => (kind === 'gold' ? goldFace(w) : null),
 
   panel(state, view, send) {
     const row = SCENARIOS.find((r) => r.key === scenarioKey(state));
@@ -659,6 +663,7 @@ export const epHud: HudExtension = {
         {
           class: `hcard rcard ep-hc${n === 0 ? ' is-zero' : n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}`,
           title: `Gold: ${n}`,
+          attrs: { 'data-card': 'gold' },
         },
         goldFace(46),
         h('span', { class: 'count-badge' }, String(n)),
