@@ -319,6 +319,16 @@ drawer (one line). Tests: `src/net/sessionExpansions.test.ts` (two C3 scenarios)
 `scripts/e2e-server.ts` (Fishermen on the Fog Islands online, fish and fog masked),
 `scripts/shots-tbsea.mjs --c3`.
 
+Browser check (`node scripts/shots-tbsea.mjs <preview url> <dir> --c3`): the setup screen lists
+all 23 scenario tiles; an all-bot game of each of the 18 scenarios ran past turn 50 with no
+page errors, shot mid-game in two themes each (lake, grounds, second discs, rivers and bridges,
+the lone watering hole and its camels at sea, trade hexes with plazas, conquered hexes). It
+found two generator bugs, fixed with a regression test over many seeds: Rivers + Tribe could
+place the first river where the second no longer fits (8% of seeds), and a crowded New World
+coast could leave no notch for a ground (seed "7"). Online: `e2e:server` plays Fishermen on the
+Fog Islands (fish and fog stacks masked in every view); `sessionExpansions.test.ts` plays
+Rivers Through the Desert and T&B Through the Desert.
+
 Tests: `tbsea/engine/overlays.test.ts` (text set-ups), `diagrams.test.ts` (diagram set-ups),
 `sound.test.ts` (every scenario), `mask.test.ts` (T&B and Seafarers secrets in five C3
 scenarios), `ui.test.ts`.
