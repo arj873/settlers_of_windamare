@@ -334,9 +334,18 @@ export const seaMapIdOf = (pair: SeaPair, m: SeaPairMap): `${string}/${string}` 
 export const seaPairOf = (scenario: ScenarioId | null): SeaPair | undefined =>
   SEA_PAIRS.find((p) => p.id === scenario);
 
+/**
+ * A C3 map. Nothing of another module is read at module top level (the registry import cycle:
+ * Seafarers' `SEA_MAPS` may not be evaluated yet): the base map is looked up on first use.
+ */
 function seaMapDefOf(pair: SeaPair, m: SeaPairMap): CustomMapDef {
   const id = seaMapIdOf(pair, m);
-  const base = SEA_MAPS.find((x) => x.id === `${SEAFARERS}/${m.key}`) as CustomMapDef;
+  const basedOn = `seafarers/${m.key}` as const;
+  const base = (): CustomMapDef => {
+    const def = SEA_MAPS.find((x) => x.id === basedOn);
+    if (!def) throw new Error(`unknown Seafarers map ${basedOn}`);
+    return def;
+  };
   let frame: HexListFrameDef | null = null;
   return {
     id,
@@ -348,9 +357,13 @@ function seaMapDefOf(pair: SeaPair, m: SeaPairMap): CustomMapDef {
     minPlayers: m.players[0],
     maxPlayers: m.players[1],
     layout: 'custom',
-    basedOn: base.id,
-    bankPerResource: base.bankPerResource,
-    devDeck: base.devDeck,
+    basedOn,
+    get bankPerResource(): number {
+      return base().bankPerResource;
+    },
+    get devDeck(): Readonly<DevCardCounts> {
+      return base().devDeck;
+    },
     generate: (rng, players) => planBoard(rng, id, m.key, players, m.plan),
   };
 }

@@ -507,16 +507,19 @@ function centreCell(rng: Rng, key: MapKey): HexId {
 // Layouts: a sheet's diagram as changes to the printed map
 // ---------------------------------------------------------------------------------------------
 
-/** T&B terrains by the short names the layouts use. */
-const TB_TERRAINS: Readonly<Record<string, Terrain>> = {
-  swamp: SWAMP,
-  lake: LAKE,
-  oasis: OASIS,
-  castle: CASTLE,
-  tradeCastle: TRADE_CASTLE,
-  quarry: QUARRY,
-  glassworks: GLASSWORKS,
-};
+/** T&B terrains by the short names the layouts use (read on use: no top-level import reads). */
+const tbTerrain = (name: string): Terrain | undefined =>
+  (
+    ({
+      swamp: SWAMP,
+      lake: LAKE,
+      oasis: OASIS,
+      castle: CASTLE,
+      tradeCastle: TRADE_CASTLE,
+      quarry: QUARRY,
+      glassworks: GLASSWORKS,
+    }) as Readonly<Record<string, Terrain>>
+  )[name];
 
 interface LaidCell {
   hex: HexId;
@@ -537,7 +540,7 @@ function laidCells(layout: Layout): LaidCell[] {
     const [a, b] = (disc ?? '').split('/');
     return {
       hex: cellHex(parseCell(pos)),
-      terrain: TB_TERRAINS[name] ?? (name as Terrain),
+      terrain: tbTerrain(name) ?? (name as Terrain),
       token: a ? Number(a) : null,
       extra: b ? Number(b) : null,
     };
