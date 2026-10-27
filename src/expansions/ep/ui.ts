@@ -5,7 +5,7 @@
  * steal dialog and turn-pill hints. Board clicks: setup road / ship, moving and selecting ships,
  * landing settlers, placing the pirate.
  */
-import type { Action, GameState, PlayerId, Resource } from '../../engine';
+import type { Action, GameState, PlayerId, Resource, VertexId } from '../../engine';
 import { RESOURCES } from '../../engine/constants';
 import { h, type Child } from '../../ui/dom';
 import type { HudDialog, HudExtension } from '../../ui/expansions';
@@ -14,7 +14,16 @@ import type { HudView } from '../../ui/types';
 import { playerStyle, resCardFace } from '../../ui/widgets';
 import { A } from './engine/actions';
 import { missionsOf, missionVp, tileHolder, totalMissionVp, vpParts } from './engine/missions';
-import { crewsLeft, harborsLeft, mpLeft, settlersLeft, shipsLeft, shipsOf } from './engine/ships';
+import { isCoastal } from './engine/geometry';
+import {
+  crewsLeft,
+  harborsLeft,
+  isHarbor,
+  mpLeft,
+  settlersLeft,
+  shipsLeft,
+  shipsOf,
+} from './engine/ships';
 import { goldOffer } from './engine/trade';
 import {
   citiesInPlay,
@@ -561,6 +570,17 @@ export const epHud: HudExtension = {
       costItem: ITEM.harbor,
       left: left(ITEM.harbor),
       total: () => LIMIT.harbor,
+      blocker: (state, p) => {
+        if (harborsLeft(state, p) <= 0) return 'No harbor settlements left';
+        const coastal = Object.entries(state.pieces.buildings).some(
+          ([v, b]) =>
+            b?.owner === p &&
+            b.kind === 'settlement' &&
+            !isHarbor(state, v as VertexId) &&
+            isCoastal(state, v as VertexId),
+        );
+        return coastal ? null : 'No coastal settlement to upgrade';
+      },
     },
     {
       mode: 'ep/ship',

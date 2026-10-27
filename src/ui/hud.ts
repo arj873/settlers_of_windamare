@@ -905,7 +905,11 @@ export class Hud {
           cost && hand
             ? RESOURCES.filter((r) => cost[r] > hand[r]).map((r) => `${cost[r] - hand[r]} ${r}`)
             : [];
-        const why = short.length > 0 ? `Missing ${short.join(', ')}` : 'Not possible right now';
+        const reasons = [
+          short.length > 0 ? `Missing ${short.join(', ')}` : null,
+          over ? null : (c.blocker?.(state, view.viewer) ?? null),
+        ].filter((x): x is string => x !== null);
+        const why = reasons.length > 0 ? reasons.join('; ') : 'Not possible right now';
         build.append(
           h(
             'span',

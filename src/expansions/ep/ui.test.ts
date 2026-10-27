@@ -87,6 +87,23 @@ describe('E&P HUD', () => {
     expect(vpStat(1).title).toMatch(/none yet/);
   });
 
+  it('a disabled Harbor card says why when resources are not the problem', () => {
+    const s = blank('full');
+    give(s, 0, { grain: 2, ore: 2 });
+    show(s);
+    const harbor = () =>
+      [...root.querySelectorAll<HTMLButtonElement>('.bcard')].find(
+        (b) => b.querySelector('.bcard-label')?.textContent === 'Harbor',
+      )!;
+    expect(harbor().disabled).toBe(true);
+    expect(harbor().dataset['why']).toBe('No coastal settlement to upgrade');
+    give(s, 0, { grain: -2, ore: -2 });
+    show(s);
+    expect(harbor().dataset['why']).toBe(
+      'Missing 2 grain, 2 ore; No coastal settlement to upgrade',
+    );
+  });
+
   it('build bar: Harbor, Ship, Settler and Crew cards; no City card', () => {
     const s = blank('full');
     settle(s, 0, COAST);
