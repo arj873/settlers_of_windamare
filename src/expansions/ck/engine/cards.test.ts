@@ -1,6 +1,7 @@
 /** Every progress card (docs/rules/cities-knights.md §4.6, CK-53..CK-64): effect + edge cases. */
 import { describe, expect, it } from 'vitest';
 import { publicVictoryPoints } from '../../../engine/selectors';
+import { statsOf } from '../../../engine/stats';
 import type { GameState } from '../../../engine/types';
 import { ckPlayer, ckSlice, giveRatio, type CkPhase } from '.';
 import {
@@ -352,6 +353,9 @@ describe('trade', () => {
     setGoods(r, 0, { cloth: 2 });
     const t = ok(r, { type: 'ck/bankTrade', player: 0, give: 'cloth', receive: 'grain' });
     expect(t.players[0]!.resources.grain).toBe(1);
+    // Stats: a commodity trade at the Fleet's 2:1 counts under "2:1".
+    expect(statsOf(t).players[0]!.tradesByRatio).toEqual({ '2:1': 1 });
+    expect(statsOf(t).players[0]!.portTrades).toBe(1);
     const next = structuredClone(r);
     next.turn.current = 1;
     next.phase = { kind: 'main' };

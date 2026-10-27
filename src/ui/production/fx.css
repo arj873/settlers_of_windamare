@@ -1,0 +1,108 @@
+/* Production animation (issue #29): flying cards and gain badges, over board and HUD. */
+.prod-fx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  overflow: hidden;
+}
+.prod-card {
+  position: fixed;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+.prod-token {
+  background: var(--surface-pop);
+  color: var(--ink-strong);
+  font: 800 calc(var(--cw) * 0.5) / 1 var(--font-num);
+}
+.prod-back {
+  display: block;
+  width: 20px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1.5px solid var(--card-edge);
+  background: repeating-linear-gradient(45deg, #7a4a28 0 4px, #8d5a33 4px 8px);
+}
+.prod-blocked-mark {
+  position: fixed;
+  color: #fff;
+  background: #b3261e;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font: 800 15px / 1 var(--font-num);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* "+2 [grain] +1 [ore]": anchored at the row's right edge, growing to the left. */
+.prod-badge {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px 3px 7px;
+  border-radius: 999px;
+  background: var(--surface-pop);
+  color: var(--ink-strong);
+  border: 2px solid var(--accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  font: 800 14px / 1 var(--font-num);
+  white-space: nowrap;
+  transform: translate(-100%, -50%);
+  animation: prod-badge 2.2s ease-out both;
+}
+.prod-badge .card-face {
+  box-shadow: none;
+}
+.prod-n {
+  margin-left: 2px;
+}
+.prod-n:first-child {
+  margin-left: 0;
+}
+@keyframes prod-badge {
+  0% {
+    opacity: 0;
+    transform: translate(-100%, -50%) scale(0.6);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-100%, -50%) scale(1.08);
+  }
+  18%,
+  78% {
+    opacity: 1;
+    transform: translate(-100%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-100%, -60%) scale(1);
+  }
+}
+/* Animations off / reduced motion: the badge only fades in and out, it does not move. */
+.prod-badge.is-still {
+  animation-name: prod-badge-still;
+}
+@keyframes prod-badge-still {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prod-badge {
+    animation-name: prod-badge-still;
+  }
+}
+.tb-card-face,
+.oil-card-face {
+  background: var(--surface-pop);
+}

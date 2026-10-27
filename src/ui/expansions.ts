@@ -20,6 +20,7 @@ import { eptbHud } from '../expansions/eptb/ui';
 import { backHud } from '../expansions/back/ui';
 import { twockHud } from '../expansions/twock/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
+import type { ExtensionSounds, SoundRecipe } from '../audio/types';
 import { setBoardExtensions } from '../game/logic';
 import type { Child } from './dom';
 import type { GlyphName } from './icons';
@@ -85,6 +86,12 @@ export interface HudExtension {
   handCards?(state: GameState, view: HudView, send: (a: Action) => void): Child[];
   /** Extra items shown in the open trade offer's `give` / `want` row (C&K commodities). */
   offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
+  /**
+   * Card art for a kind of card this module hands out (as the log names it: 'paper', 'gold',
+   * 'fish' ...), `w` px wide; null = not one of this module's. The production animation flies
+   * it; without one it flies a generic token.
+   */
+  cardFace?(kind: string, w: number): HTMLElement | null;
   /** Action types submitted by a plain board click, without a button (like moveRobber). */
   impliedActions?: readonly string[];
   /**
@@ -93,6 +100,11 @@ export interface HudExtension {
    */
   hideBaseCards?:
     readonly BasePlaceMode[] | ((state: Pick<GameState, 'settings'>) => readonly BasePlaceMode[]);
+  /**
+   * Sound effects (A1): recipes under `<id>/<name>` (registered for every module at boot) and a
+   * cue hook called with each state change of a game the module is active in (src/game/sounds.ts).
+   */
+  sounds?: ExtensionSounds<GameState>;
 }
 
 export const HUD_EXTENSIONS: readonly HudExtension[] = [
@@ -139,6 +151,19 @@ export function extensionHint(state: GameState, view: HudView): string | null {
   return null;
 }
 
+/** The sound hooks of the expansions active in `state` (A1). */
+export function extensionSounds(state: Pick<GameState, 'settings'>): ExtensionSounds<GameState>[] {
+  return hudExtensionsFor(state).flatMap((x) => (x.sounds ? [x.sounds] : []));
+}
+
+/** Every module's sound recipes, keyed by namespaced id (registered once at boot). */
+export function extensionSoundRecipes(): Record<string, SoundRecipe> {
+  return Object.assign({}, ...HUD_EXTENSIONS.map((x) => x.sounds?.recipes ?? {})) as Record<
+    string,
+    SoundRecipe
+  >;
+}
+
 /** Every implied (button-less) board action type of every extension. */
 export function impliedExtActions(): ReadonlySet<string> {
   return new Set(HUD_EXTENSIONS.flatMap((x) => x.impliedActions ?? []));
@@ -173,4 +198,11 @@ export function placeModeActions(mode: string): readonly string[] {
 
 // boardActions (game/logic.ts) learns the extensions' board actions from here, so the headless room
 // server, which imports game/logic but no UI, never loads module stylesheets.
-setBoardExtensions({ implied: impliedExtActions(), placeModeAction, placeModeActions });
+setBoardExtensions({
+  implied: impliedExtActions(),
+  placeModeAction,
+  placeModeActions,
+  buildCardActions: new Set(
+    HUD_EXTENSIONS.flatMap((x) => (x.buildCards ?? []).map((c) => c.actionType)),
+  ),
+});

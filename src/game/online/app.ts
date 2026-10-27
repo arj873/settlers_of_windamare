@@ -24,7 +24,9 @@ import type { SessionAction } from '../../ui/types';
 import { openProfileDialog } from '../../ui/profile/dialog';
 import { loadProfile, saveProfile, type SeatLook } from '../../ui/profile/model';
 import type { BoardLike, ToastKind } from '../controller';
+import type { SoundObserver } from '../sounds';
 import type { Backend } from './backend';
+import type { SpotPromptLike } from '../spotPicker';
 import { NetGameController } from './netController';
 
 export interface OnlineEnv {
@@ -48,6 +50,11 @@ export interface OnlineEnv {
   playOffline: () => void;
   /** PR1: the seats' pictures and piece styles in a game (board + HUD). */
   onLooks?: (looks: readonly SeatLook[]) => void;
+  /** Board spot prompt and the "Confirm before building" setting (NetControllerOptions). */
+  prompt?: SpotPromptLike | null;
+  confirmBuild?: () => boolean;
+  /** Sound effects (A1): game views, the turn timer and chat messages from others. */
+  sounds?: SoundObserver;
 }
 
 export class OnlineApp {
@@ -173,6 +180,9 @@ export class OnlineApp {
       toast: env.toast,
       ...(env.onRender ? { onRender: env.onRender } : {}),
       ...(env.onLooks ? { onLooks: env.onLooks } : {}),
+      ...(env.prompt ? { prompt: env.prompt } : {}),
+      ...(env.confirmBuild ? { confirmBuild: env.confirmBuild } : {}),
+      ...(env.sounds ? { sounds: env.sounds } : {}),
     });
     client.on((e) => {
       switch (e.type) {
@@ -184,6 +194,9 @@ export class OnlineApp {
           break;
         case 'chat':
           this.chat?.add(e.entry);
+          if (e.entry.from !== null && e.entry.from !== client.you?.member) {
+            env.sounds?.cue('chat');
+          }
           break;
         case 'avatars':
           // Uploaded pictures arrive after the room: redraw what shows them.

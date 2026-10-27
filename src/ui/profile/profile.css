@@ -301,7 +301,8 @@ img.avatar-pic {
 .pf-seat-style > .pf-style-art > img {
   max-height: 30px;
 }
-.ol-seat > .avatar {
+.ol-seat > .avatar,
+.ol-seat-head > .avatar {
   flex: none;
 }
 .chat-row > .avatar {

@@ -607,14 +607,43 @@ function parseMode(o: Record<string, unknown>, path: string) {
   return { mode, scenario, options };
 }
 
+/** Seats a room allows: the base map's player range, or the mode + scenario's. */
+export function roomSeatRange(config: Pick<RoomConfig, 'mode' | 'map' | 'scenario'>): {
+  min: number;
+  max: number;
+} {
+  const mode = modeById(config.mode) ?? BASE_MODE;
+  if (mode.id === 'base') {
+    return { min: MAPS[config.map].minPlayers, max: MAPS[config.map].maxPlayers };
+  }
+  return playerRange({ mode: mode.id, scenario: config.scenario ?? mode.scenarios[0] ?? null });
+}
+
+/** L1: the most seats a room can grow to (the base game moves to a bigger board, up to 8). */
+export function roomSeatCap(config: RoomConfig): number {
+  return config.mode === 'base' ? MAPS.base78.maxPlayers : roomSeatRange(config).max;
+}
+
+/**
+ * L1: the config with one more seat, or null at the cap. Like the lobby's Add bot: the base game
+ * moves to the smallest board that fits (5-6 players, then 7-8).
+ */
+export function grownConfig(config: RoomConfig): RoomConfig | null {
+  const seatCount = config.seatCount + 1;
+  if (seatCount > roomSeatCap(config)) return null;
+  let map = config.map;
+  if (config.mode === 'base' && seatCount > MAPS[map].maxPlayers) {
+    map = seatCount <= MAPS.base56.maxPlayers ? 'base56' : 'base78';
+  }
+  const grown = { ...config, map, seatCount };
+  return roomConfigError(grown) === null ? grown : null;
+}
+
 export const parseRoomConfig: Check<RoomConfig> = (x, path) => {
   const o = record(x, path);
   const { mode, scenario, options } = parseMode(o, path);
   const map = field(o, 'map', oneOf(MAP_IDS), path) as BaseMapId;
-  const range =
-    mode.id === 'base'
-      ? { min: MAPS[map].minPlayers, max: MAPS[map].maxPlayers }
-      : playerRange({ mode: mode.id, scenario: scenario ?? mode.scenarios[0] ?? null });
+  const range = roomSeatRange({ mode: mode.id, map, scenario });
   const rules = record(o.rules, `${path}.rules`);
   const timer = field(o, 'turnTimerSec', nullable(int(1, 3600)), path);
   if (timer !== null && !TIMER_STEPS.includes(timer)) {

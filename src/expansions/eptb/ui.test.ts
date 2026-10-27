@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createGame, legalActions, type Action, type GameState } from '../../engine';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { epSlice, freshTurn } from '../ep/engine';
@@ -19,7 +20,7 @@ describe('E&P + T&B setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${EPTB_MODE}`)?.click();
+    expect(pickMode(screen.element, EPTB_MODE)).toBe(true);
     expect(screen.state.mode).toBe(EPTB_MODE);
     for (const sc of ['landHo', 'pirateLairs', 'fish', 'spices', 'full']) {
       expect(q(screen, `scenario-ep/${sc}`), sc).not.toBeNull();
@@ -35,7 +36,7 @@ describe('E&P + T&B setup screen', () => {
   it('refuses Harbors of Catan with a message', () => {
     const screen = new SetupScreen({ onStart: () => undefined, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${EPTB_MODE}`)?.click();
+    expect(pickMode(screen.element, EPTB_MODE)).toBe(true);
     const options = { ...screen.state.options, tb: { harbormaster: true } };
     expect(setupError({ ...screen.state, options })).toMatch(/harbors/);
   });

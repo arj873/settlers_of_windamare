@@ -1,0 +1,98 @@
+/*
+ * Spot prompt (issue #28): a small popover next to a clicked board spot. It wears the menu
+ * panel's look (`.menu-panel`, themed per theme); these rules only place and size it.
+ */
+.spot-prompt.menu-panel {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 30;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font: 14px/1.35 var(--font-ui);
+  animation: spot-pop 0.14s ease-out;
+}
+/* The caret pointing at the spot (down from above, up from below), in the panel's colours. */
+.spot-prompt::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--caret-x, 50%) - 8px);
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border: 0 solid;
+  border-color: inherit;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  transform: rotate(45deg);
+}
+.spot-prompt.is-below::after {
+  bottom: auto;
+  top: -9px;
+  transform: rotate(225deg);
+}
+.spot-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.spot-title {
+  font-weight: 750;
+  color: var(--ink-dim);
+}
+.spot-label {
+  font-weight: 750;
+  font-size: 15px;
+}
+.spot-cost {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.spot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.spot-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  text-align: left;
+}
+.spot-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.spot-btns .btn {
+  min-height: 40px;
+  min-width: 86px;
+}
+@media (max-width: 600px) {
+  .spot-prompt.menu-panel {
+    min-width: 220px;
+  }
+  .spot-btns .btn,
+  .spot-choice {
+    min-height: 48px;
+    font-size: 16px;
+  }
+}
+@keyframes spot-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spot-prompt.menu-panel {
+    animation: none;
+  }
+}

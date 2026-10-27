@@ -56,6 +56,7 @@ import {
   PROTOCOL_VERSION,
   RATE_LIMITS,
   ROOM_COLORS,
+  grownConfig,
   type ChatEntry,
   type ClientMessage,
   type ErrorCode,
@@ -557,6 +558,7 @@ export class GameSession {
     const before = m.name;
     m.name = name;
     if (opts.announce && before === '') this.system(`${name} joined the room`);
+    if (before === '') this.autoSeat(m);
     this.roomDirty = true;
     return null;
   }
@@ -598,6 +600,28 @@ export class GameSession {
       if (m.avatar !== undefined && isImageAvatar(m.avatar)) out[avatarKey(m)] = m.avatar;
     }
     return out;
+  }
+
+  /**
+   * L1: a member who just picked a nickname in the lobby sits down: in the first seat a bot
+   * holds (the host lands in seat 1), else in a new seat (grownConfig: up to 8 in the base game,
+   * the mode / scenario's maximum otherwise). Only at that cap (or once the game runs) do they
+   * watch. Only on the first name: someone who stands up stays standing.
+   */
+  private autoSeat(m: MemberRec): void {
+    if (this.d.phase !== 'lobby' || this.seatOf(m.id) !== null) return;
+    const free = () => this.d.seats.find((s) => s.occupant === null);
+    let open = free();
+    if (!open) {
+      const grown = grownConfig(this.d.config);
+      if (!grown) return;
+      this.setConfig(grown);
+      open = free();
+      if (!open) return;
+      this.system(`Added seat ${this.d.seats.length} for ${m.name}`);
+    }
+    open.occupant = m.id;
+    open.status = 'human';
   }
 
   private takeSeat(m: MemberRec, seat: PlayerId): Failure | null {
@@ -645,6 +669,12 @@ export class GameSession {
   private configure(m: MemberRec, config: RoomConfig): Failure | null {
     if (m.id !== this.d.host) return ['not_host', 'only the host can change the game'];
     if (this.d.phase !== 'lobby') return ['wrong_phase', 'the game has started'];
+    this.setConfig(config);
+    return null;
+  }
+
+  /** A (valid) config; seats are added or dropped from the end to match its seat count. */
+  private setConfig(config: RoomConfig): void {
     this.d.config = config;
     const seats = this.d.seats;
     while (seats.length > config.seatCount) seats.pop();
@@ -657,7 +687,6 @@ export class GameSession {
       });
     }
     this.roomDirty = true;
-    return null;
   }
 
   private kick(m: MemberRec, target: MemberId): Failure | null {

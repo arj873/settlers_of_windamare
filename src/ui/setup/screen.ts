@@ -2,12 +2,21 @@
  * The new-game setup screen: stacked sections (mode, map, rules, advanced, seats) and a sticky
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
-import { scenarioById } from '../../engine';
 import { botLevelSelect } from '../botLevel';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
+import { soundControl } from '../sound';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
+import {
+  chipNotes,
+  chipStates,
+  modeLabel,
+  pickScenario,
+  scenarioGroups,
+  toggleChip,
+  type ScenarioEntry,
+} from './modePicker';
 import {
   addSeat,
   buildConfig,
@@ -53,7 +62,6 @@ import {
   setMode,
   setOption,
   setPlayerCount,
-  setScenario,
   visibleModes,
   TIMER_STEPS,
   timerLabel,
@@ -172,6 +180,7 @@ export class SetupScreen {
           'div',
           { class: 'su-footer-in' },
           this.summary,
+          soundControl({ compact: true }),
           themePicker({ compact: true }),
           opts.onBack &&
             h(
@@ -276,66 +285,125 @@ export class SetupScreen {
     );
   }
 
-  /** Mode tiles come from the engine registry (docs/EXPANSIONS.md §8); base first. */
+  /**
+   * Expansion chips (src/ui/setup/modePicker.ts, from the engine registry): none on = base. A
+   * line names the resulting mode; chips that can't toggle are disabled, their reasons below.
+   */
   private modeSection(): HTMLElement {
-    const modes = visibleModes(this.showAllModes);
+    const d = this.draft;
+    const chips = chipStates(d, this.showAllModes);
+    const mode = modeOf(d);
     return this.section(
       'Game mode',
       'mode',
       h(
+        'p',
+        { class: 'su-mode-base' },
+        h('strong', {}, 'Base game'),
+        h('span', { class: 'su-mode-tick', attrs: { 'aria-label': 'included' } }, '✓'),
+      ),
+      h('p', { class: 'su-mode-add', id: 'su-mode-add' }, 'Add expansions:'),
+      h(
         'div',
-        { class: 'su-tiles', attrs: { role: 'group', 'aria-labelledby': 'su-h-mode' } },
-        ...modes.map((m) => {
-          const on = this.draft.mode === m.id;
-          return h(
+        { class: 'su-chips', attrs: { role: 'group', 'aria-labelledby': 'su-mode-add' } },
+        ...chips.map((c) =>
+          h(
             'button',
             {
-              class: `su-tile${on ? ' is-on' : ''}`,
-              title: `${m.name}: ${m.players.min}–${m.players.max} players`,
-              attrs: { 'aria-pressed': String(on), 'data-k': `mode-${m.id}` },
-              on: { click: () => this.set(setMode(this.draft, m.id)) },
+              class: `su-chip${c.on ? ' is-on' : ''}`,
+              disabled: c.reason !== null,
+              title: c.reason ?? `${c.on ? 'Remove' : 'Add'} ${c.name}`,
+              attrs: { 'aria-pressed': String(c.on), 'data-k': `chip-${c.id}` },
+              on: { click: () => this.set(toggleChip(this.draft, c.id, this.showAllModes)) },
             },
-            h('span', { class: 'su-tile-title' }, m.name),
-            h('span', { class: 'su-tile-sub' }, m.blurb),
-            m.status !== 'ready' && h('span', { class: 'su-tile-reason' }, m.status),
-          );
-        }),
+            h('span', { class: 'su-chip-ico', attrs: { 'aria-hidden': 'true' } }, c.icon),
+            h('span', { class: 'su-chip-name' }, c.name),
+            h(
+              'span',
+              { class: 'su-chip-mark', attrs: { 'aria-hidden': 'true' } },
+              c.on ? '✓' : '+',
+            ),
+          ),
+        ),
+      ),
+      h(
+        'p',
+        { class: 'su-mode-result', attrs: { 'aria-live': 'polite', 'data-k': 'mode-result' } },
+        h('span', { class: 'su-mode-arrow', attrs: { 'aria-hidden': 'true' } }, '→'),
+        h('strong', {}, modeLabel(d)),
+        mode.status !== 'ready' && h('span', { class: 'su-mode-status' }, mode.status),
+      ),
+      h(
+        'ul',
+        { class: 'su-mode-notes' },
+        ...chipNotes(chips).map((n) => h('li', {}, `${n.names.join(', ')}: ${n.reason}`)),
       ),
     );
   }
 
-  /** Expansion modes: one tile per scenario of the mode, with its map preview. */
+  /**
+   * Expansion modes: one tile per scenario (map preview, seats, VP) of every mode of the chip
+   * selection, grouped under the mode's name when the selection stands for several modes.
+   */
   private scenarioSection(): HTMLElement {
-    const mode = modeOf(this.draft);
-    const n = this.draft.seats.length;
-    return this.section(
-      'Scenario',
-      'map',
+    const d = this.draft;
+    const n = d.seats.length;
+    const groups = scenarioGroups(d, this.showAllModes);
+    const tiles = (entries: ScenarioEntry[], label: Record<string, string>) =>
       h(
         'div',
-        { class: 'su-tiles su-maps', attrs: { role: 'group', 'aria-labelledby': 'su-h-map' } },
-        ...mode.scenarios.map((id) => {
-          const s = scenarioById(id);
-          if (!s) return null;
-          const on = this.draft.scenario === id;
-          // The seats this mode allows on the scenario (E&P + C&K: 3-4 on 3-6 player scenarios).
-          const min = Math.max(s.players.min, mode.players.min);
-          const max = Math.min(s.players.max, mode.players.max);
-          const players = clamp(n, min, max);
+        { class: 'su-tiles su-maps', attrs: { role: 'group', ...label } },
+        ...entries.map((e) => {
+          const { min, max } = e.players;
+          const on = d.mode === e.mode.id && d.scenario === e.scenario.id;
           return h(
             'button',
             {
               class: `su-tile su-map${on ? ' is-on' : ''}`,
-              title: `${s.name}: ${s.blurb}`,
-              attrs: { 'aria-pressed': String(on), 'data-k': `scenario-${id}` },
-              on: { click: () => this.set(setScenario(this.draft, id)) },
+              title: `${e.scenario.name}: ${e.scenario.blurb}`,
+              attrs: {
+                'aria-pressed': String(on),
+                'data-k': e.key,
+                'data-mode': e.mode.id,
+                'data-scenario': e.scenario.id,
+              },
+              on: {
+                click: () => this.set(pickScenario(this.draft, e.mode.id, e.scenario.id)),
+              },
             },
-            h('span', { class: 'su-map-art' }, mapPreviewSvg(s.mapFor(players))),
-            h('span', { class: 'su-tile-title' }, s.name),
-            h('span', { class: 'su-tile-sub' }, `${min}–${max} players`),
+            h(
+              'span',
+              { class: 'su-map-art' },
+              mapPreviewSvg(e.scenario.mapFor(clamp(n, min, max))),
+            ),
+            h('span', { class: 'su-tile-title' }, e.scenario.name),
+            h(
+              'span',
+              { class: 'su-tile-sub' },
+              `${min === max ? min : `${min}–${max}`} players · ${e.vp} VP`,
+            ),
           );
         }),
-      ),
+      );
+    const [only] = groups;
+    return this.section(
+      'Scenario',
+      'map',
+      ...(groups.length === 1 && only
+        ? [tiles(only.entries, { 'aria-labelledby': 'su-h-map' })]
+        : groups.map((g) =>
+            h(
+              'div',
+              { class: 'su-scen-group' },
+              h(
+                'h3',
+                { class: 'su-scen-head' },
+                g.mode.name,
+                h('span', { class: 'su-scen-blurb' }, g.mode.blurb),
+              ),
+              tiles(g.entries, { 'aria-label': g.mode.name }),
+            ),
+          )),
     );
   }
 

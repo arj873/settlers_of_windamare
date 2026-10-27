@@ -307,7 +307,7 @@ describe('SetupScreen', () => {
     document.body.append(screen.element);
   });
 
-  it('renders the sections, 4 seats and the Base mode tile first (then the ready expansions)', () => {
+  it('renders the sections, 4 seats and Base with every expansion chip off', () => {
     const titles = [...screen.element.querySelectorAll('h2')].map((h) => h.textContent);
     expect(titles).toEqual([
       'Game mode',
@@ -318,10 +318,11 @@ describe('SetupScreen', () => {
       'Seats',
     ]);
     expect(screen.element.querySelectorAll('.su-seat')).toHaveLength(4);
-    const modes = [...screen.element.querySelectorAll('[data-k^="mode-"]')];
-    expect(modes[0]?.getAttribute('data-k')).toBe('mode-base');
+    const chips = [...screen.element.querySelectorAll('[data-k^="chip-"]')];
+    expect(chips.map((c) => c.getAttribute('aria-pressed'))).not.toContain('true');
+    expect(q('[data-k="mode-result"]').textContent).toContain('Base game');
     // Work-in-progress and demo modes stay hidden.
-    expect(modes.map((m) => m.getAttribute('data-k'))).not.toContain('mode-demo');
+    expect(chips.map((m) => m.getAttribute('data-k'))).not.toContain('chip-demo');
     expect(screen.element.querySelectorAll('.su-map')).toHaveLength(4);
     expect(screen.element.textContent).toContain('3–4 players');
     expect(screen.element.textContent).toContain('7–8 players');

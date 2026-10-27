@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyAction, createGame, legalActions, type Action, type GameState } from '../engine';
+import {
+  applyAction,
+  createGame,
+  legalActions,
+  type Action,
+  type GameState,
+  type VertexId,
+} from '../engine';
 import {
   FIXTURE_PLAYERS,
   discardGame,
@@ -11,6 +18,8 @@ import type { BoardEvents, Highlights } from '../render';
 import type { HudEvents, HudView, NewGameConfig } from '../ui';
 import { GameController, type BoardLike, type HudLike } from './controller';
 import { SAVE_KEY, loadSession, type KeyValueStore } from './persist';
+import type { SpotPromptLike } from './spotPicker';
+import type { SpotPromptRequest } from '../ui/spotPrompt';
 
 // --- stubs -----------------------------------------------------------------
 
@@ -201,17 +210,23 @@ describe('GameController: board highlights and clicks', () => {
     expect(toasts).toEqual([]);
   });
 
-  it('shows build targets only while the HUD is in place mode', () => {
+  it('shows one mode’s targets in place mode, every build spot on hover only without one', () => {
     const c = make();
     const s = richMidGame();
     c.start(s, humans4);
-    expect(board.highlights).toEqual({});
     const roads = legalActions(s, 1).filter((a) => a.type === 'buildRoad');
+    const towns = legalActions(s, 1).filter((a) => a.type === 'buildSettlement');
     expect(roads.length).toBeGreaterThan(0);
+    // No mode: build-anywhere spots (issue #28), glowing only under the pointer.
+    expect(board.highlights.hoverOnly).toBe(true);
+    expect(board.highlights.edges).toEqual(roads.map((a) => a.edge));
+    expect(board.highlights.vertices).toEqual(expect.arrayContaining(towns.map((a) => a.vertex)));
     hud.emit('placeMode', 'road');
     expect(board.highlights.edges).toEqual(roads.map((a) => a.edge));
+    expect(board.highlights.vertices).toEqual([]);
+    expect(board.highlights.hoverOnly).toBeUndefined();
     hud.emit('placeMode', null);
-    expect(board.highlights).toEqual({});
+    expect(board.highlights.hoverOnly).toBe(true);
   });
 
   it('maps a board click in place mode to the build action', () => {
@@ -240,6 +255,123 @@ describe('GameController: board highlights and clicks', () => {
     expect(c.boardActions).toEqual([]);
     expect(board.highlights).toEqual({});
     expect(hud.last.isBotTurn).toBe(true);
+  });
+});
+
+class FakePrompt implements SpotPromptLike {
+  req: SpotPromptRequest | null = null;
+  shown = 0;
+  show(req: SpotPromptRequest): void {
+    this.req = req;
+    this.shown++;
+  }
+  hide(): void {
+    this.req = null;
+  }
+}
+
+describe('GameController: build by clicking a spot (issue #28)', () => {
+  let prompt: FakePrompt;
+  let confirm: boolean;
+  const makeSpot = () =>
+    new GameController({
+      board,
+      hud,
+      storage: store,
+      toast: (m) => toasts.push(m),
+      prompt,
+      confirmBuild: () => confirm,
+    });
+  beforeEach(() => {
+    prompt = new FakePrompt();
+    confirm = true;
+  });
+
+  it('asks before building a road on a plain edge click, and builds on Build', () => {
+    const c = makeSpot();
+    c.start(richMidGame(), humans4);
+    const edge = board.highlights.edges![0]!;
+    board.click('edgeClick', edge);
+    expect(prompt.req?.choices).toEqual([{ type: 'buildRoad', player: 1, edge }]);
+    expect(c.state?.pieces.roads[edge]).toBeUndefined();
+    // While asking, only that spot glows (pulsing, not hover-only).
+    expect(board.highlights.edges).toEqual([edge]);
+    expect(board.highlights.hoverOnly).toBeUndefined();
+    prompt.req!.onPick(prompt.req!.choices[0]!);
+    expect(c.state?.pieces.roads[edge]).toBe(1);
+    expect(board.highlights.hoverOnly).toBe(true);
+  });
+
+  it('cancel leaves the game as it was', () => {
+    const c = makeSpot();
+    c.start(richMidGame(), humans4);
+    const before = c.state;
+    const vertex = board.highlights.vertices![0]!;
+    board.click('vertexClick', vertex);
+    expect(prompt.req).not.toBeNull();
+    prompt.req!.onCancel();
+    expect(c.state).toBe(before);
+    expect(board.highlights.hoverOnly).toBe(true);
+  });
+
+  it('offers a city on the viewer’s own settlement', () => {
+    const c = makeSpot();
+    const s = richMidGame();
+    c.start(s, humans4);
+    const own = Object.entries(s.pieces.buildings).find(
+      ([, b]) => b.owner === 1 && b.kind === 'settlement',
+    )![0] as VertexId;
+    board.click('vertexClick', own);
+    expect(prompt.req?.choices).toEqual([{ type: 'buildCity', player: 1, vertex: own }]);
+    prompt.req!.onPick(prompt.req!.choices[0]!);
+    expect(c.state?.pieces.buildings[own]).toEqual({ owner: 1, kind: 'city' });
+  });
+
+  it('builds at once with "Confirm before building" off', () => {
+    confirm = false;
+    const c = makeSpot();
+    c.start(richMidGame(), humans4);
+    const edge = board.highlights.edges![0]!;
+    board.click('edgeClick', edge);
+    expect(prompt.shown).toBe(0);
+    expect(c.state?.pieces.roads[edge]).toBe(1);
+  });
+
+  it('build modes and prompts still act at once', () => {
+    const c = makeSpot();
+    c.start(richMidGame(), humans4);
+    hud.emit('placeMode', 'road');
+    const edge = board.highlights.edges![0]!;
+    board.click('edgeClick', edge);
+    expect(prompt.shown).toBe(0);
+    expect(c.state?.pieces.roads[edge]).toBe(1);
+
+    c.start(freshGame(4), humans4);
+    const spot = board.highlights.vertices![0]!;
+    board.click('vertexClick', spot);
+    expect(prompt.shown).toBe(0);
+    expect(c.state?.pieces.buildings[spot]).toEqual({ owner: 0, kind: 'settlement' });
+  });
+
+  it('closes the prompt when a build mode starts or the choice stops being legal', () => {
+    const c = makeSpot();
+    c.start(richMidGame(), humans4);
+    board.click('edgeClick', board.highlights.edges![0]!);
+    expect(prompt.req).not.toBeNull();
+    hud.emit('placeMode', 'settlement');
+    expect(prompt.req).toBeNull();
+
+    hud.emit('placeMode', null);
+    board.click('edgeClick', board.highlights.edges![0]!);
+    expect(prompt.req).not.toBeNull();
+    hud.emit('action', { type: 'endTurn', player: 1 });
+    expect(prompt.req).toBeNull();
+  });
+
+  it('ignores clicks on spots with no build', () => {
+    makeSpot().start(richMidGame(), humans4);
+    board.click('edgeClick', 'e:9,9,NE');
+    expect(prompt.shown).toBe(0);
   });
 });
 

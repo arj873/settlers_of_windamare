@@ -218,15 +218,51 @@ button.ol-choice:hover {
   color: var(--accent-ink);
   background: var(--accent);
 }
+/* Copy link: both labels share one cell, so the width never changes (L1). */
+.ol-copy-labels {
+  display: inline-grid;
+}
+.ol-copy-label {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+.ol-copy-label.is-off {
+  visibility: hidden;
+}
+/* "You're watching. Pick a seat: [Sit here]" (L1) */
+.ol-watch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--tile-on-bg), var(--tile-bg);
+  border: 1px solid var(--accent);
+  box-shadow: var(--tile-shadow);
+}
+.ol-watch[hidden] {
+  display: none;
+}
+.ol-watch > .glyph {
+  flex: none;
+  color: var(--accent);
+}
+.ol-watch-text {
+  flex: 1 1 200px;
+  font-size: 14px;
+}
 .ol-seats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 10px;
 }
 .ol-seat {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
   min-height: 72px;
   padding: 10px 12px;
   border-radius: var(--radius);
@@ -258,6 +294,12 @@ button.ol-choice:hover {
   background: var(--pc);
   box-shadow: 0 0 0 2px var(--edge);
 }
+.ol-seat-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
 .ol-seat-main {
   flex: 1;
   min-width: 0;
@@ -273,6 +315,12 @@ button.ol-choice:hover {
   font-size: 15px;
   min-width: 0;
 }
+.ol-seat-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ol-seat.is-open .ol-seat-name {
   color: var(--ink-dim);
 }
@@ -280,19 +328,27 @@ button.ol-choice:hover {
   font-size: 12px;
   color: var(--ink-dim);
 }
+/* Swatches and the footer line up under the name (dot 40px + gap 12px). */
 .ol-seat .su-swatches {
-  margin: 4px 0 0;
+  margin: 0 0 0 52px;
   flex-wrap: wrap;
 }
-.ol-seat-actions {
-  flex: none;
+.ol-seat-foot {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 52px;
+}
+.ol-seat-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
 }
-.ol-seat-main .bot-level {
-  align-self: flex-start;
+.ol-seat-foot .bot-level {
   width: 108px;
   padding-top: 3px;
   padding-bottom: 3px;
@@ -300,11 +356,12 @@ button.ol-choice:hover {
 .ol-hint {
   font-size: 11.5px;
   color: var(--ink-dim);
-  max-width: 90px;
-  text-align: right;
 }
 .ol-seat-add {
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
   font: inherit;
   font-weight: 700;
   color: var(--ink-dim);
@@ -387,6 +444,10 @@ button.ol-choice:hover {
 }
 .ol-config.is-readonly * {
   cursor: default !important;
+}
+/* Guests see the host's pick, not why other chips are off. */
+.ol-config.is-readonly .su-mode-notes {
+  display: none;
 }
 
 /* ---- chat ------------------------------------------------------------- */

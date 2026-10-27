@@ -21,19 +21,11 @@ import { createRandomBot, DEFAULT_BOT_LEVEL, type Bot, type BotLevel } from '../
 import { botForLevel } from '../bots/byLevel';
 import type { BoardView } from '../render';
 import type { Hud, NewGameConfig, PlaceMode } from '../ui';
-import {
-  actionForClick,
-  boardActions,
-  gameConfigOf,
-  highlightsFor,
-  isStalled,
-  nextBot,
-  pickViewer,
-  type BoardClick,
-  type Seats,
-} from './logic';
+import { gameConfigOf, isStalled, nextBot, pickViewer, type BoardClick, type Seats } from './logic';
+import { SpotPicker, type SpotPromptLike } from './spotPicker';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
 import { cleanLooks, type SeatLook } from '../ui/profile/model';
+import type { SoundObserver } from './sounds';
 import {
   IDLE_CLOCK,
   bankAfterAction,
@@ -48,7 +40,8 @@ import {
   type TurnClock,
 } from './turnTimer';
 
-export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'>;
+export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'> &
+  Partial<Pick<BoardView, 'screenPos'>>;
 export type HudLike = Pick<Hud, 'render' | 'on' | 'isCovered' | 'setTurnTimer'>;
 export type ToastKind = 'error' | 'info';
 
@@ -68,6 +61,12 @@ export interface ControllerOptions {
   wallClock?: () => number;
   /** PR1: the seats' pictures and piece styles changed (a new or resumed game). Cosmetic. */
   onLooks?: (looks: readonly SeatLook[]) => void;
+  /** The popover a click on a board spot opens (issue #28); absent = a click acts at once. */
+  prompt?: SpotPromptLike | null;
+  /** The "Confirm before building" setting; default on. */
+  confirmBuild?: () => boolean;
+  /** Sound effects (A1): told about every rendered state and the turn timer. */
+  sounds?: SoundObserver;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -96,6 +95,7 @@ export class GameController {
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
   private readonly onLooks: (looks: readonly SeatLook[]) => void;
+  private readonly sounds: SoundObserver | null;
   private speedMs: number;
   /** PR1: picture and piece style per seat (index = PlayerId). */
   private looks: SeatLook[] = [];
@@ -107,6 +107,7 @@ export class GameController {
   private legal: Action[] = [];
   private viewerId: PlayerId | null = null;
   private placeMode: PlaceMode | null = null;
+  private readonly spots: SpotPicker;
   private botRng = new Rng(1);
   /** Offers made per player this turn (key `${turn}:${player}`), for BOT_OFFERS_PER_TURN. */
   private offers = new Map<string, number>();
@@ -139,12 +140,22 @@ export class GameController {
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
     this.onLooks = opts.onLooks ?? (() => undefined);
+    this.sounds = opts.sounds ?? null;
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
+    const board = this.board;
+    this.spots = new SpotPicker({
+      prompt: opts.prompt ?? null,
+      screenPos: (id) => board.screenPos?.(id) ?? null,
+      confirm: opts.confirmBuild ?? (() => true),
+      submit: (a) => this.dispatch(a),
+      rehighlight: () => this.updateHighlights(),
+    });
 
     this.hud.on('action', (a) => this.dispatch(a));
     this.hud.on('newGame', (cfg) => this.newGame(cfg));
     this.hud.on('placeMode', (m) => {
       this.placeMode = m;
+      this.spots.close();
       this.updateHighlights();
     });
     this.unsubscribe.push(
@@ -182,9 +193,14 @@ export class GameController {
   get legalActions(): readonly Action[] {
     return this.legal;
   }
-  /** Board actions a click may submit right now (what the board highlights). */
+  /**
+   * Board actions a click may lead to right now (what the board highlights): a prompt's or build
+   * mode's spots, else every build-anywhere spot (a click opens the spot prompt, issue #28).
+   */
   get boardActions(): Action[] {
-    return this.viewerId === null ? [] : boardActions(this.legal, this.viewerId, this.placeMode);
+    return this.viewerId === null
+      ? []
+      : this.spots.targets({ legal: this.legal, viewer: this.viewerId, placeMode: this.placeMode });
   }
 
   // -------------------------------------------------------------------------
@@ -219,6 +235,7 @@ export class GameController {
     this.onLooks(this.looks);
     this.viewerId = opts.viewer ?? null;
     this.placeMode = null;
+    this.spots.close();
     this.offers.clear();
     this.stallReported = false;
     this.botRng = new Rng(opts.botRng ?? Rng.fromSeed(`bots:${String(state.settings.seed)}`).state);
@@ -295,6 +312,7 @@ export class GameController {
   destroy(): void {
     this.cancelTimer();
     this.stopClock();
+    this.spots.close();
     for (const off of this.unsubscribe) off();
     this.unsubscribe.length = 0;
     this.current = null;
@@ -340,8 +358,10 @@ export class GameController {
   }
 
   private click(click: BoardClick): void {
-    const action = actionForClick(this.boardActions, click);
-    if (action) this.dispatch(action);
+    const state = this.current;
+    if (!state || this.viewerId === null) return;
+    const ctx = { state, legal: this.legal, viewer: this.viewerId, placeMode: this.placeMode };
+    this.spots.click(ctx, click);
   }
 
   // -------------------------------------------------------------------------
@@ -354,6 +374,7 @@ export class GameController {
     if (!state) return;
     this.legal = legalActions(state);
     this.viewerId = pickViewer(state, this.seatList, this.legal, this.viewerId);
+    this.spots.sync({ legal: this.legal, viewer: this.viewerId, placeMode: this.placeMode });
     if (state.phase.kind === 'gameOver' && this.durationMs === null && this.startedAt !== null) {
       this.durationMs = this.wallClock() - this.startedAt;
     }
@@ -369,6 +390,11 @@ export class GameController {
       bots: this.seatList.map((s) => s === 'bot'),
       turnTimer,
       gameDurationMs: this.durationMs,
+    });
+    this.sounds?.observe(state, {
+      viewer: this.viewerId,
+      local: this.seatList.map((s) => s === 'human'),
+      bots: this.seatList.map((s) => s === 'bot'),
     });
     this.updateHighlights();
     this.persist();
@@ -391,8 +417,14 @@ export class GameController {
       this.board.setHighlights({});
       return;
     }
-    const color = state.players[this.viewerId]?.color;
-    this.board.setHighlights(highlightsFor(this.boardActions, color));
+    this.board.setHighlights(
+      this.spots.highlights({
+        state,
+        legal: this.legal,
+        viewer: this.viewerId,
+        placeMode: this.placeMode,
+      }),
+    );
   }
 
   private persist(): void {
@@ -445,6 +477,8 @@ export class GameController {
     if (shown !== this.clockShown) {
       this.clockShown = shown;
       this.hud.setTurnTimer(view);
+      // Bots are never timed: the clock is always a human's on this screen.
+      this.sounds?.timer(view ? view.remainingSec : null, true);
     }
   }
 

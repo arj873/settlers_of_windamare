@@ -13,6 +13,7 @@ import {
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import { CK, ckSlice } from './engine';
@@ -57,7 +58,7 @@ describe('C&K setup screen', () => {
 
   it('offers C&K with its two scenarios, 3-6 seats and a 13 VP target', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     expect(screen.state.mode).toBe(CK);
     expect(q(screen, 'scenario-ck/classic')).not.toBeNull();
     expect(q(screen, 'scenario-ck/starter')).not.toBeNull();
@@ -69,7 +70,7 @@ describe('C&K setup screen', () => {
 
   it('refuses Rush mode with C&K: the reason is shown and Start is off', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     q(screen, 'rule-rushMode')?.click();
     expect(setupError(screen.state)).toMatch(/Rush/);
     expect(screen.element.querySelector('.su-error')?.textContent).toMatch(/Rush/);
