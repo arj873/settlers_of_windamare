@@ -47,7 +47,8 @@
   font-family: var(--font-display, serif);
   font-size: 17px;
   font-weight: var(--display-weight, 700);
-  color: var(--accent-2, #ffe29a);
+  /* The toast ink: light themes put the toast on cream, where the accent colours fade out. */
+  color: var(--toast-ink, #eef3f8);
 }
 .award-banner .award-text {
   color: var(--toast-ink, #eef3f8);
