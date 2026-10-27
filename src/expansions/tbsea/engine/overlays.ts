@@ -12,25 +12,36 @@
  * Everything T&B reads (lakes, grounds, rivers and bridge sites, caravan starts) goes to
  * `board.ext.tb` in the shape its own boards use, so T&B's rules run unchanged.
  */
+import { NO_ROBBER } from '../../../engine/expansions/ext';
 import {
   CORNERS,
   SIDES,
   cornerVertex,
+  edgeEndpoints,
   hexCenter,
   neighbor,
   parseHexId,
   sideEdge,
   hexId,
+  type Corner,
 } from '../../../engine/hex';
-import type { GeneratedBoard } from '../../../engine/maps';
+import type { GeneratedBoard, HexListFrameDef } from '../../../engine/maps';
 import type { Rng } from '../../../engine/rng';
 import { topologyFor, type Topology } from '../../../engine/topology';
 import type { EdgeId, HexId, HexTile, MapId, Port, Terrain, VertexId } from '../../../engine/types';
+import {
+  cellEdge,
+  cellHex,
+  parseCell,
+  type BookSide,
+  type Cell,
+} from '../../seafarers/engine/coords';
 import {
   boardWith,
   components,
   dealTokens,
   newWorldCounts,
+  parseHarbors,
   prepared,
   randomHarbors,
   SEA_MAPS,
@@ -39,8 +50,22 @@ import {
   type MapKey,
   type SeaBoard,
 } from '../../seafarers/engine/maps';
-import { ARROWS, caravanStart, RIVERS_19, sharedEdge } from '../../tb/engine/maps';
-import { LAKE, OASIS, SWAMP, type FishingGround, type TbBoard } from '../../tb/engine/state';
+import { ARROWS, RIVERS_19, sharedEdge } from '../../tb/engine/maps';
+import {
+  CASTLE,
+  GLASSWORKS,
+  LAKE,
+  OASIS,
+  QUARRY,
+  SWAMP,
+  TRADE_CASTLE,
+  TRADE_TERRAINS,
+  type CaravanStart,
+  type FishingGround,
+  type TbBoard,
+  type TradeHex,
+  type TradeKind,
+} from '../../tb/engine/state';
 
 const TB = 'tb';
 export const TBSEA_EXT = 'tbsea';
@@ -69,17 +94,40 @@ export type GroundRule =
   /** New World: like the harbours, never sharing a corner with a harbour. */
   | 'newWorld';
 
+/**
+ * A sheet's set-up diagram as changes to our printed map (the 2025 diagrams are drawn on the same
+ * cells, docs/rules/combos.md §2d), in the rules doc's book cells (seafarers.md §2.0).
+ */
+export interface Layout {
+  /** "c,r terrain [n[/m]]": the cell's terrain and number (m: a second disc); 'sea' removes it. */
+  cells?: string;
+  /** "c,r SIDE kind; ...": replaces the map's harbours. */
+  harbors?: string;
+  /** Each river from its source to its swamp, then the mouth side: "3,1 2,2 1,3 0,4 NW". */
+  rivers?: readonly string[];
+  /** Barbarians' start paths "c,r SIDE; ..." (Traders & Barbarians). */
+  barbarians?: string;
+  /** The robber's and the pirate's start: a cell, 'off' (beside the board) or 'none'. */
+  robber?: string;
+  pirate?: string;
+}
+
 export interface Plan {
   lake?: Pick;
   /** The watering hole on a printed hex, or as central as possible (New World). */
   oasis?: Pick | 'centre';
-  /** Where the replaced hex's number disc goes: a printed hex, or the lowest-ranking pasture. */
-  disc?: Pick | 'lowestPasture';
+  /** Where the replaced hex's number disc goes. */
+  disc?: Pick;
   grounds?: GroundRule;
   rivers?: 'variableTribe' | 'newWorld';
   robber?: 'swamp' | 'oasis';
   /** The robber may go back onto the watering hole (Merchant Trains + Forgotten Tribe). */
   robberOnOasis?: boolean;
+  layout?: Layout;
+  /** Traders & Barbarians: the board prints a 2 and a 12 (no re-roll). */
+  keep212?: boolean;
+  /** Barbarian Attack: the castle, the coast and the knights on the main island (region M). */
+  ba?: boolean;
 }
 
 const GROUND_NUMBERS: readonly number[] = [4, 5, 6, 8, 9, 10];
@@ -458,6 +506,221 @@ function centreCell(rng: Rng, key: MapKey): HexId {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Layouts: a sheet's diagram as changes to the printed map
+// ---------------------------------------------------------------------------------------------
+
+/** T&B terrains by the short names the layouts use. */
+const TB_TERRAINS: Readonly<Record<string, Terrain>> = {
+  swamp: SWAMP,
+  lake: LAKE,
+  oasis: OASIS,
+  castle: CASTLE,
+  tradeCastle: TRADE_CASTLE,
+  quarry: QUARRY,
+  glassworks: GLASSWORKS,
+};
+
+interface LaidCell {
+  hex: HexId;
+  terrain: Terrain;
+  token: number | null;
+  extra: number | null;
+}
+
+const entries = (s: string | undefined): string[] =>
+  (s ?? '')
+    .split(/[;\n]/)
+    .map((x) => x.trim().replace(/\s+/g, ' '))
+    .filter((x) => x.length > 0);
+
+function laidCells(layout: Layout): LaidCell[] {
+  return entries(layout.cells).map((e) => {
+    const [pos = '', name = '', disc] = e.split(' ');
+    const [a, b] = (disc ?? '').split('/');
+    return {
+      hex: cellHex(parseCell(pos)),
+      terrain: TB_TERRAINS[name] ?? (name as Terrain),
+      token: a ? Number(a) : null,
+      extra: b ? Number(b) : null,
+    };
+  });
+}
+
+const bookEdge = (s: string): EdgeId => {
+  const [pos = '', side = ''] = s.trim().split(/\s+/);
+  return cellEdge(parseCell(pos), side as BookSide);
+};
+
+/** A start cell ('off' = beside the board, 'none' = not in the game). */
+function startHex(s: string): HexId | null {
+  if (s === 'none') return null;
+  return s === 'off' ? NO_ROBBER : cellHex(parseCell(s));
+}
+
+/** The land of `key`'s printed map with the layout's changes (static: frames and plazas). */
+function staticLand(key: MapKey, layout: Layout): Map<HexId, Terrain> {
+  const land = new Map<HexId, Terrain>();
+  for (const c of prepared(key).boardCells) land.set(c.hex, c.terrain);
+  for (const c of laidCells(layout)) land.set(c.hex, c.terrain);
+  return land;
+}
+
+/** The corners of trade hex `h` next to other land: the settlement corners (plaza spokes). */
+function tradeCorners(h: HexId, isLandHex: (x: HexId) => boolean): Corner[] {
+  const { q, r } = parseHexId(h);
+  const around = SIDES.map((s) => {
+    const n = neighbor(q, r, s);
+    return hexId(n.q, n.r);
+  }).filter(isLandHex);
+  return CORNERS.filter((c) => {
+    const v = cornerVertex(q, r, c);
+    return around.some((n) => cornersOf(n).includes(v));
+  });
+}
+
+/**
+ * The frame of a combination map on `key`: the printed cells plus the layout's new land, its
+ * harbours, and a plaza on each trade hex (spokes to its corners on other land).
+ */
+export function layoutFrame(
+  key: MapKey,
+  id: `${string}/${string}`,
+  layout: Layout | undefined,
+): HexListFrameDef {
+  const base = prepared(key).frame;
+  if (!layout) return { ...base, id };
+  const land = staticLand(key, layout);
+  const added = laidCells(layout)
+    .map((c) => c.hex)
+    .filter((h) => !base.hexes.includes(h));
+  const harbors = layout.harbors
+    ? parseHarbors(layout.harbors).map((s) => [s.water, s.land] as const)
+    : base.harbors;
+  const isLandHex = (h: HexId) => isLand(land.get(h));
+  const plazas = [...land]
+    .filter(([, t]) => TRADE_TERRAINS.includes(t))
+    .map(([hex]) => ({ hex, corners: tradeCorners(hex, isLandHex) }));
+  return {
+    id,
+    hexes: [...base.hexes, ...added],
+    sea: (base.sea ?? []).filter((h) => !added.includes(h)),
+    harbors,
+    ...(plazas.length > 0 ? { plazas } : {}),
+  };
+}
+
+/** Lay the diagram on `hexes` (in place): cells, rivers, harbours, the barbarians' paths. */
+function applyLayout(
+  layout: Layout,
+  hexes: Record<HexId, HexTile>,
+): { tb: TbBoard; ports: Port[] | null; extraTokens: { hex: HexId; number: number }[] } {
+  const extraTokens: { hex: HexId; number: number }[] = [];
+  for (const c of laidCells(layout)) {
+    hexes[c.hex] = tileAt(c.hex, c.terrain, c.token);
+    if (c.extra !== null) extraTokens.push({ hex: c.hex, number: c.extra });
+  }
+  let tb: TbBoard = {};
+  if (layout.rivers) {
+    const rivers = layout.rivers.map((s): River => {
+      const parts = s.trim().split(/\s+/);
+      const side = parts.pop() as BookSide;
+      const cells = parts.map(parseCell);
+      const swamp = cells[cells.length - 1] as Cell;
+      return { hexes: cells.map(cellHex), mouth: cellEdge(swamp, side) };
+    });
+    tb = riverData(rivers);
+  }
+  if (layout.barbarians) tb = { ...tb, barbarians: entries(layout.barbarians).map(bookEdge) };
+  const ports = layout.harbors
+    ? parseHarbors(layout.harbors).map((s): Port => ({
+        kind: s.kind ?? 'generic',
+        edge: s.edge,
+        vertices: edgeEndpoints(s.edge),
+        waterHex: s.water,
+      }))
+    : null;
+  return { tb, ports, extraTokens };
+}
+
+/** Traders & Barbarians: the trade hexes, the corners nobody settles and the sides nobody builds on. */
+function tradeData(hexes: Record<HexId, HexTile>): TbBoard {
+  const kinds: Readonly<Record<string, TradeKind>> = {
+    [TRADE_CASTLE]: 'castle',
+    [QUARRY]: 'quarry',
+    [GLASSWORKS]: 'glassworks',
+  };
+  const isLandHex = (h: HexId) => isLand(hexes[h]?.terrain);
+  const tradeHexes: TradeHex[] = [];
+  const noBuild: VertexId[] = [];
+  const noRoad: EdgeId[] = [];
+  for (const t of Object.values(hexes).sort((a, b) => byId(a.id, b.id))) {
+    const kind = kinds[t.terrain];
+    if (!kind) continue;
+    tradeHexes.push({ hex: t.id, kind });
+    const open = tradeCorners(t.id, isLandHex);
+    const closed = CORNERS.filter((c) => !open.includes(c)).map((c) => cornerVertex(t.q, t.r, c));
+    noBuild.push(...closed);
+    for (const side of SIDES) {
+      const n = neighbor(t.q, t.r, side);
+      const e = sideEdge(t.q, t.r, side);
+      if (isLandHex(hexId(n.q, n.r))) continue;
+      if (edgeEndpoints(e).some((v) => closed.includes(v))) noRoad.push(e);
+    }
+  }
+  return { tradeHexes, noBuild, noRoad };
+}
+
+/**
+ * Barbarian Attack on the main island (region M): its castle, its coastal hexes in check order
+ * (clockwise from the hex after the castle; castle and deserts skipped, as on T&B's own boards),
+ * and the knights' area.
+ */
+function baData(hexes: Record<HexId, HexTile>, sea: SeaBoard): TbBoard {
+  const main = (Object.keys(hexes) as HexId[])
+    .sort(byId)
+    .filter((h) => sea.region[h] === 'M' && isLand(hexes[h]?.terrain));
+  const castles = main.filter((h) => hexes[h]?.terrain === CASTLE);
+  const coastal = main.filter((h) => {
+    const { q, r } = parseHexId(h);
+    return SIDES.some((s) => {
+      const n = neighbor(q, r, s);
+      return !isLand(hexes[hexId(n.q, n.r)]?.terrain);
+    });
+  });
+  const pts = main.map((h) => hexCenter(parseHexId(h).q, parseHexId(h).r));
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const angle = (h: HexId) => {
+    const p = hexCenter(parseHexId(h).q, parseHexId(h).r);
+    return Math.atan2(p.y - cy, p.x - cx);
+  };
+  const ring = coastal.sort((a, b) => angle(a) - angle(b));
+  const first = castles[0];
+  const i = first === undefined ? -1 : ring.indexOf(first);
+  const ordered = i < 0 ? ring : [...ring.slice(i + 1), ...ring.slice(0, i + 1)];
+  const coast = ordered.filter(
+    (h) => hexes[h]?.terrain !== CASTLE && hexes[h]?.terrain !== 'desert',
+  );
+  return { castles, coast, knightArea: main };
+}
+
+/**
+ * The first camel of the arrow at `corner` of the watering hole: the path leaving that corner,
+ * between the hole's two neighbours there (T&B's `caravanStart`, but also on open sea: Four Islands).
+ */
+function seaCaravanStart(oasis: HexId, corner: Corner): CaravanStart {
+  const { q, r } = parseHexId(oasis);
+  const tail = cornerVertex(q, r, corner);
+  const [a, b] = SIDES.map((s) => {
+    const n = neighbor(q, r, s);
+    return hexId(n.q, n.r);
+  }).filter((n) => cornersOf(n).includes(tail));
+  const edge = sharedEdge(a as HexId, b as HexId);
+  const head = edgeEndpoints(edge).find((v) => v !== tail) as VertexId;
+  return { edge, head };
+}
+
+// ---------------------------------------------------------------------------------------------
 // The board of a plan
 // ---------------------------------------------------------------------------------------------
 
@@ -498,15 +761,18 @@ export function planBoard(
     tb = r.tb;
     own = r.extra;
   }
+  const layout = plan.layout;
+  const laid = layout ? applyLayout(layout, hexes) : null;
+  if (laid) {
+    tb = { ...tb, ...laid.tb };
+    if (laid.extraTokens.length > 0) own = { extraTokens: laid.extraTokens };
+  }
   // The lake or the watering hole replaces a printed hex; its number may join another hex.
   const replace = (pick: Pick, terrain: Terrain): HexId => {
     const h = findHex(hexes, pick);
     hexes[h] = tileAt(h, terrain);
     if (plan.disc) {
-      const to =
-        plan.disc === 'lowestPasture'
-          ? lowestRanking(rng, hexes, ['wool'], new Set())
-          : findHex(hexes, plan.disc);
+      const to = findHex(hexes, plan.disc);
       own = { extraTokens: [...(own.extraTokens ?? []), { hex: to, number: pick.token }] };
     }
     return h;
@@ -517,9 +783,49 @@ export function planBoard(
   }
   if (plan.oasis && plan.oasis !== 'centre') oasisHex = replace(plan.oasis, OASIS);
   const topo = topologyFor(mapId);
+  if (layout && laid) {
+    const ports = laid.ports ?? gb.board.ports;
+    // Region tags and bonus areas from the changed board (a lone watering hole is no island).
+    const fresh = boardWith(prepared(key), hexes, ports);
+    const seaExt = fresh.board.ext?.[SEAFARERS] as SeaBoard;
+    const area: Record<HexId, string> = Object.fromEntries(
+      Object.entries(seaExt.area).filter(([h]) => hexes[h as HexId]?.terrain !== OASIS),
+    );
+    // Land the diagram adds beside an island belongs to that island's bonus area.
+    for (const c of laidCells(layout)) {
+      if (area[c.hex] !== undefined || !isLand(c.terrain) || c.terrain === OASIS) continue;
+      const { q, r } = parseHexId(c.hex);
+      for (const s of SIDES) {
+        const n = neighbor(q, r, s);
+        const a = area[hexId(n.q, n.r)];
+        if (a !== undefined) {
+          area[c.hex] = a;
+          break;
+        }
+      }
+    }
+    const pirate = layout.pirate === undefined ? undefined : startHex(layout.pirate);
+    gb = {
+      board: {
+        ...gb.board,
+        ports,
+        ext: {
+          ...gb.board.ext,
+          [SEAFARERS]: { ...seaExt, area, ...(pirate === undefined ? {} : { pirate }) },
+        },
+      },
+      robber: layout.robber === undefined ? gb.robber : (startHex(layout.robber) ?? NO_ROBBER),
+    };
+    oasisHex ??= (Object.keys(hexes) as HexId[]).find((h) => hexes[h]?.terrain === OASIS) ?? null;
+    if (Object.values(hexes).some((t) => TRADE_TERRAINS.includes(t.terrain))) {
+      tb = { ...tb, ...tradeData(hexes) };
+    }
+    if (plan.ba) tb = { ...tb, ...baData(hexes, seaExt) };
+  }
+  if (plan.keep212) tb = { ...tb, keep212: true };
   if (oasisHex !== null) {
     const h = oasisHex;
-    tb = { ...tb, caravanStarts: ARROWS.map((c) => caravanStart(topo, h, c)) };
+    tb = { ...tb, caravanStarts: ARROWS.map((c) => seaCaravanStart(h, c)) };
     if (plan.robberOnOasis) tb = { ...tb, robberOnOasis: true };
   }
   const sea = gb.board.ext?.[SEAFARERS] as SeaBoard;

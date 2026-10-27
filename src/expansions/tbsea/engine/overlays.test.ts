@@ -48,6 +48,20 @@ describe('the scenarios', () => {
       'tbsea/caravansNewWorld': ['newWorld', 14],
       'tbsea/riversTribe': ['forgottenTribe', 13], // the sheet names no change
       'tbsea/riversNewWorld': ['newWorld', 12],
+      // The set-up diagrams.
+      'tbsea/riversFog': ['fogIslands', 12],
+      'tbsea/riversDesert': ['throughTheDesert', 14],
+      'tbsea/riversDesert2': ['throughTheDesert', 14],
+      'tbsea/caravansFour': ['fourIslands', 15], // + 2
+      'tbsea/tradersDesert': ['throughTheDesert', 17], // + 3
+      'tbsea/barbarianAttackDesert': ['throughTheDesert', 14], // "14 or more VPs"
+    };
+    const feature: Record<string, string> = {
+      'tb/fishermen': 'fish',
+      'tb/caravans': 'caravans',
+      'tb/rivers': 'rivers',
+      'tb/traders': 'traders',
+      'tb/barbarianAttack': 'ba',
     };
     expect(SEA_PAIRS.map((p) => p.id).sort()).toEqual(Object.keys(vp).sort());
     for (const pair of SEA_PAIRS) {
@@ -57,9 +71,7 @@ describe('the scenarios', () => {
         const [key, target] = vp[pair.id] as [string, number];
         expect(rulesOf(s).key, pair.id).toBe(key);
         expect(s.settings.vpToWin, pair.id).toBe(target);
-        expect(featuresOf(pair.id)).toEqual([
-          { 'tb/fishermen': 'fish', 'tb/caravans': 'caravans', 'tb/rivers': 'rivers' }[pair.tb],
-        ]);
+        expect(featuresOf(pair.id)).toEqual([feature[pair.tb]]);
       }
     }
   });
@@ -175,15 +187,15 @@ describe('Fishing on Catan with the Seafarers scenarios', () => {
     }
   });
 
-  it('Through the Desert (3): the lake replaces the 2 field; the 2 joins a pasture', () => {
+  it('Through the Desert (3): the lake replaces the 2 field; the 2 joins the 12 pasture', () => {
     const s = game('tbsea/fishermenDesert', 3);
     const lake = cell('2,4');
     expect(s.board.hexes[lake]?.terrain).toBe(LAKE);
     expect(s.board.hexes[lake]?.token).toBeNull();
     expect(tbBoard(s).lakes).toEqual([{ hex: lake, numbers: [2, 3, 11, 12] }]);
-    // Our 5th-edition map has no 12 pasture: the 2 joins the lowest-ranking pasture, the 11.
+    // The 2025 map prints 12 on the 5,9 pasture (our 5th-edition map: 11).
     expect(tbseaBoard(s.board).extraTokens).toEqual([{ hex: cell('5,9'), number: 2 }]);
-    expect(s.board.hexes[cell('5,9')]).toMatchObject({ terrain: 'wool', token: 11 });
+    expect(s.board.hexes[cell('5,9')]).toMatchObject({ terrain: 'wool', token: 12 });
   });
 
   it('Through the Desert (4): the lake replaces the 11 hill; the 11 joins the 2 hill', () => {

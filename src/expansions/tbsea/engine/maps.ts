@@ -31,7 +31,22 @@ import {
 } from '../../seafarers/engine/maps';
 import { TB_MAPS, TRADERS_BARBARIANS_19 } from '../../tb/engine/maps';
 import type { TbBoard } from '../../tb/engine/state';
-import { planBoard, type Plan } from './overlays';
+import {
+  BA_DESERT3,
+  BA_DESERT4,
+  CARAVANS_FOUR3,
+  CARAVANS_FOUR4,
+  DESERT3_2025,
+  RIVERS_DESERT3_V1,
+  RIVERS_DESERT3_V2,
+  RIVERS_DESERT4_V1,
+  RIVERS_DESERT4_V2,
+  RIVERS_FOG3,
+  RIVERS_FOG4,
+  TRADERS_DESERT3,
+  TRADERS_DESERT4,
+} from './layouts';
+import { layoutFrame, planBoard, type Plan } from './overlays';
 
 export const TBSEA = 'tbsea';
 const TB = 'tb';
@@ -232,7 +247,7 @@ export const SEA_PAIRS: readonly SeaPair[] = [
     blurb: 'The lake replaces a field (3) or a hill (4): its number joins another hex',
     maps: [
       { key: 'desert3', players: [3, 3],
-        plan: { lake: { terrain: 'grain', token: 2 }, disc: 'lowestPasture', grounds: 'any' } },
+        plan: { layout: DESERT3_2025, lake: { terrain: 'grain', token: 2 }, disc: { terrain: 'wool', token: 12 }, grounds: 'any' } },
       { key: 'desert4', players: [4, 4],
         plan: { lake: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 }, grounds: 'any' } }] },
   { id: 'tbsea/fishermenTribe', tb: 'tb/fishermen', sea: 'seafarers/forgottenTribe', vp: 13,
@@ -255,7 +270,7 @@ export const SEA_PAIRS: readonly SeaPair[] = [
     name: 'Caravans Through the Desert',
     blurb: 'The watering hole replaces a field (3) or a hill (4); camels may cross the sea',
     maps: [
-      { key: 'desert3', players: [3, 3], plan: { oasis: { terrain: 'grain', token: 2 }, disc: 'lowestPasture' } },
+      { key: 'desert3', players: [3, 3], plan: { layout: DESERT3_2025, oasis: { terrain: 'grain', token: 2 }, disc: { terrain: 'wool', token: 12 } } },
       { key: 'desert4', players: [4, 4], plan: { oasis: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 } } }] },
   { id: 'tbsea/caravansTribe', tb: 'tb/caravans', sea: 'seafarers/forgottenTribe', vp: 15,
     name: 'Caravans and the Forgotten Tribe',
@@ -274,6 +289,43 @@ export const SEA_PAIRS: readonly SeaPair[] = [
     name: 'Rivers in the New World',
     blurb: 'Two rivers flow into the frame of a random archipelago',
     maps: both('newworld', { rivers: 'newWorld' }) },
+  // --- The sheets' set-up diagrams (decoded in docs/rules/combos.md §2d) -----------------------
+  { id: 'tbsea/riversFog', tb: 'tb/rivers', sea: 'seafarers/fogIslands', vp: 12,
+    name: 'Rivers on the Fog Islands',
+    blurb: 'Rivers on both home islands; gold fields in the fog give resource cards',
+    maps: [
+      { key: 'fog3', players: [3, 3], plan: { robber: 'swamp', layout: RIVERS_FOG3 } },
+      { key: 'fog4', players: [4, 4], plan: { robber: 'swamp', layout: RIVERS_FOG4 } }] },
+  { id: 'tbsea/riversDesert', tb: 'tb/rivers', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Rivers Through the Desert (1)',
+    blurb: 'Swamps in the desert belt: the rivers flow into the desert and a gold field',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: RIVERS_DESERT3_V1 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: RIVERS_DESERT4_V1 } }] },
+  { id: 'tbsea/riversDesert2', tb: 'tb/rivers', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Rivers Through the Desert (2)',
+    blurb: 'A river beyond the desert instead of the strip’s gold field',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: RIVERS_DESERT3_V2 } },
+      { key: 'desert4', players: [4, 4], plan: { layout: RIVERS_DESERT4_V2 } }] },
+  { id: 'tbsea/caravansFour', tb: 'tb/caravans', sea: 'seafarers/fourIslands', vp: 15,
+    name: 'Caravans on the Four Islands',
+    blurb: 'The watering hole alone in the middle; the pirate starts beside the board',
+    maps: [
+      { key: 'four3', players: [3, 3], plan: { layout: CARAVANS_FOUR3 } },
+      { key: 'four4', players: [4, 4], plan: { layout: CARAVANS_FOUR4 } }] },
+  { id: 'tbsea/tradersDesert', tb: 'tb/traders', sea: 'seafarers/throughTheDesert', vp: 17,
+    name: 'Traders & Barbarians Through the Desert',
+    blurb: 'Castle, quarry beyond the desert and glassworks; wagons cross sea and sand',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: TRADERS_DESERT3, keep212: true } },
+      { key: 'desert4', players: [4, 4], plan: { layout: TRADERS_DESERT4, keep212: true } }] },
+  { id: 'tbsea/barbarianAttackDesert', tb: 'tb/barbarianAttack', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Barbarian Attack Through the Desert',
+    blurb: 'The barbarians land on the main island only; knights guard it',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { layout: BA_DESERT3, ba: true } },
+      { key: 'desert4', players: [4, 4], plan: { layout: BA_DESERT4, ba: true } }] },
 ];
 
 export const seaMapIdOf = (pair: SeaPair, m: SeaPairMap): `${string}/${string}` =>
@@ -290,7 +342,7 @@ function seaMapDefOf(pair: SeaPair, m: SeaPairMap): CustomMapDef {
     id,
     name: `${pair.name} (${m.players[0] === m.players[1] ? m.players[0] : m.players.join('-')})`,
     get frame() {
-      frame ??= { ...prepared(m.key).frame, id };
+      frame ??= layoutFrame(m.key, id, m.plan.layout);
       return frame;
     },
     minPlayers: m.players[0],

@@ -134,7 +134,14 @@ export function knightSpots(state: GameState, card: 'knighthood' | 'swiftKnight'
   const s = baOf(state);
   const t = topologyOf(state);
   const pool = card === 'knighthood' ? castleHexes(state).flatMap((h) => hexEdges(t, h)) : t.edges;
-  return [...new Set(pool)].filter((e) => s.knights[e] === undefined && isLandPath(state, e));
+  return [...new Set(pool)].filter((e) => s.knights[e] === undefined && isKnightPath(state, e));
+}
+
+/** A land path knights may use (the board's knight area only, if it names one: C3). */
+function isKnightPath(state: GameState, e: EdgeId): boolean {
+  if (!isLandPath(state, e)) return false;
+  const area = tbBoard(state).knightArea;
+  return !area || (topologyOf(state).edge[e]?.hexes ?? []).some((h) => area.includes(h));
 }
 
 /** Edge distance (steps between land edges sharing a vertex) from `from`, up to `max`. */
@@ -146,7 +153,7 @@ function edgeDistances(state: GameState, from: EdgeId, max: number): Map<EdgeId,
     const next: EdgeId[] = [];
     for (const e of frontier) {
       for (const n of edgeNeighbors(t, e)) {
-        if (dist.has(n) || !isLandPath(state, n)) continue;
+        if (dist.has(n) || !isKnightPath(state, n)) continue;
         dist.set(n, d);
         next.push(n);
       }

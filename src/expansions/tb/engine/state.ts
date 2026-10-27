@@ -149,6 +149,10 @@ export interface TbBoard {
   noRoad?: EdgeId[];
   /** T&B: the barbarians' start paths when the map moves them (absent = the X marks of §2.6). */
   barbarians?: EdgeId[];
+  /** T&B: the board prints a 2 and a 12, so they are not re-rolled (as on the 5-6 board; C3). */
+  keep212?: boolean;
+  /** Barbarian Attack: knights only on paths touching these hexes (the main island; C3). */
+  knightArea?: HexId[];
 }
 
 export const tbBoard = (state: Pick<GameState, 'board'>): TbBoard =>

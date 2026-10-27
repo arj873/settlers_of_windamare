@@ -1006,7 +1006,7 @@ export const tbModule: ExpansionModule = {
         : undefined,
 
     rollDice(draft) {
-      const reroll212 = has(draft, 'traders');
+      const reroll212 = has(draft, 'traders') && tbBoard(draft).keep212 !== true;
       const two = tbSlice(draft).two;
       const avoid = two && two.rolls === 1 ? two.firstRoll : null;
       if (!reroll212 && avoid === null) return undefined;
