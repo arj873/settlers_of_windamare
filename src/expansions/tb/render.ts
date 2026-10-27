@@ -33,6 +33,7 @@ import {
   SWAMP,
   TB,
   TRADE_CASTLE,
+  barbarianEdges,
   tbBoard,
   type Commodity,
   type TbSlice,
@@ -757,13 +758,19 @@ export const tbDrawer: BoardDrawer = {
     {
       key: 'coastBarbarians',
       z: 'top',
-      sig: (state) => JSON.stringify(slice(state)?.ba?.onHex ?? {}),
+      sig: (state) => JSON.stringify([slice(state)?.ba?.onHex ?? {}, slice(state)?.ba?.paths]),
       draw: (state, ctx) =>
         graphicsLayer((g) => {
-          for (const [h, n] of Object.entries(slice(state)?.ba?.onHex ?? {}) as [HexId, number][]) {
+          // BA + T&B: the barbarians by a path are drawn there (pathBarbarians).
+          const byPath = Object.values(slice(state)?.ba?.paths ?? {});
+          for (const [h, all] of Object.entries(slice(state)?.ba?.onHex ?? {}) as [
+            HexId,
+            number,
+          ][]) {
             const info = ctx.topo.hex[h];
             if (!info) continue;
             const [x, y] = ctx.pt(info);
+            const n = all - byPath.filter((x) => x === h).length;
             for (let i = 0; i < n; i++) {
               barbarian(g, x + (i - (n - 1) / 2) * 0.2 * ctx.S, y + 0.72 * ctx.S, ctx.S);
             }
@@ -894,10 +901,10 @@ export const tbDrawer: BoardDrawer = {
     {
       key: 'pathBarbarians',
       z: 'top',
-      sig: (state) => (slice(state)?.traders?.barbarians ?? []).join(','),
+      sig: (state) => barbarianEdges(state).join(','),
       draw: (state, ctx) =>
         graphicsLayer((g) => {
-          for (const e of slice(state)?.traders?.barbarians ?? []) {
+          for (const e of barbarianEdges(state)) {
             const info = edgeInfo(ctx.topo, e);
             if (!info) continue;
             const [x, y] = ctx.pt(info);
