@@ -13,6 +13,7 @@ import {
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import { CK, ckSlice } from './engine';
@@ -57,7 +58,7 @@ describe('C&K setup screen', () => {
 
   it('offers C&K with its two scenarios, 3-6 seats and a 13 VP target', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     expect(screen.state.mode).toBe(CK);
     expect(q(screen, 'scenario-ck/classic')).not.toBeNull();
     expect(q(screen, 'scenario-ck/starter')).not.toBeNull();
@@ -69,7 +70,7 @@ describe('C&K setup screen', () => {
 
   it('refuses Rush mode with C&K: the reason is shown and Start is off', () => {
     const screen = make();
-    q(screen, `mode-${CK}`)?.click();
+    expect(pickMode(screen.element, CK)).toBe(true);
     q(screen, 'rule-rushMode')?.click();
     expect(setupError(screen.state)).toMatch(/Rush/);
     expect(screen.element.querySelector('.su-error')?.textContent).toMatch(/Rush/);
@@ -223,6 +224,39 @@ describe('C&K HUD', () => {
     expect(root.textContent).toContain('Basic knight (inactive)');
     byText('Activate')?.click();
     expect(actions.at(-1)).toEqual({ type: 'ck/activateKnight', player: 0, vertex: V(0, 0, 'N') });
+  });
+
+  describe('knight dialog and turn pill say the same, and what is true', () => {
+    const selected = (active: boolean, withRoad: boolean) => {
+      const s = main();
+      build(s, 0, V(0, 0, 'SW'));
+      roads(s, 0, E(0, 0, 'W'), ...(withRoad ? [E(0, 0, 'NW')] : []));
+      setGoods(s, 0, { grain: 1, wool: 1, ore: 1 }); // activate or promote: selectable
+      knight(s, 0, V(0, 0, 'NW'), 1, active, active ? 1 : null);
+      return applyOk(s, { type: 'ck/selectKnight', player: 0, vertex: V(0, 0, 'NW') } as Action);
+    };
+    const pill = () => root.querySelector('.hint')?.textContent ?? '';
+    const say = () => root.querySelector('.dialog p')?.textContent ?? '';
+
+    it('an active knight with a free spot: move', () => {
+      show(selected(true, true));
+      expect(pill()).toBe('Knight: move');
+      expect(say()).toBe('Click a highlighted spot to move there.');
+    });
+
+    it('an active knight with nowhere to go says so (not "must be active")', () => {
+      show(selected(true, false));
+      expect(pill()).toBe('Knight has nowhere to go: promote it, or close');
+      expect(say()).toContain('This active knight has nowhere to go');
+      expect(root.textContent).not.toContain('must be active');
+      expect(pill()).not.toBe('Your move');
+    });
+
+    it('an inactive knight: activate it', () => {
+      show(selected(false, true));
+      expect(pill()).toBe('Inactive knight: activate or promote it, or close');
+      expect(say()).toContain('An inactive knight cannot move');
+    });
   });
 
   it('discarding on a 7 counts commodities', () => {

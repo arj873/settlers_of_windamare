@@ -14,6 +14,7 @@ import { rngForRoll } from '../../engine/actions/testkit';
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import {
   buildConfig,
   defaultSetup,
@@ -45,13 +46,13 @@ describe('setup screen', () => {
     expect(visibleModes().map((m) => m.id)).not.toContain(DEMO);
     expect(visibleModes(true).map((m) => m.id)[0]).toBe('base');
     expect(visibleModes(true).map((m) => m.id)).toContain(DEMO);
-    expect(q(make(false), `mode-${DEMO}`)).toBeNull();
-    expect(q(make(true), `mode-${DEMO}`)).not.toBeNull();
+    expect(q(make(false), `chip-${DEMO}`)).toBeNull();
+    expect(q(make(true), `chip-${DEMO}`)).not.toBeNull();
   });
 
   it('picking the demo shows its scenario and option, clamps seats, and starts a demo game', () => {
     const screen = make(true);
-    q(screen, `mode-${DEMO}`)?.click();
+    expect(pickMode(screen.element, DEMO)).toBe(true);
     expect(screen.state.mode).toBe(DEMO);
     expect(q(screen, 'scenario-demo/oasis')?.getAttribute('aria-pressed')).toBe('true');
     expect(q(screen, 'map-base')).toBeNull();

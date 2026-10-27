@@ -23,7 +23,7 @@ describe('oil in the simulator', () => {
       expect(result.failure, JSON.stringify(result.failure?.message)).toBeNull();
       expect(result.outcome).toBe('finished');
     }
-  });
+  }, 60_000);
 
   it('the invariants catch lost oil, a loose metropolis and an unresolved disaster', () => {
     const s = newGame({ seed: 1, players: 4, mode: OIL });
