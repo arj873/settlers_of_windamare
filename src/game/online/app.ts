@@ -23,6 +23,7 @@ import { errorText, fatalText } from '../../ui/online/messages';
 import type { SessionAction } from '../../ui/types';
 import type { BoardLike, ToastKind } from '../controller';
 import type { Backend } from './backend';
+import type { SpotPromptLike } from '../spotPicker';
 import { NetGameController } from './netController';
 
 export interface OnlineEnv {
@@ -44,6 +45,9 @@ export interface OnlineEnv {
   goHome: () => void;
   /** From the invite landing card: play hotseat instead. */
   playOffline: () => void;
+  /** Board spot prompt and the "Confirm before building" setting (NetControllerOptions). */
+  prompt?: SpotPromptLike | null;
+  confirmBuild?: () => boolean;
 }
 
 export class OnlineApp {
@@ -162,6 +166,8 @@ export class OnlineApp {
       client,
       toast: env.toast,
       ...(env.onRender ? { onRender: env.onRender } : {}),
+      ...(env.prompt ? { prompt: env.prompt } : {}),
+      ...(env.confirmBuild ? { confirmBuild: env.confirmBuild } : {}),
     });
     client.on((e) => {
       switch (e.type) {

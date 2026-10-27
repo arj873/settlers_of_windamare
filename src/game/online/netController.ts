@@ -8,13 +8,8 @@ import type { Action, GameState, PlayerId } from '../../engine';
 import type { RoomClient, RoomInfo } from '../../net';
 import type { HudView, PlaceMode } from '../../ui';
 import type { BoardLike, HudLike, ToastKind } from '../controller';
-import {
-  actionForClick,
-  boardActions,
-  highlightsFor,
-  tradeEndNotice,
-  type BoardClick,
-} from '../logic';
+import { tradeEndNotice, type BoardClick } from '../logic';
+import { SpotPicker, type SpotPromptLike } from '../spotPicker';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -24,6 +19,10 @@ export interface NetControllerOptions {
   onRender?: () => void;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
+  /** The popover a click on a board spot opens (issue #28); absent = a click acts at once. */
+  prompt?: SpotPromptLike | null;
+  /** The "Confirm before building" setting; default on. */
+  confirmBuild?: () => boolean;
 }
 
 export const NET_TIMER_TICK_MS = 250;
@@ -59,6 +58,7 @@ export class NetGameController {
   private readonly every: (fn: () => void, ms: number) => () => void;
   private active = false;
   private placeMode: PlaceMode | null = null;
+  private readonly spots: SpotPicker;
   private stopTimer: (() => void) | null = null;
   private shownSec = -1;
   /** The last rendered view, to notice an ended trade offer (`tradeEndNotice`). */
@@ -74,6 +74,14 @@ export class NetGameController {
     this.toast = opts.toast ?? ((m) => console.info(m));
     this.onRender = opts.onRender ?? (() => undefined);
     this.every = opts.every ?? defaultEvery;
+    const board = this.board;
+    this.spots = new SpotPicker({
+      prompt: opts.prompt ?? null,
+      screenPos: (id) => board.screenPos?.(id) ?? null,
+      confirm: opts.confirmBuild ?? (() => true),
+      submit: (a) => this.send(a),
+      rehighlight: () => this.updateHighlights(),
+    });
 
     // The HUD has no unsubscribe: these stay registered and check `active`.
     this.hud.on('action', (a) => {
@@ -82,6 +90,7 @@ export class NetGameController {
     this.hud.on('placeMode', (m) => {
       if (!this.active) return;
       this.placeMode = m;
+      this.spots.close();
       this.updateHighlights();
     });
     this.offs.push(
@@ -100,11 +109,13 @@ export class NetGameController {
     return this.client.game?.view.view.viewer ?? null;
   }
 
-  /** Board actions a click may submit right now. */
+  /** Board actions a click may lead to right now (GameController.boardActions). */
   get boardActions(): Action[] {
     const g = this.client.game;
     const v = this.viewer;
-    return g && v !== null ? boardActions(g.legal, v, this.placeMode) : [];
+    return g && v !== null
+      ? this.spots.targets({ legal: g.legal, viewer: v, placeMode: this.placeMode })
+      : [];
   }
 
   start(): void {
@@ -117,6 +128,7 @@ export class NetGameController {
 
   stop(): void {
     this.active = false;
+    this.spots.close();
     this.stopTimer?.();
     this.stopTimer = null;
     this.board.setHighlights({});
@@ -155,15 +167,20 @@ export class NetGameController {
   }
 
   private click(click: BoardClick): void {
-    if (!this.active) return;
-    const action = actionForClick(this.boardActions, click);
-    if (action) this.send(action);
+    const g = this.client.game;
+    const v = this.viewer;
+    if (!this.active || !g || v === null) return;
+    this.spots.click(
+      { state: g.view, legal: g.legal, viewer: v, placeMode: this.placeMode },
+      click,
+    );
   }
 
   private render(): void {
     const g = this.client.game;
     const hv = this.hudView();
     if (!g || !hv) return;
+    this.spots.sync({ legal: g.legal, viewer: this.viewer, placeMode: this.placeMode });
     this.noticeTradeEnd(g.view, hv.viewer);
     this.shownSec = hv.turnTimer ? Math.ceil(hv.turnTimer.remainingSec) : -1;
     this.board.render(g.view);
@@ -193,7 +210,14 @@ export class NetGameController {
       this.board.setHighlights({});
       return;
     }
-    this.board.setHighlights(highlightsFor(this.boardActions, g.view.players[v]?.color));
+    this.board.setHighlights(
+      this.spots.highlights({
+        state: g.view,
+        legal: g.legal,
+        viewer: v,
+        placeMode: this.placeMode,
+      }),
+    );
   }
 
   private timerView(): HudView['turnTimer'] {

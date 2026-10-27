@@ -21,7 +21,9 @@ import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
+import { SpotPrompt } from './ui/spotPrompt';
 import {
+  CONFIRM_BUILD_KEY,
   SPEED_KEY,
   browserStorage,
   clearSession,
@@ -113,6 +115,17 @@ async function boot() {
   onThemeChange(frameToTheme);
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
+  // A click on a board spot asks before building (issue #28), unless switched off in the menu.
+  const prompt = new SpotPrompt(uiRoot);
+  let confirmOn = loadNumber(prefs, CONFIRM_BUILD_KEY) !== 0;
+  hud.setBuildConfirm({
+    value: confirmOn,
+    onChange: (on) => {
+      confirmOn = on;
+      saveNumber(prefs, CONFIRM_BUILD_KEY, on ? 1 : 0);
+    },
+  });
+  const spots = { prompt, confirmBuild: () => confirmOn };
 
   const fitBoard = () => {
     const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
@@ -144,6 +157,7 @@ async function boot() {
             history.replaceState(null, '', homeUrl());
             offline(null);
           },
+          ...spots,
         },
         roomId,
       );
@@ -160,7 +174,7 @@ async function boot() {
 
   // Hotseat: everything below is the offline game, unchanged.
   const offline = (dev: { state: GameState; seats: Controller[] } | null) =>
-    startOffline({ board, hud, params, dev, storage, prefs, fitBoard });
+    startOffline({ board, hud, params, dev, storage, prefs, fitBoard, spots });
   if (dev) {
     offline(dev);
     return;
@@ -215,8 +229,9 @@ function startOffline(o: {
   storage: KeyValueStore | null;
   prefs: KeyValueStore | null;
   fitBoard: () => void;
+  spots: { prompt: SpotPrompt; confirmBuild: () => boolean };
 }): void {
-  const { board, hud, params, dev, storage, prefs, fitBoard } = o;
+  const { board, hud, params, dev, storage, prefs, fitBoard, spots } = o;
   const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
   const controller = new GameController({
     board,
@@ -225,6 +240,7 @@ function startOffline(o: {
     speed,
     toast: showToast,
     onRender: fitBoard,
+    ...spots,
   });
   // Bot speed lives in the HUD menu (shown while any seat is a bot).
   hud.setBotSpeed({
