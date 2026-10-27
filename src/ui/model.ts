@@ -34,6 +34,7 @@ import {
   type GameState,
   type PlayerId,
   type Resource,
+  resourceWord,
 } from '../engine';
 import { extensionHint, placeModeAction, placeModeActions, placeModeLabel } from './expansions';
 import type { BasePlaceMode, HudView, PlaceMode } from './types';
@@ -349,7 +350,7 @@ export function blockReasons(state: GameState, viewer: PlayerId, card: BuildCard
   const missing: Partial<Record<Resource, number>> = {};
   for (const r of RESOURCES) if (cost[r] > hand[r]) missing[r] = cost[r] - hand[r];
   if (Object.keys(missing).length > 0) {
-    const list = Object.entries(missing).map(([r, n]) => `${n} ${r}`);
+    const list = Object.entries(missing).map(([r, n]) => `${n} ${resourceWord(r)}`);
     out.push({ text: `Missing ${list.join(', ')}`, missing });
   }
   if (kind !== 'dev' && !anySpot(state, viewer, kind)) {
@@ -390,7 +391,7 @@ export function tradeBlockReason(
   }
   const ratios = bestRatios(state, viewer);
   if (RESOURCES.every((r) => hand[r] < ratios[r])) {
-    return `Need ${RESOURCES.map((r) => `${ratios[r]} ${r}`).join(' or ')}`;
+    return `Need ${RESOURCES.map((r) => `${ratios[r]} ${resourceWord(r)}`).join(' or ')}`;
   }
   return null;
 }

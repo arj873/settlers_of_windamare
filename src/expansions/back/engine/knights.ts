@@ -71,7 +71,7 @@ export function recruitBlocker(state: GameState, p: PlayerId, e: unknown): strin
   const t = buildTurn(state, p);
   if (t) return t;
   if (inSupply(state, p, 1) <= 0) return 'no basic knights left (promote one first)';
-  if (!canAfford(state, p, KNIGHT_ITEM)) return 'a knight costs 1 wool and 1 ore';
+  if (!canAfford(state, p, KNIGHT_ITEM)) return 'a knight costs 1 sheep and 1 ore';
   if (typeof e !== 'string' || !recruitSpots(state).includes(e as EdgeId)) {
     return 'a new knight goes on a free edge of the castle';
   }
@@ -90,7 +90,7 @@ export function activateBlocker(state: GameState, p: PlayerId, e: unknown): stri
   const k = ownKnight(state, p, e);
   if (!k) return 'not your knight';
   if (k.active) return 'that knight is already active';
-  return canAfford(state, p, ACTIVATE_ITEM) ? null : 'activating costs 1 grain';
+  return canAfford(state, p, ACTIVATE_ITEM) ? null : 'activating costs 1 wheat';
 }
 
 /** Can `p` promote the knight on `e` (C&K: supply, the Fortress for mighty, once a turn)? */
@@ -104,7 +104,7 @@ export function promoteBlocker(state: GameState, p: PlayerId, e: unknown, free =
   if (k.promotedOn === state.turn.number) return 'that knight was already promoted this turn';
   const next = (k.level + 1) as KnightLevel;
   if (inSupply(state, p, next) <= 0) return `no ${KNIGHT_NAMES[next]} knights left`;
-  if (!free && !canAfford(state, p, PROMOTE_ITEM)) return 'promoting costs 1 wool and 1 ore';
+  if (!free && !canAfford(state, p, PROMOTE_ITEM)) return 'promoting costs 1 sheep and 1 ore';
   return null;
 }
 

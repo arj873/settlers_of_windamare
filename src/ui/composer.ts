@@ -9,6 +9,7 @@ import {
   type Resource,
   type ResourceBundle,
   type ResourceCounts,
+  resourceWord,
 } from '../engine';
 
 // ---------------------------------------------------------------------------
@@ -71,8 +72,9 @@ export function validateDraft(draft: TradeDraft, hand: ResourceCounts): string |
   if (totalResources(draft.give) === 0) return 'Choose what you give';
   if (totalResources(draft.want) === 0) return 'Choose what you want';
   for (const r of RESOURCES) {
-    if (draft.give[r] > hand[r]) return `You only have ${hand[r]} ${r}`;
-    if (draft.give[r] > 0 && draft.want[r] > 0) return `Cannot trade ${r} for ${r}`;
+    if (draft.give[r] > hand[r]) return `You only have ${hand[r]} ${resourceWord(r)}`;
+    if (draft.give[r] > 0 && draft.want[r] > 0)
+      return `Cannot trade ${resourceWord(r)} for ${resourceWord(r)}`;
   }
   if (draft.to.length === 0) return 'Choose at least one player';
   return null;
@@ -118,7 +120,7 @@ export function validateDiscard(
 ): string | null {
   for (const r of RESOURCES) {
     if (selection[r] < 0 || !Number.isInteger(selection[r])) return 'Invalid amount';
-    if (selection[r] > hand[r]) return `You only have ${hand[r]} ${r}`;
+    if (selection[r] > hand[r]) return `You only have ${hand[r]} ${resourceWord(r)}`;
   }
   const total = totalResources(selection);
   if (total < required) return `Choose ${required - total} more`;

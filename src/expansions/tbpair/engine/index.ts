@@ -139,7 +139,7 @@ export function fishWagonBlocker(state: GameState, p: PlayerId): string | null {
   if (state.phase.kind !== 'tb/wagon' || !isCurrent(state, p)) return 'while moving your wagon';
   const m = tradersOf(state).move;
   if (m.over) return 'the move is over';
-  if (m.grain) return 'grain or fish was paid for this move already';
+  if (m.grain) return 'wheat or fish was paid for this move already';
   return fishOfPlayer(state, p) < FISH_WAGON ? `needs ${FISH_WAGON} fish` : null;
 }
 

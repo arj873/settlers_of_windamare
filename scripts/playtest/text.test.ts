@@ -10,6 +10,17 @@ describe('normalize', () => {
 });
 
 describe('matchChoice', () => {
+  it('accepts the pre-#47 resource words (wool, grain) for Sheep and Wheat', () => {
+    const labels = ['Brick', 'Sheep', 'Wheat'];
+    expect(matchChoice('grain', labels)).toMatchObject({ kind: 'one', index: 2 });
+    expect(matchChoice('wool', labels)).toMatchObject({ kind: 'one', index: 1 });
+    expect(matchChoice('Wheat', labels)).toMatchObject({ kind: 'one', index: 2 });
+    expect(matchChoice('give wool', ['Give Wool', 'Give Ore'])).toMatchObject({
+      kind: 'one',
+      index: 0,
+    });
+  });
+
   const bar = ['Roll dice', 'Road', 'Settlement', 'City', 'Buy card', 'Bank', 'Trade', 'End turn'];
 
   it('prefers an exact label over looser matches', () => {

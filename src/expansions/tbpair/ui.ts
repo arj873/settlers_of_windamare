@@ -30,7 +30,7 @@ const SHEET_RULES: Readonly<Record<string, readonly string[]>> = {
     'A 2 or 12 lands a barbarian on that hex (no re-roll).',
     'A 7: steal 1 card from any player; no barbarian moves.',
     'Treason and drive-offs move barbarians to any unconquered hex.',
-    'The castle (12) produces wool, the glassworks (2) lumber; not once conquered.',
+    'The castle (12) produces sheep, the glassworks (2) lumber; not once conquered.',
     'Knights and the wagon end the turn, in either order.',
   ],
   'tbpair/caravansBa': [
@@ -38,7 +38,7 @@ const SHEET_RULES: Readonly<Record<string, readonly string[]>> = {
     'Barbarians never stop a camel.',
   ],
   'tbpair/caravansTraders': [
-    'Trade hexes produce: quarry brick, glassworks lumber, castle wool.',
+    'Trade hexes produce: quarry brick, glassworks lumber, castle sheep.',
     'The 2 and the 12 are not re-rolled.',
   ],
   'tbpair/riversBa': [
@@ -53,7 +53,7 @@ const SHEET_RULES: Readonly<Record<string, readonly string[]>> = {
     '3 gold to start; a building beside a river pays gold only during set-up.',
     'Bridges pay 2 gold. The Poor Settler loses no VP.',
     'A wagon crosses a river for 3 MP; 1 MP over your bridge, 1 MP + 2 gold over another’s.',
-    'Trade hexes produce: quarry brick, glassworks lumber, castle wool. The 2 shares the 12’s hex.',
+    'Trade hexes produce: quarry brick, glassworks lumber, castle sheep. The 2 shares the 12’s hex.',
   ],
 };
 
@@ -62,10 +62,10 @@ export function pairRules(state: GameState): string[] {
   if (sheet) return [...(SHEET_RULES[sheet.id] ?? [])];
   const out = ['No lake (with the Caravans it lies beside the oasis). The old boot: 1 more VP.'];
   if (has(state, 'rivers')) out.push(`${FISH_BRIDGE} fish pay for a bridge (click a bridge site).`);
-  if (has(state, 'traders')) out.push(`${FISH_WAGON} fish give the wagon 2 more MP (like grain).`);
+  if (has(state, 'traders')) out.push(`${FISH_WAGON} fish give the wagon 2 more MP (like wheat).`);
   if (has(state, 'ba')) {
     out.push(
-      `${FISH_KNIGHT} fish move a knight up to 5 paths (like grain).`,
+      `${FISH_KNIGHT} fish move a knight up to 5 paths (like wheat).`,
       'Conquered buildings catch no fish.',
     );
   }

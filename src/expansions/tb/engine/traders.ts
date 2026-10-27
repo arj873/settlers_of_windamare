@@ -227,9 +227,9 @@ export function grainBlocker(state: GameState, p: PlayerId): string | null {
   if (state.phase.kind !== 'tb/wagon') return 'buy movement while moving the wagon';
   if (!isCurrent(state, p)) return 'not your turn';
   const m = tradersOf(state).move;
-  if (m.grain) return 'grain was paid for this move already';
+  if (m.grain) return 'wheat was paid for this move already';
   if (m.over) return 'the move is over';
-  if ((state.players[p]?.resources.grain ?? 0) < 1) return 'needs 1 grain';
+  if ((state.players[p]?.resources.grain ?? 0) < 1) return 'needs 1 wheat';
   return null;
 }
 
@@ -238,7 +238,7 @@ export function payGrain(draft: GameState, p: PlayerId): void {
   payBank(draft, p, { grain: 1 });
   m.grain = true;
   m.mp += WAGON_GRAIN_MP;
-  log(draft, p, `${pn(draft, p)} paid 1 grain for 2 more movement points`);
+  log(draft, p, `${pn(draft, p)} paid 1 wheat for 2 more movement points`);
 }
 
 /** Barbarian paths next to the wagon that may be driven off now. */

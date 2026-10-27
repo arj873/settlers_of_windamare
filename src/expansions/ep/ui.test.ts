@@ -102,7 +102,7 @@ describe('E&P HUD', () => {
     give(s, 0, { grain: -2, ore: -2 });
     show(s);
     expect(harbor().dataset['why']).toBe(
-      'Missing 2 grain, 2 ore; No coastal settlement to upgrade',
+      'Missing 2 wheat, 2 ore; No coastal settlement to upgrade',
     );
   });
 

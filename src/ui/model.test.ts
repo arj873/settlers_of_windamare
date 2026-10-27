@@ -6,6 +6,7 @@ import {
   createGame,
   legalActions,
   PLAYER_COLORS,
+  resourceWord,
   RESOURCES,
   TOPOLOGY,
 } from '../engine';
@@ -264,7 +265,7 @@ describe('why a build button is disabled', () => {
     s.phase = { kind: 'main' };
     const ratios = bestRatios(s, 1);
     s.players[1]!.resources = { brick: 1, lumber: 0, wool: 1, grain: 1, ore: 0 };
-    const need = RESOURCES.map((r) => `${ratios[r]} ${r}`).join(' or ');
+    const need = RESOURCES.map((r) => `${ratios[r]} ${resourceWord(r)}`).join(' or ');
     expect(tradeBlockReason(s, 1, 'bank')).toBe(`Need ${need}`);
     expect(tradeBlockReason(s, 1, 'trade')).toBeNull();
     s.players[1]!.resources = { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 };

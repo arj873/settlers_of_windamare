@@ -14,6 +14,7 @@ import {
   type PlayerId,
   type Resource,
   type ResourceBundle,
+  resourceWord,
 } from '../../engine';
 import { RESOURCES } from '../../engine/constants';
 import { h, type Child } from '../../ui/dom';
@@ -480,7 +481,7 @@ function fishActions(state: GameState, view: HudView, send: Send): Child[] {
       out.push(
         row(
           cost,
-          resourceButtons(list, send, (r) => `Take 1 ${r} for ${n} fish`),
+          resourceButtons(list, send, (r) => `Take 1 ${resourceWord(r)} for ${n} fish`),
         ),
       );
     } else if (use === 'steal') {
@@ -533,7 +534,7 @@ function goldActions(state: GameState, view: HudView, send: Send): Child[] {
     out.push(
       row(
         label(tbIcon('gold', 14), ` ${GOLD_PER_RESOURCE} gold → 1`),
-        resourceButtons(buy, send, (r) => `Buy 1 ${r} for ${GOLD_PER_RESOURCE} gold`),
+        resourceButtons(buy, send, (r) => `Buy 1 ${resourceWord(r)} for ${GOLD_PER_RESOURCE} gold`),
       ),
     );
   const sell = mine(view, 'tb/sellForGold');
@@ -542,7 +543,7 @@ function goldActions(state: GameState, view: HudView, send: Send): Child[] {
     out.push(
       row(
         label(`${n} of a kind → 1 `, tbIcon('gold', 14)),
-        resourceButtons(sell, send, (r) => `Sell ${n} ${r} for 1 gold`),
+        resourceButtons(sell, send, (r) => `Sell ${n} ${resourceWord(r)} for 1 gold`),
       ),
     );
   }
@@ -693,7 +694,7 @@ function stepper(r: Resource, max: number, onChange: () => void): HTMLElement {
       'button',
       {
         class: 'btn btn-sm btn-ghost',
-        attrs: { 'aria-label': `less ${r}` },
+        attrs: { 'aria-label': `less ${resourceWord(r)}` },
         on: { click: bump(-1) },
       },
       '−',
@@ -703,7 +704,7 @@ function stepper(r: Resource, max: number, onChange: () => void): HTMLElement {
       'button',
       {
         class: 'btn btn-sm btn-ghost',
-        attrs: { 'aria-label': `more ${r}` },
+        attrs: { 'aria-label': `more ${resourceWord(r)}` },
         on: { click: bump(1) },
       },
       '+',
@@ -744,8 +745,8 @@ function voteDialog(state: GameState, view: HudView, send: Send): HudDialog | nu
         'p',
         {},
         vote.ender === me
-          ? 'You built this turn: a camel joins a caravan. Bid wool and grain (1 vote each, paid to the bank). The most votes decides where it goes; a tie leaves it to you.'
-          : `${nameOf(state, vote.ender)} built this turn: a camel joins a caravan. Bid wool and grain (1 vote each, paid to the bank). The most votes decides where it goes; a tie leaves it to ${nameOf(state, vote.ender)}.`,
+          ? 'You built this turn: a camel joins a caravan. Bid sheep and wheat (1 vote each, paid to the bank). The most votes decides where it goes; a tie leaves it to you.'
+          : `${nameOf(state, vote.ender)} built this turn: a camel joins a caravan. Bid sheep and wheat (1 vote each, paid to the bank). The most votes decides where it goes; a tie leaves it to ${nameOf(state, vote.ender)}.`,
       ),
       bids.length > 0 &&
         h(
@@ -820,7 +821,7 @@ function hint(state: GameState, view: HudView): string | null {
       if (!acting) return `${nameOf(state, state.turn.current)} moves knights`;
       return from === null
         ? 'Pick a knight to move, or end your turn (the barbarians are fought then)'
-        : 'Move the knight to a highlighted path (more than 3 steps costs 1 grain)';
+        : 'Move the knight to a highlighted path (more than 3 steps costs 1 wheat)';
     }
     case 'tb/placeKnight':
       return acting ? 'Place your new knight on a highlighted path' : null;

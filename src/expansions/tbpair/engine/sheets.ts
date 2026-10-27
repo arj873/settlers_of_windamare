@@ -63,7 +63,7 @@ export const SHEETS: readonly Sheet[] = [
     blurb: 'The oasis on the coast: two caravans; barbarians never stop a camel' },
   { id: 'tbpair/caravansTraders', pair: ['tb/caravans', 'tb/traders'], vp: 15, tradeYield: true,
     name: 'Caravans + Traders & Barbarians',
-    blurb: 'The oasis in the middle; the trade hexes produce brick, lumber and wool' },
+    blurb: 'The oasis in the middle; the trade hexes produce brick, lumber and sheep' },
   { id: 'tbpair/riversBa', pair: ['tb/rivers', 'tb/barbarianAttack'], vp: 12, tradeYield: false,
     name: 'Rivers + Barbarian Attack',
     blurb: 'The 2 and 12 share a hex and both land barbarians; no Poor Settler penalty' },

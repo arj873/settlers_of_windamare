@@ -11,6 +11,7 @@ import {
   type GameState,
   type Point,
   type ResourceCounts,
+  resourceWord,
 } from '../engine';
 import { h } from './dom';
 import { HUD_EXTENSIONS } from './expansions';
@@ -250,5 +251,5 @@ function costRow({ cost, free }: SpotChoice): HTMLElement | null {
 
 const describe = (cost: ResourceCounts) =>
   RESOURCES.filter((r) => cost[r] > 0)
-    .map((r) => `${cost[r]} ${r}`)
+    .map((r) => `${cost[r]} ${resourceWord(r)}`)
     .join(', ');

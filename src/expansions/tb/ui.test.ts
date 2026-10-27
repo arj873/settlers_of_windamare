@@ -244,10 +244,10 @@ describe('T&B HUD', () => {
     } as never;
     show(s);
     expect(root.textContent).toContain('Camel vote');
-    root.querySelector<HTMLButtonElement>('button[aria-label="more wool"]')?.click();
-    root.querySelector<HTMLButtonElement>('button[aria-label="more wool"]')?.click();
-    root.querySelector<HTMLButtonElement>('button[aria-label="more wool"]')?.click(); // capped at 2
-    root.querySelector<HTMLButtonElement>('button[aria-label="more grain"]')?.click();
+    root.querySelector<HTMLButtonElement>('button[aria-label="more sheep"]')?.click();
+    root.querySelector<HTMLButtonElement>('button[aria-label="more sheep"]')?.click();
+    root.querySelector<HTMLButtonElement>('button[aria-label="more sheep"]')?.click(); // capped at 2
+    root.querySelector<HTMLButtonElement>('button[aria-label="more wheat"]')?.click();
     root.querySelector<HTMLButtonElement>('.dialog .btn-primary')?.click();
     expect(actions.at(-1)).toEqual({ type: 'tb/bid', player: 0, wool: 2, grain: 1 });
   });

@@ -1,5 +1,5 @@
 /** OWNER: T2 (rules-core). Small formatting helpers for log lines. */
-import { RESOURCES } from '../constants';
+import { RESOURCES, resourceWord } from '../constants';
 import type { GameState, PlayerId, ResourceBundle, SecretText } from '../types';
 
 export function playerName(state: GameState, p: PlayerId): string {
@@ -10,7 +10,7 @@ export function playerName(state: GameState, p: PlayerId): string {
 export function describeCards(cards: readonly string[]): string {
   const counts = new Map<string, number>();
   for (const c of cards) counts.set(c, (counts.get(c) ?? 0) + 1);
-  return [...counts].map(([c, n]) => `${n} ${c}`).join(', ');
+  return [...counts].map(([c, n]) => `${n} ${resourceWord(c)}`).join(', ');
 }
 
 /**
@@ -34,7 +34,7 @@ export function stealSecret(
 export function describeBundle(bundle: ResourceBundle): string {
   const parts = RESOURCES.flatMap((r) => {
     const n = bundle[r] ?? 0;
-    return n > 0 ? [`${n} ${r}`] : [];
+    return n > 0 ? [`${n} ${resourceWord(r)}`] : [];
   });
   return parts.length > 0 ? parts.join(', ') : 'nothing';
 }

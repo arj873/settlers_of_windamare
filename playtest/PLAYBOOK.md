@@ -77,7 +77,7 @@ CLI, same loop below. What is different:
 | `spots`                   | numbered board spots (setup, build, robber, free roads)           |
 | `click-spot N`            | click spot N from your **latest** `spots` list                    |
 | `click <label>`           | click a button: `click Roll dice`, `click End turn`               |
-| `set <label> <n>`         | stepper in discard/trade dialogs: `set grain 2`, `set want ore 1` |
+| `set <label> <n>`         | stepper in discard/trade dialogs: `set wheat 2`, `set want ore 1` |
 | `pass`                    | dismiss the "Pass to <you>" cover                                 |
 | `shot [board\|hud\|full]` | screenshot; prints a path you can open and look at                |
 | `console`                 | new browser console errors                                        |
@@ -93,11 +93,11 @@ CLI, same loop below. What is different:
   road: `spots` -> `click-spot N`.
 - **Turn:** `click Roll dice`. Then build/trade/play, then `click End turn`.
 - **Build:** `click Road` (or `Settlement`, `City`) -> `spots` -> `click-spot N`.
-  Costs: road = brick+lumber; settlement = brick+lumber+wool+grain; city = 2 grain+3 ore;
-  dev card (`click Buy card`) = wool+grain+ore.
+  Costs: road = brick+lumber; settlement = brick+lumber+sheep+wheat; city = 2 wheat+3 ore;
+  dev card (`click Buy card`) = sheep+wheat+ore.
 - **Bank trade:** `click Bank` -> `click Give: <Resource>` -> `click Receive: <Resource>` ->
   `click Trade`. Ratios (4:1, 3:1, 2:1) are in `status`.
-- **Player trade:** `click Trade` -> `set give wool 1` -> `set want ore 1` -> optional
+- **Player trade:** `click Trade` -> `set give sheep 1` -> `set want ore 1` -> optional
   `click to: SeatN` to drop a recipient -> `click Send offer`. Then `wait`: it wakes once every
   recipient has answered (or the offer ended); then `click SeatN: Trade` to confirm with someone
   who accepted, or `click Cancel offer`. If everyone rejects, the offer closes by itself
@@ -141,9 +141,9 @@ Everything still goes through `status`, `spots`, `click` and `click-spot`. What 
 ### Cities & Knights (`ck`)
 
 - **Setup:** round 2 places a **city** (`YOU MUST: Place your setup city`), not a settlement.
-- **Knight:** `click Knight` -> `spots` -> `click-spot N` (wool + ore).
+- **Knight:** `click Knight` -> `spots` -> `click-spot N` (sheep + ore).
 - **Activate / promote / move / displace / chase the robber:** `click Command` -> `spots`
-  (your knights) -> `click-spot N` opens the knight dialog: `click Activate` (grain),
+  (your knights) -> `click-spot N` opens the knight dialog: `click Activate` (wheat),
   `click Promote`, `click Chase the robber`, or `spots` -> `click-spot N` to move there / onto a
   weaker knight. `click Done` closes it. A knight activated this turn cannot move yet, and every
   barbarian attack deactivates all knights.
@@ -152,7 +152,7 @@ Everything still goes through `status`, `spots`, `click` and `click-spot`. What 
   section of `status` (e.g. `[Cities & Knights: Trade]` for the trade track). Progress card
   prompts (give a commodity, pick a player) show as `YOU MUST: Expansion step (ck/card): "..."`:
   click the named button.
-- **Discard on a 7:** commodities count; `set cloth 1`, `set wool 2`, ... then `click Discard`.
+- **Discard on a 7:** commodities count; `set cloth 1`, `set sheep 2`, ... then `click Discard`.
 
 ### Seafarers (`seafarers`, e.g. `--scenario fogIslands`)
 
@@ -184,7 +184,7 @@ Everything still goes through `status`, `spots`, `click` and `click-spot`. What 
 
 ## Strategy (short)
 
-Settle on high pips with varied resources. Grain + ore -> cities and dev cards; brick +
+Settle on high pips with varied resources. Wheat + ore -> cities and dev cards; brick +
 lumber -> roads and settlements. Use harbors you own. Rob the leader. But **finding bugs comes
 first**: try odd but legal things (trade with a harbor, build on a coast, play a card before
 rolling, cancel dialogs, Esc out of build mode via `click Cancel`).
@@ -213,7 +213,7 @@ One report per distinct bug, as soon as you see it. Before reporting, check it a
 pnpm -s pt K report --title "Discard dialog accepts 3 of 4 cards" --severity major \
   --expected "Discard button disabled until 4 cards chosen (RULES 5.2)" \
   --actual "Button enabled at 3; clicking it showed toast 'Action rejected'" \
-  --steps "1. Seat2 rolled 7 with 9 cards 2. set grain 3 3. click Discard"
+  --steps "1. Seat2 rolled 7 with 9 cards 2. set wheat 3 3. click Discard"
 ```
 
 Severity: `blocker` (game cannot continue), `major` (wrong rules/numbers, lost turn),

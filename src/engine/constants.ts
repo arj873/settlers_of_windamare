@@ -8,6 +8,32 @@ import type {
 } from './types';
 
 export const RESOURCES: readonly Resource[] = ['brick', 'lumber', 'wool', 'grain', 'ore'];
+/**
+ * Player-visible resource names (#47). The ids (`wool`, `grain`) stay in state, saves and the
+ * protocol; every label, log line and tooltip goes through this map (lowercase: `resourceWord`).
+ */
+export const RESOURCE_NAME: Record<Resource, string> = {
+  brick: 'Brick',
+  lumber: 'Lumber',
+  wool: 'Sheep',
+  grain: 'Wheat',
+  ore: 'Ore',
+};
+/**
+ * The resource a word names: ids (`wool`), display names (`sheep`, `Wheat`), plural-free. Used to read
+ * log texts back, so lines saved before #47 ("2 grain") still parse. null for anything else.
+ */
+export function resourceId(word: string): Resource | null {
+  const w = word.toLowerCase();
+  if ((RESOURCES as readonly string[]).includes(w)) return w as Resource;
+  if (w === 'sheep') return 'wool';
+  if (w === 'wheat') return 'grain';
+  return null;
+}
+/** Lowercase name for running text: `resourceWord('wool')` -> "sheep". Passes other strings through. */
+export function resourceWord(id: string): string {
+  return (RESOURCE_NAME as Record<string, string | undefined>)[id]?.toLowerCase() ?? id;
+}
 export const DEV_CARD_TYPES: readonly DevCardType[] = [
   'knight',
   'victoryPoint',

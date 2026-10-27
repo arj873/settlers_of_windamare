@@ -48,7 +48,7 @@ describe('steal log secrets (#32)', () => {
   });
 
   it('helpers', () => {
-    expect(describeCards(['wool', 'ore', 'wool'])).toBe('2 wool, 1 ore');
+    expect(describeCards(['wool', 'ore', 'wool'])).toBe('2 sheep, 1 ore');
     const s = moveRobberGame();
     expect(stealSecret(s, 1, 0, [null])).toEqual([]);
     expect(stealSecret(s, 1, 0, ['cloth'], ' (Bishop)')).toEqual([

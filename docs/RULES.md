@@ -5,6 +5,8 @@ how `src/engine` handles it. **This is the rules reference for every agent.** If
 engine behaviour, update the status here. If a rule is unclear, check the cited source; do not
 go from memory.
 
+**Resource names (#47):** this file and `docs/rules/*` keep the official rulebook names and the engine ids (`wool`, `grain`). The game shows them as **Sheep** and **Wheat** (`RESOURCE_NAME` in `src/engine/constants.ts`); the ids in state, saves and the protocol are unchanged.
+
 Compiled by T8 (2026-10-25). Rule numbers (e.g. **5.3**) are stable; tests cite them, e.g.
 `src/engine/rulesAudit.test.ts`.
 

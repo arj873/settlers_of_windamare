@@ -198,7 +198,7 @@ describe('oasis income and the friendly robber', () => {
     s.phase = { kind: 'main' };
     const after = run(s, { type: 'endTurn', player: 0 });
     expect(after.players[0]?.resources.wool).toBe(1);
-    expect(after.log.some((l) => l.text === 'P0 received 1 wool (oasis)')).toBe(true);
+    expect(after.log.some((l) => l.text === 'P0 received 1 sheep (oasis)')).toBe(true);
     // Not for the other players' turns.
     const other = { ...cloneState(s), turn: { ...s.turn, current: 1 } };
     expect(run(other, { type: 'endTurn', player: 1 }).players[0]?.resources.wool).toBe(0);

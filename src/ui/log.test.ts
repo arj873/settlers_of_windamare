@@ -127,12 +127,30 @@ describe('groupLog', () => {
   });
 });
 
+describe('resource words in log texts (#47)', () => {
+  it('reads the new names and lines saved before the rename', () => {
+    const kinds = (t: string) =>
+      parseLogText(t, players).flatMap((x) =>
+        x.kind === 'resource' ? [[x.resource, x.count]] : [],
+      );
+    expect(kinds('Red received 2 sheep, 1 wheat')).toEqual([
+      ['wool', 2],
+      ['grain', 1],
+    ]);
+    expect(kinds('Red received 2 wool, 1 grain')).toEqual([
+      ['wool', 2],
+      ['grain', 1],
+    ]);
+    expect(kinds('Red harvested wheat (+1 food)')).toEqual([]);
+  });
+});
+
 describe('private steal texts (#32)', () => {
   const entry: LogEntry = {
     turn: 4,
     player: 0,
     text: 'Red stole from Blue',
-    secret: [{ to: [0, 2], text: 'Red stole 1 wool from Blue' }],
+    secret: [{ to: [0, 2], text: 'Red stole 1 sheep from Blue' }],
   };
   const line = (viewer: number | null) => {
     const item = groupLog([entry], players, viewer)[0]!.items[0]!;
@@ -152,7 +170,7 @@ describe('private steal texts (#32)', () => {
   });
   it('tokensText spells tokens out for a toast', () => {
     expect(tokensText(youTokens(parseLogText(entry.secret![0]!.text, players), 2), players)).toBe(
-      'Red stole 1 wool from you',
+      'Red stole 1 sheep from you',
     );
   });
 });

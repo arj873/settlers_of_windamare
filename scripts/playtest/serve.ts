@@ -521,7 +521,7 @@ const commands: Record<string, Handler> = {
     const target = Number(args.at(-1));
     const query = args.slice(0, -1).join(' ').trim();
     if (!query || !Number.isInteger(target) || target < 0) {
-      return refuse('Usage: `set <label> <count>`, e.g. `set brick 2` or `set give wool 1`.');
+      return refuse('Usage: `set <label> <count>`, e.g. `set brick 2` or `set give sheep 1`.');
     }
     let snap = await guarded(seat, 'act');
     if (typeof snap === 'string') return refuse(snap);
@@ -569,7 +569,7 @@ const commands: Record<string, Handler> = {
     const query = eq < 0 ? '' : line.slice(0, eq).trim();
     const want = eq < 0 ? '' : line.slice(eq + 1).trim();
     if (!query || !want) {
-      return refuse('Usage: `choose <dropdown> = <option>`, e.g. `choose Bank: give = Grain`.');
+      return refuse('Usage: `choose <dropdown> = <option>`, e.g. `choose Bank: give = Wheat`.');
     }
     const snap = await guarded(seat, 'act');
     if (typeof snap === 'string') return refuse(snap);

@@ -581,7 +581,7 @@ function whyExtra(state: GameState, p: PlayerId, id: number): Why {
   const t = shipTurn(epSlice(state), id);
   if (t.extra) return 'once per ship per turn';
   if (t.done) return 'that ship has finished moving';
-  return canAfford(state, p, ITEM.extraMove) ? null : 'you need 1 wool';
+  return canAfford(state, p, ITEM.extraMove) ? null : 'you need 1 sheep';
 }
 
 /** Cargo transfer between an own ship and an own harbor at one of its ends. */

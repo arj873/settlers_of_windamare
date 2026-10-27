@@ -165,7 +165,7 @@ export function medicineCityBlocker(state: GameState, p: PlayerId, v: VertexId):
   if (!plainSettlement(state, p, v)) return 'pick one of your settlements (not a harbor)';
   if (piecesLeft(state, p).city <= 0) return 'no cities left';
   const h = hand(state, p);
-  return h && hasResources(h, ckCost()) ? null : 'needs 1 grain and 2 ore';
+  return h && hasResources(h, ckCost()) ? null : 'needs 1 wheat and 2 ore';
 }
 
 /** Medicine's harbor settlement: a plain coastal settlement, a harbor left, 1 grain + 1 ore. */
@@ -174,7 +174,7 @@ export function medicineHarborBlocker(state: GameState, p: PlayerId, v: VertexId
   if (!isCoastal(state, v)) return 'a harbor settlement must be on the coast';
   if (harborsLeft(state, p) <= 0) return 'no harbor settlements left';
   const h = hand(state, p);
-  return h && hasResources(h, MEDICINE_HARBOR_COST) ? null : 'needs 1 grain and 1 ore';
+  return h && hasResources(h, MEDICINE_HARBOR_COST) ? null : 'needs 1 wheat and 1 ore';
 }
 
 function ckCost(): ResourceCounts {

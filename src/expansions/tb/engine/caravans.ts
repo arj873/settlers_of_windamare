@@ -159,7 +159,7 @@ export function bidBlocker(
   const phase = state.phase as unknown as TbPhase;
   if (phase.kind !== 'tb/vote' || phase.placer !== null) return 'no vote now';
   if (phase.order[0] !== p) return 'not your bid';
-  if (!isCount(wool) || !isCount(grain)) return 'bid whole wool and grain cards';
+  if (!isCount(wool) || !isCount(grain)) return 'bid whole sheep and wheat cards';
   const hand = state.players[p]?.resources;
   if (!hand || hand.wool < wool || hand.grain < grain) return 'you do not have those cards';
   return null;

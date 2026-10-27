@@ -368,7 +368,7 @@ describe('Hud', () => {
     expect(city.classList.contains('is-blocked')).toBe(false);
     const tip = city.querySelector('.why.cost-tip')!;
     expect(tip.querySelector('.cost-cards')!.getAttribute('aria-label')).toBe(
-      'Cost: 2 grain, 3 ore',
+      'Cost: 2 wheat, 3 ore',
     );
     expect(tip.textContent).toContain('You have the cards');
     expect(tip.querySelector('.is-missing')).toBeNull();
@@ -389,7 +389,7 @@ describe('Hud', () => {
     const setup = freshGame(4);
     hud.render(setup, { viewer: 0, legal: legalActions(setup, 0), isBotTurn: false });
     expect(tipOf('City')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
-      'Cost: 2 grain, 3 ore',
+      'Cost: 2 wheat, 3 ore',
     );
   });
 
@@ -408,7 +408,7 @@ describe('Hud', () => {
       'City',
     ]);
     expect(tipOf('Settlement')?.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
-      'Cost: 1 brick, 1 lumber, 1 wool, 1 grain',
+      'Cost: 1 brick, 1 lumber, 1 sheep, 1 wheat',
     );
     expect(tipOf('Settlement')?.querySelector('.cost-have')).toBeNull();
     expect(bar.querySelectorAll('button:not([disabled])')).toHaveLength(0);

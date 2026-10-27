@@ -79,7 +79,7 @@ describe('Barbarian Attack + C&K HUD', () => {
     const tip = cards[0]!.closest('.bslot')!.querySelector('.cost-tip')!;
     expect(tip.querySelector('b')?.textContent).toBe('Knight');
     expect(tip.querySelector('.cost-cards')?.getAttribute('aria-label')).toBe(
-      'Cost: 1 wool, 1 ore',
+      'Cost: 1 sheep, 1 ore',
     );
     expect(tip.textContent).toContain('You have the cards');
     const wall = cards[4]!.closest('.bslot')!.querySelector('.cost-tip')!;

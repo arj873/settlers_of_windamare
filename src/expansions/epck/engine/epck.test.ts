@@ -368,7 +368,7 @@ describe('progress cards', () => {
     expect(s.players[0]?.resources.ore).toBe(0);
   });
 
-  it('Medicine: or a harbor settlement for 1 grain + 1 ore', () => {
+  it('Medicine: or a harbor settlement for 1 wheat + 1 ore', () => {
     let s = main();
     s.pieces.buildings[COAST] = { owner: 0, kind: 'settlement' };
     setGoods(s, 0, { grain: 1, ore: 1 });
@@ -376,7 +376,7 @@ describe('progress cards', () => {
     expect(legalOf(s, 'ck/play').some((x) => JSON.stringify(x).includes('medicine'))).toBe(true);
     s = run(s, a('ck/play', 0, { card: 'medicine' }));
     expect(legalOf(s, 'ck/pickVertex')).toHaveLength(0);
-    fails(s, a('ck/pickVertex', 0, { vertex: COAST }), /grain/);
+    fails(s, a('ck/pickVertex', 0, { vertex: COAST }), /wheat/);
     expect(legalOf(s, 'epck/medicineHarbor')).toHaveLength(1);
     s = run(s, a('epck/medicineHarbor', 0, { vertex: COAST }));
     expect(epSlice(s).harbors[COAST]).toEqual([]);

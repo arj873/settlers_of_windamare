@@ -1,13 +1,7 @@
 /** Inline SVG icons. The markup is static (no user text), so innerHTML is safe here. */
-import type { DevCardType, Resource } from '../engine';
+import { RESOURCE_NAME, type DevCardType, type Resource } from '../engine';
 
-export const RESOURCE_LABEL: Record<Resource, string> = {
-  brick: 'Brick',
-  lumber: 'Lumber',
-  wool: 'Wool',
-  grain: 'Grain',
-  ore: 'Ore',
-};
+export const RESOURCE_LABEL: Record<Resource, string> = RESOURCE_NAME;
 
 const SVG: Record<Resource, string> = {
   brick: `<rect x="3" y="7" width="26" height="18" rx="2.5" fill="#c4532d"/>

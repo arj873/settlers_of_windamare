@@ -276,7 +276,7 @@ export const demoModule: ExpansionModule = {
       if (!p) return;
       p.resources.wool += 1;
       draft.bank.wool -= 1;
-      log(draft, player, `${playerName(draft, player)} received 1 wool (oasis)`);
+      log(draft, player, `${playerName(draft, player)} received 1 sheep (oasis)`);
     },
   },
 };
