@@ -273,8 +273,7 @@ describe('trade hexes that produce (Caravans + T&B, Rivers + T&B, BA + T&B)', ()
       const n = tokenOf(s, h) as number;
       const v = cornerOf(s, h);
       settle(s, 1, v, 'city');
-      const owed = computeProduction(s, n)[1] ?? {};
-      expect(owed[r], h).toBeGreaterThanOrEqual(2);
+      expect(computeProduction(s, n)[1]?.[r], h).toBeGreaterThanOrEqual(2);
       s.pieces.buildings = {};
     }
   });
@@ -517,7 +516,7 @@ describe('BA + T&B: barbarians by paths', () => {
     const s = main('baTraders');
     const e = hexPaths(s, 'h:-1,-1')[0] as EdgeId;
     baOf(s).onHex['h:-1,-1'] = 1;
-    baOf(s).paths = { [e]: 'h:-1,-1' };
+    baOf(s).paths = { [e]: 'h:-1,-1' as HexId };
     const at = topologyOf(s).edge[e]?.vertices[0] as VertexId;
     tradersOf(s).wagons[0] = at;
     tradersOf(s).level[0] = 5;
@@ -534,7 +533,7 @@ describe('BA + T&B: barbarians by paths', () => {
     expect(w.phase.kind).toBe('tb/wagon');
     expect(baOf(w).onHex['h:-1,-1']).toBeUndefined();
     expect(baOf(w).onHex['h:0,0']).toBe(1);
-    expect(baOf(w).paths).toEqual({ [field(path, 'edge')]: 'h:0,0' });
+    expect(baOf(w).paths).toEqual({ [field(path, 'edge') as string]: 'h:0,0' });
   });
 
   it('Treason: pick a barbarian, a hex (inland too), its path; twice; +2 gold', () => {
@@ -571,7 +570,7 @@ describe('BA + T&B: barbarians by paths', () => {
     const s = main('baTraders');
     const e = hexPaths(s, 'h:0,-2')[0] as EdgeId;
     baOf(s).onHex['h:0,-2'] = 1;
-    baOf(s).paths = { [e]: 'h:0,-2' };
+    baOf(s).paths = { [e]: 'h:0,-2' as HexId };
     baOf(s).deck.push('intrigue');
     s.players[0]!.resources = { brick: 0, lumber: 0, wool: 1, grain: 1, ore: 1 };
     const t = run(s, act('tb/buyCard', 0));
@@ -588,7 +587,7 @@ describe('BA + T&B: barbarians by paths', () => {
     const h: HexId = 'h:0,-2';
     const [a, b, c] = hexPaths(s, h) as [EdgeId, EdgeId, EdgeId];
     baOf(s).onHex[h] = 1;
-    baOf(s).paths = { [a]: h };
+    baOf(s).paths = { [a]: h } as Record<EdgeId, HexId>;
     baOf(s).knights[b] = 0;
     baOf(s).knights[c] = 0;
     const t = run(s, act('endTurn', 0));

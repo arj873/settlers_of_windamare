@@ -34,6 +34,7 @@ import {
   TB,
   TRADE_CASTLE,
   barbarianEdges,
+  extraNumbers,
   tbBoard,
   type Commodity,
   type TbSlice,
@@ -409,8 +410,16 @@ function dashed(
 
 const isConquered = (s: TbSlice | undefined, h: HexId) => (s?.ba?.onHex[h] ?? 0) >= 3;
 
+/** A numbered trade hex (T&B × T&B sheets): its token sits left of the plaza, smaller. */
+const TRADE_TOKEN = { dx: -0.5, dy: 0, scale: 0.62 } as const;
+const tradeToken = (state: GameState, h: HexId) =>
+  state.board.hexes[h]?.token != null && (tbBoard(state).tradeHexes ?? []).some((t) => t.hex === h)
+    ? TRADE_TOKEN
+    : undefined;
+
 export const tbDrawer: BoardDrawer = {
   id: TB,
+  tokenAt: tradeToken,
   terrain: {
     [LAKE]: lake,
     [SWAMP]: swamp,
@@ -439,6 +448,21 @@ export const tbDrawer: BoardDrawer = {
                 -Math.PI / 2 + (i * 2 * Math.PI) / k + (k === 2 ? Math.PI / 2 : Math.PI / 4);
               disc(c, n, x + Math.cos(a) * 0.3 * ctx.S, y + Math.sin(a) * 0.3 * ctx.S, r);
             });
+          }
+        }),
+    },
+    // --- Rivers and the T&B × T&B sheets: a second number on a hex (the 2 on the 12) -------
+    {
+      key: 'extraNumbers',
+      z: 'board',
+      sig: (state) => JSON.stringify(extraNumbers(state)),
+      draw: (state, ctx) =>
+        graphicsLayer((_g, c) => {
+          for (const x of extraNumbers(state)) {
+            const info = ctx.topo.hex[x.hex];
+            if (!info) continue;
+            const [cx, cy] = ctx.pt(info);
+            disc(c, x.number, cx + 0.42 * ctx.S, cy - 0.3 * ctx.S, 0.2 * ctx.S);
           }
         }),
     },
@@ -741,17 +765,22 @@ export const tbDrawer: BoardDrawer = {
             if (!isConquered(s, h)) continue;
             const info = ctx.topo.hex[h];
             if (!info) continue;
-            const [x, y] = ctx.pt(info);
-            g.poly(hexPoints(x, y, S * 0.98)).fill({ color: 0x2a1a10, alpha: 0.5 });
-            // The number token is turned face down.
-            g.circle(x, y, 0.37 * S)
+            const [hx, hy] = ctx.pt(info);
+            g.poly(hexPoints(hx, hy, S * 0.98)).fill({ color: 0x2a1a10, alpha: 0.5 });
+            // The number token is turned face down (where it sits: a trade hex's is moved).
+            const at = tradeToken(state, h);
+            const k = at?.scale ?? 1;
+            const x = hx + (at?.dx ?? 0) * S;
+            const y = hy + (at?.dy ?? 0) * S;
+            g.circle(x, y, 0.37 * S * k)
               .fill(0x5a4a3a)
               .stroke({ width: 2.5, color: INK });
-            g.moveTo(x - 0.17 * S, y - 0.17 * S)
-              .lineTo(x + 0.17 * S, y + 0.17 * S)
-              .moveTo(x + 0.17 * S, y - 0.17 * S)
-              .lineTo(x - 0.17 * S, y + 0.17 * S)
-              .stroke({ width: 0.05 * S, color: 0xd9a35a, cap: 'round' });
+            const d = 0.17 * S * k;
+            g.moveTo(x - d, y - d)
+              .lineTo(x + d, y + d)
+              .moveTo(x + d, y - d)
+              .lineTo(x - d, y + d)
+              .stroke({ width: 0.05 * S * k, color: 0xd9a35a, cap: 'round' });
           }
         }),
     },
