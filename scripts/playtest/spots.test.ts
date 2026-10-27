@@ -157,6 +157,17 @@ describe('expansion spots', () => {
     expect(actionName(s, { type: 'placeSetupSettlement' })).toBe('setup settlement');
   });
 
+  it('T&B barbarian: the pick step and the destination step have their own words', () => {
+    const s = freshGame(3);
+    const a = { type: 'tb/placeBarbarian' };
+    s.phase = { kind: 'tb/barbarian', from: null } as never;
+    expect(spotVerb(s, a.type)).toBe('pick the barbarian to move');
+    expect(actionName(s, a)).toBe('pick barbarian');
+    s.phase = { kind: 'tb/barbarian', from: 'e:0,1,E' } as never;
+    expect(spotVerb(s, a.type)).toBe('move the barbarian to');
+    expect(actionName(s, a)).toBe('move barbarian here');
+  });
+
   it('names the setup city when the engine places one (C&K round 2)', () => {
     let s = createGame({ seed: 'ck-spots', players: PLAYER_COLORS.slice(0, 3), mode: 'ck' });
     while (s.phase.kind === 'setup' && s.phase.index < s.players.length) {
