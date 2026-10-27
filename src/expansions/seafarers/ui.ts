@@ -31,6 +31,7 @@ import { wonderCards, WONDER_LEVELS } from './engine/features';
 import { mapKeyOf, type MapKey } from './engine/maps';
 import { fortressOf, warships } from './engine/pirates';
 import { SHIP, shipsLeft } from './engine/ships';
+import { seafarersSounds } from './sounds';
 import './seafarers.css';
 
 type Send = (a: Action) => void;
@@ -363,6 +364,7 @@ function clothStealDialog(state: GameState, view: HudView, send: Send): HudDialo
 
 export const seafarersHud: HudExtension = {
   id: 'seafarers',
+  sounds: seafarersSounds,
 
   panel(state, view, send) {
     const body = h(

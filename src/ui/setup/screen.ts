@@ -5,6 +5,7 @@
 import { botLevelSelect } from '../botLevel';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
+import { soundControl } from '../sound';
 import type { MapId, NewGameConfig } from '../types';
 import { mapPreviewSvg } from './mapPreviews';
 import {
@@ -154,6 +155,7 @@ export class SetupScreen {
           'div',
           { class: 'su-footer-in' },
           this.summary,
+          soundControl({ compact: true }),
           themePicker({ compact: true }),
           opts.onBack &&
             h(

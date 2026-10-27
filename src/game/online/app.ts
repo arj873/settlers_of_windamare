@@ -22,6 +22,7 @@ import { inviteUrl } from '../../ui/online/lobbyModel';
 import { errorText, fatalText } from '../../ui/online/messages';
 import type { SessionAction } from '../../ui/types';
 import type { BoardLike, ToastKind } from '../controller';
+import type { SoundObserver } from '../sounds';
 import type { Backend } from './backend';
 import { NetGameController } from './netController';
 
@@ -44,6 +45,8 @@ export interface OnlineEnv {
   goHome: () => void;
   /** From the invite landing card: play hotseat instead. */
   playOffline: () => void;
+  /** Sound effects (A1): game views, the turn timer and chat messages from others. */
+  sounds?: SoundObserver;
 }
 
 export class OnlineApp {
@@ -162,6 +165,7 @@ export class OnlineApp {
       client,
       toast: env.toast,
       ...(env.onRender ? { onRender: env.onRender } : {}),
+      ...(env.sounds ? { sounds: env.sounds } : {}),
     });
     client.on((e) => {
       switch (e.type) {
@@ -173,6 +177,9 @@ export class OnlineApp {
           break;
         case 'chat':
           this.chat?.add(e.entry);
+          if (e.entry.from !== null && e.entry.from !== client.you?.member) {
+            env.sounds?.cue('chat');
+          }
           break;
         case 'reaction': {
           const m = client.room?.members.find((x) => x.id === e.member);
