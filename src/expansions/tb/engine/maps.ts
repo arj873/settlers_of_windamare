@@ -203,7 +203,7 @@ export const TB_FISH30: CustomMapDef = {
 // Rivers of Catan (§2.3)
 // ---------------------------------------------------------------------------
 
-interface RiverLayout {
+export interface RiverLayout {
   /** Each river as [hex, terrain] from source to mouth; the swamps are part of it. */
   rivers: readonly (readonly (readonly [HexId, Terrain])[])[];
   /** Coastal mouth edges (also bridge sites). */
@@ -214,7 +214,7 @@ interface RiverLayout {
   twoOnTwelve: boolean;
 }
 
-const RIVERS_19: RiverLayout = {
+export const RIVERS_19: RiverLayout = {
   rivers: [
     [
       ['h:-1,-1', SWAMP],
@@ -265,7 +265,7 @@ const RIVERS_30: RiverLayout = {
 };
 
 /** The side of hex `a` facing hex `b` (they must be neighbours). */
-function sharedEdge(a: HexId, b: HexId): EdgeId {
+export function sharedEdge(a: HexId, b: HexId): EdgeId {
   const pa = parseHexId(a);
   const pb = parseHexId(b);
   const side = SIDES.find((s) => {
@@ -341,7 +341,7 @@ export const TB_RIVERS30: CustomMapDef = {
 // ---------------------------------------------------------------------------
 
 /** The arrow corners of an oasis (alternating corners). */
-const ARROWS: readonly Corner[] = ['NW', 'NE', 'S'];
+export const ARROWS: readonly Corner[] = ['NW', 'NE', 'S'];
 
 /** The first camel of the arrow at `corner` of oasis `hex`: the corner's edge leaving the hex. */
 export function caravanStart(topo: Topology, hex: HexId, corner: Corner): CaravanStart {

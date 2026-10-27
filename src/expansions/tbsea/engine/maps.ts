@@ -22,9 +22,16 @@ import type {
   Port,
   ScenarioId,
 } from '../../../engine/types';
-import { prepared, SEA_MAPS, SEAFARERS, type SeaBoard } from '../../seafarers/engine/maps';
+import {
+  prepared,
+  SEA_MAPS,
+  SEAFARERS,
+  type MapKey,
+  type SeaBoard,
+} from '../../seafarers/engine/maps';
 import { TB_MAPS, TRADERS_BARBARIANS_19 } from '../../tb/engine/maps';
 import type { TbBoard } from '../../tb/engine/state';
+import { planBoard, type Plan } from './overlays';
 
 export const TBSEA = 'tbsea';
 const TB = 'tb';
@@ -184,4 +191,119 @@ function mapDefOf(pair: Pair): CustomMapDef {
   };
 }
 
-export const TBSEA_MAPS: readonly CustomMapDef[] = PAIRS.map(mapDefOf);
+// ---------------------------------------------------------------------------------------------
+// C3: T&B scenarios on the other Seafarers scenarios (overlays.ts)
+// ---------------------------------------------------------------------------------------------
+
+export interface SeaPairMap {
+  key: MapKey;
+  players: readonly [number, number];
+  plan: Plan;
+}
+
+export interface SeaPair {
+  id: ScenarioId;
+  /** The T&B scenario and the Seafarers scenario it is played on. */
+  tb: ScenarioId;
+  sea: ScenarioId;
+  name: string;
+  blurb: string;
+  /** The Seafarers scenario's target plus the sheet's increment. */
+  vp: number;
+  maps: readonly SeaPairMap[];
+}
+
+const both = (key: MapKey, plan: Plan): SeaPairMap[] => [{ key, players: [3, 4], plan }];
+
+// prettier-ignore
+export const SEA_PAIRS: readonly SeaPair[] = [
+  { id: 'tbsea/fishermenFour', tb: 'tb/fishermen', sea: 'seafarers/fourIslands', vp: 13,
+    name: 'Fishermen on the Four Islands',
+    blurb: '4 and 8, 6 and 10 fish by the small islands, 5 and 9 by the big ones',
+    maps: [{ key: 'four3', players: [3, 3], plan: { grounds: 'fourIslands' } },
+      { key: 'four4', players: [4, 4], plan: { grounds: 'fourIslands' } }] },
+  { id: 'tbsea/fishermenFog', tb: 'tb/fishermen', sea: 'seafarers/fogIslands', vp: 12,
+    name: 'Fishermen on the Fog Islands',
+    blurb: 'Fishing grounds along the face-up islands; no lake',
+    maps: [{ key: 'fog3', players: [3, 3], plan: { grounds: 'any' } },
+      { key: 'fog4', players: [4, 4], plan: { grounds: 'any' } }] },
+  { id: 'tbsea/fishermenDesert', tb: 'tb/fishermen', sea: 'seafarers/throughTheDesert', vp: 14,
+    name: 'Fishermen Through the Desert',
+    blurb: 'The lake replaces a field (3) or a hill (4): its number joins another hex',
+    maps: [
+      { key: 'desert3', players: [3, 3],
+        plan: { lake: { terrain: 'grain', token: 2 }, disc: 'lowestPasture', grounds: 'any' } },
+      { key: 'desert4', players: [4, 4],
+        plan: { lake: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 }, grounds: 'any' } }] },
+  { id: 'tbsea/fishermenTribe', tb: 'tb/fishermen', sea: 'seafarers/forgottenTribe', vp: 13,
+    name: 'Fishermen and the Forgotten Tribe',
+    blurb: 'The lake replaces the 12 field; the robber stays on the large island',
+    maps: both('tribe', { lake: { terrain: 'grain', token: 12 }, grounds: 'main' }) },
+  { id: 'tbsea/fishermenCloth', tb: 'tb/fishermen', sea: 'seafarers/clothForCatan', vp: 14,
+    name: 'Fishermen and Cloth for Catan',
+    blurb: 'Three grounds by each large island; chase the pirate with a route to a village',
+    maps: both('cloth', { grounds: 'cloth' }) },
+  { id: 'tbsea/fishermenWonders', tb: 'tb/fishermen', sea: 'seafarers/wondersOfCatan', vp: 10,
+    name: 'Fishermen and the Wonders of Catan',
+    blurb: 'Fishing grounds along the large and small islands; no lake',
+    maps: both('wonders', { grounds: 'any' }) },
+  { id: 'tbsea/fishermenNewWorld', tb: 'tb/fishermen', sea: 'seafarers/newWorld', vp: 12,
+    name: 'Fishermen in the New World',
+    blurb: 'A random archipelago; the grounds placed like the harbours',
+    maps: both('newworld', { grounds: 'newWorld' }) },
+  { id: 'tbsea/caravansDesert', tb: 'tb/caravans', sea: 'seafarers/throughTheDesert', vp: 16,
+    name: 'Caravans Through the Desert',
+    blurb: 'The watering hole replaces a field (3) or a hill (4); camels may cross the sea',
+    maps: [
+      { key: 'desert3', players: [3, 3], plan: { oasis: { terrain: 'grain', token: 2 }, disc: 'lowestPasture' } },
+      { key: 'desert4', players: [4, 4], plan: { oasis: { terrain: 'brick', token: 11 }, disc: { terrain: 'brick', token: 2 } } }] },
+  { id: 'tbsea/caravansTribe', tb: 'tb/caravans', sea: 'seafarers/forgottenTribe', vp: 15,
+    name: 'Caravans and the Forgotten Tribe',
+    blurb: 'The robber starts on the watering hole and may go back there',
+    maps: both('tribe', { oasis: { terrain: 'grain', token: 12 }, disc: { terrain: 'wool', token: 2 },
+      robber: 'oasis', robberOnOasis: true }) },
+  { id: 'tbsea/caravansNewWorld', tb: 'tb/caravans', sea: 'seafarers/newWorld', vp: 14,
+    name: 'Caravans in the New World',
+    blurb: 'The watering hole in the middle of a random archipelago',
+    maps: both('newworld', { oasis: 'centre' }) },
+  { id: 'tbsea/riversTribe', tb: 'tb/rivers', sea: 'seafarers/forgottenTribe', vp: 13,
+    name: 'Rivers and the Forgotten Tribe',
+    blurb: 'Two rivers on a variable large island; the 2 and the 12 join weak hexes',
+    maps: both('tribe', { rivers: 'variableTribe', robber: 'swamp' }) },
+  { id: 'tbsea/riversNewWorld', tb: 'tb/rivers', sea: 'seafarers/newWorld', vp: 12,
+    name: 'Rivers in the New World',
+    blurb: 'Two rivers flow into the frame of a random archipelago',
+    maps: both('newworld', { rivers: 'newWorld' }) },
+];
+
+export const seaMapIdOf = (pair: SeaPair, m: SeaPairMap): `${string}/${string}` =>
+  `${TBSEA}/${pair.id.slice(TBSEA.length + 1)}-${m.key}`;
+
+export const seaPairOf = (scenario: ScenarioId | null): SeaPair | undefined =>
+  SEA_PAIRS.find((p) => p.id === scenario);
+
+function seaMapDefOf(pair: SeaPair, m: SeaPairMap): CustomMapDef {
+  const id = seaMapIdOf(pair, m);
+  const base = SEA_MAPS.find((x) => x.id === `${SEAFARERS}/${m.key}`) as CustomMapDef;
+  let frame: HexListFrameDef | null = null;
+  return {
+    id,
+    name: `${pair.name} (${m.players[0] === m.players[1] ? m.players[0] : m.players.join('-')})`,
+    get frame() {
+      frame ??= { ...prepared(m.key).frame, id };
+      return frame;
+    },
+    minPlayers: m.players[0],
+    maxPlayers: m.players[1],
+    layout: 'custom',
+    basedOn: base.id,
+    bankPerResource: base.bankPerResource,
+    devDeck: base.devDeck,
+    generate: (rng, players) => planBoard(rng, id, m.key, players, m.plan),
+  };
+}
+
+export const TBSEA_MAPS: readonly CustomMapDef[] = [
+  ...PAIRS.map(mapDefOf),
+  ...SEA_PAIRS.flatMap((p) => p.maps.map((m) => seaMapDefOf(p, m))),
+];

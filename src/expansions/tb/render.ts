@@ -66,8 +66,8 @@ function label(text: string, size: number, fill: number): Text {
   return t;
 }
 
-/** A number disc like the core tokens, at (x, y) with radius r. */
-function disc(c: Container, n: number, x: number, y: number, r: number): void {
+/** A number disc like the core tokens, at (x, y) with radius r (also tbsea's second discs). */
+export function disc(c: Container, n: number, x: number, y: number, r: number): void {
   const g = new Graphics();
   g.circle(x + 1, y + 2, r).fill({ color: 0x000000, alpha: 0.3 });
   g.circle(x, y, r).fill(TOKEN.face).stroke({ width: 2, color: TOKEN.rim });

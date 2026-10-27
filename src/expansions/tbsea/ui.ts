@@ -8,8 +8,9 @@ import type { Action, GameState } from '../../engine';
 import { h } from '../../ui/dom';
 import type { HudExtension } from '../../ui/expansions';
 import type { HudView } from '../../ui/types';
-import { has } from '../tb/engine';
-import { FISH_PIRATE, FISH_SHIP, TBSEA } from './engine';
+import { seaSlice } from '../seafarers/engine';
+import { has, tbBoard } from '../tb/engine';
+import { FISH_PIRATE, FISH_SHIP, TBSEA, tbseaBoard } from './engine';
 import './tbsea.css';
 
 type Send = (a: Action) => void;
@@ -26,17 +27,38 @@ export function pairRules(state: GameState): string[] {
       'No robber, no pirate, no Longest Trade Route.',
     );
   }
+  const cloth = seaSlice(state).cloth !== undefined;
+  const pirate = seaSlice(state).pirate !== null;
   if (has(state, 'fish')) {
+    if (pirate) {
+      out.push(
+        cloth
+          ? `${FISH_PIRATE} fish chase the pirate off the board (needs a route to a village).`
+          : `${FISH_PIRATE} fish chase the pirate off the board.`,
+      );
+    }
+    out.push(`${FISH_SHIP} fish build a free ship.`);
     out.push(
-      `${FISH_PIRATE} fish chase the pirate off the board; ${FISH_SHIP} fish build a free ship.`,
-      'The pirate on a fishing ground blocks it. Ships catch no fish.',
+      pirate
+        ? 'The pirate on a fishing ground blocks it. Ships catch no fish.'
+        : 'Ships catch no fish.',
     );
+  }
+  for (const x of tbseaBoard(state.board).extraTokens ?? []) {
+    const own = state.board.hexes[x.hex]?.token;
+    out.push(`The hex with ${own} and ${x.number} produces on either number.`);
+  }
+  if (has(state, 'caravans') && tbBoard(state).robberOnOasis) {
+    out.push('The robber starts on the watering hole and may go back there.');
   }
   if (has(state, 'rivers')) {
     out.push(
       'A ship built on a river hex’s edge earns 1 gold; sailing it off costs 1 gold.',
       'No ship on a bridge site.',
     );
+    if (Object.values(state.board.hexes).some((h) => h.terrain === 'gold')) {
+      out.push('Gold fields produce resource cards, never gold coins.');
+    }
   }
   if (has(state, 'caravans')) {
     out.push(

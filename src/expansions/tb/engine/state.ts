@@ -138,6 +138,8 @@ export interface TbBoard {
   twoOnTwelve?: HexId | null;
   /** Caravans: start edges, one per oasis arrow. */
   caravanStarts?: CaravanStart[];
+  /** Caravans: the robber may stand on the oasis (Merchant Trains + Forgotten Tribe, C3). */
+  robberOnOasis?: boolean;
   /** Barbarian Attack: castle hexes, coastal hexes in check order (clockwise). */
   castles?: HexId[];
   coast?: HexId[];

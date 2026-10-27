@@ -39,6 +39,7 @@ import type {
   ActionResult,
   EdgeId,
   GameState,
+  HexId,
   Phase,
   PlayerId,
   VertexId,
@@ -679,6 +680,12 @@ function secondRoll(draft: GameState): void {
   if (draft.settings.rushMode) rollFor(draft, draft.turn.current);
 }
 
+/** Caravans: the robber never stands on the oasis (unless the board allows it, C3). */
+const oasisBansRobber = (state: GameState, h: HexId): boolean =>
+  has(state, 'caravans') &&
+  state.board.hexes[h]?.terrain === OASIS &&
+  tbBoard(state).robberOnOasis !== true;
+
 /** Gold, tokens and fish for a new settlement on `v` (setup or built). */
 function settled(draft: GameState, p: PlayerId, v: VertexId): void {
   if (has(draft, 'rivers') && vertexOnRiver(draft, v)) {
@@ -854,7 +861,7 @@ export const tbModule: ExpansionModule = {
     return list.filter((a) => {
       switch (a.type) {
         case 'moveRobber':
-          return !(has(state, 'caravans') && state.board.hexes[a.hex]?.terrain === OASIS);
+          return !oasisBansRobber(state, a.hex);
         case 'endTurn':
           return endTurnBlocker(state, a.player) === null;
         case 'buildCity':
@@ -933,7 +940,7 @@ export const tbModule: ExpansionModule = {
       return r;
     },
     moveRobber: (draft, action, next) => {
-      if (has(draft, 'caravans') && draft.board.hexes[action.hex]?.terrain === OASIS) {
+      if (oasisBansRobber(draft, action.hex)) {
         return fail('the robber may not stand on the oasis');
       }
       return next(draft, action);
