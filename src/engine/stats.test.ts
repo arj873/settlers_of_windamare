@@ -14,7 +14,14 @@ import { applyAction, legalActions } from './engine';
 import { EVENT_CARDS } from './rules/events';
 import { FIXTURE_PLAYERS, freshGame, midGame } from './fixtures';
 import { emptyResources } from './resources';
-import { emptyPlayerStats, emptyStats, statsOf, sumCounts } from './stats';
+import {
+  bankCards,
+  emptyPlayerStats,
+  emptyStats,
+  statsOf,
+  sumCounts,
+  tradesByRatio,
+} from './stats';
 import { hexVertices, TOPOLOGY } from './topology';
 import type { Action, EventKind, GameState, HexId, PlayerId, PlayerStats } from './types';
 
@@ -293,6 +300,56 @@ describe('stats: trading', () => {
     const viaPort = run(s1, { type: 'bankTrade', player: 0, give: 'ore', receive: 'brick' });
     expect(ps(viaPort, 0).portTrades).toBe(1);
     expect(ps(viaPort, 0).lost.bank).toEqual(res({ ore: 3 }));
+  });
+
+  it('trades are counted by ratio: 4:1, 3:1 and 2:1', () => {
+    const inMain = () => {
+      const s = tracked(emptyBoardGame());
+      s.phase = { kind: 'main' };
+      return s;
+    };
+    const trade = { type: 'bankTrade', player: 0, give: 'ore', receive: 'brick' } as const;
+    const s0 = inMain();
+    setHand(s0, 0, { ore: 4 });
+    const bank = run(s0, trade);
+    expect(ps(bank, 0).tradesByRatio).toEqual({ '4:1': 1 });
+
+    const generic = s0.board.ports.find((p) => p.kind === 'generic')!;
+    const s1 = inMain();
+    setHand(s1, 0, { ore: 3 });
+    place(s1, 0, generic.vertices[0]);
+    expect(ps(run(s1, trade), 0).tradesByRatio).toEqual({ '3:1': 1 });
+
+    const ore = s0.board.ports.find((p) => p.kind === 'ore')!;
+    const s2 = inMain();
+    setHand(s2, 0, { ore: 6 });
+    place(s2, 0, ore.vertices[0]);
+    const twice = run(s2, trade, trade);
+    expect(ps(twice, 0).tradesByRatio).toEqual({ '2:1': 2 });
+    expect(ps(twice, 0).portTrades).toBe(2);
+    expect(ps(twice, 0).bankTrades).toBe(0);
+    expect(tradesByRatio(ps(twice, 0))).toEqual([{ key: '2:1', count: 2 }]);
+    expect(bankCards(ps(twice, 0))).toEqual({ given: 4, received: 2 });
+  });
+
+  it('old saves (no tradesByRatio) still read: 4:1 from bankTrades, the rest as "harbor"', () => {
+    const old = emptyPlayerStats();
+    old.bankTrades = 2;
+    old.portTrades = 3;
+    expect(old.tradesByRatio).toBeUndefined();
+    expect(tradesByRatio(old)).toEqual([
+      { key: 'harbor', count: 3 },
+      { key: '4:1', count: 2 },
+    ]);
+    // New trades on top of an old save keep the old harbor trades.
+    old.tradesByRatio = { '3:1': 1 };
+    old.portTrades = 4;
+    expect(tradesByRatio(old)).toEqual([
+      { key: '3:1', count: 1 },
+      { key: 'harbor', count: 3 },
+      { key: '4:1', count: 2 },
+    ]);
+    expect(tradesByRatio(emptyPlayerStats())).toEqual([]);
   });
 });
 

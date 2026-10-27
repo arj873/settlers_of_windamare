@@ -770,6 +770,10 @@ export const ckModule: ExpansionModule = {
     },
 
     statsCategory,
+    statsBankTradeRatio: (state, action) =>
+      action.type === 'ck/bankTrade'
+        ? giveRatio(state, action.player, action['give'] as Parameters<typeof giveRatio>[2])
+        : undefined,
 
     maskFor: ckMaskFor,
   },
