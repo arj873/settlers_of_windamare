@@ -165,12 +165,18 @@ export const tradeOverrides: {
         return fail('your partner no longer has the gold');
       }
     }
+    const offer = draft.phase.kind === 'trade' ? draft.phase.offer : null;
     const r = next(draft, action);
-    if (r.ok && g) {
+    if (r.ok && g && offer) {
       const gold = epSlice(draft).gold;
       const net = g.want - g.give;
       gold[action.player] = (gold[action.player] ?? 0) + net;
       gold[action.partner] = (gold[action.partner] ?? 0) - net;
+      // The base line names the resources only ("traded  to X for "): add the gold.
+      const line = draft.log.at(-1);
+      if (line) {
+        line.text = `${playerName(draft, action.player)} traded ${describe(offer.give, g.give)} to ${playerName(draft, action.partner)} for ${describe(offer.want, g.want)}`;
+      }
     }
     return r;
   },

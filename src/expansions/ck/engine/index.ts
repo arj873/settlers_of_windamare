@@ -20,10 +20,17 @@ import { emptyDevCards } from '../../../engine/resources';
 import { playerName } from '../../../engine/rules/text';
 import { Rng } from '../../../engine/rng';
 import { DICE_CARDS } from '../../../engine/rules/dice';
-import { DICE_DECK_RESHUFFLE_AT } from '../../../engine/constants';
+import { DICE_DECK_RESHUFFLE_AT, RESOURCES } from '../../../engine/constants';
 import { buildingsOf } from '../../../engine/selectors';
 import { recordRoll } from '../../../engine/stats';
-import type { Action, GameState, Phase, PlayerId, VertexId } from '../../../engine/types';
+import type {
+  Action,
+  GameState,
+  Phase,
+  PlayerId,
+  ResourceBundle,
+  VertexId,
+} from '../../../engine/types';
 import { playBlocker, startCard } from './cards';
 import { ckLegal } from './legal';
 import { CK_STARTER19 } from './maps';
@@ -98,6 +105,7 @@ import {
   isRobberActive,
   isTrack,
   type CkAction,
+  type Commodity,
   asPhase,
   phaseOf,
   type CkSlice,
@@ -116,6 +124,14 @@ export { ckLegal } from './legal';
 export { HIDDEN_PROGRESS_CARD, ckMaskFor } from './mask';
 
 const pn = playerName;
+
+/** "1 brick, 2 paper": a trade side's resources, then its commodities. */
+function describeGoods(res: ResourceBundle, com: Partial<Record<Commodity, number>>): string {
+  return [
+    ...RESOURCES.filter((r) => (res[r] ?? 0) > 0).map((r) => `${res[r]} ${r}`),
+    ...COMMODITIES.filter((c) => (com[c] ?? 0) > 0).map((c) => `${com[c]} ${c}`),
+  ].join(', ');
+}
 const asCk = (a: { type: string }) => a as unknown as CkAction;
 const isInt = (x: unknown, lo: number, hi: number): x is number =>
   typeof x === 'number' && Number.isInteger(x) && x >= lo && x <= hi;
@@ -379,7 +395,11 @@ const actions: Record<`ck/${string}`, ExtHandler> = {
     };
     ckSlice(draft).trade = { give: give.com, want: want.com };
     draft.turn.tradeOffers += 1;
-    log(draft, action.player, `${pn(draft, action.player)} offers a trade with commodities`);
+    log(
+      draft,
+      action.player,
+      `${pn(draft, action.player)} offers ${describeGoods(give.res, give.com)} for ${describeGoods(want.res, want.com)}`,
+    );
     return ok(draft);
   },
 
@@ -616,11 +636,17 @@ export const ckModule: ExpansionModule = {
           return fail('your partner no longer has the commodities');
         }
       }
+      const offer = draft.phase.kind === 'trade' ? draft.phase.offer : null;
       const r = next(draft, action);
-      if (r.ok && t) {
+      if (r.ok && t && offer) {
         for (const c of COMMODITIES) {
           if (t.give[c] > 0) moveGood(draft, action.player, action.partner, c, t.give[c]);
           if (t.want[c] > 0) moveGood(draft, action.partner, action.player, c, t.want[c]);
+        }
+        // The base line names the resources only: name the commodities too.
+        const line = draft.log.at(-1);
+        if (line) {
+          line.text = `${pn(draft, action.player)} traded ${describeGoods(offer.give, t.give)} to ${pn(draft, action.partner)} for ${describeGoods(offer.want, t.want)}`;
         }
       }
       return r;

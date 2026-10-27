@@ -654,6 +654,7 @@ describe('trading (§3.7)', () => {
     expect(cards(r, 1)).toEqual({ paper: 0, cloth: 0, coin: 1 });
     expect(ckSlice(r).trade).toBeNull();
     expectConserved(r);
+    expect(r.log.at(-1)?.text).toMatch(/ traded 1 coin to .+ for 1 brick, 1 paper$/);
   });
 
   it('a partner without the commodities cannot accept', () => {
