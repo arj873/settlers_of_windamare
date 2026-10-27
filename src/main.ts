@@ -23,6 +23,7 @@ import { extensionSoundRecipes, extensionSounds } from './ui/expansions';
 import { sfxPanel } from './ui/sfxPanel';
 import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
+import { showNotice } from './game/noticeView';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import { SpotPrompt } from './ui/spotPrompt';
@@ -163,6 +164,7 @@ async function boot() {
           tokens: tokenStoreFor(backend.kind),
           clock: realClock,
           toast: showToast,
+          notice: showNotice,
           onRender: fitBoard,
           sounds,
           layer: document.body,
@@ -255,6 +257,7 @@ function startOffline(o: {
     storage,
     speed,
     toast: showToast,
+    notice: showNotice,
     onRender: fitBoard,
     ...spots,
     sounds,

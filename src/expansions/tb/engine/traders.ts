@@ -11,6 +11,7 @@
  * path, spokes and sea sides included (Q21); the T&B deck's Knight counts for Largest Army (Q13).
  */
 import { isCurrent, log } from '../../../engine/actions/common';
+import { stealSecret } from '../../../engine/rules/text';
 import { isBuildPhase } from '../../../engine/actions/build';
 import { isCentreVertex } from '../../../engine/hex';
 import { hasResources } from '../../../engine/resources';
@@ -339,7 +340,12 @@ export function moveBarbarian(
   const owner = routeOwner(draft, to);
   if (steal && owner !== null && owner !== p) {
     const card = stealResource(draft, p, owner);
-    log(draft, p, `${pn(draft, p)} stole from ${pn(draft, owner)}${card ? '' : ' (no cards)'}`);
+    log(
+      draft,
+      p,
+      `${pn(draft, p)} stole from ${pn(draft, owner)}${card ? '' : ' (no cards)'}`,
+      stealSecret(draft, p, owner, [card]),
+    );
   }
 }
 

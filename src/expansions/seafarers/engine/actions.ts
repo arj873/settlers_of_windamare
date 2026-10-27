@@ -21,7 +21,7 @@ import type { Override } from '../../../engine/expansions/types';
 import { Rng } from '../../../engine/rng';
 import { hasResources, isValidBundle, totalResources } from '../../../engine/resources';
 import { canPlaceRoad, canPlaceSettlement } from '../../../engine/rules/placement';
-import { describeBundle, playerName } from '../../../engine/rules/text';
+import { describeBundle, playerName, stealSecret } from '../../../engine/rules/text';
 import { cardsInHand, getPlayer, piecesLeft, victoryPoints } from '../../../engine/selectors';
 import { topologyOf } from '../../../engine/topology';
 import type {
@@ -521,7 +521,12 @@ const stealCard: H = (draft, a) => {
   draft.rng = rng.state;
   victim.resources[card] -= 1;
   getPlayer(draft, a.player).resources[card] += 1;
-  log(draft, a.player, `${name(draft, a.player)} stole from ${name(draft, v)}`);
+  log(
+    draft,
+    a.player,
+    `${name(draft, a.player)} stole from ${name(draft, v)}`,
+    stealSecret(draft, a.player, v, [card]),
+  );
   draft.phase = resumePhase(draft, (draft.phase as ClothStealPhase).resume);
   return ok(draft);
 };

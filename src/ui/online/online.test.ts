@@ -405,7 +405,11 @@ describe('Hud online bits', () => {
   it('spectator: no hand bar, no buttons, no dialogs, a Spectating pill', () => {
     const s = viewFor(discardGame(), 'spectator');
     hud.render(s, { viewer: -1, legal: [], isBotTurn: false, spectator: true });
-    expect(root.querySelector('.hud-bottom')!.childElementCount).toBe(0);
+    // No hand; only the read-only price list (#35), every card disabled.
+    const bottom = root.querySelector('.hud-bottom')!;
+    expect(bottom.querySelector('.hand')).toBeNull();
+    expect([...bottom.children].map((c) => c.className)).toEqual(['build-bar wood is-costs']);
+    expect(bottom.querySelectorAll('button:not([disabled])')).toHaveLength(0);
     expect(root.querySelector('.btn-roll')).toBeNull();
     expect(root.querySelector('.hud-dialog-layer')!.childElementCount).toBe(0);
     expect(root.querySelector('.spectate-pill')!.textContent).toContain('Spectating');

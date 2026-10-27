@@ -73,6 +73,7 @@ const make = (speed = 500) =>
     storage: store,
     speed,
     toast: (m) => toasts.push(m),
+    notice: () => undefined,
   });
 
 beforeEach(() => {

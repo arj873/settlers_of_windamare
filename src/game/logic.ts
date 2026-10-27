@@ -293,7 +293,7 @@ export function nextBot(state: GameState, seats: Seats, legal: readonly Action[]
 }
 
 /** Log entries `next` appended after `prev`'s newest one (the engine trims old entries). */
-function appendedLog(prev: GameState, next: GameState): GameState['log'] {
+export function appendedLog(prev: GameState, next: GameState): GameState['log'] {
   const last = prev.log[prev.log.length - 1];
   if (!last) return next.log;
   for (let i = next.log.length - 1; i >= 0; i--) {
@@ -349,6 +349,19 @@ export function tradeEndNotice(
   const partner = prev.players.find((p) => end.text.includes(` to ${p.name} for `));
   if (partner?.id === viewer) return `Trade done: ${end.text}`;
   return answer === 'accepted' ? `${offerer} traded with ${partner?.name ?? 'someone else'}` : null;
+}
+
+/**
+ * The steal the controllers submit for `viewer` without asking (#34): their only legal move is a
+ * steal (robber, knight, pirate, event card, any module's `…steal…` action) from one player. A
+ * real choice (several victims, cloth or a card, an optional pass) still opens the dialog.
+ */
+export function autoSteal(legal: readonly Action[], viewer: PlayerId | null): Action | null {
+  if (viewer === null) return null;
+  const mine = legal.filter((a) => a.player === viewer);
+  const only = mine.length === 1 ? mine[0] : undefined;
+  if (!only || !/steal/i.test(only.type)) return null;
+  return typeof (only as { victim?: unknown }).victim === 'number' ? only : null;
 }
 
 /** Nobody can move but the game is not over: the controller reports this instead of hanging. */
