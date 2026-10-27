@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 
 const [base = 'http://localhost:4173', out = 'playtest/shots/game-stats'] = process.argv.slice(2);
 const TABS = ['overview', 'dice', 'resources', 'activity', 'dev'];
+const ALL_THEMES = ['sunfired', 'chartroom', 'parlour', 'wood', 'githubdark', 'materialdark'];
 const SIZES = [
   { name: 'desktop', width: 1440, height: 900 },
   { name: 'phone', width: 390, height: 844 },
@@ -48,6 +49,23 @@ for (const size of SIZES) {
       }
     }
     if (theme === 'sunfired') {
+      // #49: in every theme (fonts differ) and tab, the header and tab strip keep their full
+      // height: nothing in them is clipped, so the active tab's underline never crosses a label.
+      for (const t of ALL_THEMES) {
+        for (const tab of TABS) {
+          await page.evaluate((t) => (document.documentElement.dataset.theme = t), t);
+          await page.click(`.gs-tab[data-tab="${tab}"]`);
+          await page.waitForTimeout(50);
+          // A shrunk strip stretches its buttons to the smaller height: their text overflows them.
+          const clipped = await page.evaluate(() =>
+            [...document.querySelectorAll('.gs-head, .gs-tabs, .gs-tab, .gs-foot')]
+              .filter((el) => el.scrollHeight > el.clientHeight + 1)
+              .map((el) => el.textContent || el.className),
+          );
+          if (clipped.length) errors.push(`${tag} ${t} ${tab}: clipped ${clipped.join(', ')}`);
+        }
+      }
+      await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
       await page.click('.gs-collapse');
       await page.waitForTimeout(150);
       await page.screenshot({ path: `${out}/${tag}-6-collapsed.png` });
