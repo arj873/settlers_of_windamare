@@ -16,6 +16,7 @@ import { rngForRoll } from '../../engine/actions/testkit';
 import { actionForClick, boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { CROP, cropSlice, fieldsHexes } from './engine';
@@ -42,7 +43,7 @@ describe('crop setup screen', () => {
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
     const q = (k: string) => screen.element.querySelector<HTMLButtonElement>(`[data-k="${k}"]`);
-    q(`mode-${CROP}`)?.click();
+    expect(pickMode(screen.element, CROP)).toBe(true);
     expect(screen.state.mode).toBe(CROP);
     expect(q('scenario-crop/cropTrust')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('scenario-crop/cropTrustVariable')).not.toBeNull();

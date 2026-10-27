@@ -1,7 +1,7 @@
 /** Pure lobby logic (no DOM): what each seat shows and which buttons the viewer gets. */
 import { MAPS, modeById, scenarioById } from '../../engine';
 import type { MemberId, MemberInfo, RoomConfig, RoomInfo } from '../../net/protocol';
-import { ROOM_COLORS } from '../../net/protocol';
+import { ROOM_COLORS, roomSeatCap } from '../../net/protocol';
 import { DEFAULT_BOT_LEVEL, type BotLevel } from '../../bots/levels';
 import {
   colorName,
@@ -44,6 +44,19 @@ export interface LobbyView {
   /** Start button: null = enabled, else why not. */
   startBlocked: string | null;
   summary: string;
+  /** L1: the viewer has no seat (the prompt at the top); null when seated. */
+  watching: WatchingView | null;
+  /** L1: who sits down on joining, and the seat cap when that is why newcomers watch. */
+  inviteNote: string;
+  /** Every seat has a person and the room cannot grow: newcomers watch. */
+  tableFull: boolean;
+}
+
+export interface WatchingView {
+  /** Has a nickname (needed to sit). */
+  named: boolean;
+  /** First open (bot) seat, or null when every seat has a person. */
+  openSeat: number | null;
 }
 
 /** Seats the config's map (base) or mode + scenario (expansions) allow. */
@@ -85,6 +98,8 @@ export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
     };
   });
   const seated = room.seats.some((s) => s.occupant !== null);
+  const cap = roomSeatCap(room.config);
+  const tableFull = room.seats.every((s) => s.occupant !== null) && room.seats.length >= cap;
   return {
     seats,
     spectators: room.members.filter((m) => m.seat === null && m.name !== ''),
@@ -98,19 +113,37 @@ export function lobbyView(room: RoomInfo, meId: MemberId | null): LobbyView {
         ? 'Someone has to take a seat first'
         : null,
     summary: configSummary(room.config),
+    watching:
+      me === null || me.seat !== null
+        ? null
+        : { named, openSeat: room.seats.find((s) => s.occupant === null)?.index ?? null },
+    inviteNote: inviteNote(room.config, cap, tableFull),
+    tableFull,
   };
 }
 
-export function configSummary(c: RoomConfig): string {
+/** Why the cap is what it is: "8 players" or "4 players (the most Explorers & Pirates: …)". */
+function capText(c: RoomConfig, cap: number): string {
+  return c.mode === 'base' ? `${cap} players` : `${cap} players, the most ${boardLabel(c)} allows`;
+}
+
+function inviteNote(c: RoomConfig, cap: number, full: boolean): string {
+  if (full) return `The table is full (${capText(c, cap)}): anyone else who joins watches.`;
+  return `Anyone with the link can join. They take a bot's seat, or a new one up to ${capText(c, cap)}; after that, newcomers watch.`;
+}
+
+function boardLabel(c: RoomConfig): string {
   const mode = modeById(c.mode);
   const scenario = c.scenario ? scenarioById(c.scenario) : undefined;
-  const board =
-    c.mode === 'base' || !mode
-      ? mapInfo(c.map).label
-      : scenario
-        ? `${mode.name}: ${scenario.name}`
-        : mode.name;
-  const parts = [board, `${c.seatCount} seats`, `${c.vpToWin} VP`];
+  return c.mode === 'base' || !mode
+    ? mapInfo(c.map).label
+    : scenario
+      ? `${mode.name}: ${scenario.name}`
+      : mode.name;
+}
+
+export function configSummary(c: RoomConfig): string {
+  const parts = [boardLabel(c), `${c.seatCount} seats`, `${c.vpToWin} VP`];
   const idx = TIMER_STEPS.indexOf(c.turnTimerSec);
   if (c.turnTimerSec !== null && idx >= 0) parts.push(`${timerLabel(idx)} timer`);
   return parts.join(' · ');

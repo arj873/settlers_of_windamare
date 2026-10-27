@@ -5,6 +5,7 @@ import { legalActions, type Action, type GameState } from '../../engine';
 import { actionForClick, boardActions } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { setupError, playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { seaSlice, type GoldPhase } from './engine';
@@ -18,7 +19,7 @@ describe('Seafarers setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-seafarers')?.click();
+    expect(pickMode(screen.element, 'seafarers')).toBe(true);
     expect(screen.state.mode).toBe('seafarers');
     expect(q(screen, 'scenario-seafarers/newShores')?.getAttribute('aria-pressed')).toBe('true');
     for (const s of [
@@ -42,7 +43,7 @@ describe('Seafarers setup screen', () => {
   it('refuses Event Cards with the Pirate Islands: a message, Start disabled', () => {
     const screen = new SetupScreen({ onStart: () => undefined, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-seafarers')?.click();
+    expect(pickMode(screen.element, 'seafarers')).toBe(true);
     q(screen, 'scenario-seafarers/pirateIslands')?.click();
     const draft = { ...screen.state, eventCards: true };
     expect(setupError(draft)).toMatch(/Event Cards/);

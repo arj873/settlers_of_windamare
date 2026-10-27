@@ -6,6 +6,7 @@ import { actionForClick, boardActions } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { bestRatios } from '../../ui/model';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange, setupError } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { A } from './engine/actions';
@@ -22,7 +23,7 @@ describe('E&P setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-ep')?.click();
+    expect(pickMode(screen.element, 'ep')).toBe(true);
     expect(screen.state.mode).toBe('ep');
     for (const s of ['landHo', 'pirateLairs', 'fish', 'spices', 'full']) {
       expect(q(screen, `scenario-ep/${s}`), s).not.toBeNull();
@@ -38,7 +39,7 @@ describe('E&P setup screen', () => {
   it('refuses unofficial combinations with a message: setup variants, balance rules', () => {
     const screen = new SetupScreen({ onStart: () => undefined, storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, 'mode-ep')?.click();
+    expect(pickMode(screen.element, 'ep')).toBe(true);
     expect(setupError(screen.state)).toBeNull();
     expect(setupError({ ...screen.state, eventCards: true })).toBeNull();
   });

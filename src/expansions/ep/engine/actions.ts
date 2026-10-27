@@ -17,7 +17,7 @@ import {
   type LegalGenerator,
 } from '../../../engine/actions/common';
 import { advanceSetup } from '../../../engine/actions/setup';
-import { costOf } from '../../../engine/expansions/hooks';
+import { costOf, terrainKind } from '../../../engine/expansions/hooks';
 import type { Override } from '../../../engine/expansions/types';
 import { Rng } from '../../../engine/rng';
 import { hasResources, isResource } from '../../../engine/resources';
@@ -25,6 +25,7 @@ import { canPlaceRoad, isVertexOpen, touchesLand } from '../../../engine/rules/p
 import { checkVictory } from '../../../engine/rules/victory';
 import { playerName } from '../../../engine/rules/text';
 import { piecesLeft, setupOrderOf } from '../../../engine/selectors';
+import { edgeInfo, topologyOf, vertexInfo } from '../../../engine/topology';
 import type {
   Action,
   BaseActionType,
@@ -128,6 +129,53 @@ export const A = {
 export type EpActionType = (typeof A)[keyof typeof A];
 
 const name = (s: GameState, p: PlayerId) => playerName(s, p);
+const CARGO_TEXT: Readonly<Record<Cargo, [string, string]>> = {
+  settler: ['a settler', 'settlers'],
+  crew: ['a crew', 'crews'],
+  fish: ['a fish haul', 'fish hauls'],
+  spice: ['a spice sack', 'spice sacks'],
+};
+
+/** "a ship", "a ship with a settler", "a ship with 2 crews", "a ship with a crew and a spice sack". */
+export function shipText(ship: Pick<Ship, 'cargo'>): string {
+  const kinds = [...new Set(ship.cargo)];
+  if (kinds.length === 0) return 'a ship';
+  const parts = kinds.map((c) => {
+    const n = ship.cargo.filter((x) => x === c).length;
+    return n === 1 ? CARGO_TEXT[c][0] : `${n} ${CARGO_TEXT[c][1]}`;
+  });
+  return `a ship with ${parts.join(' and ')}`;
+}
+
+/**
+ * Where a ship on `e` lies, for the log: the explored land and sites touching the edge (its two
+ * sides and the corners at its ends, where settlers land), or open sea.
+ */
+export function shipPlace(state: GameState, e: EdgeId): string {
+  const t = topologyOf(state);
+  const info = edgeInfo(t, e);
+  const s = epSlice(state);
+  const ends = (info?.vertices ?? []).map((v) => vertexInfo(t, v));
+  const hexes = new Set<HexId>([
+    ...(info?.hexes ?? []),
+    ...(info?.seas ?? []),
+    ...ends.flatMap((v) => [...(v?.hexes ?? []), ...(v?.seas ?? [])]),
+  ]);
+  const near = [...hexes].flatMap((h) => {
+    const tile = state.board.hexes[h];
+    if (!tile || s.hidden[h]) return [];
+    if (s.lairs[h]) return ['a pirate lair'];
+    if (s.spice[h]) return ['a spice farm'];
+    if (s.shoals[h] !== undefined) return ['a fish shoal'];
+    if (terrainKind(tile.terrain) !== 'land') return [];
+    const what = tile.terrain === 'gold' ? 'gold field' : tile.terrain;
+    return [tile.token === null ? what : `${what} ${tile.token}`];
+  });
+  if (near.length === 0) return 'out on open sea';
+  const last = near.pop() as string;
+  return `next to ${near.length > 0 ? `${near.join(', ')} and ${last}` : last}`;
+}
+
 const isEdge = (x: unknown): x is EdgeId => typeof x === 'string' && x.startsWith('e:');
 const isVertex = (x: unknown): x is VertexId => typeof x === 'string' && x.startsWith('v:');
 const isHex = (x: unknown): x is HexId => typeof x === 'string' && x.startsWith('h:');
@@ -901,7 +949,11 @@ export const HANDLERS: Record<EpActionType, H> = {
           );
         }
         ship.edge = e;
-        log(draft, a.player, `${name(draft, a.player)} sailed ${step.dist}`);
+        log(
+          draft,
+          a.player,
+          `${name(draft, a.player)} sailed ${shipText(ship)} ${step.dist} ${step.dist === 1 ? 'space' : 'spaces'}, ${shipPlace(draft, e)}`,
+        );
         if (explore(draft, a.player, e).length > 0) t.done = true;
       },
       draft,

@@ -14,6 +14,7 @@ import { rngForRoll } from '../../engine/actions/testkit';
 import { boardActions, highlightsFor } from '../../game/logic';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig, PlaceMode } from '../../ui/types';
 import { OIL, oilSlice } from './engine';
@@ -50,8 +51,8 @@ describe('oil setup screen', () => {
 
   it('offers Oil Springs as a ready mode with 2 scenarios, 3-6 seats and a 12 VP target', () => {
     const screen = make();
-    expect(q(screen, `mode-${OIL}`)).not.toBeNull();
-    q(screen, `mode-${OIL}`)?.click();
+    expect(q(screen, `chip-${OIL}`)).not.toBeNull();
+    expect(pickMode(screen.element, OIL)).toBe(true);
     expect(screen.state.mode).toBe(OIL);
     expect(q(screen, 'scenario-oil/oilSprings')?.getAttribute('aria-pressed')).toBe('true');
     expect(q(screen, 'scenario-oil/oilSpringsVariable')).not.toBeNull();

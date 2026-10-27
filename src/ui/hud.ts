@@ -18,6 +18,8 @@ import {
 } from '../engine';
 import {
   discardAction,
+  discardRows,
+  discardStatus,
   draftToAction,
   emptyDraft,
   stepDiscard,
@@ -802,6 +804,12 @@ export class Hud {
       devCards.length > 0 && h('span', { class: 'hand-sep' }),
       ...devCards,
     );
+    // The CSS sizes the narrowest fan from these (hud.css, `.hand`).
+    hand.style.setProperty('--hand-n', String(hand.querySelectorAll(':scope > .hcard').length));
+    hand.style.setProperty(
+      '--hand-seps',
+      String(hand.querySelectorAll(':scope > .hand-sep').length),
+    );
 
     const sideBtn = (label: 'Trade' | 'Bank', enabled: boolean, d: 'trade' | 'bank') => {
       const why = enabled && !over ? null : tradeBlockReason(state, view.viewer, d);
@@ -957,6 +965,7 @@ export class Hud {
 
     // DOM order puts the build bar first so text lookups ("Road") hit it before "Road Building";
     // CSS `order` shows hand | trade | build from left to right.
+    build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
   }
 
@@ -1344,15 +1353,17 @@ export class Hud {
     value: number,
     onDelta: (d: number) => void,
     max: number,
+    held?: number,
   ): HTMLElement {
     return h(
       'div',
       {
-        class: `step${value > 0 ? ' has-value' : ''}`,
+        class: `step${value > 0 ? ' has-value' : ''}${held === 0 ? ' is-none' : ''}`,
         style: { '--rc': `var(--res-${resource})` },
       },
       resourceIcon(resource, 26),
       h('span', { class: 'step-name' }, RESOURCE_LABEL[resource]),
+      held === undefined ? null : h('span', { class: 'step-have' }, `you have ${held}`),
       h(
         'div',
         { class: 'step-ctl' },
@@ -1673,6 +1684,8 @@ export class Hud {
   private discardDialog(view: HudView, hand: ResourceCounts, required: number) {
     const sel = this.discardSel;
     const error = validateDiscard(hand, required, sel);
+    const status = discardStatus(hand, required, sel);
+    const rows = discardRows(hand, sel, required);
     return {
       key: `discard-${view.viewer}`,
       title: `Discard ${required} cards`,
@@ -1686,25 +1699,23 @@ export class Hud {
         h(
           'div',
           { class: 'col wide-col' },
-          ...RESOURCES.filter((r) => hand[r] > 0).map((r) =>
+          ...rows.map((row) =>
             this.stepper(
-              r,
-              sel[r],
+              row.resource,
+              row.picked,
               (d) => {
-                this.discardSel = stepDiscard(sel, r, d, hand, required);
+                this.discardSel = stepDiscard(sel, row.resource, d, hand, required);
                 this.refresh();
               },
-              Math.min(
-                hand[r],
-                required - (Object.values(sel).reduce((a, b) => a + b, 0) - sel[r]),
-              ),
+              row.max,
+              row.held,
             ),
           ),
         ),
         h(
           'p',
-          { class: `summary${error ? '' : ' is-ok'}` },
-          error ?? `Discarding ${required} of ${required}`,
+          { class: `discard-status${status.ok ? ' is-ok' : ''}`, attrs: { role: 'status' } },
+          status.text,
         ),
         h(
           'div',

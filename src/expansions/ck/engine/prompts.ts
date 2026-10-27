@@ -18,6 +18,7 @@ import {
   freeCities,
   knightActionBlocker,
   moveGood,
+  ownerName,
   pillage,
   pillageable,
   placeMetropolis,
@@ -212,7 +213,7 @@ export function answer(draft: GameState, player: PlayerId, choice: Choice): stri
         log(
           draft,
           player,
-          `${pn(draft, player)}'s knight displaced a knight of ${pn(draft, victim.owner)}`,
+          `${pn(draft, player)}'s knight displaced a knight of ${ownerName(draft, victim.owner)}`,
         );
         draft.phase = (displaced(draft, victim, choice.id) as Phase | null) ?? { kind: 'main' };
       } else {

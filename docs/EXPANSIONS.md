@@ -137,6 +137,7 @@ version where the slice is read (or add a migration step in your module and ask 
 interface ExpansionModule {
   id;
   name;
+  icon?: string; // one emoji for the setup screen's expansion chip (modules that play alone)
   requires?;
   conflicts?;
   before?: ExpansionId[]; // composition order: run (and wrap) before these modules (§11)
@@ -389,9 +390,15 @@ interface HudExtension {
   viewer acts in (not only its own); a namespaced place mode shows its card's label in the pill.
 - The card is enabled from legal actions only; its cost comes from `costOf(state, costItem)`.
 - CSS: `src/expansions/<id>/<id>.css`, imported by your `ui.ts`; prefix classes with `<id>-`.
-- **Setup screen** (generated from the registry): mode tiles from `listModes()` (`status: 'ready'`
-  always; `'wip'` / `'demo'` with `?modes=all`), base first and default; an expansion mode shows its
-  scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
+- **Setup screen** (generated from the registry, U7 `src/ui/setup/modePicker.ts`): modes from
+  `listModes()` (`status: 'ready'` always; `'wip'` / `'demo'` with `?modes=all`) are picked with
+  expansion chips, none on = base. A mode's chips are the modules it activates that have no
+  `requires` (combo modules drop out: `tb+ck` = C&K + T&B), so a new combo module appears by
+  itself. A chip is disabled when no offered mode has the resulting chips (reason: its
+  `conflicts`, else "no official combination"). Modes with the same chips (`tb+ck`, `ba+ck`,
+  `two+ck`) share one selection: the scenario picker lists every scenario of each, grouped by
+  mode, with seats and VP. Give a standalone module an `icon` (emoji) for its chip. An expansion
+  mode shows its scenario tiles (map preview) instead of base maps, its options as rule tiles (boolean) or
   selects (int / choice), and clamps seats to the mode's range. `NewGameConfig` carries
   `{ mode, scenario?, options? }`. Dev: `?mode=<id>` starts a game at once.
 

@@ -673,6 +673,7 @@ export const oilLegal: LegalGenerator = (state) => {
 export const oilModule: ExpansionModule = {
   id: OIL,
   name: 'Oil Springs',
+  icon: '🛢️',
   players: { min: 3, max: 6 },
   terrains: {
     'oil/desertSpring': { kind: 'land', name: 'Oil spring (desert)', color: '#3a3342' },

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame, legalActions, type Action, type GameState } from '../../engine';
 import { Hud } from '../../ui/hud';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { fishOf, tradersOf } from '../tb/engine/state';
@@ -19,7 +20,7 @@ describe('T&B scenario pairs in the UI', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${TBPAIR_MODE}`)?.click();
+    expect(pickMode(screen.element, TBPAIR_MODE)).toBe(true);
     for (const p of FISH_PAIRS) expect(q(screen, `scenario-${p.id}`), p.id).not.toBeNull();
     expect(playerRange(screen.state)).toEqual({ min: 3, max: 4 });
     q(screen, 'scenario-tbpair/fishRivers')?.click();
@@ -60,7 +61,7 @@ describe('T&B scenario pairs in the UI', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${TBPAIR_MODE}`)?.click();
+    expect(pickMode(screen.element, TBPAIR_MODE)).toBe(true);
     for (const x of SHEETS) expect(q(screen, `scenario-${x.id}`), x.id).not.toBeNull();
     q(screen, 'scenario-tbpair/baTraders')?.click();
     q(screen, 'start')?.click();

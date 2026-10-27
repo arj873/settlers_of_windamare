@@ -8,6 +8,7 @@ import { createGame, legalActions, type Action, type GameState } from '../../eng
 import { Hud } from '../../ui/hud';
 import { hiddenBaseCards } from '../../ui/expansions';
 import { SetupScreen } from '../../ui/setup/screen';
+import { pickMode } from '../../ui/setup/testkit';
 import { playerRange } from '../../ui/setup/model';
 import type { NewGameConfig } from '../../ui/types';
 import { giveCards, setGoods } from '../ck/engine/testkit';
@@ -23,7 +24,7 @@ describe('E&P + C&K setup screen', () => {
     const started: NewGameConfig[] = [];
     const screen = new SetupScreen({ onStart: (c) => started.push(c), storage: null });
     document.body.replaceChildren(screen.element);
-    q(screen, `mode-${EPCK_MODE}`)?.click();
+    expect(pickMode(screen.element, EPCK_MODE)).toBe(true);
     expect(screen.state.mode).toBe(EPCK_MODE);
     for (const sc of ['pirateLairs', 'fish', 'spices', 'full']) {
       expect(q(screen, `scenario-ep/${sc}`), sc).not.toBeNull();
