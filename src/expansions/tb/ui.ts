@@ -872,6 +872,15 @@ export const tbHud: HudExtension = {
   id: TB,
   sounds: tbSounds,
 
+  cardFace: (kind, w) =>
+    kind === 'gold' || kind === 'fish'
+      ? h(
+          'span',
+          { class: 'card-face tb-card-face', style: { '--cw': `${w}px` } },
+          tbIcon(kind, Math.round(w * 0.72)),
+        )
+      : null,
+
   panel(state, view, send) {
     const scenario = state.settings.scenario ?? SC_BASE;
     // data-feat lets tb.css hide the build cards of other scenarios (bridge, wagon, knights).

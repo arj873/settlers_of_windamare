@@ -471,6 +471,15 @@ function tradeDialog(state: GameState, view: HudView, send: Send): HudDialog | n
 export const oilHud: HudExtension = {
   id: OIL,
 
+  cardFace: (kind, w) =>
+    kind === 'oil'
+      ? h(
+          'span',
+          { class: 'card-face oil-card-face', style: { '--cw': `${w}px` } },
+          drop(Math.round(w * 0.72)),
+        )
+      : null,
+
   panel(state, view, send) {
     const s = oilSlice(state);
     const scale = oilScale(state);
