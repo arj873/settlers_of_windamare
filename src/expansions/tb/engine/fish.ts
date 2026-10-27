@@ -10,6 +10,7 @@
  */
 import { RESOURCES } from '../../../engine/constants';
 import { isCurrent, log } from '../../../engine/actions/common';
+import { stealSecret } from '../../../engine/rules/text';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
 import { canPlaceRoad } from '../../../engine/rules/placement';
 import { Rng } from '../../../engine/rng';
@@ -229,8 +230,13 @@ export function useFish(
       break;
     case 'steal': {
       const v = victim as PlayerId;
-      stealResource(draft, p, v);
-      log(draft, p, `${name} paid fish to steal from ${pn(draft, v)}`);
+      const card = stealResource(draft, p, v);
+      log(
+        draft,
+        p,
+        `${name} paid fish to steal from ${pn(draft, v)}`,
+        stealSecret(draft, p, v, [card], ' (fish)'),
+      );
       break;
     }
     case 'resource':

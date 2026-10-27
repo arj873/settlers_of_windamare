@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LogEntry } from '../engine';
-import { groupLog, parseLogText, type LogToken } from './log';
+import { groupLog, parseLogText, secretText, tokensText, youTokens, type LogToken } from './log';
 
 const players = [
   { id: 0, name: 'Red' },
@@ -124,5 +124,35 @@ describe('groupLog', () => {
   it('does not fold a received line that does not follow a roll', () => {
     const items = groupLog([{ turn: 3, player: 0, text: 'Red received 1 ore' }], players)[0]!.items;
     expect(items[0]!.kind).toBe('line');
+  });
+});
+
+describe('private steal texts (#32)', () => {
+  const entry: LogEntry = {
+    turn: 4,
+    player: 0,
+    text: 'Red stole from Blue',
+    secret: [{ to: [0, 2], text: 'Red stole 1 wool from Blue' }],
+  };
+  const line = (viewer: number | null) => {
+    const item = groupLog([entry], players, viewer)[0]!.items[0]!;
+    if (item.kind !== 'line') throw new Error('not a line');
+    return item;
+  };
+  it('thief and victim read the card, their own name as You / you', () => {
+    expect(show(line(0).tokens)).toBe('You stole [1 wool] from <P2>');
+    expect(line(0).secret).toBe(true);
+    expect(show(line(2).tokens)).toBe('<P0> stole [1 wool] from you');
+  });
+  it('everyone else reads the public text', () => {
+    expect(show(line(1).tokens)).toBe('<P0> stole from <P2>');
+    expect(line(1).secret).toBeUndefined();
+    expect(show(line(null).tokens)).toBe('<P0> stole from <P2>');
+    expect(secretText(entry, -1)).toBeNull();
+  });
+  it('tokensText spells tokens out for a toast', () => {
+    expect(tokensText(youTokens(parseLogText(entry.secret![0]!.text, players), 2), players)).toBe(
+      'Red stole 1 wool from you',
+    );
   });
 });

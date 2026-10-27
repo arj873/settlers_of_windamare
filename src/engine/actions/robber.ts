@@ -9,7 +9,7 @@
  */
 import { RESOURCES } from '../constants';
 import { hookDiscardLimit, hookSevenPhase } from '../expansions/hooks';
-import { describeBundle, playerName } from '../rules/text';
+import { describeBundle, playerName, stealSecret } from '../rules/text';
 import { Rng } from '../rng';
 import { hasResources, isValidBundle, totalResources } from '../resources';
 import { cardsInHand } from '../selectors';
@@ -168,16 +168,17 @@ export const robberHandlers: HandlerMap<'discard' | 'moveRobber' | 'steal'> = {
       Array.from({ length: victim.resources[r] }, () => r),
     );
     let text = `${playerName(draft, action.player)} stole from ${playerName(draft, action.victim)}`;
+    let card: Resource | null = null;
     if (cards.length > 0) {
       const rng = new Rng(draft.rng);
-      const card = rng.pick(cards);
+      card = rng.pick(cards);
       draft.rng = rng.state;
       victim.resources[card] -= 1;
       thief.resources[card] += 1;
     } else {
       text += ' (no cards)';
     }
-    log(draft, action.player, text);
+    log(draft, action.player, text, stealSecret(draft, action.player, action.victim, [card]));
     draft.phase = resumePhase(draft, phase.resume);
     return ok(draft);
   },

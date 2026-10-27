@@ -33,6 +33,8 @@ export interface LogLine {
   tokens: LogToken[];
   /** Index into `state.log`. */
   index: number;
+  /** #32: the viewer reads the entry's private text (e.g. which card a steal took). */
+  secret?: true;
 }
 
 export interface ProductionBlock {
@@ -167,13 +169,57 @@ function joinResources(tokens: LogToken[]): LogToken[] {
 
 const RECEIVED = ' received ';
 
+/** #32: the private text `viewer` may read for `e` (`LogEntry.secret`), or null. */
+export function secretText(e: LogEntry, viewer: PlayerId | null): string | null {
+  if (viewer === null || viewer < 0) return null;
+  return e.secret?.find((s) => s.to.includes(viewer))?.text ?? null;
+}
+
+/** The viewer's name in a private text reads "You" / "you" ("You stole 1 wool from Blue"). */
+export function youTokens(tokens: readonly LogToken[], viewer: PlayerId): LogToken[] {
+  return tokens.map((t, i) =>
+    t.kind === 'player' && t.id === viewer ? { kind: 'text', text: i === 0 ? 'You' : 'you' } : t,
+  );
+}
+
+/** Plain text of tokens (toasts): players by name, resources as "1 wool". */
+export function tokensText(
+  tokens: readonly LogToken[],
+  players: readonly Pick<Player, 'id' | 'name'>[],
+): string {
+  return tokens
+    .map((t) => {
+      switch (t.kind) {
+        case 'text':
+          return t.text;
+        case 'player':
+          return players.find((p) => p.id === t.id)?.name ?? '';
+        case 'resource':
+          return `${t.count} ${t.resource}`;
+        case 'dice':
+          return String(t.total);
+        case 'piece':
+          return `a ${t.piece}`;
+        case 'robber':
+          return 'the robber';
+        default:
+          // Award and dev card icons: their label follows as text.
+          return '';
+      }
+    })
+    .join('')
+    .replace(/ {2,}/g, ' ');
+}
+
 /**
  * Group the log per turn (setup: per placing player) and fold the "received" lines that follow a
- * roll into one production block.
+ * roll into one production block. With a `viewer`, entries with a private text for them read it
+ * (#32), their own name as "You".
  */
 export function groupLog(
   log: readonly LogEntry[],
   players: readonly Pick<Player, 'id' | 'name'>[],
+  viewer: PlayerId | null = null,
 ): LogGroup[] {
   const groups: LogGroup[] = [];
   let g: LogGroup | undefined;
@@ -204,6 +250,13 @@ export function groupLog(
         player: e.player,
         tokens: parseLogText(rest.slice(RECEIVED.length), players),
       });
+      continue;
+    }
+    const secret = secretText(e, viewer);
+    if (secret !== null && viewer !== null) {
+      const tokens = youTokens(parseLogText(secret, players), viewer);
+      afterRoll = false;
+      g.items.push({ kind: 'line', player: e.player, tokens, index, secret: true });
       continue;
     }
     const tokens = parseLogText(e.text, players);

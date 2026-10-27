@@ -21,7 +21,7 @@ import { cloneJson } from '../../../engine/expansions/ext';
 import type { ExpansionModule, ExtHandler, ExtWrap } from '../../../engine/expansions/types';
 import { hasResources } from '../../../engine/resources';
 import type { Rng } from '../../../engine/rng';
-import { playerName } from '../../../engine/rules/text';
+import { playerName, stealSecret } from '../../../engine/rules/text';
 import { buildingsOf, piecesLeft, setupPlayerAt } from '../../../engine/selectors';
 import type {
   Action,
@@ -426,8 +426,13 @@ const pirateSteal: ExtWrap = (draft, action, next) => {
   ) {
     return next(draft, action);
   }
-  stealRandom(draft, action.player, victim);
-  log(draft, action.player, `${pn(draft, action.player)}’s pirates robbed ${pn(draft, victim)}`);
+  const card = stealRandom(draft, action.player, victim);
+  log(
+    draft,
+    action.player,
+    `${pn(draft, action.player)}’s pirates robbed ${pn(draft, victim)}`,
+    stealSecret(draft, action.player, victim, [card], ' (pirates)'),
+  );
   draft.phase = resumePhase(draft, ph.resume);
   return ok(draft);
 };

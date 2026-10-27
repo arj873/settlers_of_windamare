@@ -16,6 +16,7 @@ import {
   tradeEndNotice,
   type BoardClick,
 } from '../logic';
+import { emitGameNotice, gameNotices, type GameNotice } from '../notices';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -23,6 +24,8 @@ export interface NetControllerOptions {
   client: RoomClient;
   toast?: (message: string, kind: ToastKind) => void;
   onRender?: () => void;
+  /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
+  notice?: (n: GameNotice) => void;
   /** Timer tick; injectable for tests. */
   every?: (fn: () => void, ms: number) => () => void;
 }
@@ -57,6 +60,7 @@ export class NetGameController {
   private readonly client: RoomClient;
   private readonly toast: (message: string, kind: ToastKind) => void;
   private readonly onRender: () => void;
+  private readonly notice: (n: GameNotice) => void;
   private readonly every: (fn: () => void, ms: number) => () => void;
   private active = false;
   private placeMode: PlaceMode | null = null;
@@ -76,6 +80,7 @@ export class NetGameController {
     this.client = opts.client;
     this.toast = opts.toast ?? ((m) => console.info(m));
     this.onRender = opts.onRender ?? (() => undefined);
+    this.notice = opts.notice ?? ((n) => this.toast(n.text, 'info'));
     this.every = opts.every ?? defaultEvery;
 
     // The HUD has no unsubscribe: these stay registered and check `active`.
@@ -167,6 +172,8 @@ export class NetGameController {
     const g = this.client.game;
     const hv = this.hudView();
     if (!g || !hv) return;
+    const prev = this.shown;
+    const notices = prev ? gameNotices(prev, g.view, hv.viewer) : [];
     this.noticeTradeEnd(g.view, hv.viewer);
     // #34: rob the only player who can be robbed at once; the dialog never opens for it.
     const steal = autoSteal(g.legal, hv.viewer);
@@ -183,6 +190,10 @@ export class NetGameController {
     this.hud.render(g.view, hv);
     this.updateHighlights();
     this.onRender();
+    for (const n of notices) {
+      this.notice(n);
+      emitGameNotice(n);
+    }
   }
 
   /** Toast how a trade offer this seat took part in ended, unless the seat ended it itself. */

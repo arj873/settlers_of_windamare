@@ -204,7 +204,7 @@ export function nextBot(state: GameState, seats: Seats, legal: readonly Action[]
 }
 
 /** Log entries `next` appended after `prev`'s newest one (the engine trims old entries). */
-function appendedLog(prev: GameState, next: GameState): GameState['log'] {
+export function appendedLog(prev: GameState, next: GameState): GameState['log'] {
   const last = prev.log[prev.log.length - 1];
   if (!last) return next.log;
   for (let i = next.log.length - 1; i >= 0; i--) {

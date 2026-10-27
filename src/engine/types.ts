@@ -242,6 +242,19 @@ export interface TurnState {
 export interface LogEntry {
   turn: number;
   player: PlayerId | null;
+  /** Public text: everyone reads it (online too), so it never names a hidden card. */
+  text: string;
+  /**
+   * #32: private versions of `text` (e.g. which card a steal took), each for the players in
+   * `to`; a player reads the first one naming them. `viewFor` keeps only the viewer's own
+   * (none for spectators). Absent on most entries.
+   */
+  secret?: SecretText[];
+}
+
+/** A log text only `to` may read (`LogEntry.secret`). */
+export interface SecretText {
+  to: PlayerId[];
   text: string;
 }
 

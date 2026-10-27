@@ -142,7 +142,7 @@ GameState {
   dice:    [d1, d2] | null           // last roll
   diceDeck: number[]                 // balanced dice: undrawn cards 0..35 = (d1-1)*6+(d2-1); [] otherwise
   awards:  { longestRoad: PlayerId|null, largestArmy: PlayerId|null }
-  log:     { turn, player, text }[]  // newest LOG_LIMIT (200) entries only
+  log:     { turn, player, text, secret? }[]  // newest LOG_LIMIT (200) entries only; secret: #32
   rng:     number                    // uint32 RNG state
   winner:  PlayerId | null
   ext:     Record<ExpansionId, Json> // v5 (F1): one slice per active expansion; {} in base games
@@ -701,6 +701,13 @@ c.destroy();
 - Special building phase (T13 engine, T14 controller): `turn.current` is the builder, so `pickViewer`
   hands the screen to a human builder (the cover shows when it changes humans), `nextBot` runs bot
   builders, and the timer gives each human step its own slot.
+- Game notices (`game/notices.ts`, #32 / #36): after each render both controllers diff the last
+  rendered state (view) with the new one, `gameNotices(prev, next, reader)`: `steal` (the
+  reader's private log texts, "You stole 1 wool from Blue") and `award` (Longest Road / Largest
+  Army changing hands, with the expansions' names; C&K metropolis, Defender, T&B Harbormaster from
+  their log lines). `ControllerOptions.notice` / `OnlineEnv.notice` show them (default: a
+  toast); every notice also goes to `onGameNotice` listeners (generic hook, e.g. sounds). The
+  hotseat reader is the human viewer (a bot viewer in an all-bot game reads no secrets).
 - Dev params (`game/params.ts`): `?fixture=`, `?seed=`, `?layout=`, `?map=base56`, `?seats=hbbbbb` (3–8), `?vp=`, `?speed=ms`,
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
   timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
@@ -759,7 +766,15 @@ near winning, plans with production rates). `botForLevel(level)` in `byLevel.ts`
 - **Player trade:** two-step (responders accept, offerer confirms with one partner). Only the current player can initiate.
 - **Bank shortage:** if the bank can't pay a resource to everyone owed, nobody gets it, unless only one player is owed (gets the remainder).
 - **Victory:** only checked for the current player (official: you win on your own turn). Not checked during setup or the special building phase. A player who reaches `vpToWin` on someone else's turn (e.g. Longest Road shifting) wins right after the previous player's `endTurn`, i.e. as their own turn starts.
-- **Steal log:** says who stole from whom, never which card (the log is public).
+- **Steal log:** the public `text` says who stole from whom, never which card. Since #32 the entry
+  also carries `secret: SecretText[]` (`{ to: PlayerId[], text }`): "Red stole 1 wool from Blue"
+  for thief and victim (`stealSecret` in `rules/text.ts`; `log(draft, p, text, secret)`). Every
+  hidden-card steal writes one: robber / knight, event card, C&K (+ Bishop, Spy, Master Merchant),
+  Seafarers and E&P pirates, T&B traders / fish / forced trade (+ C&K combos), BA Taxation (the
+  collector reads all cards, each victim their own). `viewFor` keeps only the viewer's own secrets
+  (spectators none; tested in `bots/viewLeak.test.ts`). The Game Events panel shows the viewer's
+  secret instead of the text, their name as "You" (`groupLog(log, players, viewer)`), and the
+  controllers toast it (`game/notices.ts`).
 - **Road Building (T3):** rejected when the player could place no road at all (no pieces or no legal edge), so the card is never wasted. `remaining = min(2, roads left)`; the phase also ends early once no legal edge remains.
 - **Year of Plenty (T3):** the bank must cover both cards; no partial grant.
 - **Player trade details (T3):** `to` = distinct other players, non-empty. Only `'pending'` responders may respond (no changing your mind). Acceptor must hold `want` when accepting; both sides are re-checked at confirm. Offer auto-closes to `main` when every addressee rejected. The legal sample of `offerTrade` = 1-for-1 offers to all opponents for each held resource.

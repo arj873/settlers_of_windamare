@@ -11,6 +11,7 @@ import {
 import type { BoardEvents, Highlights } from '../render';
 import type { HudEvents, HudView, NewGameConfig } from '../ui';
 import { GameController, type BoardLike, type HudLike } from './controller';
+import type { GameNotice } from './notices';
 import { SAVE_KEY, loadSession, type KeyValueStore } from './persist';
 
 // --- stubs -----------------------------------------------------------------
@@ -80,6 +81,7 @@ let board: FakeBoard;
 let hud: FakeHud;
 let store: MemoryStore;
 let toasts: string[];
+let notices: GameNotice[];
 
 function make(speed = 500): GameController {
   return new GameController({
@@ -88,6 +90,7 @@ function make(speed = 500): GameController {
     storage: store,
     speed,
     toast: (m) => toasts.push(m),
+    notice: (n) => notices.push(n),
   });
 }
 
@@ -96,6 +99,7 @@ beforeEach(() => {
   hud = new FakeHud();
   store = new MemoryStore();
   toasts = [];
+  notices = [];
   vi.useFakeTimers();
 });
 afterEach(() => {
@@ -278,6 +282,10 @@ describe('GameController: viewer and hotseat', () => {
     expect(hud.views.some((v) => v.legal.some((a) => a.type === 'steal'))).toBe(false);
     const total = (r: typeof before) => Object.values(r).reduce((n, k) => n + k, 0);
     expect(total(c.state!.players[1]!.resources)).toBe(total(before) + 1);
+    // #32: the thief is told which card.
+    expect(notices).toEqual([
+      { kind: 'steal', text: expect.stringMatching(/^You stole 1 \w+ from \w+$/) },
+    ]);
 
     // Two victims: the dialog asks.
     c.start(moveRobberGame(), humans4);

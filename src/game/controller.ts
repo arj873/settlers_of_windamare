@@ -33,6 +33,7 @@ import {
   type BoardClick,
   type Seats,
 } from './logic';
+import { emitGameNotice, gameNotices, type GameNotice } from './notices';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
 import {
   IDLE_CLOCK,
@@ -66,6 +67,8 @@ export interface ControllerOptions {
   onRender?: () => void;
   /** Wall clock in ms for the game duration (UX2 stats); default Date.now. */
   wallClock?: () => number;
+  /** Shows a game notice (steal, award; `notices.ts`); default: an info toast. */
+  notice?: (n: GameNotice) => void;
 }
 
 export const DEFAULT_SPEED = 500;
@@ -93,9 +96,12 @@ export class GameController {
   private readonly bot: Bot | null;
   private readonly onRender: () => void;
   private readonly wallClock: () => number;
+  private readonly notice: (n: GameNotice) => void;
   private speedMs: number;
 
   private current: GameState | null = null;
+  /** The state last rendered: notices describe what changed since (null after `start`). */
+  private shown: GameState | null = null;
   private seatList: Seats = [];
   /** Bot level per seat (B1); absent entries play DEFAULT_BOT_LEVEL. */
   private levels: BotLevel[] = [];
@@ -133,6 +139,7 @@ export class GameController {
     this.bot = opts.bot ?? null;
     this.onRender = opts.onRender ?? (() => undefined);
     this.wallClock = opts.wallClock ?? (() => Date.now());
+    this.notice = opts.notice ?? ((n) => this.toast(n.text, 'info'));
     this.speedMs = Math.max(0, opts.speed ?? DEFAULT_SPEED);
 
     this.hud.on('action', (a) => this.dispatch(a));
@@ -201,6 +208,7 @@ export class GameController {
     this.cancelTimer();
     this.stopClock();
     this.current = state;
+    this.shown = null;
     this.seatList = [...seats];
     this.levels = seats.map((_, i) => opts.botLevels?.[i] ?? DEFAULT_BOT_LEVEL);
     this.viewerId = opts.viewer ?? null;
@@ -338,6 +346,12 @@ export class GameController {
       this.refresh();
       return;
     }
+    const prev = this.shown;
+    this.shown = state;
+    // A bot "viewer" (all-bot game) is a spectator: no private texts.
+    const reader =
+      this.viewerId !== null && this.seatList[this.viewerId] === 'human' ? this.viewerId : null;
+    const notices = prev ? gameNotices(prev, state, reader) : [];
     if (state.phase.kind === 'gameOver' && this.durationMs === null && this.startedAt !== null) {
       this.durationMs = this.wallClock() - this.startedAt;
     }
@@ -357,6 +371,10 @@ export class GameController {
     this.updateHighlights();
     this.persist();
     this.onRender();
+    for (const n of notices) {
+      this.notice(n);
+      emitGameNotice(n);
+    }
 
     if (isStalled(state, this.legal)) {
       if (!this.stallReported) {

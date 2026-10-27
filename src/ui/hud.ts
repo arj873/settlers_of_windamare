@@ -643,7 +643,7 @@ export class Hud {
     const wasAtBottom = !old || old.scrollTop + old.clientHeight >= old.scrollHeight - 8;
     const prevTop = old ? old.scrollTop : 0;
 
-    const list = logList(state);
+    const list = logList(state, view.viewer);
     side.classList.toggle('is-open', this.drawerOpen);
     const extPanels = hudExtensionsFor(state).flatMap((x) => {
       const p = x.panel?.(state, view, (a) => this.send(a));

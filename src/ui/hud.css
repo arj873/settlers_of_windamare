@@ -584,6 +584,13 @@
   color: var(--ink-dim);
   font-style: italic;
 }
+/* #32: a private text (which card a steal took): only thief and victim read it. */
+.log-row.is-secret::after {
+  content: ' · private';
+  color: var(--ink-dim);
+  font-size: 0.85em;
+  font-style: italic;
+}
 .log-row .glyph {
   vertical-align: -4px;
   margin: 0 1px;

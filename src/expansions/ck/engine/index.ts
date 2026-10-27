@@ -18,7 +18,7 @@ import { continueRoll } from '../../../engine/actions/turn';
 import { runOnRoll } from '../../../engine/expansions/hooks';
 import type { ExpansionModule, ExtHandler } from '../../../engine/expansions/types';
 import { emptyDevCards } from '../../../engine/resources';
-import { playerName } from '../../../engine/rules/text';
+import { playerName, stealSecret } from '../../../engine/rules/text';
 import { Rng } from '../../../engine/rng';
 import { DICE_CARDS } from '../../../engine/rules/dice';
 import { DICE_DECK_RESHUFFLE_AT, RESOURCES } from '../../../engine/constants';
@@ -608,6 +608,7 @@ export const ckModule: ExpansionModule = {
         draft,
         action.player,
         `${pn(draft, action.player)} stole from ${pn(draft, action.victim)}${card ? '' : ' (no cards)'}`,
+        stealSecret(draft, action.player, action.victim, [card]),
       );
       draft.phase = resumePhase(draft, phase.resume);
       return ok(draft);

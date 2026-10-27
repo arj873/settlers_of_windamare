@@ -24,6 +24,7 @@ import type { SessionAction } from '../../ui/types';
 import type { BoardLike, ToastKind } from '../controller';
 import type { Backend } from './backend';
 import { NetGameController } from './netController';
+import type { GameNotice } from '../notices';
 
 export interface OnlineEnv {
   board: BoardLike;
@@ -35,6 +36,8 @@ export interface OnlineEnv {
   tokens: KeyStore;
   clock: Clock;
   toast: (message: string, kind: ToastKind) => void;
+  /** Shows a game notice (steal, award); default: a toast. */
+  notice?: (n: GameNotice) => void;
   onRender?: () => void;
   /** Where full-screen pages go (document.body). */
   layer: HTMLElement;
@@ -161,6 +164,7 @@ export class OnlineApp {
       hud: env.hud,
       client,
       toast: env.toast,
+      ...(env.notice ? { notice: env.notice } : {}),
       ...(env.onRender ? { onRender: env.onRender } : {}),
     });
     client.on((e) => {
