@@ -74,7 +74,15 @@ import {
   pirateSeats,
   warships,
 } from './pirates';
-import { markClosedRoutes, SHIP, SHIP_COST, SHIP_LIMIT, tradeRouteLength } from './ships';
+import {
+  longerRoute,
+  markClosedRoutes,
+  SHIP,
+  SHIP_COST,
+  SHIP_LIMIT,
+  tradeRoute,
+  tradeRouteLength,
+} from './ships';
 import {
   rulesOf,
   SCENARIOS,
@@ -520,6 +528,10 @@ export const seafarersModule: ExpansionModule = {
 
     roadLength: (state, p, base) =>
       rulesOf(state).longestRoute ? Math.max(base, tradeRouteLength(state, p)) : 0,
+    roadPath: (state, p, base) =>
+      rulesOf(state).longestRoute
+        ? longerRoute(base, tradeRoute(state, p))
+        : { length: 0, edges: [] },
 
     armySize: (state, _p, base) => (rulesOf(state).largestArmy ? base : 0),
 

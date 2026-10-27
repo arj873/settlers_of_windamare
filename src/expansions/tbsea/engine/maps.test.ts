@@ -9,7 +9,7 @@ import { mapKeyOf, seaBoard } from '../../seafarers/engine/maps';
 import { rulesOf, seaSlice } from '../../seafarers/engine/state';
 import { featuresOf, tbBoard, tradersOf } from '../../tb/engine';
 import { pathEdges } from '../../tb/engine/paths';
-import { BASE_MAP, PAIRS, TBSEA, TBSEA_SCENARIOS, shiftId } from '.';
+import { BASE_MAP, PAIRS, TBSEA, shiftId } from '.';
 import { game } from './testkit';
 
 const mainIsland = (s: ReturnType<typeof game>): HexId[] => {
@@ -30,7 +30,7 @@ describe('the mode', () => {
       'tbsea/caravans': 16, // + 2
       'tbsea/barbarianAttack': 14, // "14 or more VPs"
     };
-    for (const sc of TBSEA_SCENARIOS) {
+    for (const sc of PAIRS.map((p) => p.id)) {
       const s = game(sc, 3);
       expect(s.settings.vpToWin, sc).toBe(vp[sc]);
       expect(rulesOf(s).key).toBe('newShores');

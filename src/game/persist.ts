@@ -6,6 +6,8 @@ import { cleanLooks, type SeatLook } from '../ui/profile/model';
 
 export const SAVE_KEY = 'catan:save:v1';
 export const SPEED_KEY = 'catan:botSpeed';
+/** #51: "Show longest road on the board" (1 = on; default off). */
+export const LONGEST_ROAD_KEY = 'catan:showLongestRoad';
 /** "Confirm before building" (issue #28): 1 = on (the default), 0 = off. */
 export const CONFIRM_BUILD_KEY = 'catan:confirmBuild';
 

@@ -114,6 +114,12 @@ export interface BotSpeedControl {
   onChange: (ms: number) => void;
 }
 
+/** An on/off menu setting (#51: "Show longest road on the board"). */
+export interface ToggleControl {
+  value: boolean;
+  onChange: (on: boolean) => void;
+}
+
 /** The "Confirm before building" menu setting (issue #28): ask before a board click builds. */
 export interface BuildConfirmControl {
   value: boolean;

@@ -31,6 +31,7 @@ import {
   totalResources,
 } from '../../../engine/resources';
 import { rollTwoDice } from '../../../engine/rules/dice';
+import { longestRoadTrail } from '../../../engine/rules/longestRoad';
 import type { Rng } from '../../../engine/rng';
 import { piecesLeft, victoryPoints } from '../../../engine/selectors';
 import { canPlaceRoad } from '../../../engine/rules/placement';
@@ -40,6 +41,7 @@ import type {
   ActionResult,
   EdgeId,
   GameState,
+  HexId,
   Phase,
   PlayerId,
   VertexId,
@@ -695,6 +697,12 @@ function secondRoll(draft: GameState): void {
   if (draft.settings.rushMode) rollFor(draft, draft.turn.current);
 }
 
+/** Caravans: the robber never stands on the oasis (unless the board allows it, C3). */
+const oasisBansRobber = (state: GameState, h: HexId): boolean =>
+  has(state, 'caravans') &&
+  state.board.hexes[h]?.terrain === OASIS &&
+  tbBoard(state).robberOnOasis !== true;
+
 /** Gold, tokens and fish for a new settlement on `v` (setup or built). */
 function settled(draft: GameState, p: PlayerId, v: VertexId, setup: boolean): void {
   const riverGold = setup || !sheetRules(draft).riverGoldSetupOnly;
@@ -872,7 +880,7 @@ export const tbModule: ExpansionModule = {
     return list.filter((a) => {
       switch (a.type) {
         case 'moveRobber':
-          return !(has(state, 'caravans') && state.board.hexes[a.hex]?.terrain === OASIS);
+          return !oasisBansRobber(state, a.hex);
         case 'endTurn':
           return endTurnBlocker(state, a.player) === null;
         case 'buildCity':
@@ -951,7 +959,7 @@ export const tbModule: ExpansionModule = {
       return r;
     },
     moveRobber: (draft, action, next) => {
-      if (has(draft, 'caravans') && draft.board.hexes[action.hex]?.terrain === OASIS) {
+      if (oasisBansRobber(draft, action.hex)) {
         return fail('the robber may not stand on the oasis');
       }
       return next(draft, action);
@@ -1017,7 +1025,8 @@ export const tbModule: ExpansionModule = {
         : undefined,
 
     rollDice(draft) {
-      // T&B re-rolls a 2 or 12 when no hex carries them (5-6 and the sheets with those discs: no).
+      // T&B re-rolls a 2 or 12 when no hex carries them (5-6, the sheets with those discs and
+      // T&B + Seafarers Through the Desert: no).
       const reroll212 = has(draft, 'traders') && !carries212(draft);
       const two = tbSlice(draft).two;
       const avoid = two && two.rolls === 1 ? two.firstRoll : null;
@@ -1129,6 +1138,16 @@ export const tbModule: ExpansionModule = {
       let n = has(state, 'caravans') ? Math.max(base, camelRoadLength(state, p)) : base;
       if (isTwo(state)) n = lengthAgainstNeutrals(state, p, n);
       return n;
+    },
+
+    // The route roadLength counts (#51). Traders and a beaten 2-player road count 0: the engine
+    // draws nothing for a 0 length, so only the camels' longer route needs a path here.
+    roadPath(state, p, base) {
+      if (has(state, 'traders')) return { length: 0, edges: [] };
+      if (!has(state, 'caravans')) return base;
+      const camels = new Set(caravansOf(state).camels.map((c) => c.edge));
+      const trail = longestRoadTrail(state, p, (e) => (camels.has(e) ? 2 : 1));
+      return trail.length > base.length ? trail : base;
     },
 
     supply: (state, base) => (has(state, 'ba') ? { ...base, devDeck: emptyDevCards() } : base),

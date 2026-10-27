@@ -144,6 +144,14 @@
   outline-offset: 2px;
 }
 
+/* Header, tabs and footer keep their height; only the body scrolls. (#49: on a tall tab the
+   overflowing tab strip shrank in the column and the active tab's underline crossed its label.) */
+.gs-head,
+.gs-tabs,
+.gs-foot {
+  flex-shrink: 0;
+}
+
 /* ---- body -------------------------------------------------------------- */
 .gs-body {
   flex: 1 1 auto;

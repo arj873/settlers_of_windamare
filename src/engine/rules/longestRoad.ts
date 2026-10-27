@@ -10,12 +10,26 @@ import {
   hasRoadLengthHook,
   hasRouteBlockers,
   hookRoadLength,
+  hookRoadPath,
 } from '../expansions/hooks';
+import type { RouteTrail } from '../expansions/types';
 import { edgeVertices, topologyOf, vertexEdges } from '../topology';
 import { roadsOf } from '../selectors';
 import type { EdgeId, GameState, PlayerId, VertexId } from '../types';
 
 export function longestRoadLength(state: GameState, player: PlayerId): number {
+  return longestRoadTrail(state, player).length;
+}
+
+/**
+ * The longest road trail of `player` and its edges in order (one of them on a tie). `weight`
+ * counts an edge more than once (T&B Caravans: a road under a camel counts twice).
+ */
+export function longestRoadTrail(
+  state: GameState,
+  player: PlayerId,
+  weight: (e: EdgeId) => number = () => 1,
+): RouteTrail {
   const t = topologyOf(state);
   const roads = state.pieces.roads;
   const buildings = state.pieces.buildings;
@@ -27,19 +41,23 @@ export function longestRoadLength(state: GameState, player: PlayerId): number {
   };
 
   const used = new Set<EdgeId>();
-  let best = 0;
+  const path: EdgeId[] = [];
+  let best: RouteTrail = { length: 0, edges: [] };
   const walk = (v: VertexId, len: number): void => {
-    if (len > best) best = len;
+    if (len > best.length) best = { length: len, edges: [...path] };
     for (const e of vertexEdges(t, v)) {
       if (roads[e] !== player || used.has(e)) continue;
       const [a, b] = edgeVertices(t, e) as [VertexId, VertexId];
       const next = a === v ? b : a;
+      const w = weight(e);
       if (blocked(next)) {
-        if (len + 1 > best) best = len + 1;
+        if (len + w > best.length) best = { length: len + w, edges: [...path, e] };
         continue;
       }
       used.add(e);
-      walk(next, len + 1);
+      path.push(e);
+      walk(next, len + w);
+      path.pop();
       used.delete(e);
     }
   };
@@ -61,4 +79,15 @@ export function longestRoadLengths(state: GameState): number[] {
     const base = longestRoadLength(state, p.id);
     return hooked ? hookRoadLength(state, p.id, base) : base;
   });
+}
+
+/**
+ * The edges of `player`'s counted Longest Road (#51: drawn on the board): the road trail, or an
+ * expansion's longer route (roadPath hooks: Seafarers ships, T&B camels). [] when the award's
+ * length is 0 for them (no roads, or a module that switches the award off).
+ */
+export function longestRoadPath(state: GameState, player: PlayerId): EdgeId[] {
+  if ((longestRoadLengths(state)[player] ?? 0) === 0) return [];
+  const base = longestRoadTrail(state, player);
+  return [...hookRoadPath(state, player, base).edges];
 }

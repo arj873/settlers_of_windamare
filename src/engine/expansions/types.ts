@@ -47,6 +47,12 @@ export interface VictoryPointPart {
   vp: number;
 }
 
+/** A counted route (Longest Road): its length as the award counts it and its edges in order. */
+export interface RouteTrail {
+  length: number;
+  edges: readonly EdgeId[];
+}
+
 export interface TerrainInfo {
   kind: 'land' | 'sea' | 'fog';
   /** Display name (HUD, previews). */
@@ -274,6 +280,11 @@ export interface ExpansionHooks {
   routeEdges?(state: GameState, player: PlayerId): readonly EdgeId[];
   /** chained. Length for Longest Road (Seafarers: trade route). */
   roadLength?(state: GameState, player: PlayerId, base: number): number;
+  /**
+   * chained. The route `roadLength` counts, for the board to draw it (#51): return `base` or your
+   * longer route (Seafarers: roads + ships). Modules that only zero the length need not add it.
+   */
+  roadPath?(state: GameState, player: PlayerId, base: RouteTrail): RouteTrail;
   /** chained. Army size for Largest Army, base = knights played (Pirate Islands: no award, 0). */
   armySize?(state: GameState, player: PlayerId, base: number): number;
   /** additive. `player` ended their turn (before the special build phase / next turn). */

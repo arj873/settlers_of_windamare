@@ -148,6 +148,8 @@ export interface TbBoard {
   twoOnTwelve?: HexId | null;
   /** Caravans: start edges, one per oasis arrow. */
   caravanStarts?: CaravanStart[];
+  /** Caravans: the robber may stand on the oasis (Merchant Trains + Forgotten Tribe, C3). */
+  robberOnOasis?: boolean;
   /** Barbarian Attack: castle hexes, coastal hexes in check order (clockwise). */
   castles?: HexId[];
   coast?: HexId[];
@@ -157,7 +159,12 @@ export interface TbBoard {
   noRoad?: EdgeId[];
   /** T&B: the barbarians' start paths when the map moves them (absent = the X marks of §2.6). */
   barbarians?: EdgeId[];
-  /** More numbers on a hex besides its token (Rivers + Merchant Trains: the 2 and 12 on the 3s). */
+  /** Barbarian Attack: knights only on paths touching these hexes (the main island; C3). */
+  knightArea?: HexId[];
+  /**
+   * More numbers on a hex besides its token (Rivers + Merchant Trains: the 2 and 12 on the 3s;
+   * T&B + Seafarers, C3: the number of the hex a lake or watering hole replaced).
+   */
   alsoOn?: { hex: HexId; number: number }[];
   /** A 2025 T&B × T&B sheet's rule changes (module tbpair); absent in the box's scenarios. */
   rules?: TbSheetRules;
