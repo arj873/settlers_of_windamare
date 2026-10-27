@@ -1,5 +1,6 @@
 /** Board-target descriptions for the playtest CLI: "what is at this spot", in words. */
 import {
+  edgeEndpoints,
   edgeVertices,
   setupRoundAt,
   tokenPips,
@@ -131,7 +132,11 @@ export function describeEdge(state: GameState, e: EdgeId, viewer: PlayerId): str
   const hexes = topologyOf(state).edge[e]?.hexes ?? [];
   const sides = hexes.map((h) => hexLabel(state, h));
   if (hexes.length < 2) sides.push('sea');
-  const ends = edgeVertices(topologyOf(state), e).map((v) => endpoint(state, v, viewer));
+  // Open-sea edges (ships) are not in the land topology: take the ends from the id.
+  const t = topologyOf(state);
+  const ends = (t.edge[e] ? edgeVertices(t, e) : edgeEndpoints(e)).map((v) =>
+    endpoint(state, v, viewer),
+  );
   return `between ${sides.join(' | ')}; ends ${ends.join(', ')}`;
 }
 

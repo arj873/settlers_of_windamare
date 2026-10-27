@@ -97,6 +97,13 @@ describe('describeEdge / describeHex', () => {
     expect(text).toContain(`${b} (open)`);
   });
 
+  it('names the ends of an open-sea edge too (not in the land topology)', () => {
+    const e = 'e:0,6,SE' as EdgeId;
+    expect(TOPOLOGY.edge[e]).toBeUndefined();
+    const text = describeEdge(freshGame(3), e, 0);
+    expect(text).toMatch(/^between sea; ends v:\S+ \(open\), v:\S+ \(open\)$/);
+  });
+
   it('lists the buildings around a robber target', () => {
     const h = TOPOLOGY.landHexes[0] as HexId;
     const v = TOPOLOGY.hex[h]?.vertices[0] as VertexId;
