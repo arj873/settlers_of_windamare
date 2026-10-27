@@ -351,6 +351,20 @@ failures, 0 errors, 0 stalls, 0 capped; average turns of a finished game in brac
 | `tb+tb` Fishing + Barbarian Attack     | 300 (360)         | 50 (365)         |
 | `tb+tb` Fishing + Caravans             | 300 (276)         | 50 (274)         |
 
+C4, the six other `tb+tb` sheets (same flags). Every run: 0 invariant failures, 0 errors, 0
+stalls, 0 capped. Spot runs after the T&B seams (20 games each, all clean): `tb` Traders &
+Barbarians 6p and Barbarian Attack 4p, `tb+seafarers` Barbarian Attack, `tb+tb` Fishing + BA,
+`tb+ck` Traders & Barbarians.
+
+| Mode / scenario                                 | 4p (300) finished | 3p (50) finished |
+| ----------------------------------------------- | ----------------- | ---------------- |
+| `tb+tb` Barbarian Attack + Traders & Barbarians | 300 (285)         | 50 (225)         |
+| `tb+tb` Caravans + Barbarian Attack             | 300 (341)         | 50 (333)         |
+| `tb+tb` Caravans + Traders & Barbarians         | 300 (264)         | 50 (219)         |
+| `tb+tb` Rivers + Barbarian Attack               | 300 (332)         | 50 (339)         |
+| `tb+tb` Rivers + Caravans                       | 300 (319)         | 50 (341)         |
+| `tb+tb` Rivers + Traders & Barbarians           | 300 (218)         | 50 (188)         |
+
 The first C2 runs found Rivers stalls (Road Building with only bridge-site ship spots) and a
 Barbarian Attack award lag (a Treason conquest cut the trade route without a recompute); both fixed
 with regression tests (`tbsea.test.ts`, sim seed 55).
