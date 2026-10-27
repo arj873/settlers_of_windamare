@@ -35,6 +35,7 @@ import {
 } from './logic';
 import { emitGameNotice, gameNotices, type NoticeSink } from './notices';
 import { saveSession, type KeyValueStore, type SavedSession } from './persist';
+import { TurnRecap } from './recap';
 import {
   IDLE_CLOCK,
   bankAfterAction,
@@ -49,7 +50,8 @@ import {
   type TurnClock,
 } from './turnTimer';
 
-export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'>;
+export type BoardLike = Pick<BoardView, 'render' | 'setHighlights' | 'on'> &
+  Partial<Pick<BoardView, 'markSince'>>;
 export type HudLike = Pick<Hud, 'render' | 'on' | 'isCovered' | 'setTurnTimer'>;
 export type ToastKind = 'error' | 'info';
 
@@ -102,6 +104,7 @@ export class GameController {
   private current: GameState | null = null;
   /** The state last rendered: notices describe what changed since (null after `start`). */
   private shown: GameState | null = null;
+  private readonly recap = new TurnRecap();
   private seatList: Seats = [];
   /** Bot level per seat (B1); absent entries play DEFAULT_BOT_LEVEL. */
   private levels: BotLevel[] = [];
@@ -209,6 +212,7 @@ export class GameController {
     this.stopClock();
     this.current = state;
     this.shown = null;
+    this.recap.clear();
     this.seatList = [...seats];
     this.levels = seats.map((_, i) => opts.botLevels?.[i] ?? DEFAULT_BOT_LEVEL);
     this.viewerId = opts.viewer ?? null;
@@ -375,6 +379,9 @@ export class GameController {
       this.notice(n, state, reader);
       emitGameNotice(n);
     }
+    // #33: your turn again: briefly mark what the others built since your last one.
+    const since = this.recap.update(prev, state, reader);
+    if (since) this.board.markSince?.(since);
 
     if (isStalled(state, this.legal)) {
       if (!this.stallReported) {

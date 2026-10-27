@@ -506,7 +506,17 @@ view.isFitted();                          // false once the user panned/zoomed, 
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
+view.markSince(earlierState);             // #33 recap: faint rings on the pieces built since then
 ```
+
+- Just-built marks (#33, `render/marks.ts`): every `render` diffs the board's pieces (`allSites`:
+  buildings, roads, and each active drawer's `sites` hook: Seafarers ships, C&K knights / walls)
+  with the last render's and puts two expanding, fading rings in the builder's colour on each new
+  or changed one (a city upgrade, a moved ship, a promoted knight), ~1.7 s, on top of the pop-in.
+  More than `MAX_LIVE_MARKS` (6) new pieces at once (a loaded game, another board) mark nothing.
+  Both controllers call `markSince` with the state the viewer's last turn ended in when their next
+  turn starts (`game/recap.ts`, `TurnRecap`): one fainter ring per piece built meanwhile (at most
+  16). Marks keep the ticker running while they fade; `setAnimated(false)` drops them at once.
 
 - Render on demand (`render/frames.ts`): the view stops `app.ticker` after the first frame with
   nothing moving and restarts it on any change (state, highlights, hover, pan/zoom, resize,

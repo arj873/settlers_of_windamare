@@ -18,6 +18,10 @@ import { SAVE_KEY, loadSession, type KeyValueStore } from './persist';
 
 class FakeBoard implements BoardLike {
   renders = 0;
+  recaps: GameState[] = [];
+  markSince(since: GameState): void {
+    this.recaps.push(since);
+  }
   highlights: Highlights = {};
   private handlers = new Map<string, ((id: never) => void)[]>();
   render(): void {
@@ -145,6 +149,23 @@ describe('GameController: rendering and actions', () => {
     ]);
     hud.emit('action', { type: 'endTurn', player: 1 });
     expect(notices).toHaveLength(1);
+  });
+
+  it('marks what the others built when the viewer’s turn comes back (#33)', () => {
+    const c = make(0);
+    // Blue (1) is the human; the bots play their turns at instant speed.
+    c.start(midGame(), ['bot', 'human', 'bot', 'bot']);
+    hud.emit('action', { type: 'endTurn', player: 1 });
+    const ended = c.state!;
+    for (let i = 0; i < 400 && c.state!.turn.current !== 1; i++) {
+      // Blue answers what the bots ask of them (trade offers, discards on a 7).
+      const owed = c.legalActions.filter((a) => a.player === 1);
+      const reply = owed.find((a) => a.type === 'rejectTrade') ?? owed[0];
+      if (reply) hud.emit('action', reply);
+      vi.advanceTimersByTime(20);
+    }
+    expect(c.state!.turn.current).toBe(1);
+    expect(board.recaps).toEqual([ended]);
   });
 
   it('applies HUD actions through applyAction and re-renders', () => {

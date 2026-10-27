@@ -17,6 +17,7 @@ import {
   type BoardClick,
 } from '../logic';
 import { emitGameNotice, gameNotices, type NoticeSink } from '../notices';
+import { TurnRecap } from '../recap';
 
 export interface NetControllerOptions {
   board: BoardLike;
@@ -68,6 +69,7 @@ export class NetGameController {
   private shownSec = -1;
   /** The last rendered view, to notice an ended trade offer (`tradeEndNotice`). */
   private shown: GameState | null = null;
+  private readonly recap = new TurnRecap();
   /** The last action this seat sent (a cancel / confirm / reject ends offers on purpose). */
   private lastSent: Action['type'] | null = null;
   /** The steal phase whose only steal this seat already sent on its own (#34). */
@@ -194,6 +196,9 @@ export class NetGameController {
       this.notice(n, g.view, hv.viewer < 0 ? null : hv.viewer);
       emitGameNotice(n);
     }
+    // #33: your turn again: briefly mark what the others built since your last one.
+    const since = this.recap.update(prev, g.view, hv.viewer);
+    if (since) this.board.markSince?.(since);
   }
 
   /** Toast how a trade offer this seat took part in ended, unless the seat ended it itself. */
