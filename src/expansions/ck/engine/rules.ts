@@ -80,6 +80,15 @@ export const MEDICINE_COST: ResourceCounts = { brick: 0, lumber: 0, wool: 0, gra
 
 const pn = playerName;
 
+/**
+ * Who owns a knight, for the log: a seat, or a neutral player (Catan for Two + C&K gives the two
+ * neutrals knights, owned by ids past the seats; named like T&B's NEUTRAL_NAMES).
+ */
+export function ownerName(state: GameState, owner: PlayerId): string {
+  const neutral = owner - state.players.length;
+  return neutral >= 0 ? `Neutral ${neutral + 1}` : pn(state, owner);
+}
+
 // ---------------------------------------------------------------------------
 // Goods
 // ---------------------------------------------------------------------------
@@ -430,13 +439,13 @@ export function displaced(draft: GameState, knight: Knight, from: VertexId): CkP
     log(
       draft,
       knight.owner,
-      `${pn(draft, knight.owner)}'s knight had nowhere to go and was removed`,
+      `${ownerName(draft, knight.owner)}'s knight had nowhere to go and was removed`,
     );
     return null;
   }
   if (spots.length === 1) {
     putKnight(draft, spots[0] as VertexId, knight);
-    log(draft, knight.owner, `${pn(draft, knight.owner)}'s knight retreated`);
+    log(draft, knight.owner, `${ownerName(draft, knight.owner)}'s knight retreated`);
     return null;
   }
   return { kind: 'ck/relocate', player: knight.owner, from, knight };
