@@ -87,11 +87,13 @@ function check(state: GameState): Violation[] {
   if (!s.gold.every(isCount)) bad(`negative gold ${String(s.gold)}`);
   if (s.goldBuys > 2) bad(`${s.goldBuys} gold purchases this turn`);
 
-  // Development cards: deck + hands + played (+ knights turned in) = the supply.
+  // Development cards: deck + hands + played (+ knights turned in) = the supply. With Seafarers
+  // its own check counts them, Forgotten Tribe gifts on the board too (C3; never Catan for Two).
   const supply = supplyOf(state);
   const played = (p: (typeof state.players)[number], c: DevCardType) =>
     c === 'knight' ? p.knightsPlayed : c === 'victoryPoint' ? 0 : p.progressCardsPlayed[c];
-  for (const c of DEV_CARD_TYPES) {
+  const seaCounts = state.settings.expansions.includes('seafarers');
+  for (const c of seaCounts ? [] : DEV_CARD_TYPES) {
     const deck = state.devDeck.filter((x) => x === c).length;
     const held = sum(state.players.map((p) => p.devCards[c] + p.newDevCards[c] + played(p, c)));
     const gone = c === 'knight' ? (s.two?.knightsDiscarded ?? 0) : 0;
@@ -151,7 +153,9 @@ function check(state: GameState): Violation[] {
     const edges = c.camels.map((x) => x.edge);
     if (new Set(edges).size !== edges.length) bad('two camels on one edge');
     if (!edges.every((e) => paths.has(e))) bad('a camel off the board');
-    if (state.board.hexes[state.robber]?.terrain === 'tb/oasis') bad('the robber is on the oasis');
+    if (state.board.hexes[state.robber]?.terrain === 'tb/oasis' && !tbBoard(state).robberOnOasis) {
+      bad('the robber is on the oasis');
+    }
   }
 
   if (has(state, 'ba')) {
@@ -184,7 +188,8 @@ function check(state: GameState): Violation[] {
     tr.level.forEach((l, p) => {
       if (!Number.isInteger(l) || l < 1 || l > MAX_LEVEL) bad(`baggage train level ${l}`, p);
     });
-    if (state.phase.kind !== 'setup') {
+    // After the set-up (a setup settlement on gold may open Seafarers' gold choice in it: C3).
+    if (state.phase.kind !== 'setup' && state.turn.number > 0) {
       tr.wagons.forEach((w, p) => {
         if (w === null || (!isBoardVertex(t, w) && pathsAt(state, w).length === 0)) {
           bad(`wagon at ${String(w)}`, p);

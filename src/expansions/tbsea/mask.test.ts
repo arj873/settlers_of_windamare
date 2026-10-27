@@ -4,7 +4,16 @@
  * modules are composed, and the Seafarers slice reaches every viewer unchanged on New Shores.
  */
 import { describe, expect, it } from 'vitest';
-import { viewFor, type GameState, type HexId, type Viewer } from '../../engine';
+import {
+  viewFor,
+  type DevCardType,
+  type EdgeId,
+  type GameState,
+  type HexId,
+  type Terrain,
+  type Viewer,
+} from '../../engine';
+import type { Gift, SeaSlice } from '../seafarers/engine';
 import { canary, canaryNumber, expectNoLeak, sampleStates, type Plant } from '../maskTestkit';
 import { TB, tbSlice, type BaCard, type Commodity, type TbSlice } from '../tb/engine';
 import { TBSEA, TBSEA_MODE } from './engine';
@@ -59,6 +68,53 @@ describe('T&B + Seafarers online views', () => {
     const report = expectNoLeak(states, plant);
     expect(report.planted).toBeGreaterThan(5);
     if (perSeat) expect(report.ownerSaw).toBeGreaterThan(players);
+  });
+
+  // C3: the other Seafarers scenarios (fish hands and pool, BA deck, commodity stacks).
+  it.each([
+    ['tbsea/fishermenFog', 4, 35, true],
+    ['tbsea/fishermenTribe', 3, 36, true],
+    ['tbsea/fishermenNewWorld', 4, 37, true],
+    ['tbsea/tradersDesert', 4, 38, false],
+    ['tbsea/barbarianAttackDesert', 3, 39, false],
+  ])('%s, %i players: T&B secrets stay hidden', (scenario, players, seed, perSeat) => {
+    const states = sample(scenario, players, seed);
+    const report = expectNoLeak(states, plant);
+    expect(report.planted).toBeGreaterThan(5);
+    if (perSeat) expect(report.ownerSaw).toBeGreaterThan(players);
+  });
+
+  it('the Seafarers secrets of the composed scenario stay hidden: fog stacks, Tribe gifts', () => {
+    const plantSea: Plant = (state, owner) => {
+      if (owner !== null) return null;
+      const s = state.ext['seafarers'] as SeaSlice;
+      const out: SeaSlice = { ...s };
+      const canaries: string[] = [];
+      if (s.fog && s.fog.terrains.length > 0) {
+        const terrains = s.fog.terrains.map((_, i) => canary(`fog${i}`) as Terrain);
+        out.fog = { ...s.fog, terrains };
+        canaries.push(...terrains);
+      }
+      if (s.gifts) {
+        const gifts = { ...s.gifts };
+        for (const [e, g] of Object.entries(gifts) as [EdgeId, Gift][]) {
+          if (g.kind !== 'dev') continue;
+          const card = canary(`gift${e}`) as DevCardType;
+          gifts[e] = { kind: 'dev', card };
+          canaries.push(card);
+        }
+        out.gifts = gifts;
+      }
+      if (canaries.length === 0) return null;
+      return { state: { ...state, ext: { ...state.ext, seafarers: out } }, canaries };
+    };
+    for (const [sc, seed] of [
+      ['tbsea/riversFog', 40],
+      ['tbsea/fishermenTribe', 41],
+      ['tbsea/caravansTribe', 42],
+    ] as const) {
+      expect(expectNoLeak(sample(sc, 4, seed), plantSea).planted, sc).toBeGreaterThan(5);
+    }
   });
 
   it('the pair keeps no slice; the Seafarers slice has no secret on New Shores', () => {
