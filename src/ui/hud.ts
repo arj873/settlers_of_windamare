@@ -55,6 +55,8 @@ import { bankPanel, logList, playersList } from './sidebar';
 import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
+import { loadAnimations, saveAnimations } from './motion';
+import { ProductionFx, type HexLocator } from './production/fx';
 import type {
   BotSpeedControl,
   HudEventName,
@@ -164,6 +166,8 @@ export class Hud {
   /** Disabled build button whose reason was tapped open. */
   private whyKind: BuildKind | null = null;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Issue #29: cards flying from the producing hexes after a roll, gain badges on the rows. */
+  private readonly fx: ProductionFx;
   private onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.menuOpen) {
@@ -193,6 +197,7 @@ export class Hud {
       overlay: mk('hud-overlay-layer'),
     };
     root.replaceChildren(...Object.values(this.regions));
+    this.fx = new ProductionFx(root);
     document.addEventListener('keydown', this.onKey);
     document.addEventListener('click', this.onDocClick, true);
   }
@@ -200,6 +205,7 @@ export class Hud {
   /** Remove listeners and DOM. */
   destroy(): void {
     if (this.whyTimer !== null) clearTimeout(this.whyTimer);
+    this.fx.destroy();
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('click', this.onDocClick, true);
     this.root.replaceChildren();
@@ -255,6 +261,12 @@ export class Hud {
     this.view = view;
     this.syncLocalState(state, view);
     this.refresh();
+    this.fx.update(state, view, this.isCovered());
+  }
+
+  /** Where board hexes are on screen (`BoardView.screenPos`): the production cards start there. */
+  setHexLocator(locate: HexLocator | null): void {
+    this.fx.setLocator(locate);
   }
 
   /** The hotseat cover or the new-game screen hides the game (the controller pauses the turn timer). */
@@ -549,6 +561,7 @@ export class Hud {
               ),
             ),
           ),
+        this.animationsToggle(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
         h(
           'a',
@@ -565,6 +578,37 @@ export class Hud {
         ),
       ),
     ];
+  }
+
+  /** Animations on / off (saved like the theme): off = no flying cards, badges only. */
+  private animationsToggle(): HTMLElement {
+    const on = loadAnimations();
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Animations'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Animations' } },
+        ...[true, false].map((v) =>
+          h(
+            'button',
+            {
+              class: `seg-btn${v === on ? ' is-on' : ''}`,
+              attrs: { 'aria-pressed': String(v === on), 'data-animations': v ? 'on' : 'off' },
+              on: {
+                click: () => {
+                  saveAnimations(v);
+                  if (!v) this.fx.clear();
+                  this.refresh();
+                },
+              },
+            },
+            v ? 'On' : 'Off',
+          ),
+        ),
+      ),
+    );
   }
 
   private turnPill(state: GameState, view: HudView): HTMLElement[] {
@@ -751,6 +795,7 @@ export class Hud {
         {
           class: `hcard rcard rc-${r}${stackCls(n)}`,
           title: `${RESOURCE_LABEL[r]}: ${n} (bank ${ratios[r]}:1)`,
+          attrs: { 'data-card': r },
         },
         resCardFace(r, 46),
         ratios[r] < 4 && h('span', { class: `ratio-tag r${ratios[r]}` }, `${ratios[r]}:1`),

@@ -85,6 +85,12 @@ export interface HudExtension {
   handCards?(state: GameState, view: HudView, send: (a: Action) => void): Child[];
   /** Extra items shown in the open trade offer's `give` / `want` row (C&K commodities). */
   offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
+  /**
+   * Card art for a kind of card this module hands out (as the log names it: 'paper', 'gold',
+   * 'fish' ...), `w` px wide; null = not one of this module's. The production animation flies
+   * it; without one it flies a generic token.
+   */
+  cardFace?(kind: string, w: number): HTMLElement | null;
   /** Action types submitted by a plain board click, without a button (like moveRobber). */
   impliedActions?: readonly string[];
   /**

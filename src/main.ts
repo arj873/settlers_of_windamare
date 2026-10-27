@@ -113,6 +113,8 @@ async function boot() {
   onThemeChange(frameToTheme);
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const hud = new Hud(uiRoot);
+  // Production cards (issue #29) fly from the hexes: hotseat and online share the HUD.
+  hud.setHexLocator((id) => board.screenPos(id));
 
   const fitBoard = () => {
     const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
