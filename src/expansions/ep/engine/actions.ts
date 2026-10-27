@@ -25,7 +25,7 @@ import { canPlaceRoad, isVertexOpen, touchesLand } from '../../../engine/rules/p
 import { checkVictory } from '../../../engine/rules/victory';
 import { playerName } from '../../../engine/rules/text';
 import { piecesLeft, setupOrderOf } from '../../../engine/selectors';
-import { edgeInfo, topologyOf } from '../../../engine/topology';
+import { edgeInfo, topologyOf, vertexInfo } from '../../../engine/topology';
 import type {
   Action,
   BaseActionType,
@@ -147,11 +147,21 @@ export function shipText(ship: Pick<Ship, 'cargo'>): string {
   return `a ship with ${parts.join(' and ')}`;
 }
 
-/** Where a ship on `e` lies, for the log: the explored land and sites beside it, or open sea. */
+/**
+ * Where a ship on `e` lies, for the log: the explored land and sites touching the edge (its two
+ * sides and the corners at its ends, where settlers land), or open sea.
+ */
 export function shipPlace(state: GameState, e: EdgeId): string {
-  const info = edgeInfo(topologyOf(state), e);
+  const t = topologyOf(state);
+  const info = edgeInfo(t, e);
   const s = epSlice(state);
-  const near = [...(info?.hexes ?? []), ...(info?.seas ?? [])].flatMap((h) => {
+  const ends = (info?.vertices ?? []).map((v) => vertexInfo(t, v));
+  const hexes = new Set<HexId>([
+    ...(info?.hexes ?? []),
+    ...(info?.seas ?? []),
+    ...ends.flatMap((v) => [...(v?.hexes ?? []), ...(v?.seas ?? [])]),
+  ]);
+  const near = [...hexes].flatMap((h) => {
     const tile = state.board.hexes[h];
     if (!tile || s.hidden[h]) return [];
     if (s.lairs[h]) return ['a pirate lair'];
@@ -161,7 +171,9 @@ export function shipPlace(state: GameState, e: EdgeId): string {
     const what = tile.terrain === 'gold' ? 'gold field' : tile.terrain;
     return [tile.token === null ? what : `${what} ${tile.token}`];
   });
-  return near.length > 0 ? `next to ${near.join(' and ')}` : 'out on open sea';
+  if (near.length === 0) return 'out on open sea';
+  const last = near.pop() as string;
+  return `next to ${near.length > 0 ? `${near.join(', ')} and ${last}` : last}`;
 }
 
 const isEdge = (x: unknown): x is EdgeId => typeof x === 'string' && x.startsWith('e:');

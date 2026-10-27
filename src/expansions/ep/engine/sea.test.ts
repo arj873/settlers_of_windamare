@@ -176,6 +176,8 @@ describe('the movement log says what sailed where', () => {
     const who = s.players[0]?.name;
     const line = s.log.map((e) => e.text).find((t) => t.includes(' sailed '));
     expect(line).toBe(`${who} sailed a ship with a settler 2 spaces, next to lumber 5`);
+    // The move turned (9,2) over: it touches the end of the edge (settlers land at corners).
+    expect(shipPlace(s, E(7, 2, 'NE'))).toMatch(/^next to lumber 5 and ore( \d+)?$/);
     epSlice(s).hidden[H(7, 2)] = { terrain: 'brick' };
     expect(shipPlace(s, E(7, 2, 'NE'))).not.toContain('lumber');
   });
