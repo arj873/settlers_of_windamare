@@ -43,6 +43,7 @@ import {
   ckSlice,
   commodityCount,
   defenderStrength,
+  giveRatio,
   improvementCost,
   isCommodity,
   knightsInSupply,
@@ -373,13 +374,21 @@ function select(opts: readonly [string, string][]): HTMLSelectElement {
   return el;
 }
 
-function bankForm(view: HudView, send: Send): HTMLElement | null {
+function bankForm(state: GameState, view: HudView, send: Send): HTMLElement | null {
   const trades = mine(view, 'ck/bankTrade');
   if (trades.length === 0) return null;
   const gives = [...new Set(trades.map((a) => field(a, 'give') as Good))];
   const give = select(gives.map((g) => [g, goodLabel(g)]));
   const receive = select([]);
   const go = h('button', { class: 'btn btn-sm' }, 'Trade');
+  // The button states the price: one click trades at once (no dialog).
+  const price = () => {
+    const n = giveRatio(state, view.viewer, give.value as Good);
+    go.textContent = `Trade ${n}:1`;
+    const got = goodLabel(receive.value as Good);
+    go.setAttribute('aria-label', `Give ${n} ${goodLabel(give.value as Good)} for 1 ${got}`);
+  };
+  receive.addEventListener('change', price);
   const sync = () => {
     const options = trades.filter((a) => field(a, 'give') === give.value);
     receive.replaceChildren(
@@ -390,6 +399,7 @@ function bankForm(view: HudView, send: Send): HTMLElement | null {
         return o;
       }),
     );
+    price();
   };
   give.addEventListener('change', sync);
   go.addEventListener('click', () => {
@@ -844,7 +854,7 @@ export const ckHud: HudExtension = {
       const extra = [
         alchemistForm(view, send),
         progressList(state, view, send),
-        bankForm(view, send),
+        bankForm(state, view, send),
         offerForm(state, view, send),
       ].filter((x): x is HTMLElement => x !== null);
       if (extra.length > 0) body.append(h('div', { class: 'ck-actions' }, ...extra));

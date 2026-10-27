@@ -135,6 +135,33 @@ describe('C&K HUD', () => {
     }
   });
 
+  it('the commodity Bank form states the price on its button', () => {
+    const s = main();
+    setGoods(s, 0, { grain: 4, coin: 4 });
+    show(s);
+    const form = [...root.querySelectorAll('.sec-ext-ck .ck-form')].find((f) =>
+      f.textContent?.startsWith('Bank'),
+    )!;
+    const [give, receive] = [...form.querySelectorAll('select')];
+    const go = form.querySelector('button')!;
+    give!.value = 'grain';
+    give!.dispatchEvent(new Event('change'));
+    receive!.value = 'paper';
+    receive!.dispatchEvent(new Event('change'));
+    expect(go.textContent).toBe('Trade 4:1');
+    expect(go.getAttribute('aria-label')).toBe('Give 4 Grain for 1 Paper');
+    go.click();
+    expect(actions.at(-1)).toEqual({
+      type: 'ck/bankTrade',
+      player: 0,
+      give: 'grain',
+      receive: 'paper',
+    });
+    give!.value = 'coin';
+    give!.dispatchEvent(new Event('change'));
+    expect(go.getAttribute('aria-label')).toMatch(/^Give 4 Coin for 1 /);
+  });
+
   it('Improve buttons send ck/improve; progress cards have Play buttons', () => {
     const s = main();
     build(s, 0, V(0, 0, 'S'), 'city');
