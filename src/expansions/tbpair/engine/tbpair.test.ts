@@ -57,7 +57,7 @@ describe('the mode and boards', () => {
       'tbpair/fishBa': ['ba', 12],
       'tbpair/fishCaravans': ['caravans', 12],
     };
-    for (const sc of TBPAIR_SCENARIOS) {
+    for (const sc of FISH_PAIRS.map((p) => p.id)) {
       const s = game(sc, 3);
       expect(s.settings.expansions).toEqual([TBPAIR, 'tb']);
       expect(featuresOf(sc)).toEqual(['fish', want[sc]?.[0]]);

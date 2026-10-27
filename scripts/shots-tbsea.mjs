@@ -2,32 +2,43 @@
 // mode's scenario tiles, then an all-bot game per scenario (start, and mid-game in two or more
 // themes). No page errors allowed.
 // --epck: the E&P + C&K sidebar check (a tall C&K panel next to the E&P one).
-// Usage: node scripts/shots-tbsea.mjs <baseUrl> <outDir> [--pairs | --epck] [--setup-only]
+// --sheets: the six T&B × T&B sheets without Fishing (C4).
+// Usage: node scripts/shots-tbsea.mjs <baseUrl> <outDir> [--pairs | --sheets | --epck] [--setup-only]
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const [base = 'http://localhost:4173', out = 'playtest/shots/tbsea'] = args;
 mkdirSync(out, { recursive: true });
-const PAIRS = process.argv.includes('--pairs');
+const SHEETS = process.argv.includes('--sheets');
+const PAIRS = SHEETS || process.argv.includes('--pairs');
 const EPCK = process.argv.includes('--epck');
 const MODE = EPCK ? 'ep+ck' : PAIRS ? 'tb+tb' : 'tb+seafarers';
 const GAMES = EPCK
   ? [{ scenario: 'ep/full', themes: ['sunfired', 'githubdark'], turn: 30 }]
-  : PAIRS
+  : SHEETS
     ? [
-        { scenario: 'tbpair/fishRivers', themes: ['sunfired', 'githubdark'], turn: 40 },
-        { scenario: 'tbpair/fishTraders', themes: ['chartroom', 'materialdark'], turn: 40 },
-        { scenario: 'tbpair/fishBa', themes: ['parlour', 'githubdark'], turn: 40 },
-        { scenario: 'tbpair/fishCaravans', themes: ['wood', 'materialdark'], turn: 40 },
+        { scenario: 'tbpair/baTraders', themes: ['sunfired', 'githubdark'], turn: 45 },
+        { scenario: 'tbpair/caravansBa', themes: ['chartroom', 'materialdark'], turn: 40 },
+        { scenario: 'tbpair/caravansTraders', themes: ['parlour', 'githubdark'], turn: 40 },
+        { scenario: 'tbpair/riversBa', themes: ['wood', 'materialdark'], turn: 40 },
+        { scenario: 'tbpair/riversCaravans', themes: ['sunfired', 'githubdark'], turn: 40 },
+        { scenario: 'tbpair/riversTraders', themes: ['chartroom', 'materialdark'], turn: 40 },
       ]
-    : [
-        { scenario: 'tbsea/traders', themes: ['sunfired', 'chartroom', 'githubdark'], turn: 45 },
-        { scenario: 'tbsea/fishermen', themes: ['parlour', 'materialdark'], turn: 40 },
-        { scenario: 'tbsea/rivers', themes: ['wood', 'githubdark'], turn: 40 },
-        { scenario: 'tbsea/caravans', themes: ['sunfired', 'materialdark'], turn: 50 },
-        { scenario: 'tbsea/barbarianAttack', themes: ['chartroom', 'githubdark'], turn: 40 },
-      ];
+    : PAIRS
+      ? [
+          { scenario: 'tbpair/fishRivers', themes: ['sunfired', 'githubdark'], turn: 40 },
+          { scenario: 'tbpair/fishTraders', themes: ['chartroom', 'materialdark'], turn: 40 },
+          { scenario: 'tbpair/fishBa', themes: ['parlour', 'githubdark'], turn: 40 },
+          { scenario: 'tbpair/fishCaravans', themes: ['wood', 'materialdark'], turn: 40 },
+        ]
+      : [
+          { scenario: 'tbsea/traders', themes: ['sunfired', 'chartroom', 'githubdark'], turn: 45 },
+          { scenario: 'tbsea/fishermen', themes: ['parlour', 'materialdark'], turn: 40 },
+          { scenario: 'tbsea/rivers', themes: ['wood', 'githubdark'], turn: 40 },
+          { scenario: 'tbsea/caravans', themes: ['sunfired', 'materialdark'], turn: 50 },
+          { scenario: 'tbsea/barbarianAttack', themes: ['chartroom', 'githubdark'], turn: 40 },
+        ];
 
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],

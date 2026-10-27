@@ -32,6 +32,7 @@ Combinations (C1, `docs/rules/combos.md`): `seack` (mode `seafarers+ck`) and `tb
 `tb+ck`), small modules that `requires` two expansions, run first (`before`) and add only the
 pair's rules (§11). C2: `tbsea` (mode `tb+seafarers`), each T&B scenario on Heading for New
 Shores, through the `playsAs` / `basedOn` seam (§11). E5b added `epck` (mode `ep+ck`) and `eptb` (mode `ep+tb`).
+C4: the six other T&B × T&B sheets in `tb+tb` (static sheet rules on the board, `TbSheetRules`).
 
 ---
 
@@ -468,14 +469,14 @@ with `pairedTurns56: true` (E5, E&P) defaults 5+ player games to the paired play
 Official combinations are per scenario (`docs/rules/scenarios-and-combos.md` part C). Built (C1,
 engine status per rule in `docs/rules/combos.md`):
 
-| Mode           | Module   | Composes          | Scenarios (VP)                                                                                 |
-| -------------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                     |
-| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                |
-| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2) |
-| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + Barbarian Attack 12, + Caravans 12; 3-4 (C2)                  |
-| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                          |
-| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                        |
+| Mode           | Module   | Composes          | Scenarios (VP)                                                                                                                                                  |
+| -------------- | -------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seafarers+ck` | `seack`  | `ck`, `seafarers` | Heading for New Shores, Through the Desert (scenario + 2: 16), 3-6 players                                                                                      |
+| `tb+ck`        | `tbck`   | `ck`, `tb`        | Fishermen 13, Rivers 13, Caravans 15, Traders & Barbarians 15, variants 13; 3-6                                                                                 |
+| `tb+seafarers` | `tbsea`  | `seafarers`, `tb` | Each T&B scenario on New Shores: T&B 17, Fishermen 14, Rivers 14, Caravans 16, BA 14; 3-4 (C2)                                                                  |
+| `tb+tb`        | `tbpair` | `tb` (twice)      | Fishing + Rivers 10, + T&B 12, + BA 12, + Caravans 12 (C2); BA + T&B 14, Caravans + BA 12, Caravans + T&B 15, Rivers + BA 12, + Caravans 12, + T&B 13 (C4); 3-4 |
+| `ep+ck`        | `epck`   | `ck`, `ep`        | Pirate Lairs 17, Fish 20, Spices 20, full game 22 (scenario + 5); 3-4                                                                                           |
+| `ep+tb`        | `eptb`   | `tb`, `ep`        | The Fishermen on every E&P scenario (scenario VP; the old boot +1); 3-4                                                                                         |
 
 How a combination is built:
 

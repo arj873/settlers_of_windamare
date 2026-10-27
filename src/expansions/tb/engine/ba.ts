@@ -41,6 +41,8 @@ import {
   PRISONER_CONSOLATION_GOLD,
   TREASON_GOLD,
   baOf,
+  hexHasNumber,
+  sheetRules,
   tbBoard,
   type BaCard,
   type BaSlice,
@@ -50,9 +52,11 @@ import {
 
 export function initBa(state: GameState, rng: Rng): BaSlice {
   const coast = tbBoard(state).coast ?? [];
+  const rules = sheetRules(state);
   const onHex: Record<HexId, number> = {};
-  // One barbarian on a coastal "2" and one on a coastal "12".
-  for (const n of [2, 12]) {
+  // One barbarian on a coastal "2" and one on a coastal "12" (a sheet may name the hexes).
+  for (const h of rules.baStart ?? []) onHex[h] = 1;
+  for (const n of rules.baStart ? [] : [2, 12]) {
     const h = coast.find((x) => state.board.hexes[x]?.token === n);
     if (h) onHex[h] = 1;
   }
@@ -65,17 +69,34 @@ export function initBa(state: GameState, rng: Rng): BaSlice {
     deck: rng.shuffle(BA_DECK.flatMap(([c, k]) => Array<BaCard>(k).fill(c))),
     discard: [],
     moved: [],
+    ...(rules.barbarianPaths ? { paths: {} } : {}),
   };
 }
 
 const coastOf = (state: GameState): HexId[] => tbBoard(state).coast ?? [];
 export const barbariansOn = (state: GameState, h: HexId): number => baOf(state).onHex[h] ?? 0;
 
-function setBarbarians(draft: GameState, h: HexId, n: number): void {
+/**
+ * Hexes that may hold barbarians in check order: the coast, then (BA + T&B, where Treason and a
+ * drive-off reach any hex) the other hexes holding some.
+ */
+export function barbarianHexes(state: GameState): HexId[] {
+  const coast = coastOf(state);
+  const inland = (Object.keys(baOf(state).onHex) as HexId[]).filter((h) => !coast.includes(h));
+  return inland.length === 0 ? coast : [...coast, ...inland];
+}
+
+/** Set the barbarians on `h` (BA + T&B: none left there, none by its paths). */
+export function setBarbarians(draft: GameState, h: HexId, n: number): void {
   const s = baOf(draft);
   const was = s.onHex[h] ?? 0;
   if (n > 0) s.onHex[h] = n;
   else Reflect.deleteProperty(s.onHex, h);
+  if (n <= 0 && s.paths) {
+    for (const [e, at] of Object.entries(s.paths) as [EdgeId, HexId][]) {
+      if (at === h) Reflect.deleteProperty(s.paths, e);
+    }
+  }
   const name = draft.board.hexes[h]?.token ?? '?';
   if (was < CONQUER_AT && n >= CONQUER_AT)
     log(draft, null, `The barbarians conquered the ${name} hex`);
@@ -96,7 +117,7 @@ export function landBarbarians(draft: GameState): void {
     for (let tries = 0; tries < 200 && (n === 7 || used.includes(n)); tries++) n = rollTwo(draft);
     if (n === 7 || used.includes(n)) break;
     used.push(n);
-    const hexes = coast.filter((h) => draft.board.hexes[h]?.token === n);
+    const hexes = coast.filter((h) => hexHasNumber(draft, h, n));
     let landed = 0;
     for (const h of hexes) {
       const k = s.onHex[h] ?? 0;
@@ -275,7 +296,7 @@ function battle(draft: GameState, h: HexId): void {
 
 /** Every coastal hex in check order: a victory where knights outnumber the barbarians. */
 export function expelBarbarians(draft: GameState): void {
-  for (const h of coastOf(draft)) battle(draft, h);
+  for (const h of barbarianHexes(draft)) battle(draft, h);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +334,7 @@ const CARD_NAME: Readonly<Record<BaCard, string>> = {
 };
 
 export const treasonSources = (state: GameState, used: readonly HexId[]): HexId[] =>
-  coastOf(state).filter((h) => barbariansOn(state, h) > 0 && !used.includes(h));
+  barbarianHexes(state).filter((h) => barbariansOn(state, h) > 0 && !used.includes(h));
 
 export function treasonDests(
   state: GameState,
@@ -420,7 +441,7 @@ export function conqueredProduction(
   cityYield: number,
 ): void {
   const t = topologyOf(state);
-  for (const h of coastOf(state)) {
+  for (const h of barbarianHexes(state)) {
     const tile = state.board.hexes[h];
     if (!tile || tile.token !== roll || !isConqueredHex(state, h)) continue;
     const r = tile.terrain;

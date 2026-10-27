@@ -58,6 +58,7 @@ import {
   type Commodity,
   type FishUse,
   type TbPhase,
+  sheetRules,
 } from './engine';
 import './tb.css';
 
@@ -198,7 +199,8 @@ function wealthMarks(state: GameState, p: PlayerId): Child[] {
   if (mine === max && gold.filter((g) => g === max).length === 1) {
     out.push(h('span', { class: 'tb-tag is-good', title: 'Wealthiest Settler: +1 VP' }, '+1'));
   }
-  if (mine === min)
+  // No penalty on the Rivers + BA and Rivers + T&B sheets.
+  if (mine === min && !sheetRules(state).noPoorVp)
     out.push(h('span', { class: 'tb-tag is-bad', title: 'Poor Settler: −2 VP' }, '−2'));
   return out;
 }
