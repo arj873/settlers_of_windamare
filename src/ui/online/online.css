@@ -73,6 +73,32 @@
   right: 14px;
   bottom: 12px;
 }
+/* FB1: bug / feature links, bottom-left (the theme picker is bottom-right) */
+.fb-footer {
+  position: fixed;
+  left: 14px;
+  bottom: 12px;
+  max-width: calc(100% - 200px);
+  font-size: 13px;
+  color: var(--ink-soft, var(--ink));
+}
+.fb-link {
+  color: inherit;
+  text-decoration: underline;
+}
+@media (max-width: 640px) {
+  /* above the theme picker instead of beside it */
+  .fb-footer {
+    bottom: 64px;
+    left: 0;
+    right: 0;
+    max-width: none;
+    text-align: center;
+  }
+}
+.fb-link:hover {
+  color: var(--accent);
+}
 .ol-logo {
   color: var(--accent);
 }
