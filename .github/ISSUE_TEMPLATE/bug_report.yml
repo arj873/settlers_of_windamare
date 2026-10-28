@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in the game does not work as it should.
+labels: ['bug']
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a game with ...
+        2. Build ...
+        3. See the problem
+  - type: input
+    id: mode
+    attributes:
+      label: Game mode / scenario
+      description: Filled in for you when a game was open. Do not add private info.
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Online or offline?
+      options:
+        - Online
+        - Offline
+  - type: input
+    id: players
+    attributes:
+      label: Number of players
+  - type: input
+    id: version
+    attributes:
+      label: App version
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / device
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image here. Check it shows no private info.

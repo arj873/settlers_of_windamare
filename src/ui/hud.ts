@@ -63,6 +63,7 @@ import { themePicker } from './theme';
 import { loadAnimations, saveAnimations } from './motion';
 import { ProductionFx, type HexLocator } from './production/fx';
 import { soundControl } from './sound';
+import { feedbackMenuItems } from './feedback';
 import type {
   BotSpeedControl,
   BuildConfirmControl,
@@ -650,6 +651,7 @@ export class Hud {
         this.longestRoadMenu(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Theme'), themePicker()),
+        ...feedbackMenuItems({ state: this.state, online: this.sessionActions !== null }),
         h(
           'a',
           {

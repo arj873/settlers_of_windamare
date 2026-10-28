@@ -6,6 +6,7 @@
 import { LIMITS } from '../../net/protocol';
 import { parseRoomCode } from '../../net/transport';
 import { h, type Child } from '../dom';
+import { feedbackFooter } from '../feedback';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
 import { openProfileDialog, profileChip } from '../profile/dialog';
@@ -48,6 +49,7 @@ function shell(...children: Child[]): HTMLElement {
     'div',
     { class: 'online-screen setup ol-home' },
     h('div', { class: 'ol-home-card' }, logo(), ...children),
+    feedbackFooter(),
     h('div', { class: 'ol-home-theme' }, themePicker({ compact: true })),
   );
 }
