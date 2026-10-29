@@ -1,432 +1,75 @@
-import { Application } from 'pixi.js';
-import {
-  PLAYER_COLORS,
-  createGame,
-  defaultMapFor,
-  layoutToMap,
-  topologyOf,
-  type GameState,
-} from './engine';
-import * as fixtures from './engine/fixtures';
-import { BoardView } from './render';
-import { setFrameColors } from './render';
-import { boardFrameColors, Hud, initTheme, onThemeChange, type Controller } from './ui';
-import { NAME_KEY, parseRoomCode, tokenKey } from './net/transport';
-import { HomeScreen } from './ui/online/home';
-import { inviteUrl } from './ui/online/lobbyModel';
-import { OnlineApp } from './game/online/app';
-import { pieceStylePreview } from './render/stylePreview';
-import { setStylePreview } from './ui/profile/dialog';
-import { setSeatLooks } from './ui/profile/looks';
-import { loadProfile, saveProfile, type Profile, type SeatLook } from './ui/profile/model';
-import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/online/backend';
-import { DEFAULT_SPEED, GameController } from './game/controller';
-import { isHeadless, sfx } from './audio';
-import { GameSounds } from './game/sounds';
-import { extensionSoundRecipes, extensionSounds } from './ui/expansions';
-import { sfxPanel } from './ui/sfxPanel';
-import { installDebugHook } from './game/debug';
-import { createFitButton, measureHudInsets } from './game/layout';
-import { showNotice } from './game/noticeView';
-import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
-import { parseParams, type DevParams } from './game/params';
-import { SpotPrompt } from './ui/spotPrompt';
-import { STORAGE_KEY as SETUP_KEY } from './ui/setup/model';
-import { TutorialCoach, isTutorialGame, offerTutorial } from './ui/tutorial';
-import {
-  CONFIRM_BUILD_KEY,
-  LONGEST_ROAD_KEY,
-  SPEED_KEY,
-  browserStorage,
-  clearSession,
-  loadNumber,
-  loadSession,
-  saveNumber,
-  type KeyValueStore,
-} from './game/persist';
-
 /**
- * Dev params: `?fixture=midGame` (any fixtures.ts function), `?seed=…&layout=beginner|random`
- * or `?map=base|baseRandom|base56|base78` (start at once), `?autoplay=4bots&speed=0` (all-bot
- * game, 3..8 bots), `?seats=hbbb`, `?vp=5`, `?timer=20` (turn timer, s), `?first=0` (starting
- * seat), `?speed=ms`, `?hl=vertices|edges|hexes` (highlight preview), `?names=A,B,C`, `?debug=1`
- * (playtest hook), `?mode=demo` (an expansion mode, docs/EXPANSIONS.md), `?modes=all` (setup
- * screen also offers wip / demo modes). Without any, the new-game / resume screen opens.
+ * Entry (s17): the home screen comes from a small chunk, so it paints while the game (Pixi, the
+ * engine and its expansions, the HUD: `app.ts`) is still loading beside it. A dev game or a
+ * `?room=` link waits for the game instead, and falls back to the home screen when it turns out
+ * there is nothing to start (an unknown fixture).
  */
-function devGame(params: DevParams): { state: GameState; seats: Controller[] } | null {
-  const seatsFor = (n: number, fallback: Controller): Controller[] =>
-    params.seats?.length === n ? params.seats : Array<Controller>(n).fill(fallback);
+import { NAME_KEY, parseRoomCode } from './net/transport';
+import { browserKeyStore } from './game/online/backend';
+import { HomeScreen } from './ui/online/home';
+import { setStylePreview } from './ui/profile/dialog';
+import { loadProfile, saveProfile, type Profile } from './ui/profile/model';
+import { initTheme } from './ui/theme';
+import type * as GameModule from './app';
 
-  if (params.fixture) {
-    const make = (fixtures as unknown as Record<string, unknown>)[params.fixture];
-    if (typeof make === 'function') {
-      let state = (make as () => GameState)();
-      if (params.timer !== null) {
-        state = { ...state, settings: { ...state.settings, turnTimerSec: params.timer } };
-      }
-      return { state, seats: seatsFor(state.players.length, 'human') };
-    }
-    showToast(`Unknown fixture "${params.fixture}"`, 'error');
-  }
-  if (params.autoplay || params.seed !== null || params.layout || params.map || params.mode) {
-    const n = params.autoplay ?? params.seats?.length ?? 4;
-    const seed = params.seed ?? String(Date.now() % 1e9);
-    const map = params.map ?? (params.layout ? layoutToMap(params.layout) : defaultMapFor(n));
-    console.info(`Windamere dev game: mode=${params.mode ?? 'base'} map=${map} seed=${seed}`);
-    const names = params.names?.length === n ? params.names : null;
-    let state: GameState;
-    try {
-      state = createGame({
-        seed,
-        players: PLAYER_COLORS.slice(0, n).map((p, i) => ({ ...p, name: names?.[i] ?? p.name })),
-        // An expansion mode takes its map from its scenario unless ?map= names one of its maps.
-        ...(params.mode ? { mode: params.mode, ...(params.map ? { map } : {}) } : { map }),
-        ...(params.mode && params.scenario ? { scenario: params.scenario } : {}),
-        ...(params.vpToWin === null ? {} : { vpToWin: params.vpToWin }),
-        ...(params.timer === null ? {} : { turnTimerSec: params.timer }),
-        ...(params.first === null || params.first >= n ? {} : { startingPlayer: params.first }),
-      });
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e), 'error');
-      return null;
-    }
-    return { state, seats: params.autoplay ? seatsFor(n, 'bot') : seatsFor(n, 'human') };
-  }
-  return null;
-}
+type GameChunk = typeof GameModule;
 
-async function boot() {
+/** Query parameters that start a dev game at once (game/params.ts). */
+const DEV_PARAMS = ['fixture', 'seed', 'layout', 'map', 'autoplay', 'mode'];
+
+let gameChunk: Promise<GameChunk> | null = null;
+const loadGame = () => (gameChunk ??= import('./app'));
+
+async function main() {
   // HUD look, page background, board frame (src/ui/theme): `?theme=` > saved pick > Sunfired.
   initTheme(location.search);
-  const params = parseParams(location.search);
-  const dev = devGame(params);
-  // Dev sessions never overwrite the real autosave.
-  const storage = dev ? null : browserStorage();
-  const prefs = browserStorage();
+  // The profile dialog's piece previews are drawn with Pixi: from the game chunk.
+  setStylePreview((style, color) => loadGame().then((m) => m.pieceStylePreview(style, color)));
+  const game = loadGame().then((m) => m.bootGame());
+  const search = new URLSearchParams(location.search);
+  const direct =
+    DEV_PARAMS.some((k) => search.has(k)) || parseRoomCode(search.get('room') ?? '') !== null;
+  if (direct && (await game).direct) return;
 
-  // Sound effects (A1): synthesized; the AudioContext starts on the first gesture. Silent in
-  // the playtest harness / automation (`?debug=1`, navigator.webdriver, `?mute=1`).
-  sfx.register(extensionSoundRecipes());
-  sfx.suppress(isHeadless(location.search, navigator));
-  sfx.installUnlock(window);
-  const sounds = new GameSounds({ play: (id, g) => sfx.play(id, g), extensions: extensionSounds });
-  if (new URLSearchParams(location.search).get('sfx') === '1') document.body.append(sfxPanel());
-
-  const app = new Application();
-  await app.init({
-    // Transparent: the page background (a theme token) shows around the board.
-    backgroundAlpha: 0,
-    resizeTo: window,
-    antialias: true,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
-    preference: 'webgl',
-  });
-  document.getElementById('app')?.appendChild(app.canvas);
-
-  const board = new BoardView(app);
-  // PR1: piece-style previews in the profile dialogs; seat looks onto the board and the HUD.
-  setStylePreview((style, color) => pieceStylePreview(style, color));
-  const applyLooks = (looks: readonly SeatLook[]) => {
-    board.setPieceStyles(looks.map((l) => l.pieceStyle));
-    setSeatLooks(looks);
-  };
-  const profileStore = {
+  const profile = {
     load: () => loadProfile(browserKeyStore),
     save: (p: Profile) => void saveProfile(browserKeyStore, p),
   };
-  const frameToTheme = () => {
-    const frame = boardFrameColors();
-    if (!frame) return;
-    setFrameColors(frame);
-    board.retheme();
+  let hint: HTMLElement | null = null;
+  const leave = () => {
+    hint?.remove();
+    home.element.remove();
   };
-  frameToTheme();
-  onThemeChange(frameToTheme);
-  const uiRoot = document.getElementById('ui') as HTMLElement;
-  const hud = new Hud(uiRoot);
-  wireLongestRoad(board, hud, prefs);
-  // A click on a board spot asks before building (issue #28), unless switched off in the menu.
-  const prompt = new SpotPrompt(uiRoot);
-  let confirmOn = loadNumber(prefs, CONFIRM_BUILD_KEY) !== 0;
-  hud.setBuildConfirm({
-    value: confirmOn,
-    onChange: (on) => {
-      confirmOn = on;
-      saveNumber(prefs, CONFIRM_BUILD_KEY, on ? 1 : 0);
-    },
-  });
-  const spots = { prompt, confirmBuild: () => confirmOn };
-  // Production cards (issue #29) fly from the hexes: hotseat and online share the HUD.
-  hud.setHexLocator((id) => board.screenPos(id));
-
-  // Measure the HUD once per frame, in the frame (s17): measuring right after each render forced
-  // a second layout of the whole page per move. A change redraws the board in the same frame.
-  let fitQueued = false;
-  let fitKey = '';
-  const fitBoard = () => {
-    if (fitQueued) return;
-    fitQueued = true;
-    requestAnimationFrame(() => {
-      fitQueued = false;
-      const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
-      const key = JSON.stringify(layout);
-      if (!layout || key === fitKey) return;
-      fitKey = key;
-      board.setInsets(layout.insets, layout.avoid);
-      if (app.ticker.started) app.ticker.update();
-    });
-  };
-  uiRoot.after(createFitButton(() => board.fit()));
-  window.addEventListener('resize', fitBoard);
-  // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
-  uiRoot.addEventListener('click', fitBoard);
-
-  // Online play (M3): `?room=CODE` joins a room; otherwise the home screen picks a mode.
-  const online = (roomId: string, then: (app: OnlineApp) => void = (app) => void app.run()) => {
-    void pickBackend(location.search).then((backend) => {
-      // `params` was read at boot: creating a room rewrites the URL and may drop `?debug=1`.
-      const room = new OnlineApp(
-        {
-          board,
-          hud,
-          backend,
-          store: browserKeyStore,
-          tokens: tokenStoreFor(backend.kind),
-          clock: realClock,
-          toast: showToast,
-          notice: showNotice,
-          onRender: fitBoard,
-          onLooks: applyLooks,
-          sounds,
-          layer: document.body,
-          href: location.href,
-          goHome: () => location.assign(homeUrl()),
-          playOffline: () => {
-            history.replaceState(null, '', homeUrl());
-            offline(null);
-          },
-          ...spots,
-        },
-        roomId,
-      );
-      (window as unknown as { catan: unknown }).catan = { online: room, board, hud };
-      if (params.debug) installDebugHook(room.debugController, board);
-      then(room);
-    });
-  };
-  const roomId = dev ? null : parseRoomCode(new URLSearchParams(location.search).get('room') ?? '');
-  if (roomId) {
-    online(roomId);
-    return;
-  }
-
-  // Hotseat: everything below is the offline game, unchanged.
-  const offline = (dev: { state: GameState; seats: Controller[] } | null, tutorial = false) =>
-    startOffline({
-      board,
-      hud,
-      uiRoot,
-      params,
-      dev,
-      storage,
-      prefs,
-      fitBoard,
-      applyLooks,
-      spots,
-      sounds,
-      tutorial,
-    });
-  if (dev) {
-    offline(dev);
-    return;
-  }
   const home = new HomeScreen({
     name: browserKeyStore.get(NAME_KEY) ?? '',
-    profile: profileStore,
+    profile,
     onOffline: () => {
       hint?.remove();
-      home.element.remove();
-      offline(null);
+      // Pressed before the game chunk arrived (slow network): the screen shows it is working.
+      home.element.classList.add('is-busy');
+      void game.then((g) => {
+        home.element.remove();
+        g.offline();
+      });
     },
     onCreate: async (name) => {
       hint?.remove();
-      const backend = await pickBackend(location.search);
-      const room = await backend.api.create();
-      tokenStoreFor(backend.kind).set(tokenKey(room.roomId), room.hostToken);
-      profileStore.save({ ...profileStore.load(), name });
-      history.pushState(null, '', inviteUrl(location.href, room.roomId));
-      online(room.roomId, (a) => {
-        home.element.remove();
-        a.connect(name);
-      });
+      await (await game).create(name, leave);
     },
     onJoin: async (code, name) => {
       hint?.remove();
-      const backend = await pickBackend(location.search);
-      if (!(await backend.api.check(code))) throw new Error(`There is no room “${code}”.`);
-      profileStore.save({ ...profileStore.load(), name });
-      history.pushState(null, '', inviteUrl(location.href, code));
-      online(code, (a) => {
-        home.element.remove();
-        a.connect(name);
-      });
+      await (await game).join(code, name, leave);
     },
   });
   document.body.append(home.element);
-  // First visit: a small "New here? Learn to play" card over the home screen, offered once.
-  const returning = loadSession(storage) !== null || prefs?.getItem(SETUP_KEY) != null;
-  const hint = offerTutorial(document.body, prefs, returning, () => {
-    home.element.remove();
-    offline(null, true);
-  });
-}
-
-/** This page without query parameters (except an explicit `?server=`, kept for dev). */
-function homeUrl(): string {
-  const u = new URL(location.href);
-  const server = u.searchParams.get('server');
-  u.search = '';
-  u.hash = '';
-  if (server) u.searchParams.set('server', server);
-  return u.toString();
-}
-
-/**
- * #51: the menu setting "Show longest road on the board" (saved; default off) outlines the
- * Longest Road holder's route; pointing at the holder's road count or award badge shows it too,
- * stronger (a tap: for a few seconds).
- */
-function wireLongestRoad(board: BoardView, hud: Hud, prefs: KeyValueStore | null): void {
-  const show = loadNumber(prefs, LONGEST_ROAD_KEY) === 1;
-  board.setLongestRoad(show);
-  hud.setLongestRoadToggle({
-    value: show,
-    onChange: (on) => {
-      board.setLongestRoad(on);
-      saveNumber(prefs, LONGEST_ROAD_KEY, on ? 1 : 0);
-    },
-  });
-  let tapTimer: ReturnType<typeof setTimeout> | undefined;
-  document.addEventListener('pointerover', (e) => {
-    const on = e.target instanceof Element && e.target.closest('[data-longest-road]') !== null;
-    clearTimeout(tapTimer);
-    board.setLongestRoadHover(on);
-    if (on && e.pointerType !== 'mouse') {
-      tapTimer = setTimeout(() => board.setLongestRoadHover(false), 2500);
-    }
-  });
-}
-
-/** The hotseat game: controller, bot speed, debug hook, dev params, resume prompt. */
-function startOffline(o: {
-  board: BoardView;
-  hud: Hud;
-  uiRoot: HTMLElement;
-  params: DevParams;
-  dev: { state: GameState; seats: Controller[] } | null;
-  storage: KeyValueStore | null;
-  prefs: KeyValueStore | null;
-  fitBoard: () => void;
-  applyLooks: (looks: readonly SeatLook[]) => void;
-  spots: { prompt: SpotPrompt; confirmBuild: () => boolean };
-  sounds: GameSounds;
-  /** Start the "Learn to play" game right away (first-visit hint). */
-  tutorial: boolean;
-}): void {
-  const { board, hud, uiRoot, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds } =
-    o;
-  let speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
-  let coach: TutorialCoach | null = null;
-  const controller = new GameController({
-    board,
-    hud,
-    storage,
-    speed,
-    toast: showToast,
-    notice: showNotice,
-    // The tutorial panel first: the board keeps clear of it.
-    onRender: () => {
-      coach?.update();
-      fitBoard();
-    },
-    onLooks: applyLooks,
-    ...spots,
-    sounds,
-  });
-  // Bot speed lives in the HUD menu (shown while any seat is a bot).
-  hud.setBotSpeed({
-    value: speed,
-    presets: SPEED_PRESETS.some((p) => p.ms === speed)
-      ? SPEED_PRESETS
-      : [...SPEED_PRESETS, { label: `${speed} ms`, ms: speed }],
-    onChange: (ms) => {
-      speed = ms;
-      controller.setSpeed(ms);
-      saveNumber(prefs, SPEED_KEY, ms);
-    },
-  });
-  // "Learn to play" (src/ui/tutorial): a coach panel over a normal game with two Easy bots.
-  const tutorial = new TutorialCoach(
-    uiRoot,
-    {
-      game: () => {
-        const state = controller.state;
-        return state ? { state, legal: controller.legalActions } : null;
-      },
-      start: (state, seats, botLevels) => controller.start(state, seats, { botLevels }),
-      newGame: () => hud.showNewGame(),
-      pace: (ms) => controller.setSpeed(ms === null ? speed : Math.max(speed, ms)),
-    },
-    prefs,
-  );
-  coach = tutorial;
-  hud.setLearnToPlay(() => tutorial.begin());
-  // Debug handle for the console.
-  (window as unknown as { catan: unknown }).catan = { controller, board, hud, tutorial };
-  if (params.debug) installDebugHook(controller, board);
-  if (o.tutorial) {
-    tutorial.begin();
-    return;
-  }
-
-  if (dev) {
-    const levels = params.levels?.length === dev.seats.length ? params.levels : undefined;
-    controller.start(dev.state, dev.seats, {
-      ...(levels ? { botLevels: levels } : {}),
-      ...(params.looks ? { looks: params.looks } : {}),
+  const g = await game;
+  // Still on the home screen (no button pressed meanwhile): offer the tutorial on a first visit.
+  if (home.element.isConnected && !g.direct) {
+    hint = g.offerTutorial(() => {
+      home.element.remove();
+      g.offline(true);
     });
-    const hl = params.hl;
-    const s = dev.state;
-    const topo = topologyOf(s);
-    if (hl === 'vertices') {
-      board.setHighlights({ vertices: topo.vertices.filter((v) => !s.pieces.buildings[v]) });
-    } else if (hl === 'edges') {
-      board.setHighlights({ edges: topo.edges.filter((e) => !s.pieces.roads[e]) });
-    } else if (hl === 'hexes') {
-      board.setHighlights({ hexes: topo.landHexes.filter((h) => h !== s.robber) });
-    }
-    return;
-  }
-
-  const saved = loadSession(storage);
-  if (saved && saved.state.phase.kind !== 'gameOver') {
-    const s = saved.state;
-    const names = s.players.map((p) => p.name).join(', ');
-    const when = s.turn.number === 0 ? 'setup' : `turn ${s.turn.number}`;
-    showResumePrompt(
-      isTutorialGame(s)
-        ? `Unfinished tutorial game at ${when}.`
-        : `Unfinished game (${names}) at ${when}.`,
-      () => controller.resume(saved),
-      () => {
-        clearSession(storage);
-        hud.showNewGame();
-      },
-    );
-  } else {
-    hud.showNewGame();
   }
 }
 
-void boot();
+void main();

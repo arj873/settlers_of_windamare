@@ -1,5 +1,7 @@
 /** Inline SVG icons. The markup is static (no user text), so innerHTML is safe here. */
-import { RESOURCE_NAME, type DevCardType, type Resource } from '../engine';
+import type { DevCardType, Resource } from '../engine';
+// The leaf module, not the barrel: the home screen's chunk (main.ts) must not load the engine.
+import { RESOURCE_NAME } from '../engine/constants';
 
 export const RESOURCE_LABEL: Record<Resource, string> = RESOURCE_NAME;
 

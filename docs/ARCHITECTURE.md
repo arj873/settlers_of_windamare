@@ -30,6 +30,8 @@ Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, act
 Nobody but `applyAction` produces a new GameState (fixtures excepted).
 
 Import from `src/engine` (the barrel `index.ts`). Deep imports are fine inside the engine.
+Exception (s17): code in the home screen's chunk (`src/main.ts` and what it imports statically,
+see §13b "Boot") must not import the barrel; it deep-imports leaf modules (`engine/constants`).
 
 ## 2. IDs and geometry
 
@@ -496,7 +498,7 @@ Each returns a fresh, internally consistent state on the beginner board (map `ba
 | **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                               |
 | **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                              |
 | T6 UI              | `src/ui/**`                                                                                                                                                                                                    |
-| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                                   |
+| T7 integration     | `src/game/**`, `src/main.ts`, `src/app.ts`                                                                                                                                                                     |
 | F1 framework       | `src/engine/expansions/**`, `src/engine/mapLookup.ts`, `src/{render,ui,bots}/expansions.ts`, `docs/EXPANSIONS.md`, `src/expansions/demo/**`; expansion agents own `src/expansions/<id>/**` (EXPANSIONS.md §13) |
 
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
@@ -691,6 +693,15 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   room members (`roomLooks`). main.ts sends looks to `board.setPieceStyles` + `setSeatLooks`.
 
 ## 13b. Game controller (`src/game`, T7)
+
+**Boot (s17).** `src/main.ts` is a small entry: theme, the home screen (`ui/online/home`), the
+profile chip. It imports `src/app.ts` (`bootGame()`: Pixi, board, HUD, hotseat, online wiring)
+dynamically at once, and `vite.config.ts` adds low-priority preload links for that chunk and the
+Pixi renderer, so the home screen paints from ~18 kB gz of JS while the game downloads beside it.
+Dev params and `?room=` wait for the game (`GameApp.direct`). The online client
+(`game/online/app`) is its own chunk. Keep the entry's static imports free of the engine barrel,
+`ui/model`, `net/protocol` and Pixi: anything statically reachable from it is loaded before the
+home screen (`build.rolldownOptions.treeshake` marks our modules side-effect free).
 
 ```ts
 const c = new GameController({ board, hud, storage, speed, toast, onRender });

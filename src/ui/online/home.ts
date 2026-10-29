@@ -3,14 +3,14 @@
  * With `invite` it is the landing card of an invite link: nickname, then join. Also the small
  * full-screen notices (connecting, room not found, disconnected for good).
  */
-import { LIMITS } from '../../net/protocol';
+// The home screen is in the first chunk (main.ts): nothing that pulls in the engine.
 import { parseRoomCode } from '../../net/transport';
 import { h, type Child } from '../dom';
 import { feedbackFooter } from '../feedback';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
 import { openProfileDialog, profileChip } from '../profile/dialog';
-import type { Profile } from '../profile/model';
+import { PROFILE_NAME_MAX, type Profile } from '../profile/model';
 import './online.css';
 
 export interface HomeOptions {
@@ -65,7 +65,7 @@ export class HomeScreen {
     this.nameInput = h('input', {
       class: 'input ol-name',
       value: opts.name,
-      maxLength: LIMITS.name,
+      maxLength: PROFILE_NAME_MAX,
       placeholder: 'Your nickname',
       attrs: { 'aria-label': 'Nickname', 'data-k': 'nickname', autocomplete: 'nickname' },
       on: {
