@@ -25,8 +25,6 @@ Legend: 🟦 Opus · 🟩 Sonnet
 
 ## 🏃 In Progress — Stage 6
 
-- **#47** · Rename Wool → Sheep, Grain → Wheat (display names only; ids unchanged) · `s14-names` (Sonnet) 🟦
-
 
 ## 🏃 In Progress — Stage 2
 
@@ -60,6 +58,9 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - (#46) roll id in engine state so Catan for Two's second roll always animates
 - (L1) host confirms before a joiner moves the room to the 5–6 player board
 - (#51) a board-settings group in the menu
+- (security) tbck "7 fish" progress pick reads the hidden deck into the legal list: split into pay-then-pick; scramble `ext.ck.decks` in `legalLeak.test.ts` · special-build auto-skip leaks affordability · Commercial Harbor `phase.offered` visible to all
+- (perf2) setup screen renders in place (`patchChildren`, explicit input values) · keep the clicked Roll / End turn button across HUD renders · prefetch the remembered mode's pack on the home screen · re-measure online create → lobby on a quiet machine · cache piece previews across sessions · trace the home DOM → first paint gap (~0.6 s at 6× CPU)
+- (perf2) a stale tab after a deploy can't fetch an expansion chunk: offer a reload instead of only the error
 - (C1) T&B + Seafarers (needs scenario-id seam) · Barbarian Attack + C&K · Catan for Two + C&K · T&B×T&B sheets · E&P + C&K / T&B
 - (E4) gold in player trades · 2025 T&B×T&B combination sheets · BA 5-6 SBP details · Caravans coalition vote
 - (E2) viewFor masking hook for expansion slices (fog stack, gifts, fish, progress cards) → expansions online · online protocol for expansion actions · Seafarers heuristic bot · verify guessed harbour sites vs the box
@@ -137,6 +138,13 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - Expansions (Seafarers, Cities & Knights)
 
 ## ✔️ Done
+
+- **Stage 7 (Oct 28–29)**, all squash-merged to `main` via PRs:
+  - **#47** Wool → Sheep, Grain → Wheat display names (#59) · Report a bug / Suggest a feature buttons + issue forms (#60)
+  - **Security:** Oil Springs legal list leak (#61) · Crop Trust event-token mask (#62) · 128-bit game RNG, schema v6 (#64) · Content-Security-Policy, no `unsafe-eval` (#66) · `pt:serve --online` auto-seat fix (#63)
+  - **Tutorial:** guided "Learn to play" first game (#65)
+  - **Perf round 1** (#67): HUD patched in place, small entry chunk, Low power mode; home ready 5.4 → 2.0 s, Low power tap 700 → 150 ms (6× CPU, slow 4G)
+  - **Perf round 2** (#68): expansions load on demand (base game JS 447 → 282 kB gz), glow without repaints (idle CPU 108 % → 2 %), Pixi trimmed, production animation in the next frame · details in `docs/PERF.md`
 
 - **Stage 6 (Oct 26–27)**, all squash-merged to `main` via PRs:
   - **C3** T&B + Seafarers on 18 more Seafarers scenarios (#40) · **C4** the six non-Fishing T&B × T&B sheets (#24) · **C5** Barbarian Attack + C&K, Catan for Two + C&K (#25)
