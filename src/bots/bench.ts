@@ -10,6 +10,7 @@
  */
 import { pathToFileURL } from 'node:url';
 import { Rng } from '../engine';
+import { installHeadless } from '../expansions/headless';
 import type { Bot } from './index';
 import { botForLevel } from './byLevel';
 import { BOT_LEVELS, isBotLevel, type BotLevel } from './levels';
@@ -183,6 +184,7 @@ export function parseBenchArgs(argv: readonly string[]): BenchArgs {
 }
 
 function main(): void {
+  installHeadless();
   let args: BenchArgs;
   try {
     args = parseBenchArgs(process.argv.slice(2));

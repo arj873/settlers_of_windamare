@@ -9,11 +9,12 @@ import {
   expansionById,
   listModes,
   modeById,
+  modulesReady,
   optionVpBonus,
   resolveSettings,
   scenarioById,
   timerSettings,
-  type ExpansionModule,
+  type ExpansionInfo,
   type MapRules,
   type MapSelection,
   type ModeDef,
@@ -528,8 +529,8 @@ export function scenarioOf(draft: Pick<SetupDraft, 'scenario'>): ScenarioDef | n
 }
 
 /** The modules a mode activates (with their requires), in registry order of the mode list. */
-export function modeModules(mode: ModeDef): ExpansionModule[] {
-  const out: ExpansionModule[] = [];
+export function modeModules(mode: ModeDef): ExpansionInfo[] {
+  const out: ExpansionInfo[] = [];
   const add = (id: string) => {
     const m = expansionById(id);
     if (!m || out.includes(m)) return;
@@ -654,6 +655,8 @@ export function pickSeatColor(draft: SetupDraft, index: number, color: string): 
  * `validate` rejects (C&K + Rush), or any other createGame error. The Start button is off then.
  */
 export function setupError(draft: SetupDraft): string | null {
+  // s18: the engine checks need the mode's rules (ensureModules).
+  if (!modulesReady(draft.mode)) return `Loading ${modeOf(draft).name}…`;
   const cfg = buildConfig(draft);
   try {
     resolveSettings({

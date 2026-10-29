@@ -9,12 +9,19 @@ import {
 } from './constants';
 import {
   activeModules,
-  allModules,
+  allExpansions,
   expansionById,
   modeById,
+  requireModule,
   scenarioById,
 } from './expansions/registry';
-import type { ExpansionModule, ModeDef, PlayerRange, ScenarioDef } from './expansions/types';
+import type {
+  ExpansionInfo,
+  ExpansionModule,
+  ModeDef,
+  PlayerRange,
+  ScenarioDef,
+} from './expansions/types';
 import { isMapId, mapById, supplyOf } from './mapLookup';
 import { MAPS, MAP_IDS, defaultMapFor, isBaseMapId } from './maps';
 import { MAP_VETO_CANDIDATES, vetoOrder } from './actions/veto';
@@ -167,7 +174,12 @@ export function resolveMode(config: GameConfig): ResolvedMode {
     }
     add(id, 'config');
   }
-  const modules = composeOrder(allModules().filter((m) => ids.has(m.id)));
+  // s18: the rules must be loaded (ensureModules) — ModuleNotLoadedError otherwise.
+  const modules = composeOrder(
+    allExpansions()
+      .filter((m) => ids.has(m.id))
+      .map((m) => requireModule(m.id)),
+  );
   for (const a of modules) {
     for (const b of modules) {
       if (a.conflicts?.includes(b.id)) throw new Error(`${a.id} cannot be combined with ${b.id}`);
@@ -386,7 +398,7 @@ export function resolveSettings(config: GameConfig): GameSettings {
 
 /** VP target bonus of the boolean options that are on (OptionDef.vpBonus). */
 export function optionVpBonus(
-  modules: readonly ExpansionModule[],
+  modules: readonly ExpansionInfo[],
   options: Record<ExpansionId, Record<string, OptionValue>>,
 ): number {
   let bonus = 0;

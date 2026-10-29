@@ -9,16 +9,27 @@ export * from './expansions/types';
 export * from './expansions/ext';
 export {
   BASE_MODE,
+  ModuleNotLoadedError,
   activeModules,
+  allExpansions,
   allModules,
   allScenarios,
+  ensureModules,
   expansionById,
+  expansionMapInfo,
+  installExpansion,
   isActive,
   isExpansionId,
   listModes,
   mapDef,
   modeById,
+  moduleById,
+  modulesOf,
+  modulesReady,
+  requireModule,
   scenarioById,
+  setModuleLoader,
+  type ModuleTarget,
 } from './expansions/registry';
 export {
   costOf,

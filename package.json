@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "sim": "tsx src/bots/sim.ts",
     "bench": "tsx src/bots/bench.ts",
+    "gen:catalog": "tsx scripts/gen-catalog.ts",
     "pt:serve": "tsx scripts/playtest/serve.ts",
     "pt": "tsx scripts/playtest/cli.ts",
     "e2e:online": "tsx scripts/e2e/online.ts",

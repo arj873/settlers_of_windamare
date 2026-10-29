@@ -22,12 +22,15 @@ function preloadGame(): Plugin {
           c.type === 'chunk' ? [c] : [],
         );
         // The game, and the Pixi parts `Application.init` imports in turn (WebGL is preferred).
+        // s18: found by a module they hold (a chunk group has no facade module).
         const lazy = [
           '/src/app.ts',
           '/environment-browser/browserAll.mjs',
           '/gl/WebGLRenderer.mjs',
         ];
-        const game = chunks.filter((c) => lazy.some((f) => c.facadeModuleId?.endsWith(f)));
+        const game = chunks.filter((c) =>
+          c.moduleIds.some((id) => lazy.some((f) => id.endsWith(f))),
+        );
         const entry = chunks.find((c) => c.isEntry);
         if (game.length === 0 || !entry) return;
         const have = new Set([entry.fileName, ...entry.imports]);
@@ -52,6 +55,39 @@ function preloadGame(): Plugin {
     },
   };
 }
+
+/** An expansion module's folder (src/expansions/<id>/...) → its id. */
+const EXPANSION_FILE = /[\\/]src[\\/]expansions[\\/]([^\\/]+)[\\/]/;
+/**
+ * Loaded on demand apart from the game: the online client and the in-browser room server (which
+ * imports every expansion). Pixi's WebGPU and Canvas renderers stay in the game chunk: its core
+ * statically shares nearly all of their code (adaptors, programs), apart they saved ~7 kB raw
+ * for six more small chunks.
+ */
+const NOT_IN_GAME =
+  /[\\/]src[\\/](game[\\/]online[\\/]|ui[\\/]online[\\/]|net[\\/](client|session|loopback)\.ts|server[\\/]|expansions[\\/]headless\.ts)|pixi\.js[\\/]lib[\\/]environment-webworker[\\/]/;
+
+/**
+ * s18 chunks: left alone, the bundler splits every module the game core shares with an expansion
+ * pack into its own small chunk (27 files for a base game, 6 for C&K). Instead: the home screen,
+ * the game core (engine, HUD, board, controller, Pixi's WebGL path), and one chunk per expansion
+ * module; the rest (online client, fallback renderers) keeps automatic chunking.
+ */
+const CHUNK_GROUPS = [
+  // The home screen: main.ts and everything it imports statically.
+  { name: 'index', tags: ['$initial' as const], priority: 3 },
+  {
+    name: 'game',
+    test: (id: string) => !EXPANSION_FILE.test(id) && !NOT_IN_GAME.test(id),
+    priority: 2,
+  },
+  {
+    name: (id: string) => EXPANSION_FILE.exec(id)?.[1] ?? null,
+    priority: 1,
+    // Only the module's own files: the core it imports stays in the game chunk.
+    includeDependenciesRecursively: false,
+  },
+];
 
 /** Git short SHA for the bug-report prefill (FB1); "dev" outside a git checkout. */
 function appVersion(): string {
@@ -121,11 +157,13 @@ export default defineConfig(({ mode }) => {
             { test: /\/src\/.*\.ts$/, sideEffects: false },
           ],
         },
+        output: { codeSplitting: { groups: CHUNK_GROUPS } },
       },
     },
     test: {
       include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
       environment: 'node',
+      setupFiles: ['src/testSetup.ts'],
       // Simulator tests take 1-7 s; parallel agents and CI runners can push them past vitest's
       // 5 s default. A hang still fails, just later.
       testTimeout: 30_000,

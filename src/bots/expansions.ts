@@ -1,23 +1,9 @@
 /**
  * Bot / simulator extension points for expansions (docs/EXPANSIONS.md §9).
  *
- * ADDING A MODULE: one import below and one entry at the END of BOT_EXTENSIONS.
+ * s18: modules register their bots when they load (src/expansions/headless.ts, load.ts), so only
+ * loaded modules are listed.
  */
-import { cropBots } from '../expansions/crop/bots';
-import { demoBots } from '../expansions/demo/bots';
-import { oilBots } from '../expansions/oil/bots';
-import { ckBots } from '../expansions/ck/bots';
-import { seafarersBots } from '../expansions/seafarers/bots';
-import { tbBots } from '../expansions/tb/bots';
-import { epBots } from '../expansions/ep/bots';
-import { seackBots } from '../expansions/seack/bots';
-import { tbckBots } from '../expansions/tbck/bots';
-import { tbseaBots } from '../expansions/tbsea/bots';
-import { tbpairBots } from '../expansions/tbpair/bots';
-import { epckBots } from '../expansions/epck/bots';
-import { eptbBots } from '../expansions/eptb/bots';
-import { backBots } from '../expansions/back/bots';
-import { twockBots } from '../expansions/twock/bots';
 import type { Action, ExpansionId, GameState, PlayerId, Rng } from '../engine';
 import type { Violation, ViolationCode } from './invariants';
 import type { BotContext, BotGoal } from './smart/context';
@@ -47,24 +33,18 @@ export interface BotExtension {
   goals?(ctx: BotContext): BotGoal[];
 }
 
-export const BOT_EXTENSIONS: readonly BotExtension[] = [
-  demoBots,
-  oilBots,
-  cropBots,
-  ckBots,
-  seafarersBots,
-  tbBots,
-  epBots,
-  seackBots,
-  tbckBots,
-  tbseaBots,
-  tbpairBots,
-  epckBots,
-  eptbBots,
-  backBots,
-  twockBots,
-  // new modules go here, one per line
-];
+const bots: BotExtension[] = [];
+
+/** The bot extensions of every loaded module. */
+export const BOT_EXTENSIONS: readonly BotExtension[] = bots;
+
+/** Add a module's bot extension (when the module loads; the same one again does nothing). */
+export function registerBots(x: BotExtension): void {
+  const have = bots.find((b) => b.id === x.id);
+  if (have === x) return;
+  if (have) throw new Error(`bots of ${x.id} are already registered`);
+  bots.push(x);
+}
 
 /**
  * A `steer` that only keeps the bot away from a module's no-progress actions (and from ending the

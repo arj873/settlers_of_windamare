@@ -3,24 +3,32 @@
  * expansion registry, see registry.ts).
  */
 import { hookSupply } from './expansions/hooks';
-import { activeModules, mapDef } from './expansions/registry';
+import { activeModules, expansionMapInfo, mapDef, requireModule } from './expansions/registry';
 import type { Supply } from './expansions/types';
 import { MAPS, isBaseMapId, type MapDef } from './maps';
+import { namespaceOf } from './expansions/ext';
 import type { GameSettings, GameState, MapId } from './types';
 
-/** A known map id (base map or a registered module's map). */
+/** A known map id (base map or any catalog module's map, loaded or not). */
 export function isMapId(x: unknown): x is MapId {
-  return typeof x === 'string' && (isBaseMapId(x) || mapDef(x as MapId) !== undefined);
+  return (
+    typeof x === 'string' &&
+    (isBaseMapId(x) ||
+      mapDef(x as MapId) !== undefined ||
+      expansionMapInfo(x as MapId) !== undefined)
+  );
 }
 
 /**
- * The map definition of an id; throws for unknown ids. Base maps never touch the registry, so
- * module-load-time code (the deprecated TOPOLOGY) works inside the registry's import cycle.
+ * The map definition of an id; throws for unknown ids, and `ModuleNotLoadedError` for a map of a
+ * module whose rules are not loaded (s18). Base maps never touch the registry.
  */
 export function mapById(id: MapId): MapDef {
   const def = isBaseMapId(id) ? MAPS[id] : mapDef(id);
-  if (!def) throw new Error(`unknown map ${String(id)}`);
-  return def;
+  if (def) return def;
+  const ns = namespaceOf(id);
+  if (ns !== null && expansionMapInfo(id)) requireModule(ns);
+  throw new Error(`unknown map ${String(id)}`);
 }
 
 /** The map definition of a state (or of anything carrying `settings.map`). */

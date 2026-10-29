@@ -4,12 +4,15 @@ import { Application } from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import {
   PLAYER_COLORS,
+  allExpansions,
   createGame,
   defaultMapFor,
+  ensureModules,
   layoutToMap,
   topologyOf,
   type GameState,
 } from './engine';
+import { useBrowserLoader } from './expansions/load';
 import * as fixtures from './engine/fixtures';
 import { BoardView } from './render';
 import { setFrameColors } from './render';
@@ -25,7 +28,7 @@ import { browserKeyStore, pickBackend, realClock, tokenStoreFor } from './game/o
 import { DEFAULT_SPEED, GameController } from './game/controller';
 import { isHeadless, sfx } from './audio';
 import { GameSounds } from './game/sounds';
-import { extensionSoundRecipes, extensionSounds } from './ui/expansions';
+import { extensionSounds } from './ui/expansions';
 import { sfxPanel } from './ui/sfxPanel';
 import { installDebugHook } from './game/debug';
 import { createFitButton, measureHudInsets } from './game/layout';
@@ -122,7 +125,13 @@ export { pieceStylePreview };
 
 /** Pixi, the board, the HUD and the game: everything behind the home screen (s17: own chunk). */
 export async function bootGame(): Promise<GameApp> {
+  // s18: expansion modules (rules, HUD, board, bots, sounds) are fetched when a game needs them.
+  useBrowserLoader((pack) => sfx.register(pack.hud.sounds?.recipes ?? {}));
   const params = parseParams(location.search);
+  if (params.mode) {
+    // `?mode=` starts a dev game at once: its modules first (a failed download: shown by devGame).
+    await ensureModules(params.mode).catch((e: unknown) => console.error(e));
+  }
   const dev = devGame(params);
   // Dev sessions never overwrite the real autosave.
   const storage = dev ? null : browserStorage();
@@ -130,11 +139,15 @@ export async function bootGame(): Promise<GameApp> {
 
   // Sound effects (A1): synthesized; the AudioContext starts on the first gesture. Silent in
   // the playtest harness / automation (`?debug=1`, navigator.webdriver, `?mute=1`).
-  sfx.register(extensionSoundRecipes());
   sfx.suppress(isHeadless(location.search, navigator));
   sfx.installUnlock(window);
   const sounds = new GameSounds({ play: (id, g) => sfx.play(id, g), extensions: extensionSounds });
-  if (new URLSearchParams(location.search).get('sfx') === '1') document.body.append(sfxPanel());
+  if (new URLSearchParams(location.search).get('sfx') === '1') {
+    // The audition panel lists every module's sounds: load them all first.
+    void ensureModules(allExpansions().map((m) => m.id)).then(() =>
+      document.body.append(sfxPanel()),
+    );
+  }
 
   // Performance (s17, ui/power.ts): low power skips antialiasing (fixed for the page's life) and
   // caps the resolution; Auto decides from the hardware and, below, from the board's frames.
@@ -455,11 +468,22 @@ function startOffline(o: {
     const s = saved.state;
     const names = s.players.map((p) => p.name).join(', ');
     const when = s.turn.number === 0 ? 'setup' : `turn ${s.turn.number}`;
+    // s18: an expansion game needs its modules; fetch them while the prompt shows.
+    ensureModules(s.settings.expansions).catch(() => undefined);
     showResumePrompt(
       isTutorialGame(s)
         ? `Unfinished tutorial game at ${when}.`
         : `Unfinished game (${names}) at ${when}.`,
-      () => controller.resume(saved),
+      () => {
+        ensureModules(s.settings.expansions).then(
+          () => controller.resume(saved),
+          (e: unknown) => {
+            console.error(e);
+            showToast('Could not load this game’s expansion. Check the connection.', 'error');
+            hud.showNewGame();
+          },
+        );
+      },
       () => {
         clearSession(storage);
         hud.showNewGame();

@@ -1,19 +1,11 @@
 /**
  * Board-view extension points for expansions (docs/EXPANSIONS.md §7).
  *
- * ADDING A MODULE: one import below and one entry at the END of BOARD_DRAWERS. BoardView only
- * calls the drawers of the expansions active in the shown game.
+ * A module's `pack.ts` lists its drawer; it registers when the module loads (s18,
+ * src/expansions/load.ts). BoardView only calls the drawers of the expansions active in the shown
+ * game.
  */
 import type { Container, Graphics } from 'pixi.js';
-import { cropDrawer } from '../expansions/crop/render';
-import { demoDrawer } from '../expansions/demo/render';
-import { oilDrawer } from '../expansions/oil/render';
-import { ckDrawer } from '../expansions/ck/render';
-import { seafarersDrawer } from '../expansions/seafarers/render';
-import { tbDrawer } from '../expansions/tb/render';
-import { epDrawer } from '../expansions/ep/render';
-import { backDrawer } from '../expansions/back/render';
-import { twockDrawer } from '../expansions/twock/render';
 import type { ExpansionId, GameState, HexId, PlayerId, Point, Topology } from '../engine';
 import type * as art from './art';
 import { pieceSites, type PieceSite } from './marks';
@@ -72,18 +64,18 @@ export function tokenPlace(state: GameState, hex: HexId): TokenPlace | undefined
   return undefined;
 }
 
-export const BOARD_DRAWERS: readonly BoardDrawer[] = [
-  demoDrawer,
-  oilDrawer,
-  cropDrawer,
-  ckDrawer,
-  seafarersDrawer,
-  tbDrawer,
-  epDrawer,
-  backDrawer,
-  twockDrawer,
-  // new modules go here, one per line
-];
+const drawers: BoardDrawer[] = [];
+
+/** The board drawers of every loaded module. */
+export const BOARD_DRAWERS: readonly BoardDrawer[] = drawers;
+
+/** Add a module's board drawer (when the module loads; the same one again does nothing). */
+export function registerDrawer(d: BoardDrawer): void {
+  const have = drawers.find((x) => x.id === d.id);
+  if (have === d) return;
+  if (have) throw new Error(`a board drawer for ${d.id} is already registered`);
+  drawers.push(d);
+}
 
 /** The drawers of the expansions active in `state`, in settings order. */
 export function drawersFor(state: Pick<GameState, 'settings'>): BoardDrawer[] {

@@ -16,6 +16,7 @@ import {
   type SessionSnapshot,
 } from '../net/session';
 import { CLOSE_CODES, PROTOCOL_VERSION, type ErrorCode, type ServerMessage } from '../net/protocol';
+import { installHeadless } from '../expansions/headless';
 import { SERVER_LIMITS, TokenBucket } from './limits';
 import { apiError, IP_HEADER, json } from './router';
 
@@ -69,7 +70,10 @@ export class RoomCore {
   private alarmAt: number | null = null;
   private readonly frames = new Map<ConnId, FrameGuard>();
 
-  private constructor(private readonly p: RoomPlatform) {}
+  private constructor(private readonly p: RoomPlatform) {
+    // Every expansion's rules and bots: a room may play any mode (s18, docs/EXPANSIONS.md §2b).
+    installHeadless();
+  }
 
   /** Rebuild from storage (constructor of the Durable Object, inside blockConcurrencyWhile). */
   static async load(p: RoomPlatform): Promise<RoomCore> {

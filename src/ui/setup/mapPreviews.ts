@@ -7,6 +7,7 @@
 import {
   expansionById,
   generateBoard,
+  mapDef,
   namespaceOf,
   parseHexId,
   Rng,
@@ -37,6 +38,11 @@ const hexAt = (id: HexId): PreviewHex => {
 };
 
 const cache = new Map<MapId, PreviewBoard>();
+
+/** Can `map` be drawn now? A module map needs its module's rules loaded (s18). */
+export function previewReady(map: MapId): boolean {
+  return mapDef(map) !== undefined;
+}
 
 export function previewBoard(map: MapId): PreviewBoard {
   const hit = cache.get(map);

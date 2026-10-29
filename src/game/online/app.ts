@@ -3,6 +3,7 @@
  * phase changes. Owns the chat panel (lobby column or HUD sidebar), the reaction bubbles, the
  * reconnect banner and the fatal-error screens. The game itself is NetGameController.
  */
+import { ensureModules } from '../../engine';
 import type { Hud } from '../../ui';
 import {
   NAME_KEY,
@@ -298,6 +299,9 @@ export class OnlineApp {
     if (!c || !this.chat) return;
     const me: MemberId | null = c.you?.member ?? null;
     this.syncChatInput();
+    // s18: start fetching the room's expansion modules as soon as its mode is known (the game
+    // view waits for them; a failure is reported there).
+    ensureModules(room.config.mode).catch(() => undefined);
     if (room.phase === 'lobby') {
       if (this.inGame) {
         this.inGame = false;

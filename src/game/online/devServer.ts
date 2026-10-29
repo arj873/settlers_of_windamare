@@ -7,6 +7,7 @@ import { GameSession, type RoomPhase, type SessionOptions } from '../../net';
 import { RoomHost, type Sink } from '../../net/loopback';
 import { ROOM_CODE_LENGTH, roomCodeFromBytes } from '../../net/api';
 import type { Clock } from '../../net/transport';
+import { installHeadless } from '../../expansions/headless';
 
 const ROOM_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -27,7 +28,10 @@ export class DevServer {
   constructor(
     private readonly clock: Clock = wallClock,
     private readonly opts: Partial<SessionOptions> = {},
-  ) {}
+  ) {
+    // Every expansion's rules and bots, like the Worker (s18, docs/EXPANSIONS.md §2b).
+    installHeadless();
+  }
 
   create(): { roomId: string; hostToken: string } {
     // Same code format as the Worker (6 symbols, no 0/O/1/I).

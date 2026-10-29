@@ -19,6 +19,7 @@ import {
   type OptionValue,
   type SetupPlacement,
 } from '../engine';
+import { installHeadless } from '../expansions/headless';
 import { createRandomBot, type PickMode } from './index';
 import {
   botSeedFor,
@@ -383,6 +384,7 @@ function printFailure(seed: number, r: GameResult, file: string | null) {
 }
 
 export function main(argv: readonly string[], out: (line: string) => void = console.log): number {
+  installHeadless();
   let args: SimArgs;
   try {
     args = parseArgs(argv);

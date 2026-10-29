@@ -2,12 +2,13 @@
  * The new-game setup screen: stacked sections (mode, map, rules, advanced, seats) and a sticky
  * Start button. Owns its draft; emits a `NewGameConfig` through `onStart`.
  */
+import { ensureModules, modulesReady, type MapId as EngineMapId } from '../../engine';
 import { botLevelSelect } from '../botLevel';
 import { h, type Child } from '../dom';
 import { themePicker } from '../theme';
 import { soundControl } from '../sound';
 import type { MapId, NewGameConfig } from '../types';
-import { mapPreviewSvg } from './mapPreviews';
+import { mapPreviewSvg, previewReady } from './mapPreviews';
 import {
   chipNotes,
   chipStates,
@@ -153,6 +154,9 @@ export class SetupScreen {
   private readonly summary: HTMLElement;
   private seedOpen = false;
   private readonly showAllModes: boolean;
+  /** s18: modes whose modules are downloading, and the last one that failed. */
+  private readonly loading = new Set<string>();
+  private loadFailed: string | null = null;
 
   constructor(private readonly opts: SetupScreenOptions) {
     this.storage = opts.storage === undefined ? defaultStorage() : opts.storage;
@@ -235,20 +239,68 @@ export class SetupScreen {
       d.mode === 'base'
         ? (map?.label ?? 'Base')
         : `${modeOf(d).name}${scenarioOf(d) ? `: ${scenarioOf(d)?.name ?? ''}` : ''}`;
+    // s18: the mode's rules are still downloading: no Start yet (no error either).
+    const loading = !modulesReady(d.mode);
     // A combination the engine refuses (an expansion's validate): say why, no Start.
-    const error = setupError(d);
+    const error =
+      this.loadFailed === d.mode
+        ? `Could not load ${modeOf(d).name}. Check the connection and pick it again.`
+        : loading
+          ? null
+          : setupError(d);
     this.summary.replaceChildren(
       h('strong', {}, title),
       ` · ${d.seats.length} players · ${d.vpToWin} VP`,
       TIMER_STEPS[d.timerIdx] ? ` · ${timerLabel(d.timerIdx)} timer` : '',
       d.clockPreset !== 'off' ? ` · ${clockLabel(d)} clock` : '',
-      error ? h('span', { class: 'su-error', attrs: { role: 'alert' } }, error) : '',
+      error
+        ? h('span', { class: 'su-error', attrs: { role: 'alert' } }, error)
+        : loading
+          ? h('span', { class: 'su-loading su-load-note' }, `Loading ${modeOf(d).name}…`)
+          : '',
     );
     const start = this.element.querySelector<HTMLButtonElement>('.su-start');
-    if (start) start.disabled = error !== null;
+    if (start) start.disabled = error !== null || loading;
+  }
+
+  /**
+   * s18: fetch the rules of `modes` (expansion modules load on demand); the screen redraws when
+   * they arrive. A failed download says so; picking the mode again retries.
+   */
+  private ensure(modes: readonly string[]): void {
+    for (const id of modes) {
+      if (modulesReady(id) || this.loading.has(id)) continue;
+      this.loading.add(id);
+      if (this.loadFailed === id) this.loadFailed = null;
+      ensureModules(id).then(
+        () => {
+          this.loading.delete(id);
+          this.render();
+        },
+        (e: unknown) => {
+          console.error(e);
+          this.loading.delete(id);
+          this.loadFailed = id;
+          this.renderSummary();
+        },
+      );
+    }
+  }
+
+  /** Fetch (no redraw) the modules the mode would need with chip `id` toggled. */
+  private warm(id: string): void {
+    ensureModules(toggleChip(this.draft, id, this.showAllModes).mode).catch(() => undefined);
+  }
+
+  /** A map preview, or a placeholder while its module loads. */
+  private preview(map: EngineMapId): HTMLElement | SVGSVGElement {
+    return previewReady(map)
+      ? mapPreviewSvg(map)
+      : h('span', { class: 'su-loading su-map-loading', attrs: { 'aria-label': 'Loading' } }, '…');
   }
 
   private render(): void {
+    this.ensure([this.draft.mode]);
     const active = document.activeElement;
     const focusKey = active && this.element.contains(active) ? active.getAttribute('data-k') : null;
     this.inner.replaceChildren(
@@ -328,7 +380,13 @@ export class SetupScreen {
               disabled: c.reason !== null,
               title: c.reason ?? `${c.on ? 'Remove' : 'Add'} ${c.name}`,
               attrs: { 'aria-pressed': String(c.on), 'data-k': `chip-${c.id}` },
-              on: { click: () => this.set(toggleChip(this.draft, c.id, this.showAllModes)) },
+              on: {
+                click: () => this.set(toggleChip(this.draft, c.id, this.showAllModes)),
+                // s18: start fetching the resulting mode's modules before the click lands.
+                pointerenter: () => this.warm(c.id),
+                pointerdown: () => this.warm(c.id),
+                focus: () => this.warm(c.id),
+              },
             },
             h('span', { class: 'su-chip-ico', attrs: { 'aria-hidden': 'true' } }, c.icon),
             h('span', { class: 'su-chip-name' }, c.name),
@@ -363,6 +421,8 @@ export class SetupScreen {
     const d = this.draft;
     const n = d.seats.length;
     const groups = scenarioGroups(d, this.showAllModes);
+    // Every mode on screen: its scenario maps are drawn from its rules (s18).
+    this.ensure(groups.map((g) => g.mode.id));
     const tiles = (entries: ScenarioEntry[], label: Record<string, string>) =>
       h(
         'div',
@@ -385,11 +445,7 @@ export class SetupScreen {
                 click: () => this.set(pickScenario(this.draft, e.mode.id, e.scenario.id)),
               },
             },
-            h(
-              'span',
-              { class: 'su-map-art' },
-              mapPreviewSvg(e.scenario.mapFor(clamp(n, min, max))),
-            ),
+            h('span', { class: 'su-map-art' }, this.preview(e.scenario.mapFor(clamp(n, min, max)))),
             h('span', { class: 'su-tile-title' }, e.scenario.name),
             h(
               'span',
