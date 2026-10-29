@@ -20,7 +20,7 @@ import { boardFrameColors, Hud, onThemeChange, type Controller } from './ui';
 import { parseRoomCode, tokenKey } from './net/transport';
 import { inviteUrl } from './ui/online/lobbyModel';
 import type { OnlineApp } from './game/online/app';
-import { pieceStylePreview } from './render/stylePreview';
+import { pieceStylePreview, usePreviewRenderer } from './render/stylePreview';
 import { setStylePreview } from './ui/profile/dialog';
 import { setSeatLooks } from './ui/profile/looks';
 import { loadProfile, saveProfile, type Profile, type SeatLook } from './ui/profile/model';
@@ -170,6 +170,7 @@ export async function bootGame(): Promise<GameApp> {
     skipExtensionImports: true,
   });
   document.getElementById('app')?.appendChild(app.canvas);
+  usePreviewRenderer(app.renderer);
 
   const board = new BoardView(app);
   wirePower(board);

@@ -29,12 +29,18 @@ import {
   type Crop,
 } from './upload';
 
-/** Renders a piece-style preview image (src/render/stylePreview.ts); main.ts installs it. */
-export type StylePreview = (style: PieceStyleId, color: string) => Promise<string | null>;
+/**
+ * Renders a piece-style preview (src/render/stylePreview.ts): a canvas to copy (s18: no PNG to
+ * encode) or an image URL; main.ts installs it.
+ */
+export type StylePreview = (
+  style: PieceStyleId,
+  color: string,
+) => Promise<HTMLCanvasElement | string | null>;
 
 let preview: StylePreview | null = null;
 /** Finished previews, so re-rendered screens (lobby updates) show them without a flicker. */
-const ready = new Map<string, string>();
+const ready = new Map<string, HTMLCanvasElement | string>();
 
 /** Install the piece-style preview renderer (null = names only). */
 export function setStylePreview(fn: StylePreview | null): void {
@@ -42,22 +48,30 @@ export function setStylePreview(fn: StylePreview | null): void {
   ready.clear();
 }
 
-/** A preview <img> of `style` in `color`, filled in when the renderer answers. */
+/** A preview (a canvas, or an <img> for a URL) of `style` in `color`, filled in when ready. */
 export function stylePreviewImg(style: PieceStyleId, color: string): HTMLElement {
   const box = h('span', { class: 'pf-style-art', attrs: { 'aria-hidden': 'true' } });
-  const show = (url: string) => {
-    const img = h('img', { attrs: { alt: '', draggable: 'false' } }) as HTMLImageElement;
-    img.src = url;
-    box.replaceChildren(img);
+  const show = (art: HTMLCanvasElement | string) => {
+    if (typeof art === 'string') {
+      const img = h('img', { attrs: { alt: '', draggable: 'false' } }) as HTMLImageElement;
+      img.src = art;
+      box.replaceChildren(img);
+      return;
+    }
+    const copy = document.createElement('canvas');
+    copy.width = art.width;
+    copy.height = art.height;
+    copy.getContext('2d')?.drawImage(art, 0, 0);
+    box.replaceChildren(copy);
   };
   const key = `${style}|${color}`;
   const done = ready.get(key);
   if (done) show(done);
   else {
-    void preview?.(style, color).then((url) => {
-      if (!url) return;
-      ready.set(key, url);
-      show(url);
+    void preview?.(style, color).then((art) => {
+      if (!art) return;
+      ready.set(key, art);
+      show(art);
     });
   }
   return box;
