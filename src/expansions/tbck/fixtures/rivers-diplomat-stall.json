@@ -1,713 +1,1628 @@
 {
   "note": "sim dump seed 157: the Diplomat played with only bridges / unpaid river roads open (stall before the fix)",
-  "setup": { "seed": 157, "players": 4, "mode": "tb+ck", "scenario": "tb/rivers" },
-  "history": [
-    { "type": "placeSetupSettlement", "player": 2, "vertex": "v:0,2,N" },
-    { "type": "placeSetupRoad", "player": 2, "edge": "e:0,1,E" },
-    { "type": "placeSetupSettlement", "player": 3, "vertex": "v:2,-1,N" },
-    { "type": "placeSetupRoad", "player": 3, "edge": "e:2,-2,E" },
-    { "type": "placeSetupSettlement", "player": 0, "vertex": "v:2,-1,S" },
-    { "type": "placeSetupRoad", "player": 0, "edge": "e:1,0,NE" },
-    { "type": "placeSetupSettlement", "player": 1, "vertex": "v:1,-2,N" },
-    { "type": "placeSetupRoad", "player": 1, "edge": "e:1,-2,NE" },
-    { "type": "placeSetupSettlement", "player": 1, "vertex": "v:-1,-2,S" },
-    { "type": "placeSetupRoad", "player": 1, "edge": "e:-2,-1,E" },
-    { "type": "placeSetupSettlement", "player": 0, "vertex": "v:3,-1,S" },
-    { "type": "placeSetupRoad", "player": 0, "edge": "e:2,0,NE" },
-    { "type": "placeSetupSettlement", "player": 3, "vertex": "v:0,-2,S" },
-    { "type": "placeSetupRoad", "player": 3, "edge": "e:0,-2,SE" },
-    { "type": "placeSetupSettlement", "player": 2, "vertex": "v:1,-1,N" },
-    { "type": "placeSetupRoad", "player": 2, "edge": "e:1,-2,SE" },
-    { "type": "rollDice", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "brick": 1 },
-      "want": { "wool": 1 },
-      "to": [0, 1, 3]
+  "setup": {
+    "seed": 157,
+    "players": 4,
+    "mode": "tb+ck",
+    "scenario": "tb/rivers"
+  },
+  "state": {
+    "schemaVersion": 5,
+    "settings": {
+      "seed": 157,
+      "map": "tb/rivers19",
+      "vpToWin": 13,
+      "discardLimit": 7,
+      "balancedDice": false,
+      "specialBuildPhase": false,
+      "hideBankCards": false,
+      "turnTimerSec": null,
+      "startingPlayer": 2,
+      "mode": "tb+ck",
+      "expansions": ["tbck", "ck", "tb"],
+      "scenario": "tb/rivers",
+      "options": {
+        "ck": { "easyStart": false, "knightErrant": false },
+        "tb": { "harbormaster": false }
+      }
     },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "tb/buyResource", "player": 2, "resource": "lumber" },
-    { "type": "buildRoad", "player": 2, "edge": "e:0,-1,NE" },
-    { "type": "tb/buyResource", "player": 2, "resource": "wool" },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "grain": 1 },
-      "want": { "cloth": 1 },
-      "to": [0, 1, 3]
+    "board": {
+      "hexes": {
+        "h:0,-2": {
+          "id": "h:0,-2",
+          "q": 0,
+          "r": -2,
+          "terrain": "ore",
+          "token": 11
+        },
+        "h:1,-2": {
+          "id": "h:1,-2",
+          "q": 1,
+          "r": -2,
+          "terrain": "grain",
+          "token": 11
+        },
+        "h:2,-2": {
+          "id": "h:2,-2",
+          "q": 2,
+          "r": -2,
+          "terrain": "grain",
+          "token": 4
+        },
+        "h:-1,-1": {
+          "id": "h:-1,-1",
+          "q": -1,
+          "r": -1,
+          "terrain": "tb/swamp",
+          "token": null
+        },
+        "h:0,-1": {
+          "id": "h:0,-1",
+          "q": 0,
+          "r": -1,
+          "terrain": "wool",
+          "token": 12
+        },
+        "h:1,-1": {
+          "id": "h:1,-1",
+          "q": 1,
+          "r": -1,
+          "terrain": "brick",
+          "token": 9
+        },
+        "h:2,-1": {
+          "id": "h:2,-1",
+          "q": 2,
+          "r": -1,
+          "terrain": "ore",
+          "token": 3
+        },
+        "h:-2,0": {
+          "id": "h:-2,0",
+          "q": -2,
+          "r": 0,
+          "terrain": "lumber",
+          "token": 3
+        },
+        "h:-1,0": {
+          "id": "h:-1,0",
+          "q": -1,
+          "r": 0,
+          "terrain": "wool",
+          "token": 8
+        },
+        "h:0,0": {
+          "id": "h:0,0",
+          "q": 0,
+          "r": 0,
+          "terrain": "lumber",
+          "token": 9
+        },
+        "h:1,0": {
+          "id": "h:1,0",
+          "q": 1,
+          "r": 0,
+          "terrain": "lumber",
+          "token": 10
+        },
+        "h:2,0": {
+          "id": "h:2,0",
+          "q": 2,
+          "r": 0,
+          "terrain": "lumber",
+          "token": 6
+        },
+        "h:-2,1": {
+          "id": "h:-2,1",
+          "q": -2,
+          "r": 1,
+          "terrain": "tb/swamp",
+          "token": null
+        },
+        "h:-1,1": {
+          "id": "h:-1,1",
+          "q": -1,
+          "r": 1,
+          "terrain": "brick",
+          "token": 5
+        },
+        "h:0,1": {
+          "id": "h:0,1",
+          "q": 0,
+          "r": 1,
+          "terrain": "ore",
+          "token": 5
+        },
+        "h:1,1": {
+          "id": "h:1,1",
+          "q": 1,
+          "r": 1,
+          "terrain": "grain",
+          "token": 4
+        },
+        "h:-2,2": {
+          "id": "h:-2,2",
+          "q": -2,
+          "r": 2,
+          "terrain": "brick",
+          "token": 6
+        },
+        "h:-1,2": {
+          "id": "h:-1,2",
+          "q": -1,
+          "r": 2,
+          "terrain": "grain",
+          "token": 10
+        },
+        "h:0,2": {
+          "id": "h:0,2",
+          "q": 0,
+          "r": 2,
+          "terrain": "wool",
+          "token": 8
+        }
+      },
+      "ports": [
+        {
+          "kind": "brick",
+          "edge": "e:0,-3,SE",
+          "vertices": ["v:0,-2,N", "v:0,-3,S"],
+          "waterHex": "h:0,-3"
+        },
+        {
+          "kind": "generic",
+          "edge": "e:1,-2,NE",
+          "vertices": ["v:1,-2,N", "v:2,-3,S"],
+          "waterHex": "h:2,-3"
+        },
+        {
+          "kind": "generic",
+          "edge": "e:2,-1,NE",
+          "vertices": ["v:2,-1,N", "v:3,-2,S"],
+          "waterHex": "h:3,-2"
+        },
+        {
+          "kind": "generic",
+          "edge": "e:2,0,E",
+          "vertices": ["v:3,-1,S", "v:2,1,N"],
+          "waterHex": "h:3,0"
+        },
+        {
+          "kind": "ore",
+          "edge": "e:1,1,SE",
+          "vertices": ["v:1,2,N", "v:1,1,S"],
+          "waterHex": "h:1,2"
+        },
+        {
+          "kind": "lumber",
+          "edge": "e:-1,2,SE",
+          "vertices": ["v:-1,3,N", "v:-1,2,S"],
+          "waterHex": "h:-1,3"
+        },
+        {
+          "kind": "grain",
+          "edge": "e:-3,3,NE",
+          "vertices": ["v:-3,3,N", "v:-2,2,S"],
+          "waterHex": "h:-3,3"
+        },
+        {
+          "kind": "generic",
+          "edge": "e:-3,1,E",
+          "vertices": ["v:-2,0,S", "v:-3,2,N"],
+          "waterHex": "h:-3,1"
+        },
+        {
+          "kind": "wool",
+          "edge": "e:-2,-1,E",
+          "vertices": ["v:-1,-2,S", "v:-2,0,N"],
+          "waterHex": "h:-2,-1"
+        }
+      ],
+      "ext": {
+        "tb": {
+          "rivers": ["h:-1,-1", "h:0,-1", "h:1,-1", "h:2,-1", "h:-2,1", "h:-1,1", "h:0,1"],
+          "bridgeSites": [
+            "e:-1,-1,E",
+            "e:0,-1,E",
+            "e:1,-1,E",
+            "e:-2,1,E",
+            "e:-1,1,E",
+            "e:-1,-2,SE",
+            "e:-3,2,NE"
+          ],
+          "twoOnTwelve": "h:0,-1"
+        }
+      }
     },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "lumber": 1 },
-      "to": [0, 1, 3]
+    "pieces": {
+      "buildings": {
+        "v:0,2,N": { "owner": 2, "kind": "settlement" },
+        "v:2,-1,N": { "owner": 3, "kind": "settlement" },
+        "v:2,-1,S": { "owner": 0, "kind": "settlement" },
+        "v:1,-2,N": { "owner": 1, "kind": "settlement" },
+        "v:-1,-2,S": { "owner": 1, "kind": "settlement" },
+        "v:3,-1,S": { "owner": 0, "kind": "settlement" },
+        "v:0,-2,S": { "owner": 3, "kind": "city" },
+        "v:1,-1,N": { "owner": 2, "kind": "settlement" }
+      },
+      "roads": {
+        "e:0,1,E": 2,
+        "e:2,-2,E": 3,
+        "e:1,0,NE": 0,
+        "e:-2,-1,E": 1,
+        "e:2,0,NE": 0,
+        "e:0,-2,SE": 3,
+        "e:1,-2,SE": 2,
+        "e:0,-1,NE": 2,
+        "e:2,-1,E": 0,
+        "e:2,-1,NE": 0,
+        "e:0,1,SE": 2
+      }
     },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "tb/buyResource", "player": 3, "resource": "wool" },
-    { "type": "rollDice", "player": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 3,
-      "give": { "wool": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 1, 2]
+    "robber": "h:0,0",
+    "players": [
+      {
+        "id": 0,
+        "name": "Red",
+        "color": "#d64541",
+        "resources": {
+          "brick": 0,
+          "lumber": 3,
+          "wool": 0,
+          "grain": 1,
+          "ore": 0
+        },
+        "devCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "newDevCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "knightsPlayed": 0,
+        "progressCardsPlayed": {
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        }
+      },
+      {
+        "id": 1,
+        "name": "Blue",
+        "color": "#3a7bd5",
+        "resources": {
+          "brick": 0,
+          "lumber": 0,
+          "wool": 0,
+          "grain": 0,
+          "ore": 0
+        },
+        "devCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "newDevCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "knightsPlayed": 0,
+        "progressCardsPlayed": {
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        }
+      },
+      {
+        "id": 2,
+        "name": "White",
+        "color": "#ecf0f1",
+        "resources": {
+          "brick": 1,
+          "lumber": 1,
+          "wool": 2,
+          "grain": 2,
+          "ore": 3
+        },
+        "devCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "newDevCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "knightsPlayed": 0,
+        "progressCardsPlayed": {
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        }
+      },
+      {
+        "id": 3,
+        "name": "Orange",
+        "color": "#f39c12",
+        "resources": {
+          "brick": 1,
+          "lumber": 0,
+          "wool": 0,
+          "grain": 0,
+          "ore": 0
+        },
+        "devCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "newDevCards": {
+          "knight": 0,
+          "victoryPoint": 0,
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        },
+        "knightsPlayed": 0,
+        "progressCardsPlayed": {
+          "roadBuilding": 0,
+          "yearOfPlenty": 0,
+          "monopoly": 0
+        }
+      }
+    ],
+    "bank": { "brick": 17, "lumber": 15, "wool": 17, "grain": 16, "ore": 16 },
+    "devDeck": [],
+    "turn": {
+      "number": 42,
+      "current": 3,
+      "devCardPlayed": false,
+      "tradeOffers": 2
     },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "cancelTrade", "player": 3 },
-    { "type": "ck/buildKnight", "player": 3, "vertex": "v:3,-3,S" },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "wool": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 2]
+    "phase": { "kind": "main" },
+    "dice": [2, 3],
+    "diceDeck": [],
+    "awards": { "longestRoad": null, "largestArmy": null },
+    "log": [
+      { "turn": 22, "player": 2, "text": "White received 1 wheat" },
+      { "turn": 22, "player": 3, "text": "Orange received 1 wheat" },
+      { "turn": 22, "player": 3, "text": "Orange offers 1 grain for 1 wool" },
+      { "turn": 22, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 22, "player": 0, "text": "Red accepted the offer" },
+      { "turn": 22, "player": 2, "text": "White rejected the offer" },
+      {
+        "turn": 22,
+        "player": 3,
+        "text": "Orange traded 1 grain to Red for 1 wool"
+      },
+      { "turn": 22, "player": 3, "text": "Orange ended the turn" },
+      { "turn": 23, "player": 0, "text": "Red rolled 6 (2+4)" },
+      {
+        "turn": 23,
+        "player": 0,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 23,
+        "player": null,
+        "text": "The barbarians sail closer (4/7)"
+      },
+      { "turn": 23, "player": 0, "text": "Red received 2 lumber" },
+      { "turn": 23, "player": 0, "text": "Red offers 1 coin for 1 lumber" },
+      { "turn": 23, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 23, "player": 0, "text": "Red withdrew the offer" },
+      {
+        "turn": 23,
+        "player": 0,
+        "text": "Red traded 3 lumber for 1 wheat with the bank"
+      },
+      { "turn": 23, "player": 0, "text": "Red offers 1 grain for 1 wool" },
+      { "turn": 23, "player": 3, "text": "Orange accepted the offer" },
+      { "turn": 23, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 23, "player": 2, "text": "White rejected the offer" },
+      {
+        "turn": 23,
+        "player": 0,
+        "text": "Red traded 1 grain to Orange for 1 wool"
+      },
+      { "turn": 23, "player": 0, "text": "Red ended the turn" },
+      { "turn": 24, "player": 1, "text": "Blue rolled 7 (4+3)" },
+      {
+        "turn": 24,
+        "player": 1,
+        "text": "The event die shows the yellow (trade) gate"
+      },
+      { "turn": 24, "player": 1, "text": "Blue moved the robber" },
+      { "turn": 24, "player": 1, "text": "Blue ended the turn" },
+      { "turn": 25, "player": 2, "text": "White rolled 8 (5+3)" },
+      {
+        "turn": 25,
+        "player": 2,
+        "text": "The event die shows the yellow (trade) gate"
+      },
+      { "turn": 25, "player": 2, "text": "White received 1 sheep" },
+      { "turn": 25, "player": 2, "text": "White offers 1 lumber for 1 paper" },
+      { "turn": 25, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 25, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 25, "player": 0, "text": "Red rejected the offer" },
+      { "turn": 25, "player": null, "text": "Everyone rejected the offer" },
+      { "turn": 25, "player": 2, "text": "White offers 1 wool for 1 brick" },
+      { "turn": 25, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 25, "player": 2, "text": "White withdrew the offer" },
+      { "turn": 25, "player": 2, "text": "White offers 1 cloth for 1 lumber" },
+      { "turn": 25, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 25, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 25, "player": 2, "text": "White withdrew the offer" },
+      { "turn": 25, "player": 2, "text": "White ended the turn" },
+      { "turn": 26, "player": 3, "text": "Orange rolled 10 (4+6)" },
+      {
+        "turn": 26,
+        "player": 3,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 26,
+        "player": null,
+        "text": "The barbarians sail closer (5/7)"
+      },
+      { "turn": 26, "player": 0, "text": "Red received 1 lumber" },
+      { "turn": 26, "player": 3, "text": "Orange ended the turn" },
+      { "turn": 27, "player": 0, "text": "Red rolled 10 (4+6)" },
+      {
+        "turn": 27,
+        "player": 0,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 27,
+        "player": null,
+        "text": "The barbarians sail closer (6/7)"
+      },
+      { "turn": 27, "player": 0, "text": "Red received 1 lumber" },
+      {
+        "turn": 27,
+        "player": 0,
+        "text": "Red traded 3 lumber for 1 sheep with the bank"
+      },
+      { "turn": 27, "player": 0, "text": "Red recruited a knight" },
+      { "turn": 27, "player": 0, "text": "Red ended the turn" },
+      { "turn": 28, "player": 1, "text": "Blue rolled 8 (4+4)" },
+      {
+        "turn": 28,
+        "player": 1,
+        "text": "The event die shows the blue (politics) gate"
+      },
+      { "turn": 28, "player": 2, "text": "White received 1 sheep" },
+      { "turn": 28, "player": 1, "text": "Blue ended the turn" },
+      { "turn": 29, "player": 2, "text": "White rolled 6 (4+2)" },
+      {
+        "turn": 29,
+        "player": 2,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 29,
+        "player": null,
+        "text": "The barbarians attack! Barbarians 1, knights of Catan 3"
+      },
+      {
+        "turn": 29,
+        "player": 3,
+        "text": "Orange is the Defender of Catan (1 victory point)"
+      },
+      { "turn": 29, "player": 0, "text": "Red received 2 lumber" },
+      { "turn": 29, "player": 2, "text": "White activated a knight" },
+      { "turn": 29, "player": 2, "text": "White offers 1 lumber for 1 ore" },
+      { "turn": 29, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 29, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 29, "player": 0, "text": "Red rejected the offer" },
+      { "turn": 29, "player": null, "text": "Everyone rejected the offer" },
+      { "turn": 29, "player": 2, "text": "White offers 1 lumber for 1 coin" },
+      { "turn": 29, "player": 2, "text": "White withdrew the offer" },
+      { "turn": 29, "player": 2, "text": "White offers 1 wool for 1 grain" },
+      { "turn": 29, "player": 3, "text": "Orange accepted the offer" },
+      { "turn": 29, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 29, "player": 0, "text": "Red rejected the offer" },
+      {
+        "turn": 29,
+        "player": 2,
+        "text": "White traded 1 wool to Orange for 1 grain"
+      },
+      { "turn": 29, "player": 2, "text": "White ended the turn" },
+      { "turn": 30, "player": 3, "text": "Orange rolled 7 (3+4)" },
+      {
+        "turn": 30,
+        "player": 3,
+        "text": "The event die shows the blue (politics) gate"
+      },
+      { "turn": 30, "player": 3, "text": "Orange moved the robber" },
+      { "turn": 30, "player": 3, "text": "Orange ended the turn" },
+      { "turn": 31, "player": 0, "text": "Red rolled 10 (5+5)" },
+      {
+        "turn": 31,
+        "player": 0,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 31,
+        "player": null,
+        "text": "The barbarians sail closer (1/7)"
+      },
+      { "turn": 31, "player": 0, "text": "Red received 1 lumber" },
+      {
+        "turn": 31,
+        "player": 0,
+        "text": "Red traded 3 lumber for 1 paper with the bank"
+      },
+      { "turn": 31, "player": 0, "text": "Red offers 1 coin for 1 grain" },
+      { "turn": 31, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 31, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 31, "player": 0, "text": "Red withdrew the offer" },
+      { "turn": 31, "player": 0, "text": "Red offers 1 paper for 1 ore" },
+      { "turn": 31, "player": 2, "text": "White rejected the offer" },
+      { "turn": 31, "player": 0, "text": "Red withdrew the offer" },
+      { "turn": 31, "player": 0, "text": "Red offers 1 coin for 1 wool" },
+      { "turn": 31, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 31, "player": 0, "text": "Red withdrew the offer" },
+      { "turn": 31, "player": 0, "text": "Red activated a knight" },
+      { "turn": 31, "player": 0, "text": "Red paid 2 gold for 1 brick" },
+      { "turn": 31, "player": 0, "text": "Red ended the turn" },
+      { "turn": 32, "player": 1, "text": "Blue rolled 2 (1+1)" },
+      {
+        "turn": 32,
+        "player": 1,
+        "text": "The event die shows the green (science) gate"
+      },
+      { "turn": 32, "player": 3, "text": "Orange received 2 sheep" },
+      { "turn": 32, "player": 1, "text": "Blue ended the turn" },
+      { "turn": 33, "player": 2, "text": "White rolled 6 (3+3)" },
+      {
+        "turn": 33,
+        "player": 2,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 33,
+        "player": null,
+        "text": "The barbarians sail closer (2/7)"
+      },
+      { "turn": 33, "player": 0, "text": "Red received 2 lumber" },
+      { "turn": 33, "player": 2, "text": "White ended the turn" },
+      { "turn": 34, "player": 3, "text": "Orange rolled 5 (1+4)" },
+      {
+        "turn": 34,
+        "player": 3,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 34,
+        "player": null,
+        "text": "The barbarians sail closer (3/7)"
+      },
+      { "turn": 34, "player": 2, "text": "White received 1 ore" },
+      { "turn": 34, "player": 3, "text": "Orange traded 3 sheep for 1 gold" },
+      { "turn": 34, "player": 3, "text": "Orange offers 1 lumber for 1 grain" },
+      { "turn": 34, "player": 0, "text": "Red rejected the offer" },
+      { "turn": 34, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 34, "player": 2, "text": "White accepted the offer" },
+      {
+        "turn": 34,
+        "player": 3,
+        "text": "Orange traded 1 lumber to White for 1 grain"
+      },
+      { "turn": 34, "player": 3, "text": "Orange activated a knight" },
+      { "turn": 34, "player": 3, "text": "Orange ended the turn" },
+      { "turn": 35, "player": 0, "text": "Red rolled 6 (4+2)" },
+      {
+        "turn": 35,
+        "player": 0,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 35,
+        "player": null,
+        "text": "The barbarians sail closer (4/7)"
+      },
+      { "turn": 35, "player": 0, "text": "Red received 2 lumber" },
+      { "turn": 35, "player": 0, "text": "Red offers 1 wool for 1 ore" },
+      { "turn": 35, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 35, "player": 2, "text": "White accepted the offer" },
+      {
+        "turn": 35,
+        "player": 0,
+        "text": "Red traded 1 wool to White for 1 ore"
+      },
+      { "turn": 35, "player": 0, "text": "Red built a road" },
+      { "turn": 35, "player": 0, "text": "Red got 1 gold (river)" },
+      { "turn": 35, "player": 0, "text": "Red traded 3 lumber for 1 gold" },
+      { "turn": 35, "player": 0, "text": "Red offers 1 ore for 1 brick" },
+      { "turn": 35, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 35, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 35, "player": 2, "text": "White rejected the offer" },
+      { "turn": 35, "player": null, "text": "Everyone rejected the offer" },
+      { "turn": 35, "player": 0, "text": "Red paid 2 gold for 1 brick" },
+      { "turn": 35, "player": 0, "text": "Red ended the turn" },
+      { "turn": 36, "player": 1, "text": "Blue rolled 4 (2+2)" },
+      {
+        "turn": 36,
+        "player": 1,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 36,
+        "player": null,
+        "text": "The barbarians sail closer (5/7)"
+      },
+      { "turn": 36, "player": 2, "text": "White received 1 brick, 1 wheat" },
+      { "turn": 36, "player": 3, "text": "Orange received 1 wheat" },
+      { "turn": 36, "player": 1, "text": "Blue ended the turn" },
+      { "turn": 37, "player": 2, "text": "White rolled 9 (3+6)" },
+      {
+        "turn": 37,
+        "player": 2,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 37,
+        "player": null,
+        "text": "The barbarians sail closer (6/7)"
+      },
+      { "turn": 37, "player": 2, "text": "White received 1 wheat" },
+      { "turn": 37, "player": 2, "text": "White offers 1 lumber for 1 brick" },
+      { "turn": 37, "player": 0, "text": "Red accepted the offer" },
+      { "turn": 37, "player": 1, "text": "Blue rejected the offer" },
+      {
+        "turn": 37,
+        "player": 2,
+        "text": "White traded 1 lumber to Red for 1 brick"
+      },
+      { "turn": 37, "player": 2, "text": "White built a road" },
+      { "turn": 37, "player": 2, "text": "White got 1 gold (river)" },
+      { "turn": 37, "player": 2, "text": "White ended the turn" },
+      { "turn": 38, "player": 3, "text": "Orange rolled 5 (2+3)" },
+      {
+        "turn": 38,
+        "player": 3,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 38,
+        "player": null,
+        "text": "The barbarians attack! Barbarians 1, knights of Catan 3"
+      },
+      {
+        "turn": 38,
+        "player": null,
+        "text": "The defenders tie: each of them draws a progress card"
+      },
+      {
+        "turn": 38,
+        "player": 3,
+        "text": "Orange drew a politics progress card"
+      },
+      { "turn": 38, "player": 0, "text": "Red drew a politics progress card" },
+      { "turn": 38, "player": 2, "text": "White drew a science progress card" },
+      { "turn": 38, "player": 2, "text": "White received 1 ore" },
+      { "turn": 38, "player": 3, "text": "Orange ended the turn" },
+      { "turn": 39, "player": 0, "text": "Red rolled 9 (6+3)" },
+      {
+        "turn": 39,
+        "player": 0,
+        "text": "The event die shows the blue (politics) gate"
+      },
+      { "turn": 39, "player": 2, "text": "White received 1 wheat" },
+      { "turn": 39, "player": 0, "text": "Red offers 1 ore for 1 cloth" },
+      { "turn": 39, "player": 2, "text": "White accepted the offer" },
+      {
+        "turn": 39,
+        "player": 0,
+        "text": "Red traded 1 ore to White for 1 cloth"
+      },
+      { "turn": 39, "player": 0, "text": "Red played Diplomat" },
+      { "turn": 39, "player": 0, "text": "Red removed a road of Blue" },
+      { "turn": 39, "player": 0, "text": "Red offers 1 cloth for 1 coin" },
+      { "turn": 39, "player": 3, "text": "Orange rejected the offer" },
+      { "turn": 39, "player": 1, "text": "Blue rejected the offer" },
+      { "turn": 39, "player": 0, "text": "Red withdrew the offer" },
+      { "turn": 39, "player": 0, "text": "Red ended the turn" },
+      { "turn": 40, "player": 1, "text": "Blue rolled 10 (4+6)" },
+      {
+        "turn": 40,
+        "player": 1,
+        "text": "The event die shows the yellow (trade) gate"
+      },
+      { "turn": 40, "player": 0, "text": "Red received 1 lumber" },
+      { "turn": 40, "player": 1, "text": "Blue ended the turn" },
+      { "turn": 41, "player": 2, "text": "White rolled 10 (4+6)" },
+      {
+        "turn": 41,
+        "player": 2,
+        "text": "The event die shows the barbarian ship"
+      },
+      {
+        "turn": 41,
+        "player": null,
+        "text": "The barbarians sail closer (1/7)"
+      },
+      { "turn": 41, "player": 0, "text": "Red received 1 lumber" },
+      { "turn": 41, "player": 2, "text": "White activated a knight" },
+      { "turn": 41, "player": 2, "text": "White played Inventor" },
+      { "turn": 41, "player": 2, "text": "White swapped the 4 and the 9" },
+      { "turn": 41, "player": 2, "text": "White ended the turn" },
+      { "turn": 42, "player": 3, "text": "Orange rolled 5 (2+3)" },
+      {
+        "turn": 42,
+        "player": 3,
+        "text": "The event die shows the green (science) gate"
+      },
+      { "turn": 42, "player": 2, "text": "White received 1 ore" },
+      { "turn": 42, "player": 3, "text": "Orange offers 1 grain for 1 coin" },
+      { "turn": 42, "player": 0, "text": "Red accepted the offer" },
+      { "turn": 42, "player": 2, "text": "White rejected the offer" },
+      {
+        "turn": 42,
+        "player": 3,
+        "text": "Orange traded 1 grain to Red for 1 coin"
+      },
+      { "turn": 42, "player": 3, "text": "Orange paid 2 gold for 1 brick" },
+      { "turn": 42, "player": 3, "text": "Orange offers 1 brick for 1 ore" },
+      { "turn": 42, "player": 2, "text": "White rejected the offer" },
+      { "turn": 42, "player": 3, "text": "Orange withdrew the offer" }
+    ],
+    "rng": 481483414,
+    "winner": null,
+    "ext": {
+      "tbck": { "v": 1, "roll": null },
+      "ck": {
+        "v": 1,
+        "players": [
+          {
+            "commodities": { "paper": 1, "cloth": 1, "coin": 0 },
+            "improvements": { "trade": 0, "politics": 0, "science": 0 },
+            "progress": [],
+            "vpCards": [],
+            "defender": 0
+          },
+          {
+            "commodities": { "paper": 0, "cloth": 0, "coin": 0 },
+            "improvements": { "trade": 0, "politics": 0, "science": 0 },
+            "progress": [],
+            "vpCards": [],
+            "defender": 0
+          },
+          {
+            "commodities": { "paper": 0, "cloth": 0, "coin": 0 },
+            "improvements": { "trade": 0, "politics": 0, "science": 0 },
+            "progress": [],
+            "vpCards": [],
+            "defender": 0
+          },
+          {
+            "commodities": { "paper": 0, "cloth": 0, "coin": 1 },
+            "improvements": { "trade": 1, "politics": 1, "science": 0 },
+            "progress": ["saboteur", "diplomat"],
+            "vpCards": [],
+            "defender": 1
+          }
+        ],
+        "bank": { "paper": 11, "cloth": 11, "coin": 11 },
+        "knights": {
+          "v:3,-3,S": {
+            "owner": 3,
+            "level": 1,
+            "active": false,
+            "activatedOn": 14,
+            "promotedOn": null
+          },
+          "v:0,-1,N": {
+            "owner": 3,
+            "level": 1,
+            "active": false,
+            "activatedOn": 34,
+            "promotedOn": null
+          },
+          "v:1,0,S": {
+            "owner": 2,
+            "level": 1,
+            "active": true,
+            "activatedOn": 41,
+            "promotedOn": null
+          },
+          "v:3,-2,S": {
+            "owner": 0,
+            "level": 1,
+            "active": false,
+            "activatedOn": 31,
+            "promotedOn": null
+          }
+        },
+        "walls": {},
+        "metropolis": { "trade": null, "politics": null, "science": null },
+        "barbarian": 1,
+        "attacks": 3,
+        "merchant": null,
+        "decks": {
+          "trade": [
+            "merchant",
+            "merchantFleet",
+            "resourceMonopoly",
+            "masterMerchant",
+            "tradeMonopoly",
+            "tradeMonopoly",
+            "commercialHarbor",
+            "merchant",
+            "resourceMonopoly",
+            "merchant",
+            "commercialHarbor",
+            "merchant",
+            "resourceMonopoly",
+            "merchantFleet",
+            "resourceMonopoly",
+            "merchant",
+            "merchant",
+            "masterMerchant"
+          ],
+          "politics": [
+            "diplomat",
+            "spy",
+            "constitution",
+            "deserter",
+            "warlord",
+            "saboteur",
+            "deserter",
+            "bishop",
+            "intrigue",
+            "spy",
+            "warlord",
+            "wedding",
+            "wedding",
+            "intrigue",
+            "bishop",
+            "spy"
+          ],
+          "science": [
+            "inventor",
+            "engineer",
+            "roadBuilding",
+            "irrigation",
+            "crane",
+            "inventor",
+            "mining",
+            "smith",
+            "mining",
+            "medicine",
+            "printer",
+            "smith",
+            "crane",
+            "alchemist",
+            "irrigation",
+            "alchemist",
+            "roadBuilding",
+            "medicine"
+          ]
+        },
+        "event": "science",
+        "turn": { "cranes": 0, "fleet": [], "cancels": 0, "alchemist": false },
+        "turns": [10, 10, 11, 11],
+        "trade": null
+      },
+      "tb": {
+        "v": 1,
+        "gold": [0, 1, 2, 0],
+        "goldBuys": 1,
+        "harbormaster": null,
+        "rivers": { "bridges": {} }
+      }
     },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 3,
-      "give": { "wool": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 3 },
-    { "type": "endTurn", "player": 3 },
-    { "type": "tb/buyResource", "player": 0, "resource": "grain" },
-    { "type": "rollDice", "player": 0 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "tb/buyResource", "player": 1, "resource": "grain" },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "cloth": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "rejectTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 1 },
-    {
-      "type": "offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "brick": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "paper": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "bankTrade", "player": 2, "give": "grain", "receive": "wool" },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "cloth": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "wool": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "acceptTrade", "player": 1 },
-    { "type": "confirmTrade", "player": 3, "partner": 1 },
-    { "type": "ck/activateKnight", "player": 3, "vertex": "v:3,-3,S" },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    {
-      "type": "offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 1 },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "cancelTrade", "player": 1 },
-    {
-      "type": "offerTrade",
-      "player": 1,
-      "give": { "wool": 1 },
-      "want": { "lumber": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "cancelTrade", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    { "type": "tb/sellForGold", "player": 0, "resource": "lumber" },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "grain": 1 },
-      "want": { "ore": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "lumber": 1 },
-      "want": { "wool": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "grain": 1 },
-      "want": { "paper": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "cancelTrade", "player": 0 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 1 },
-    {
-      "type": "ck/offerTrade",
-      "player": 1,
-      "give": { "wool": 1 },
-      "want": { "cloth": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "bankTrade", "player": 2, "give": "wool", "receive": "lumber" },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "paper": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "ck/bankTrade", "player": 2, "give": "grain", "receive": "cloth" },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "cloth": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "ck/improve", "player": 3, "track": "politics" },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "ore": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "acceptTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 3, "partner": 2 },
-    { "type": "ck/selectKnight", "player": 3, "vertex": "v:3,-3,S" },
-    { "type": "ck/activateKnight", "player": 3, "vertex": "v:3,-3,S" },
-    {
-      "type": "ck/offerTrade",
-      "player": 3,
-      "give": { "coin": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 3,
-      "give": { "grain": 1 },
-      "want": { "cloth": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "cancelTrade", "player": 3 },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "grain": 1 },
-      "want": { "lumber": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "lumber": 1 },
-      "want": { "coin": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "acceptTrade", "player": 3 },
-    { "type": "confirmTrade", "player": 0, "partner": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "lumber": 1 },
-      "want": { "cloth": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 0 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    {
-      "type": "offerTrade",
-      "player": 1,
-      "give": { "wool": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 2, 3]
-    },
-    { "type": "acceptTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 1, "partner": 0 },
-    { "type": "tb/sellForGold", "player": 1, "resource": "grain" },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "ck/buildKnight", "player": 3, "vertex": "v:0,-1,N" },
-    { "type": "ck/improve", "player": 3, "track": "trade" },
-    { "type": "ck/selectKnight", "player": 3, "vertex": "v:0,-1,N" },
-    { "type": "ck/activateKnight", "player": 3, "vertex": "v:0,-1,N" },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    { "type": "moveRobber", "player": 0, "hex": "h:1,-1" },
-    { "type": "steal", "player": 0, "victim": 2 },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "ore": 1 },
-      "want": { "wool": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "lumber": 1 },
-      "want": { "brick": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "acceptTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 0, "partner": 2 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "coin": 1 },
-      "want": { "grain": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "buildRoad", "player": 0, "edge": "e:2,-1,E" },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "ck/buildKnight", "player": 2, "vertex": "v:1,0,S" },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "grain": 1 },
-      "want": { "brick": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "ck/selectKnight", "player": 2, "vertex": "v:1,0,S" },
-    { "type": "ck/activateKnight", "player": 2, "vertex": "v:1,0,S" },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "paper": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "grain": 1 },
-      "want": { "wool": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "acceptTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 3, "partner": 0 },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "coin": 1 },
-      "want": { "lumber": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 0 },
-    { "type": "bankTrade", "player": 0, "give": "lumber", "receive": "grain" },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "grain": 1 },
-      "want": { "wool": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "acceptTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 0, "partner": 3 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "moveRobber", "player": 1, "hex": "h:-1,2" },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "paper": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 0 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "brick": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 2 },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "cloth": 1 },
-      "want": { "lumber": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    { "type": "bankTrade", "player": 0, "give": "lumber", "receive": "wool" },
-    { "type": "ck/buildKnight", "player": 0, "vertex": "v:3,-2,S" },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "ck/selectKnight", "player": 2, "vertex": "v:1,0,S" },
-    { "type": "ck/activateKnight", "player": 2, "vertex": "v:1,0,S" },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "cancelTrade", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "wool": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "acceptTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "confirmTrade", "player": 2, "partner": 3 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "moveRobber", "player": 3, "hex": "h:0,0" },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    { "type": "ck/bankTrade", "player": 0, "give": "lumber", "receive": "paper" },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "coin": 1 },
-      "want": { "grain": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "paper": 1 },
-      "want": { "ore": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "coin": 1 },
-      "want": { "wool": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "cancelTrade", "player": 0 },
-    { "type": "ck/activateKnight", "player": 0, "vertex": "v:3,-2,S" },
-    { "type": "tb/buyResource", "player": 0, "resource": "brick" },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "tb/sellForGold", "player": 3, "resource": "wool" },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "lumber": 1 },
-      "want": { "grain": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "acceptTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 3, "partner": 2 },
-    { "type": "ck/activateKnight", "player": 3, "vertex": "v:0,-1,N" },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "wool": 1 },
-      "want": { "ore": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "acceptTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 0, "partner": 2 },
-    { "type": "buildRoad", "player": 0, "edge": "e:2,-1,NE" },
-    { "type": "tb/sellForGold", "player": 0, "resource": "lumber" },
-    {
-      "type": "offerTrade",
-      "player": 0,
-      "give": { "ore": 1 },
-      "want": { "brick": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "ck/selectKnight", "player": 0, "vertex": "v:3,-2,S" },
-    { "type": "ck/cancel", "player": 0 },
-    { "type": "tb/buyResource", "player": 0, "resource": "brick" },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    {
-      "type": "offerTrade",
-      "player": 2,
-      "give": { "lumber": 1 },
-      "want": { "brick": 1 },
-      "to": [0, 1, 3]
-    },
-    { "type": "acceptTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "confirmTrade", "player": 2, "partner": 0 },
-    { "type": "buildRoad", "player": 2, "edge": "e:0,1,SE" },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    { "type": "ck/pickTrack", "player": 3, "track": "politics" },
-    { "type": "ck/pickTrack", "player": 0, "track": "politics" },
-    { "type": "ck/pickTrack", "player": 2, "track": "science" },
-    { "type": "endTurn", "player": 3 },
-    { "type": "rollDice", "player": 0 },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "ore": 1 },
-      "want": { "cloth": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "acceptTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 0, "partner": 2 },
-    { "type": "ck/play", "player": 0, "card": "diplomat" },
-    { "type": "ck/pickEdge", "player": 0, "edge": "e:1,-2,NE" },
-    {
-      "type": "ck/offerTrade",
-      "player": 0,
-      "give": { "cloth": 1 },
-      "want": { "coin": 1 },
-      "to": [1, 2, 3]
-    },
-    { "type": "rejectTrade", "player": 3 },
-    { "type": "rejectTrade", "player": 1 },
-    { "type": "cancelTrade", "player": 0 },
-    { "type": "endTurn", "player": 0 },
-    { "type": "rollDice", "player": 1 },
-    { "type": "endTurn", "player": 1 },
-    { "type": "rollDice", "player": 2 },
-    { "type": "ck/activateKnight", "player": 2, "vertex": "v:1,0,S" },
-    { "type": "ck/play", "player": 2, "card": "inventor" },
-    { "type": "ck/pickHex", "player": 2, "hex": "h:1,-1" },
-    { "type": "ck/pickHex", "player": 2, "hex": "h:1,1" },
-    { "type": "endTurn", "player": 2 },
-    { "type": "rollDice", "player": 3 },
-    {
-      "type": "ck/offerTrade",
-      "player": 3,
-      "give": { "grain": 1 },
-      "want": { "coin": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "acceptTrade", "player": 0 },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "confirmTrade", "player": 3, "partner": 0 },
-    { "type": "tb/buyResource", "player": 3, "resource": "brick" },
-    {
-      "type": "offerTrade",
-      "player": 3,
-      "give": { "brick": 1 },
-      "want": { "ore": 1 },
-      "to": [0, 1, 2]
-    },
-    { "type": "rejectTrade", "player": 2 },
-    { "type": "cancelTrade", "player": 3 },
-    { "type": "ck/play", "player": 3, "card": "diplomat" }
-  ]
+    "stats": {
+      "complete": true,
+      "fromTurn": 0,
+      "players": [
+        {
+          "gained": {
+            "production": {
+              "brick": 0,
+              "lumber": 20,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "setup": {
+              "brick": 0,
+              "lumber": 1,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 1,
+              "lumber": 1,
+              "wool": 2,
+              "grain": 2,
+              "ore": 1
+            },
+            "bank": {
+              "brick": 2,
+              "lumber": 0,
+              "wool": 1,
+              "grain": 2,
+              "ore": 0
+            },
+            "steal": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 1
+            },
+            "devCard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "lost": {
+            "build": {
+              "brick": 2,
+              "lumber": 2,
+              "wool": 1,
+              "grain": 1,
+              "ore": 1
+            },
+            "buyDev": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 1,
+              "lumber": 2,
+              "wool": 2,
+              "grain": 2,
+              "ore": 1
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 15,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "stolen": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "discard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "monopoly": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "blocked": {
+            "brick": 0,
+            "lumber": 0,
+            "wool": 0,
+            "grain": 0,
+            "ore": 0
+          },
+          "expected36": 685,
+          "rolls": [0, 0, 0, 0, 2, 2, 1, 1, 3, 1, 0],
+          "built": { "road": 4, "settlement": 1, "city": 1 },
+          "freeRoads": 0,
+          "devBought": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "devPlayed": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "offersMade": 8,
+          "tradesAsOfferer": 5,
+          "tradesAsPartner": 4,
+          "bankTrades": 0,
+          "portTrades": 3,
+          "robberMoves": 1,
+          "steals": 1,
+          "robbed": 0,
+          "discards": 0,
+          "tradesByRatio": { "3:1": 3 }
+        },
+        {
+          "gained": {
+            "production": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 2,
+              "ore": 0
+            },
+            "setup": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 1,
+              "grain": 1,
+              "ore": 0
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 1,
+              "ore": 0
+            },
+            "steal": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "devCard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "lost": {
+            "build": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "buyDev": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 1,
+              "grain": 1,
+              "ore": 0
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 3,
+              "ore": 0
+            },
+            "stolen": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "discard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "monopoly": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "blocked": {
+            "brick": 0,
+            "lumber": 0,
+            "wool": 0,
+            "grain": 0,
+            "ore": 0
+          },
+          "expected36": 84,
+          "rolls": [1, 0, 1, 1, 0, 1, 1, 2, 2, 1, 0],
+          "built": { "road": 2, "settlement": 1, "city": 1 },
+          "freeRoads": 0,
+          "devBought": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "devPlayed": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "offersMade": 4,
+          "tradesAsOfferer": 1,
+          "tradesAsPartner": 1,
+          "bankTrades": 0,
+          "portTrades": 0,
+          "robberMoves": 1,
+          "steals": 0,
+          "robbed": 0,
+          "discards": 0
+        },
+        {
+          "gained": {
+            "production": {
+              "brick": 2,
+              "lumber": 0,
+              "wool": 5,
+              "grain": 12,
+              "ore": 4
+            },
+            "setup": {
+              "brick": 1,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 2,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 1,
+              "lumber": 2,
+              "wool": 1,
+              "grain": 1,
+              "ore": 2
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 2,
+              "wool": 2,
+              "grain": 0,
+              "ore": 0
+            },
+            "steal": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "devCard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "lost": {
+            "build": {
+              "brick": 2,
+              "lumber": 2,
+              "wool": 1,
+              "grain": 3,
+              "ore": 1
+            },
+            "buyDev": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 1,
+              "lumber": 1,
+              "wool": 1,
+              "grain": 2,
+              "ore": 1
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 4,
+              "grain": 8,
+              "ore": 0
+            },
+            "stolen": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 1
+            },
+            "discard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "monopoly": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "blocked": {
+            "brick": 1,
+            "lumber": 0,
+            "wool": 0,
+            "grain": 0,
+            "ore": 0
+          },
+          "expected36": 955,
+          "rolls": [0, 0, 0, 0, 3, 1, 2, 2, 3, 0, 0],
+          "built": { "road": 4, "settlement": 1, "city": 1 },
+          "freeRoads": 0,
+          "devBought": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "devPlayed": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "offersMade": 9,
+          "tradesAsOfferer": 2,
+          "tradesAsPartner": 5,
+          "bankTrades": 3,
+          "portTrades": 0,
+          "robberMoves": 0,
+          "steals": 0,
+          "robbed": 1,
+          "discards": 0,
+          "tradesByRatio": { "4:1": 3 }
+        },
+        {
+          "gained": {
+            "production": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 3,
+              "grain": 3,
+              "ore": 2
+            },
+            "setup": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 1,
+              "grain": 0,
+              "ore": 1
+            },
+            "trade": {
+              "brick": 0,
+              "lumber": 1,
+              "wool": 2,
+              "grain": 4,
+              "ore": 0
+            },
+            "bank": {
+              "brick": 1,
+              "lumber": 0,
+              "wool": 1,
+              "grain": 0,
+              "ore": 0
+            },
+            "steal": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "devCard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "lost": {
+            "build": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 2,
+              "grain": 4,
+              "ore": 2
+            },
+            "buyDev": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "trade": {
+              "brick": 0,
+              "lumber": 1,
+              "wool": 2,
+              "grain": 3,
+              "ore": 1
+            },
+            "bank": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 3,
+              "grain": 0,
+              "ore": 0
+            },
+            "stolen": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "discard": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "monopoly": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "event": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            },
+            "other": {
+              "brick": 0,
+              "lumber": 0,
+              "wool": 0,
+              "grain": 0,
+              "ore": 0
+            }
+          },
+          "blocked": {
+            "brick": 0,
+            "lumber": 0,
+            "wool": 0,
+            "grain": 0,
+            "ore": 0
+          },
+          "expected36": 462,
+          "rolls": [0, 0, 2, 3, 0, 1, 1, 1, 2, 0, 1],
+          "built": { "road": 2, "settlement": 1, "city": 1 },
+          "freeRoads": 0,
+          "devBought": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "devPlayed": {
+            "knight": 0,
+            "victoryPoint": 0,
+            "roadBuilding": 0,
+            "yearOfPlenty": 0,
+            "monopoly": 0
+          },
+          "offersMade": 6,
+          "tradesAsOfferer": 5,
+          "tradesAsPartner": 3,
+          "bankTrades": 0,
+          "portTrades": 0,
+          "robberMoves": 1,
+          "steals": 0,
+          "robbed": 0,
+          "discards": 0
+        }
+      ],
+      "events": {},
+      "vpHistory": [
+        { "turn": 0, "vp": [1, 1, 4, 3] },
+        { "turn": 1, "vp": [3, 3, 1, 4] },
+        { "turn": 2, "vp": [3, 3, 1, 1] },
+        { "turn": 3, "vp": [1, 4, 3, 3] },
+        { "turn": 4, "vp": [1, 1, 3, 3] },
+        { "turn": 5, "vp": [1, 1, 3, 3] },
+        { "turn": 6, "vp": [1, 1, 3, 3] },
+        { "turn": 7, "vp": [1, 1, 3, 3] },
+        { "turn": 8, "vp": [1, 1, 3, 3] },
+        { "turn": 9, "vp": [1, 1, 3, 3] },
+        { "turn": 10, "vp": [1, 1, 3, 3] },
+        { "turn": 11, "vp": [2, 0, 2, 3] },
+        { "turn": 12, "vp": [2, 0, 2, 3] },
+        { "turn": 13, "vp": [2, 0, 2, 3] },
+        { "turn": 14, "vp": [2, 0, 2, 3] },
+        { "turn": 15, "vp": [2, 0, 2, 3] },
+        { "turn": 16, "vp": [0, 0, 0, 1] },
+        { "turn": 17, "vp": [0, 0, 0, 1] },
+        { "turn": 18, "vp": [0, 0, 0, 1] },
+        { "turn": 19, "vp": [3, 0, 0, 1] },
+        { "turn": 20, "vp": [3, 0, 0, 1] },
+        { "turn": 21, "vp": [3, 0, 0, 1] },
+        { "turn": 22, "vp": [3, 0, 0, 1] },
+        { "turn": 23, "vp": [3, 0, 0, 1] },
+        { "turn": 24, "vp": [3, 0, 0, 1] },
+        { "turn": 25, "vp": [3, 0, 0, 1] },
+        { "turn": 26, "vp": [3, 0, 0, 1] },
+        { "turn": 27, "vp": [3, 0, 0, 1] },
+        { "turn": 28, "vp": [3, 0, 0, 1] },
+        { "turn": 29, "vp": [3, 0, 0, 2] },
+        { "turn": 30, "vp": [3, 0, 0, 2] },
+        { "turn": 31, "vp": [0, 2, 2, 4] },
+        { "turn": 32, "vp": [0, 2, 2, 4] },
+        { "turn": 33, "vp": [0, 2, 2, 4] },
+        { "turn": 34, "vp": [0, 2, 2, 5] },
+        { "turn": 35, "vp": [0, 2, 2, 5] },
+        { "turn": 36, "vp": [0, 2, 2, 5] },
+        { "turn": 37, "vp": [0, 2, 2, 4] },
+        { "turn": 38, "vp": [0, 2, 2, 4] },
+        { "turn": 39, "vp": [0, 2, 2, 4] },
+        { "turn": 40, "vp": [0, 2, 2, 4] },
+        { "turn": 41, "vp": [0, 2, 2, 4] }
+      ],
+      "awardHistory": []
+    }
+  },
+  "play": { "type": "ck/play", "player": 3, "card": "diplomat" }
 }

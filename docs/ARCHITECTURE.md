@@ -129,7 +129,7 @@ Plain JSON. `JSON.parse(JSON.stringify(s))` must equal `s`. Never mutate a state
 
 ```ts
 GameState {
-  schemaVersion: 5
+  schemaVersion: 6
   settings: GameSettings             // see below; fixed after createGame
   board:   { hexes: Record<HexId, {id,q,r,terrain,token}>, ports: Port[] }   // fixed after createGame
   pieces:  { buildings: Record<VertexId, {owner, kind:'settlement'|'city'}>, roads: Record<EdgeId, PlayerId> }
@@ -143,7 +143,7 @@ GameState {
   diceDeck: number[]                 // balanced dice: undrawn cards 0..35 = (d1-1)*6+(d2-1); [] otherwise
   awards:  { longestRoad: PlayerId|null, largestArmy: PlayerId|null }
   log:     { turn, player, text, secret? }[]  // newest LOG_LIMIT (200) entries only; secret: #32
-  rng:     number                    // uint32 RNG state
+  rng:     [number, number, number, number]   // RngState: sfc32, four uint32 words (v6)
   winner:  PlayerId | null
   ext:     Record<ExpansionId, Json> // v5 (F1): one slice per active expansion; {} in base games
   // V1 variants: present only in event-card games (absent otherwise, no schema bump)
@@ -231,7 +231,11 @@ Read them only through `variants.ts` / `clock.ts` accessors. Rules and sources: 
 draws it from its own stream (`start:<seed>`), so a seed's board, deck and rolls are the same as
 before T14. `createGame` logs "Blue starts" right after "Game created …". Fixtures pin seat 0.
 
-**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v5 state from a v1–v5 one, or null.
+**Saves:** `upgradeState(raw)` (`migrate.ts`) returns a v6 state from a v1–v6 one, or null.
+v5 → v6 (s15): the uint32 `rng` becomes the 128-bit `RngState`, expanded with `expandState`
+(splitmix32 ×4) — deterministic, but the stream from there on differs from the old one. A
+v6 save whose `rng` is not four uint32 words → null. Online, `GameSession.restore` runs the
+stored game state through `upgradeState` too, and accepts the old numeric bot / timeout RNGs.
 v4 → v5 (F1): `mode 'base', expansions [], scenario null, options {}`, `ext: {}`; a v5 save naming
 an unknown expansion / mode / scenario → null.
 v1 → v2: `layout 'beginner'|'random'` → `map 'base'|'baseRandom'`, new fields get their defaults
@@ -240,7 +244,7 @@ v3 → v4 (T14): `settings.startingPlayer: 0` (every older game started with sea
 never migrated: rolls before T14 read "Blue rolled 8", since T14 "Blue rolled 8 (3+5)".
 Bump `schemaVersion` and add a step there whenever GameState changes shape.
 Exception (V1/V2/UX2): the variant fields and `stats` are optional and absent in every older
-save, so they need no migration step; each upgrade keeps them (v4 → v5 included) and v5 is
+save, so they need no migration step; each upgrade keeps them (v4 → v5 included) and v6 is
 current.
 
 **Variants × expansions.** The variant settings work in expansion modes too, through the same
@@ -446,7 +450,11 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 
 ## 9. Randomness (`src/engine/rng.ts`)
 
-mulberry32; the whole state is the uint32 `state.rng`. In a handler:
+sfc32; the whole state is `state.rng: RngState`, four uint32 words (128 bits, JSON-safe). A seed
+(number or string) is hashed over its full text with cyrb128 (`seedToState`), never squeezed to
+32 bits: with a 32-bit state an online player could brute-force the start state from the public
+board and read the dev deck and every future roll (security review s15). `Rng` is not a CSPRNG;
+online the seed itself comes from one (`sessionDeps`, 128 bits). In a handler:
 
 ```ts
 const rng = new Rng(draft.rng);
@@ -460,6 +468,9 @@ draft.rng = rng.state; // always write back
 `balancedDice` a `pop()` from `diceDeck`, refilled with `rng.shuffle(DICE_CARDS)` when
 `DICE_DECK_RESHUFFLE_AT` (5) or fewer cards remain (the deck starts empty).
 Bots should use their **own** `Rng` so bot choices don't perturb game randomness.
+`new Rng(n)` with a plain number (bot / art / test seeds, pre-v6 saves) expands it with
+`expandState` (splitmix32 ×4); `.state` is a fresh copy, `isRngState(x)` checks a stored one.
+Nobody but `Rng` reads or writes the words of `state.rng`; views mask it to `[0, 0, 0, 0]`.
 
 ## 10. Fixtures (`src/engine/fixtures.ts`)
 

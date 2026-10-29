@@ -4,6 +4,8 @@
  * If you change a public type here, update docs/ARCHITECTURE.md in the same commit.
  */
 
+import type { RngState } from './rng';
+
 // ---------------------------------------------------------------------------
 // IDs
 // ---------------------------------------------------------------------------
@@ -415,7 +417,7 @@ export interface GameSettings {
 }
 
 export interface GameState {
-  schemaVersion: 5;
+  schemaVersion: 6;
   settings: GameSettings;
   board: Board;
   pieces: Pieces;
@@ -436,8 +438,8 @@ export interface GameState {
   diceDeck: number[];
   awards: { longestRoad: PlayerId | null; largestArmy: PlayerId | null };
   log: LogEntry[];
-  /** Seeded RNG state (uint32). Only touch through `Rng` in rng.ts. */
-  rng: number;
+  /** Seeded RNG state (sfc32, four uint32 words, schema v6). Only touch through `Rng` in rng.ts. */
+  rng: RngState;
   winner: PlayerId | null;
   /**
    * Expansion state, one JSON slice per active expansion, keyed by its id (schema v5). Created by

@@ -4,7 +4,7 @@ import { RESOURCES } from '../../../engine/constants';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { createGame } from '../../../engine/createGame';
 import { cornerVertex, sideEdge, type Corner, type Side } from '../../../engine/hex';
-import { Rng } from '../../../engine/rng';
+import { Rng, expandState, type RngState } from '../../../engine/rng';
 import type {
   Action,
   ActionResult,
@@ -131,11 +131,11 @@ export const legalOf = (s: GameState, type: string, player?: PlayerId): Action[]
   legalActions(s, player).filter((a) => a.type === type);
 
 /** An RNG state whose next roll is yellow + red with the event die on `face`. */
-export function rngFor(yellow: number, red: number, face: EventFace): number {
+export function rngFor(yellow: number, red: number, face: EventFace): RngState {
   for (let seed = 0; seed < 1_000_000; seed++) {
     const rng = new Rng(seed);
     if (rng.die() !== yellow || rng.die() !== red) continue;
-    if (rng.pick(EVENT_DIE) === face) return seed;
+    if (rng.pick(EVENT_DIE) === face) return expandState(seed);
   }
   throw new Error('no such seed');
 }

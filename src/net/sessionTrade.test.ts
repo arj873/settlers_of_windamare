@@ -3,7 +3,7 @@
  * the offerer waits for them, and every way an offer ends leaves a log line.
  */
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState, PlayerId } from '../engine';
+import type { Action, GameState, PlayerId, Resource } from '../engine';
 import { defaultBot } from '../game/controller';
 import { DEFAULT_ROOM_CONFIG } from './protocol';
 import { GameSession } from './session';
@@ -44,10 +44,15 @@ function act(net: LocalNet, conn: string, action: Action): void {
   net.send(conn, { type: 'intent', action, seq: game(net, conn).seq });
 }
 
-/** Humans play their first non-trade legal move until Ann may offer a 1-for-1 to everyone. */
-function untilAnnOffers(net: LocalNet): Action {
+/**
+ * Humans play their first non-trade legal move until Ann may offer a 1-for-1 to everyone
+ * (and, with `ok`, one that `ok` accepts).
+ */
+function untilAnnOffers(net: LocalNet, ok: (offer: Action) => boolean = () => true): Action {
   for (let i = 0; i < 2000; i++) {
-    const offer = legalOf(net, 'ann').find((a) => a.type === 'offerTrade' && a.to.length === 3);
+    const offer = legalOf(net, 'ann').find(
+      (a) => a.type === 'offerTrade' && a.to.length === 3 && ok(a),
+    );
     if (offer) return offer;
     const conn = CONNS.find((c) => legalOf(net, c).length > 0);
     if (!conn) {
@@ -129,15 +134,23 @@ describe('online player trade with several humans', () => {
 
   // 20261026-050222: an open offer seemed to vanish. Every ending leaves a log line.
   it('the offerer running out of time withdraws the offer with a log line', () => {
-    const { net } = table(30);
-    act(net, 'ann', untilAnnOffers(net));
+    const { net, session } = table(30);
+    // An offer Bob or Cat can pay for (read on the full state), so a human accepts it.
+    const payable = (a: Action) =>
+      a.type === 'offerTrade' &&
+      [1, 2].some((p) =>
+        Object.entries(a.want).every(
+          ([r, n]) => (session.state!.players[p]!.resources[r as Resource] ?? 0) >= (n ?? 0),
+        ),
+      );
+    act(net, 'ann', untilAnnOffers(net, payable));
     for (const c of ['bob', 'cat'] as const) {
       const accept = legalOf(net, c).find((a) => a.type === 'acceptTrade');
       const answer = accept ?? legalOf(net, c).find((a) => a.type === 'rejectTrade')!;
       act(net, c, answer);
     }
     net.advance(2000);
-    // Someone accepted (fixed seed), so the offer waits for Ann.
+    // Someone accepted, so the offer waits for Ann.
     expect(stateOf(net, 'ann').phase.kind).toBe('trade');
     // Ann sits on her offer: her turn clock runs out, the minimum move withdraws it.
     expect(game(net, 'ann').timer?.player).toBe(0);

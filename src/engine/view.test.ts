@@ -47,7 +47,7 @@ describe('viewFor', () => {
     expect(v.devDeck).toHaveLength(s.devDeck.length);
     expect(v.devDeck.every((c) => c === HIDDEN_DEV_CARD)).toBe(true);
     expect(v.diceDeck).toEqual([0, 0, 0]);
-    expect(v.rng).toBe(0);
+    expect(v.rng).toEqual([0, 0, 0, 0]);
     expect(v.settings.seed).toBe(HIDDEN_SEED);
     expect(JSON.stringify(v)).not.toContain('secret-42');
     expect(v.log[0]!.text).toMatch(/^Game created \(.* map\)$/);
@@ -65,7 +65,7 @@ describe('viewFor', () => {
     const v = viewFor(s, 'spectator');
     expect(v.players).toEqual(s.players);
     expect(v.view.masked.some(Boolean)).toBe(false);
-    expect(v.rng).toBe(0);
+    expect(v.rng).toEqual([0, 0, 0, 0]);
   });
 
   it('does not mutate the state and is JSON-safe', () => {

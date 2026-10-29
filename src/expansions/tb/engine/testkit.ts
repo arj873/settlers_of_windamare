@@ -4,7 +4,7 @@ import { RESOURCES } from '../../../engine/constants';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { createGame } from '../../../engine/createGame';
 import { cornerVertex, sideEdge, type Corner, type Side } from '../../../engine/hex';
-import { Rng } from '../../../engine/rng';
+import { Rng, expandState, type RngState } from '../../../engine/rng';
 import type {
   Action,
   ActionResult,
@@ -90,10 +90,10 @@ export const legalOf = (s: GameState, type: string, player?: PlayerId): Action[]
   legalActions(s, player).filter((a) => a.type === type);
 
 /** An RNG state whose next two dice are d1, d2 (then anything). */
-export function rngFor(...dice: number[]): number {
+export function rngFor(...dice: number[]): RngState {
   for (let seed = 0; seed < 5_000_000; seed++) {
     const rng = new Rng(seed);
-    if (dice.every((d) => rng.die() === d)) return seed;
+    if (dice.every((d) => rng.die() === d)) return expandState(seed);
   }
   throw new Error('no such seed');
 }

@@ -39,7 +39,7 @@ describe('rollDice', () => {
     const a = expectOk(applyAction(s, { type: 'rollDice', player: 0 }));
     const b = expectOk(applyAction(s, { type: 'rollDice', player: 0 }));
     expect(a.dice).toEqual(b.dice); // deterministic
-    expect(a.rng).not.toBe(s.rng);
+    expect(a.rng).not.toEqual(s.rng);
     const [d1, d2] = a.dice!;
     for (const d of [d1, d2]) {
       expect(Number.isInteger(d)).toBe(true);

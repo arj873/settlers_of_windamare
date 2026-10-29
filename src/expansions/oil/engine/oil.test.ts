@@ -4,7 +4,7 @@ import { RESOURCES } from '../../../engine/constants';
 import { applyAction, legalActions } from '../../../engine/engine';
 import { createGame } from '../../../engine/createGame';
 import { NO_ROBBER } from '../../../engine/expansions/ext';
-import { Rng } from '../../../engine/rng';
+import { Rng, expandState, type RngState } from '../../../engine/rng';
 import { publicVictoryPoints, victoryPoints } from '../../../engine/selectors';
 import { hexVertices, topologyOf, vertexInfo } from '../../../engine/topology';
 import {
@@ -37,6 +37,19 @@ function oilGame(n = 4, seed: number | string = 1, scenario = 'oil/oilSprings'):
 }
 
 /** A game in the main phase of turn 3, player 0 to act. */
+/** An RNG state whose disaster roll is `roll` and whose pick among that number's hexes is `hit`. */
+function rngForDisasterOn(s: GameState, roll: number, hit: HexId): RngState {
+  const hexes = (Object.keys(s.board.hexes) as HexId[])
+    .filter((h) => s.board.hexes[h]?.token === roll)
+    .sort();
+  for (let seed = 0; seed < 100_000; seed++) {
+    const rng = new Rng(seed);
+    if (rng.die() + rng.die() !== roll) continue;
+    if (hexes.length < 2 || rng.pick(hexes) === hit) return expandState(seed);
+  }
+  throw new Error(`no seed rolls ${roll} onto ${hit}`);
+}
+
 function mainGame(n = 4): GameState {
   const s = oilGame(n);
   s.turn = { number: 3, current: 0, devCardPlayed: false, tradeOffers: 0 };
@@ -548,9 +561,10 @@ describe('using oil', () => {
 
 describe('the disaster phase', () => {
   /** Player 0 ends their turn with the marker at 5; the disaster roll is `roll`. */
-  function endWithMarker5(s: GameState, roll: number): GameState {
+  /** End the turn with the marker at 5 and the disaster rolling `roll`; `hit` picks the hex among those with that number. */
+  function endWithMarker5(s: GameState, roll: number, hit?: HexId): GameState {
     oilSlice(s).marker = 5;
-    s.rng = rngForRoll(roll);
+    s.rng = hit === undefined ? rngForRoll(roll) : rngForDisasterOn(s, roll, hit);
     return run(s, { type: 'endTurn', player: 0 });
   }
   const inland = (s: GameState): VertexId => {
@@ -602,7 +616,7 @@ describe('the disaster phase', () => {
     );
     const v = vertexOf(s, hex, false);
     s.pieces.buildings[v] = { owner: 1, kind: 'settlement' };
-    const after = endWithMarker5(s, 6);
+    const after = endWithMarker5(s, 6, hex);
     expect(after.board.hexes[hex]?.token).toBeNull();
     expect(after.board.hexes[hex]?.terrain).toBe('ore');
     expect(oilSlice(after).destroyed).toEqual([hex]);

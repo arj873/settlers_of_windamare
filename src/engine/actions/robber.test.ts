@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAction } from '../engine';
 import { discardGame, midGame, moveRobberGame } from '../fixtures';
 import { emptyResources, totalResources } from '../resources';
+import { expandState } from '../rng';
 import { handSize } from '../selectors';
 import { hexVertices, TOPOLOGY } from '../topology';
 import type { GameState, HexId, ResourceBundle } from '../types';
@@ -232,10 +233,12 @@ describe('steal', () => {
     const a = expectOk(applyAction(s, { type: 'steal', player: 0, victim: 1 }));
     const b = expectOk(applyAction(s, { type: 'steal', player: 0, victim: 1 }));
     expect(a.players[0]!.resources).toEqual(b.players[0]!.resources);
-    expect(a.rng).not.toBe(s.rng);
+    expect(a.rng).not.toEqual(s.rng);
     const seen = new Set<string>();
     for (let seed = 0; seed < 40; seed++) {
-      const r = expectOk(applyAction({ ...s, rng: seed }, { type: 'steal', player: 0, victim: 1 }));
+      const r = expectOk(
+        applyAction({ ...s, rng: expandState(seed) }, { type: 'steal', player: 0, victim: 1 }),
+      );
       seen.add(r.players[0]!.resources.brick === 1 ? 'brick' : 'ore');
     }
     expect(seen).toEqual(new Set(['brick', 'ore']));

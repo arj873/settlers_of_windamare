@@ -188,7 +188,7 @@ describe('E&P maskFor', () => {
     const v = viewFor(s, 0);
     expect(v.players[1]?.resources.ore).toBe(0);
     expect(viewFor(s, 1).players[1]?.resources.ore).toBe(3);
-    expect(v.rng).toBe(0);
+    expect(v.rng).toEqual([0, 0, 0, 0]);
   });
 
   it('game over: hands are revealed, face-down hexes and stacks stay hidden', () => {

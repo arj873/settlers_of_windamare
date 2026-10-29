@@ -18,6 +18,7 @@ import { longestRoadLengths } from '../rules/longestRoad';
 import { emptyBoardGame, expectFail, expectOk, rngForRoll, run, setHand } from '../actions/testkit';
 import { cloneState } from '../clone';
 import { EVENT_CARDS } from '../rules/events';
+import { expandState } from '../rng';
 import { emptyStats, statsOf } from '../stats';
 import type { Action, EventKind, GameState, VertexId } from '../types';
 import { viewFor } from '../view';
@@ -439,7 +440,7 @@ describe('createGame: modes, options, validation, init', () => {
     const a = createGame({ seed: 5, players: players(3), mode: 'tst' });
     const b = createGame({ seed: 5, players: players(3), mode: 'tst' });
     expect(a.ext.tst).toEqual(b.ext.tst);
-    expect(a.rng).not.toBe(createGame({ seed: 5, players: players(3) }).rng);
+    expect(a.rng).not.toEqual(createGame({ seed: 5, players: players(3) }).rng);
     expect(createGame({ seed: 5, players: players(3) }).ext).toEqual({});
   });
 });
@@ -575,8 +576,8 @@ describe('maskFor (online views)', () => {
 
   it('viewFor chains it after the base masks; hiddenFrom decides per seat', () => {
     hooks.maskFor = (view, viewer, state) => {
-      expect(view.rng).toBe(0); // base masks already applied
-      expect(state.rng).not.toBe(0);
+      expect(view.rng).toEqual([0, 0, 0, 0]); // base masks already applied
+      expect(state.rng).not.toEqual([0, 0, 0, 0]);
       const s = view.ext['tst'] as Slice;
       return {
         ...view,
@@ -589,7 +590,7 @@ describe('maskFor (online views)', () => {
         },
       };
     };
-    const state = { ...withTst(midGame()), rng: 42 };
+    const state = { ...withTst(midGame()), rng: expandState(42) };
     (state.ext as Record<string, unknown>)['tst'] = slice;
     const v1 = viewFor(state, 1).ext['tst'] as Slice;
     expect(v1).toEqual({ hands: [['?'], ['b1', 'b2'], [], []], deck: ['?', '?', '?'] });

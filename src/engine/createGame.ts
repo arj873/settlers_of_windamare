@@ -510,7 +510,7 @@ export function createGame(config: GameConfig): GameState {
   const veto = candidates.length > 0;
   const vetoers = vetoOrder(players.length, first, candidates.length);
   const state: GameState = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     settings,
     board,
     pieces: { buildings: {}, roads: {} },

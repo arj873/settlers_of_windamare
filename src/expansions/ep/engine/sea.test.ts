@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
+import { expandState } from '../../../engine/rng';
 import { victoryPoints } from '../../../engine/selectors';
 import type { Action, GameState, PlayerId } from '../../../engine/types';
 import { A, pirateTargets, shipPlace, shipText } from './actions';
@@ -38,7 +39,11 @@ function rollUntil(
   ok: (t: GameState) => boolean,
 ): GameState {
   for (let seed = 0; seed < 500; seed++) {
-    const r = applyAction({ ...s, rng: seed }, { type, player: p, ...payload } as Action);
+    const r = applyAction({ ...s, rng: expandState(seed) }, {
+      type,
+      player: p,
+      ...payload,
+    } as Action);
     if (r.ok && ok(r.state)) return r.state;
   }
   throw new Error(`no seed for ${type}`);

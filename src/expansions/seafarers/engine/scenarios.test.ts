@@ -15,7 +15,7 @@ import {
   setHand,
 } from '../../../engine/actions/testkit';
 import { bankTradeRatio } from '../../../engine/actions/trade';
-import { Rng } from '../../../engine/rng';
+import { Rng, expandState, type RngState } from '../../../engine/rng';
 import { canPlaceSettlement, edgeTouchesLand, touchesLand } from '../../../engine/rules/placement';
 import { topologyOf } from '../../../engine/topology';
 import { setupOrderOf, victoryPoints } from '../../../engine/selectors';
@@ -33,17 +33,17 @@ import { E, H, V, mainPhase, players, seaGame, ship } from './testkit';
 const act = (a: Record<string, unknown>) => a as unknown as Action;
 
 /** An rng state whose next two dice are `a` and `b`. */
-function rngForDice(a: number, b: number): number {
+function rngForDice(a: number, b: number): RngState {
   for (let seed = 0; seed < 200_000; seed++) {
     const r = new Rng(seed);
-    if (r.die() === a && r.die() === b) return seed;
+    if (r.die() === a && r.die() === b) return expandState(seed);
   }
   throw new Error('no seed');
 }
 
 /** An rng state whose next die is `d`. */
-function rngForDie(d: number): number {
-  for (let seed = 0; seed < 1000; seed++) if (new Rng(seed).die() === d) return seed;
+function rngForDie(d: number): RngState {
+  for (let seed = 0; seed < 1000; seed++) if (new Rng(seed).die() === d) return expandState(seed);
   throw new Error('no seed');
 }
 

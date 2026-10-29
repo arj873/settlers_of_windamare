@@ -116,7 +116,10 @@ describe('RoomClient over LocalNet', () => {
     expect(ann.room?.phase).toBe('playing');
     expect(ann.game?.view.view.viewer).toBe(0);
     expect(bob.game?.view.view.viewer).toBe(1);
-    const mover = [ann, bob].find((x) => (x.game?.legal.length ?? 0) > 0)!;
+    // The seed may seat the bot first: let it place until a human is to move.
+    const humanToMove = () => [ann, bob].find((x) => (x.game?.legal.length ?? 0) > 0);
+    for (let i = 0; i < 20 && !humanToMove(); i++) w.clock.advance(5_000);
+    const mover = humanToMove()!;
     const other = mover === ann ? bob : ann;
     expect(other.game?.legal).toEqual([]);
     const seq = mover.game!.seq;

@@ -22,10 +22,12 @@ import {
   restoreBanks,
   Rng,
   timerOf,
+  upgradeState,
   viewFor,
   type Action,
   type GameState,
   type PlayerId,
+  type RngState,
 } from '../engine';
 import type { Bot } from '../bots';
 import { botForLevel } from '../bots/byLevel';
@@ -139,8 +141,9 @@ interface SeatRec {
 interface GameRec {
   state: GameState;
   seq: number;
-  botRng: number;
-  timeoutRng: number;
+  /** Bot and timeout RNG states; a plain number in snapshots from before schema v6. */
+  botRng: RngState | number;
+  timeoutRng: RngState | number;
   clock: TurnClock;
   /** Time the clock was last advanced to. */
   clockAt: number;
@@ -242,7 +245,14 @@ export class GameSession {
     opts: Partial<SessionOptions> = {},
   ): GameSession {
     if (snapshot.version !== 1) throw new Error(`unknown session snapshot v${snapshot.version}`);
-    return new GameSession(structuredClone(snapshot), deps, opts);
+    const d = structuredClone(snapshot);
+    // A game stored before schema v6 holds a v5 state (uint32 rng): upgrade it like a save.
+    if (d.game) {
+      const state = upgradeState(d.game.state);
+      if (!state) throw new Error('session snapshot holds an unreadable game state');
+      d.game.state = state;
+    }
+    return new GameSession(d, deps, opts);
   }
 
   snapshot(): SessionSnapshot {
