@@ -1270,7 +1270,6 @@
   opacity: 0;
   pointer-events: none;
   animation: ready-glow 2s ease-in-out infinite;
-  will-change: opacity;
 }
 /* The top highlight, over the button's face. */
 .btn-roll.is-ready::before,
@@ -2013,6 +2012,13 @@
     animation: none !important;
     transition: none !important;
   }
+  /* The ready buttons' glow (s18) never shows without motion: no layers for it either. */
+  .btn-roll.is-ready::before,
+  .btn-roll.is-ready::after,
+  .btn-end.is-ready::before,
+  .btn-end.is-ready::after {
+    display: none;
+  }
 }
 /* Low power (s17, ui/power.ts): no decorative motion and no backdrop blur, so the page paints
    only when something changes (the glowing Roll / End turn button alone repainted every frame). */
@@ -2025,6 +2031,12 @@
 :root.is-low-power .scrim.is-modal,
 :root.is-low-power .pf-scrim {
   backdrop-filter: none;
+}
+:root.is-low-power .btn-roll.is-ready::before,
+:root.is-low-power .btn-roll.is-ready::after,
+:root.is-low-power .btn-end.is-ready::before,
+:root.is-low-power .btn-end.is-ready::after {
+  display: none;
 }
 
 /* ---- responsive ------------------------------------------------------- */
