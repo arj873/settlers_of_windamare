@@ -324,7 +324,41 @@ export interface ExpansionHooks {
   maskFor?(view: GameState, viewer: Viewer, state: GameState): GameState;
 }
 
-export interface ExpansionModule {
+/** What the setup screen, lobbies and saves need of a module map before its rules load (s18). */
+export type MapInfo = Pick<MapDef, 'id' | 'name' | 'minPlayers' | 'maxPlayers'>;
+
+/**
+ * A module as the always-loaded catalog knows it (s18, docs/EXPANSIONS.md §2b): ids, names,
+ * modes, scenarios, options, terrains and map ids, without its rules. `expansionById` returns
+ * this until the module is loaded (`ensureModules`), then the full module (which extends it).
+ */
+export interface ExpansionInfo {
+  id: ExpansionId;
+  name: string;
+  icon?: string;
+  requires?: readonly ExpansionId[];
+  conflicts?: readonly ExpansionId[];
+  before?: readonly ExpansionId[];
+  variant?: boolean;
+  players?: PlayerRange;
+  terrains?: Readonly<Record<string, TerrainInfo>>;
+  maps?: readonly MapInfo[];
+  scenarios?: readonly ScenarioDef[];
+  modes?: readonly ModeDef[];
+  options?: readonly OptionDef[];
+}
+
+/**
+ * One generated catalog entry (`catalogData.ts`): an `ExpansionInfo` as JSON, each scenario's
+ * `mapFor` written out per player count.
+ */
+export type CatalogEntry = Omit<ExpansionInfo, 'scenarios'> & {
+  scenarios?: readonly (Omit<ScenarioDef, 'mapFor'> & {
+    mapFor: Readonly<Record<string, MapId>>;
+  })[];
+};
+
+export interface ExpansionModule extends ExpansionInfo {
   /** = folder name in src/expansions, no '/'. */
   id: ExpansionId;
   name: string;

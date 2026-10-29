@@ -31,8 +31,10 @@ async function setUp(page, c) {
   return page.evaluate(async ({ mode, scenario, types }) => {
     const { createRandomBot } = await import('/src/bots/index.ts');
     const { newGame, randomSource, runGame } = await import('/src/bots/runner.ts');
-    const { legalActions } = await import('/src/engine/index.ts');
+    const { ensureModules, legalActions } = await import('/src/engine/index.ts');
     const { spotBuildActions, locationOf } = await import('/src/game/logic.ts');
+    // s18: expansion rules load on demand (the app set the loader at boot).
+    await ensureModules(mode);
     const RICH = { brick: 9, lumber: 9, wool: 9, grain: 9, ore: 9 };
     let found = null;
     let spot = null;

@@ -734,6 +734,14 @@
   color: var(--bad);
   font-weight: 700;
 }
+/* s18: an expansion's rules are downloading (scenario previews, Start). */
+.su-load-note {
+  display: block;
+}
+.su-map-loading {
+  color: var(--ink-dim);
+  font-size: 24px;
+}
 .su-start {
   min-width: 160px;
 }

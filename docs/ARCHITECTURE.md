@@ -445,7 +445,7 @@ Helpers (`src/engine/actions/common.ts`): `ok, fail, notImplemented, log, isCurr
 | `clock.ts` (V1)        | chess clock, pure: `TIMER_PRESET_VALUES, timerSettings, timerOf` (legacy per-turn vs bank), `initialBanks, chargeBank, creditIncrement, turnKey, restoreBanks`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `rules/events.ts` (V1) | `EVENT_CARDS` (36), `EVENT_INFO` (names, texts), `facesFor`, `drawEventCard`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `actions/veto.ts` (V1) | `MAP_VETO_CANDIDATES` (3), `vetoOrder`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `expansions/*` (F1)    | registry (`listModes, modeById, scenarioById, expansionById, activeModules, isActive, mapDef`), hook values (`costOf, pieceLimit, terrainKind, expansionVictoryPoints`), `extSlice, cloneJson, NO_ROBBER, doubledToHexId`; `createGame.ts`: `resolveMode, defaultVpToWin, optionVpBonus`. See `docs/EXPANSIONS.md`.                                                                                                                                                                                                                                                                                            |
+| `expansions/*` (F1)    | registry (`listModes, modeById, scenarioById, expansionById, activeModules, isActive, mapDef`; s18: `ensureModules(mode \| ids)` must resolve before `createGame` / `applyAction` / `legalActions` of an expansion game, else `ModuleNotLoadedError`; `modulesReady`, `moduleById`, `requireModule`, `allExpansions`; the always-loaded catalog answers the lookups, EXPANSIONS.md §2b), hook values (`costOf, pieceLimit, terrainKind, expansionVictoryPoints`), `extSlice, cloneJson, NO_ROBBER, doubledToHexId`; `createGame.ts`: `resolveMode, defaultVpToWin, optionVpBonus`. See `docs/EXPANSIONS.md`.   |
 | `selectors.ts` (F1)    | `cardsInHand(s, p)` (resources + expansion cards, for the 7 rule and stealing); `piecesLeft` uses `pieceLimit`; VP selectors add expansion VP                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `view.ts` (M1)         | `viewFor(s, seat \| 'spectator')` → `GameView` (secrets masked, `view: { viewer, handCounts, devCardCounts, masked, specialBuildQueue }`), `isGameView`, and for UI code `handCount(s,p)`, `devCardCount(s,p)`, `visibleSpecialBuildQueue(s)` (full state or view). `HIDDEN_SEED`, `HIDDEN_DEV_CARD`, `HIDDEN_DICE_CARD`, `HIDDEN_EVENT_CARD` (V1: the event deck order is masked; veto candidates, event tasks, `lastEvent`, `damagedRoads` and `seatOrder` are public)                                                                                                                                       |
 | `stats.ts` (UX2)       | `statsOf`, `emptyStats`, `sumCounts`, `GAIN_SOURCES`, `LOSS_SINKS`, `DICE_TOTALS` (exported); `recordRoll`, `recordProduction`, `recordAction` (engine-internal hooks) — §4 "Game statistics"                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -568,7 +568,9 @@ view.markSince(earlierState);             // #33 recap: faint rings on the piece
 - Also exported for the UI: `drawResourceIcon`, `RESOURCE_COLORS`, `TERRAIN_COLORS`.
 - Expansions (F1): active modules' `BoardDrawer`s (`render/expansions.ts`) paint their terrains and
   draw layers in three slots (board / pieces / top), rebuilt when their `sig` changes. Highlights,
-  hover, clicks and `screenPos` also work on sea vertices/edges and water hexes.
+  hover, clicks and `screenPos` also work on sea vertices/edges and water hexes. s18: drawers
+  register when their module loads (`registerDrawer`, EXPANSIONS.md §2b); render a game only after
+  `ensureModules` resolved for it.
 
 ## 13. UI contract (`src/ui`, T6)
 
@@ -634,7 +636,9 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   screen's expansion chips (U7: chip set -> mode, `ExpansionModule.icon`), scenario tiles
   (grouped by mode when one chip set stands for several) and option tiles come from the engine
   registry (`ready` modes; `wip`/`demo` too with `?modes=all`); a setup the engine refuses (`setupError`: a module's
-  `validate`, e.g. C&K + Rush) shows the reason and disables Start. The build bar has no Buy card
+  `validate`, e.g. C&K + Rush) shows the reason and disables Start. s18: the screen fetches the
+  modules of the modes it shows (`ensureModules`); until they arrive scenario previews are
+  placeholders (`.su-loading`) and Start is off. The build bar has no Buy card
   when the game has no development deck. The stats screen's standings show expansions' named VP
   (`victoryPoints` hook `parts`) as chips. See `docs/EXPANSIONS.md` §8.
 - The HUD never mutates state or calls `applyAction`. Buttons are enabled **only** from `legal` actions with `player === viewer`; pass legal actions for the viewer (or all, they are filtered).
@@ -720,6 +724,13 @@ Dev params and `?room=` wait for the game (`GameApp.direct`). The online client
 (`game/online/app`) is its own chunk. Keep the entry's static imports free of the engine barrel,
 `ui/model`, `net/protocol` and Pixi: anything statically reachable from it is loaded before the
 home screen (`build.rolldownOptions.treeshake` marks our modules side-effect free).
+
+**Expansions on demand (s18, EXPANSIONS.md §2b).** The game chunk holds no expansion code:
+`bootGame` calls `useBrowserLoader()`, and every path that starts or shows an expansion game awaits
+`ensureModules` first — the setup screen (Start stays off while loading), the hotseat resume
+prompt (fetches while it shows), dev `?mode=`, `OnlineApp.onRoom` (prefetch from the room's mode)
+and `NetGameController.render` (draws the newest game once loaded). `vite.config.ts`
+`CHUNK_GROUPS` keeps the output to the entry, one `game` chunk and one chunk per module.
 
 ```ts
 const c = new GameController({ board, hud, storage, speed, toast, onRender });

@@ -1,24 +1,10 @@
 /**
  * HUD extension points for expansions (docs/EXPANSIONS.md §8).
  *
- * ADDING A MODULE: one import below and one entry at the END of HUD_EXTENSIONS. The HUD only
- * calls the extensions of the expansions active in the shown game.
+ * A module's `pack.ts` lists its HUD extension; it registers when the module loads (s18,
+ * src/expansions/load.ts). The HUD only calls the extensions of the expansions active in the
+ * shown game.
  */
-import { cropHud } from '../expansions/crop/ui';
-import { demoHud } from '../expansions/demo/ui';
-import { oilHud } from '../expansions/oil/ui';
-import { ckHud } from '../expansions/ck/ui';
-import { seafarersHud } from '../expansions/seafarers/ui';
-import { tbHud } from '../expansions/tb/ui';
-import { epHud } from '../expansions/ep/ui';
-import { seackHud } from '../expansions/seack/ui';
-import { tbckHud } from '../expansions/tbck/ui';
-import { tbseaHud } from '../expansions/tbsea/ui';
-import { tbpairHud } from '../expansions/tbpair/ui';
-import { epckHud } from '../expansions/epck/ui';
-import { eptbHud } from '../expansions/eptb/ui';
-import { backHud } from '../expansions/back/ui';
-import { twockHud } from '../expansions/twock/ui';
 import type { Action, ExpansionId, GameState, PlayerId } from '../engine';
 import type { ExtensionSounds, SoundRecipe } from '../audio/types';
 import { setBoardExtensions } from '../game/logic';
@@ -107,24 +93,22 @@ export interface HudExtension {
   sounds?: ExtensionSounds<GameState>;
 }
 
-export const HUD_EXTENSIONS: readonly HudExtension[] = [
-  demoHud,
-  oilHud,
-  cropHud,
-  ckHud,
-  seafarersHud,
-  tbHud,
-  epHud,
-  seackHud,
-  tbckHud,
-  tbseaHud,
-  tbpairHud,
-  epckHud,
-  eptbHud,
-  backHud,
-  twockHud,
-  // new modules go here, one per line
-];
+const huds: HudExtension[] = [];
+
+/** The HUD extensions of every loaded module. */
+export const HUD_EXTENSIONS: readonly HudExtension[] = huds;
+
+/**
+ * Add a module's HUD extension (when the module loads; the same one again does nothing). The
+ * caller registers its sound recipes (`x.sounds.recipes`) with the sound engine.
+ */
+export function registerHud(x: HudExtension): void {
+  const have = huds.find((h) => h.id === x.id);
+  if (have === x) return;
+  if (have) throw new Error(`a HUD extension for ${x.id} is already registered`);
+  huds.push(x);
+  syncBoardExtensions();
+}
 
 /** The HUD extensions of the expansions active in `state`, in settings order. */
 export function hudExtensionsFor(state: Pick<GameState, 'settings'>): HudExtension[] {
@@ -156,7 +140,7 @@ export function extensionSounds(state: Pick<GameState, 'settings'>): ExtensionSo
   return hudExtensionsFor(state).flatMap((x) => (x.sounds ? [x.sounds] : []));
 }
 
-/** Every module's sound recipes, keyed by namespaced id (registered once at boot). */
+/** Every loaded module's sound recipes, keyed by namespaced id. */
 export function extensionSoundRecipes(): Record<string, SoundRecipe> {
   return Object.assign({}, ...HUD_EXTENSIONS.map((x) => x.sounds?.recipes ?? {})) as Record<
     string,
@@ -198,11 +182,13 @@ export function placeModeActions(mode: string): readonly string[] {
 
 // boardActions (game/logic.ts) learns the extensions' board actions from here, so the headless room
 // server, which imports game/logic but no UI, never loads module stylesheets.
-setBoardExtensions({
-  implied: impliedExtActions(),
-  placeModeAction,
-  placeModeActions,
-  buildCardActions: new Set(
-    HUD_EXTENSIONS.flatMap((x) => (x.buildCards ?? []).map((c) => c.actionType)),
-  ),
-});
+function syncBoardExtensions(): void {
+  setBoardExtensions({
+    implied: impliedExtActions(),
+    placeModeAction,
+    placeModeActions,
+    buildCardActions: new Set(
+      HUD_EXTENSIONS.flatMap((x) => (x.buildCards ?? []).map((c) => c.actionType)),
+    ),
+  });
+}

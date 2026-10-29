@@ -5,6 +5,9 @@
   pointer-events: none;
   z-index: 40;
   overflow: hidden;
+  /* s18: cards and badges added here never make the rest of the page lay out again. The layer
+     covers the viewport, so it is the fixed-position children's box with the same coordinates. */
+  contain: strict;
 }
 .prod-card {
   position: fixed;

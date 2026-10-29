@@ -309,7 +309,7 @@
 }
 [data-theme='sunfired'] .btn-roll.is-ready,
 [data-theme='sunfired'] .btn-end.is-ready {
-  animation-name: glow-cobalt;
+  --ready-glow: rgba(80, 140, 255, 0.6);
 }
 [data-theme='sunfired'] .btn-ghost {
   border-color: rgba(143, 65, 39, 0.5);
@@ -323,13 +323,6 @@
 }
 [data-theme='sunfired'] .su-seat {
   background: var(--tile-bg);
-}
-@keyframes glow-cobalt {
-  50% {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.4),
-      0 0 18px rgba(80, 140, 255, 0.6);
-  }
 }
 
 /* Glyph glazes: cobalt card backs with saffron trim. */

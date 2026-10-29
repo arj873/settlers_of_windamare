@@ -5,6 +5,12 @@
 //   pnpm build && pnpm preview --port 4173 &
 //   node scripts/perf/measure.mjs [--base http://localhost:4173] [--cpu 6] [--only load,game,online]
 //                                 [--viewport 1366x768@1] [--perf auto|high|low] [--json out.json]
+//                                 [--device low] [--load-mode ck]
+//
+// --device low: a 2-core / 2 GB device (navigator.hardwareConcurrency / deviceMemory), so the
+//               "Auto" performance setting sees a weak device (s18).
+// --load-mode ck: the load test also picks this expansion chip on the setup screen before Start
+//               (s18: expansions load on demand), and reports chip -> ready and Start -> board.
 //
 // load:   cold load on "slow 4G" (Lighthouse's DevTools numbers: 562.5 ms RTT, 1.47 Mbit/s down):
 //         transferred bytes by type, first paint, home screen, setup screen, Start game -> board.
@@ -28,6 +34,8 @@ const [vw, vh, dpr] = flag('--viewport', '1366x768@1').split(/[x@]/).map(Number)
 const PERF = flag('--perf', null);
 const JSON_OUT = flag('--json', null);
 const TURNS = Number(flag('--turns', '4'));
+const DEVICE = flag('--device', null);
+const LOAD_MODE = flag('--load-mode', null);
 
 const SLOW_4G = {
   offline: false,
@@ -162,9 +170,19 @@ async function newPage(browser, { throttleNet = false, cpu = CPU } = {}) {
     }, PERF);
   }
   await ctx.addInitScript(probes);
+  if (DEVICE === 'low') {
+    await ctx.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'deviceMemory', { get: () => 2 });
+    });
+  }
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
+  // Timing metrics (script, layout) count from here.
+  await cdp.send('Performance.enable');
+  if (DEVICE === 'low') {
+    await cdp.send('Emulation.setHardwareConcurrencyOverride', { hardwareConcurrency: 2 });
+  }
   await cdp.send('Network.enable');
   if (throttleNet) {
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
@@ -185,6 +203,19 @@ async function heap(cdp) {
     jsHeapUsedMB: Math.round((m.JSHeapUsedSize / 1048576) * 10) / 10,
     jsHeapTotalMB: Math.round((m.JSHeapTotalSize / 1048576) * 10) / 10,
     nodes: m.Nodes,
+  };
+}
+
+/** Main-thread time since the page opened (s), from DevTools' Performance metrics. */
+async function mainThread(cdp) {
+  await cdp.send('Performance.enable');
+  const { metrics } = await cdp.send('Performance.getMetrics');
+  const m = Object.fromEntries(metrics.map((x) => [x.name, x.value]));
+  const ms = (x) => Math.round((x ?? 0) * 1000);
+  return {
+    scriptMs: ms(m.ScriptDuration),
+    taskMs: ms(m.TaskDuration),
+    layoutMs: ms(m.LayoutDuration),
   };
 }
 
@@ -250,6 +281,17 @@ async function loadTest(browser) {
   await page.waitForSelector('.setup [data-k="start"]', { timeout: 60_000 });
   await page.evaluate(() => window.__perf.nextFrame());
   const setup = (await page.evaluate(() => performance.now())) - tClick;
+  let modeReady = null;
+  if (LOAD_MODE) {
+    const tChip = await page.evaluate(() => performance.now());
+    await page.click(`.setup [data-k="chip-${LOAD_MODE}"]`);
+    await page.waitForSelector('.setup [data-k="start"]:not([disabled])', { timeout: 60_000 });
+    await page.waitForFunction(() => !document.querySelector('.setup .su-loading'), null, {
+      timeout: 60_000,
+    });
+    await page.evaluate(() => window.__perf.nextFrame());
+    modeReady = Math.round((await page.evaluate(() => performance.now())) - tChip);
+  }
   const tStart = await page.evaluate(() => performance.now());
   await page.click('.setup [data-k="start"]');
   await page.waitForFunction(() => document.querySelector('.hud-side .sec-players'), null, {
@@ -268,8 +310,11 @@ async function loadTest(browser) {
     firstContentfulPaint: Math.round(paint['first-contentful-paint'] ?? NaN),
     homeReady: Math.round(home),
     offlineToSetup: Math.round(setup),
+    ...(LOAD_MODE ? { chipToReady: modeReady } : {}),
     startToBoard: Math.round(board),
     longTasks: stats(await page.evaluate(() => window.__perf.longtasks.map((t) => t.duration))),
+    mainThread: await mainThread(cdp),
+    heap: await heap(cdp),
     errors,
   };
   await ctx.close();
@@ -577,7 +622,14 @@ const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome-stable',
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
-const result = { base: BASE, cpu: CPU, viewport: `${vw}x${vh}@${dpr}`, perf: PERF ?? 'default' };
+const result = {
+  base: BASE,
+  cpu: CPU,
+  viewport: `${vw}x${vh}@${dpr}`,
+  perf: PERF ?? 'default',
+  device: DEVICE ?? 'host',
+  ...(LOAD_MODE ? { loadMode: LOAD_MODE } : {}),
+};
 try {
   if (ONLY.includes('load')) result.load = await loadTest(browser);
   if (ONLY.includes('game')) result.game = await gameTest(browser);

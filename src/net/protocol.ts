@@ -8,9 +8,9 @@
  */
 import {
   BASE_MODE,
-  expansionById,
   listModes,
   modeById,
+  moduleById,
   namespaceOf,
   resolveSettings,
   type ExpansionAction,
@@ -519,10 +519,10 @@ function extPayload(x: unknown, path: string, depth: number, budget: { nodes: nu
   return out;
 }
 
-/** Action types of every registered expansion module (`<id>/<name>`). */
+/** Action types of every loaded expansion module (`<id>/<name>`; the server loads all). */
 function isExpansionActionType(type: string): type is ExpansionActionType {
   const ns = namespaceOf(type);
-  return ns !== null && Object.hasOwn(expansionById(ns)?.actions ?? {}, type);
+  return ns !== null && Object.hasOwn(moduleById(ns)?.actions ?? {}, type);
 }
 
 /** An expansion action: a registered `<id>/<name>` type, a player, a plain JSON payload. */

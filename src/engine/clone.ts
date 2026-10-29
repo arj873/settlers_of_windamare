@@ -11,7 +11,7 @@
  * If you add a field to GameState, copy it here (clone.test.ts checks nothing else is shared).
  */
 import { cloneJson } from './expansions/ext';
-import { expansionById } from './expansions/registry';
+import { moduleById } from './expansions/registry';
 import type { Building, ExpansionId, GameState, Phase, Player, VertexId } from './types';
 
 function clonePlayer(p: Player): Player {
@@ -68,7 +68,7 @@ function cloneExt(s: GameState): Record<ExpansionId, unknown> {
   const ext = s.ext as Record<ExpansionId, unknown> | undefined;
   if (!ext) return out;
   for (const id of Object.keys(ext)) {
-    const copy = expansionById(id)?.cloneExt;
+    const copy = moduleById(id)?.cloneExt;
     out[id] = copy ? copy(ext[id]) : cloneJson(ext[id]);
   }
   return out;

@@ -4,7 +4,13 @@
  * clock down between messages. Same board/HUD wiring as the hotseat GameController, no engine
  * calls on the view (docs/MULTIPLAYER.md §6).
  */
-import type { Action, GameState, PlayerId } from '../../engine';
+import {
+  ensureModules,
+  modulesReady,
+  type Action,
+  type GameState,
+  type PlayerId,
+} from '../../engine';
 import type { MemberId, RoomClient, RoomInfo } from '../../net';
 import type { AvatarRef, SeatLook } from '../../ui/profile/model';
 import type { HudView, PlaceMode } from '../../ui';
@@ -99,6 +105,8 @@ export class NetGameController {
   private lastSent: Action['type'] | null = null;
   /** The steal phase whose only steal this seat already sent on its own (#34). */
   private autoKey: string | null = null;
+  /** s18: the room's expansion modules are downloading (render waits for them). */
+  private loadingModules = false;
   private readonly offs: (() => void)[] = [];
 
   constructor(opts: NetControllerOptions) {
@@ -219,6 +227,27 @@ export class NetGameController {
     const g = this.client.game;
     const hv = this.hudView();
     if (!g || !hv) return;
+    // s18: an expansion room's modules load on demand; draw the latest game once they are in.
+    const modules = g.view.settings.expansions;
+    if (!modulesReady(modules)) {
+      if (this.loadingModules) return;
+      this.loadingModules = true;
+      ensureModules(modules).then(
+        () => {
+          this.loadingModules = false;
+          if (this.active) this.render();
+        },
+        (e: unknown) => {
+          this.loadingModules = false;
+          console.error(e);
+          this.toast(
+            'Could not load this game’s expansion. Check the connection and reload.',
+            'error',
+          );
+        },
+      );
+      return;
+    }
     this.spots.sync({ legal: g.legal, viewer: this.viewer, placeMode: this.placeMode });
     const prev = this.shown;
     const notices = prev ? gameNotices(prev, g.view, hv.viewer) : [];
