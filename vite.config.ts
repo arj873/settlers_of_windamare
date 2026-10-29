@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import type { Plugin } from 'vite';
+import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -64,35 +64,71 @@ function appVersion(): string {
   }
 }
 
-export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
-  plugins: [preloadGame()],
-  // '/' for Cloudflare/Netlify/Vercel/custom domain; set VITE_BASE=/<repo>/ for GitHub Pages project sites.
-  base: process.env.VITE_BASE ?? '/',
-  // Online play against `wrangler dev` (M2): open the app with `?server=remote`. Without it,
-  // `pnpm dev` runs the room server in the browser (src/game/online/devServer.ts).
-  server: {
-    proxy: { '/api': { target: 'http://localhost:8787', ws: true, changeOrigin: true } },
-  },
-  build: {
-    rolldownOptions: {
-      // Our modules only declare things (s17): one whose exports nobody uses is left out, so the
-      // home screen's chunk does not drag in the engine through a shared helper. Stylesheets and
-      // the dev worker do run on import.
-      treeshake: {
-        moduleSideEffects: [
-          { test: /\.css$/, sideEffects: true },
-          { test: /\/src\/game\/online\/devWorker\.ts$/, sideEffects: true },
-          { test: /\/src\/.*\.ts$/, sideEffects: false },
-        ],
+/** The CSP marker in index.html that names where the page may open sockets and fetch. */
+const CSP_CONNECT = "connect-src 'self'";
+
+/**
+ * `https://host` → `https://host wss://host` (loopback `http:` → `ws:`); unset → nothing. The
+ * client (src/game/online/backend.ts) only talks to this origin, so nothing else is needed.
+ */
+function roomServerSources(roomServer: string | undefined): string[] {
+  if (!roomServer) return [];
+  const u = new URL(roomServer);
+  const ws = u.protocol === 'https:' ? 'wss:' : 'ws:';
+  return [u.origin, `${ws}//${u.host}`];
+}
+
+/**
+ * Content-Security-Policy (index.html, docs/MULTIPLAYER.md §12): the page's own origin covers the
+ * Worker when both are deployed together (Cloudflare). Hosting the game elsewhere (GitHub Pages)
+ * means building with VITE_ROOM_SERVER=https://…workers.dev, which this adds to the policy.
+ */
+function cspRoomServer(roomServer: string | undefined): Plugin {
+  const sources = roomServerSources(roomServer);
+  return {
+    name: 'csp-room-server',
+    transformIndexHtml(html) {
+      if (sources.length === 0) return html;
+      if (!html.includes(CSP_CONNECT)) {
+        throw new Error(`index.html: the CSP meta tag has no "${CSP_CONNECT}"`);
+      }
+      return html.replace(CSP_CONNECT, `${CSP_CONNECT} ${sources.join(' ')}`);
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  return {
+    plugins: [preloadGame(), cspRoomServer(env.VITE_ROOM_SERVER)],
+    define: { __APP_VERSION__: JSON.stringify(appVersion()) },
+    // '/' for Cloudflare/Netlify/Vercel/custom domain; set VITE_BASE=/<repo>/ for GitHub Pages project sites.
+    base: process.env.VITE_BASE ?? '/',
+    // Online play against `wrangler dev` (M2): open the app with `?server=remote`. Without it,
+    // `pnpm dev` runs the room server in the browser (src/game/online/devServer.ts).
+    server: {
+      proxy: { '/api': { target: 'http://localhost:8787', ws: true, changeOrigin: true } },
+    },
+    build: {
+      rolldownOptions: {
+        // Our modules only declare things (s17): one whose exports nobody uses is left out, so the
+        // home screen's chunk does not drag in the engine through a shared helper. Stylesheets and
+        // the dev worker do run on import.
+        treeshake: {
+          moduleSideEffects: [
+            { test: /\.css$/, sideEffects: true },
+            { test: /\/src\/game\/online\/devWorker\.ts$/, sideEffects: true },
+            { test: /\/src\/.*\.ts$/, sideEffects: false },
+          ],
+        },
       },
     },
-  },
-  test: {
-    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
-    environment: 'node',
-    // Simulator tests take 1-7 s; parallel agents and CI runners can push them past vitest's
-    // 5 s default. A hang still fails, just later.
-    testTimeout: 30_000,
-  },
+    test: {
+      include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+      environment: 'node',
+      // Simulator tests take 1-7 s; parallel agents and CI runners can push them past vitest's
+      // 5 s default. A hang still fails, just later.
+      testTimeout: 30_000,
+    },
+  };
 });

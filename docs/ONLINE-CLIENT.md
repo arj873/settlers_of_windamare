@@ -39,6 +39,9 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 - `?server=remote` (default in builds): the Worker at `VITE_ROOM_SERVER` or this origin.
   `pnpm dev` proxies `/api` (WebSocket too) to `wrangler dev` on :8787, so `pnpm dev` +
   `?server=remote` talks to a local Worker. `pnpm dev:server` serves both on :8787.
+  `VITE_ROOM_SERVER` is read at build time only: `vite.config.ts` also adds that origin (and its
+  `wss:` form) to the page's Content-Security-Policy, so any other origin is blocked by the
+  browser (MULTIPLAYER.md §12).
 - Tokens: `localStorage['catan.mp.token.<CODE>']` for real rooms (two tabs = same player, the
   newer takes over: `replaced`). The dev server keeps them in `sessionStorage` so two tabs of one
   browser are two players. Nickname: `localStorage['catan.mp.name']`.
