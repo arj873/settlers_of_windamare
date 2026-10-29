@@ -1,12 +1,14 @@
 // Production-build smoke test of the flows that load expansion modules on demand (s18), with the
 // page's Content-Security-Policy watched: base hotseat, C&K and Seafarers hotseat games picked on
 // the setup screen, resume of the Seafarers save after a reload, an online Seafarers room on the
-// in-browser server (host + a guest joining by the invite link) and the tutorial.
+// in-browser server (host + a guest joining by the invite link), the tutorial, and a short bot
+// game of every mode (`?mode=`).
 //
 //   pnpm build && pnpm preview --port 4173 &
-//   node scripts/perf/flows.mjs [--base http://localhost:4173] [--only base,ck,sea,online,tutorial]
+//   node scripts/perf/flows.mjs [--base http://localhost:4173] [--only base,ck,sea,online,tutorial,modes]
 //
 // Exits non-zero when a flow fails, the page throws or logs an error, or a CSP violation fires.
+import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const args = process.argv.slice(2);
@@ -15,7 +17,7 @@ const flag = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 const BASE = flag('--base', 'http://localhost:4173').replace(/\/$/, '');
-const ONLY = flag('--only', 'base,ck,sea,online,tutorial').split(',');
+const ONLY = flag('--only', 'base,ck,sea,online,tutorial,modes').split(',');
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome-stable',
@@ -182,7 +184,31 @@ async function tutorial() {
   await ctx.close();
 }
 
-const FLOWS = { base, ck, sea, online, tutorial };
+/** Every mode (its modules load on demand): a dev all-bot game plays a few seconds. */
+async function modes() {
+  const list = JSON.parse(
+    execSync(
+      `npx tsx -e "import { listModes } from './src/engine'; console.log(JSON.stringify(listModes().map((m) => [m.id, m.players.min, m.players.max])))"`,
+      { encoding: 'utf8' },
+    ),
+  );
+  const { ctx, open } = await profile('modes');
+  for (const [id, min, max] of list) {
+    const n = Math.min(max, Math.max(min, 4));
+    const page = await open(`${BASE}/?mode=${encodeURIComponent(id)}&autoplay=${n}bots&speed=0`);
+    await page.waitForSelector('.hud-side .sec-players', { timeout: 60_000 });
+    await page.waitForTimeout(2500);
+    const s = await page.evaluate(() => {
+      const st = window.catan?.controller?.state;
+      return st ? { mode: st.settings.mode, turn: st.turn.number } : null;
+    });
+    check(s?.mode === id && s.turn > 0, `mode ${id}: ${n} bots played to turn ${s?.turn}`);
+    await page.close();
+  }
+  await ctx.close();
+}
+
+const FLOWS = { base, ck, sea, online, tutorial, modes };
 let failed = false;
 for (const name of ONLY) {
   try {

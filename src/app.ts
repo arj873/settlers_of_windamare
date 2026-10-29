@@ -165,6 +165,9 @@ export async function bootGame(): Promise<GameApp> {
     ),
     autoDensity: true,
     preference: 'webgl',
+    // s18: not Pixi's browser extras (its event system, accessibility, DOM containers, filters):
+    // the board reads pointer input itself (render/viewport.ts) and uses no filters.
+    skipExtensionImports: true,
   });
   document.getElementById('app')?.appendChild(app.canvas);
 

@@ -11,7 +11,7 @@
  * Pan (drag) / zoom (wheel, pinch) are built in; double-click refits. The view refits on every
  * renderer resize, and on inset changes until the user pans or zooms.
  */
-import { Color, Container, EventsTicker, Graphics, Text, Ticker, type Application } from 'pixi.js';
+import { Color, Container, Graphics, Text, Ticker, type Application } from 'pixi.js';
 import {
   TOPOLOGY,
   edgeInfo,
@@ -281,15 +281,8 @@ export class BoardView {
       onHover: (p) => this.handleHover(p),
     });
 
-    // The board reads its own pointer input (Viewport). Pixi's event system would hit-test the
-    // stage on every pointer move and, through the system ticker, on every animation frame.
-    Object.assign(app.renderer.events.features, {
-      move: false,
-      globalMove: false,
-      click: false,
-      wheel: false,
-    });
-    EventsTicker.removeTickerListener();
+    // The board reads its own pointer input (Viewport): the app skips Pixi's event system (s18,
+    // `skipExtensionImports`), which hit-tested the stage on every pointer move and frame.
     // What is left on the system ticker is housekeeping (texture GC), which only matters after
     // a change: run it in the board's frames rather than on an endless animation-frame loop.
     Ticker.system.autoStart = false;

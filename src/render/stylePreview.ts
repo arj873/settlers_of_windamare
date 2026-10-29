@@ -22,6 +22,8 @@ function shared(): Promise<Renderer | null> {
     height: 8,
     backgroundAlpha: 0,
     antialias: true,
+    // Like the board's (app.ts): none of Pixi's browser extras.
+    skipExtensionImports: true,
   }).catch((e: unknown) => {
     console.warn('piece style previews unavailable', e);
     return null;

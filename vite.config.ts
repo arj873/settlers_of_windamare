@@ -21,13 +21,10 @@ function preloadGame(): Plugin {
         const chunks = Object.values(ctx.bundle ?? {}).flatMap((c) =>
           c.type === 'chunk' ? [c] : [],
         );
-        // The game, and the Pixi parts `Application.init` imports in turn (WebGL is preferred).
-        // s18: found by a module they hold (a chunk group has no facade module).
-        const lazy = [
-          '/src/app.ts',
-          '/environment-browser/browserAll.mjs',
-          '/gl/WebGLRenderer.mjs',
-        ];
+        // The game, and the Pixi renderer `Application.init` imports in turn (WebGL is preferred).
+        // s18: found by a module they hold (a chunk group has no facade module); no browserAll
+        // (`skipExtensionImports`).
+        const lazy = ['/src/app.ts', '/gl/WebGLRenderer.mjs'];
         const game = chunks.filter((c) =>
           c.moduleIds.some((id) => lazy.some((f) => id.endsWith(f))),
         );
@@ -56,22 +53,47 @@ function preloadGame(): Plugin {
   };
 }
 
+/**
+ * s18: Pixi's browser extras (`browserAll`: its event system, accessibility, DOM containers,
+ * filter system) are never loaded: the app inits Pixi with `skipExtensionImports` (the board
+ * reads pointer input itself, render/viewport.ts; no filters). Pixi still reaches them through
+ * one dynamic import in `browserExt`, which kept ~43 kB raw of them in the game chunk. That import
+ * gets a stub (its own chunk, see NOT_IN_GAME) that fails loudly if anything ever loads it.
+ */
+const PIXI_EXTRAS_STUB = '\0pixi-browser-extras-skipped';
+function pixiWithoutBrowserExtras(): Plugin {
+  return {
+    name: 'windamere:pixi-without-browser-extras',
+    apply: 'build',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      const fromPixi = /[\\/]pixi\.js[\\/].*browserExt\.mjs$/.test(importer ?? '');
+      return source === './browserAll.mjs' && fromPixi ? PIXI_EXTRAS_STUB : null;
+    },
+    load(id) {
+      if (id !== PIXI_EXTRAS_STUB) return null;
+      return 'throw new Error("Pixi\'s browser extensions are not bundled: init Pixi with skipExtensionImports (vite.config.ts)");';
+    },
+  };
+}
+
 /** An expansion module's folder (src/expansions/<id>/...) → its id. */
 const EXPANSION_FILE = /[\\/]src[\\/]expansions[\\/]([^\\/]+)[\\/]/;
 /**
- * Loaded on demand apart from the game: the online client and the in-browser room server (which
- * imports every expansion). Pixi's WebGPU and Canvas renderers stay in the game chunk: its core
- * statically shares nearly all of their code (adaptors, programs), apart they saved ~7 kB raw
- * for six more small chunks.
+ * Not in the game chunk, loaded on demand: the online client and the in-browser room server
+ * (which imports every expansion); the Pixi extras stub (in the game chunk its `throw` would make
+ * the bundler drop the code after it). Pixi's WebGPU and Canvas renderers stay in: the core
+ * imports most of their modules statically (adaptors, programs, bind groups); apart they made
+ * five more preloaded files for the same bytes.
  */
 const NOT_IN_GAME =
-  /[\\/]src[\\/](game[\\/]online[\\/]|ui[\\/]online[\\/]|net[\\/](client|session|loopback)\.ts|server[\\/]|expansions[\\/]headless\.ts)|pixi\.js[\\/]lib[\\/]environment-webworker[\\/]/;
+  /[\\/]src[\\/](game[\\/]online[\\/]|ui[\\/]online[\\/]|net[\\/](client|session|loopback)\.ts|server[\\/]|expansions[\\/]headless\.ts)|pixi-browser-extras-skipped/;
 
 /**
  * s18 chunks: left alone, the bundler splits every module the game core shares with an expansion
  * pack into its own small chunk (27 files for a base game, 6 for C&K). Instead: the home screen,
- * the game core (engine, HUD, board, controller, Pixi's WebGL path), and one chunk per expansion
- * module; the rest (online client, fallback renderers) keeps automatic chunking.
+ * the game core (engine, HUD, board, controller, Pixi), and one chunk per expansion module; the
+ * rest (the online client) keeps automatic chunking.
  */
 const CHUNK_GROUPS = [
   // The home screen: main.ts and everything it imports statically.
@@ -136,7 +158,7 @@ function cspRoomServer(roomServer: string | undefined): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [preloadGame(), cspRoomServer(env.VITE_ROOM_SERVER)],
+    plugins: [preloadGame(), pixiWithoutBrowserExtras(), cspRoomServer(env.VITE_ROOM_SERVER)],
     define: { __APP_VERSION__: JSON.stringify(appVersion()) },
     // '/' for Cloudflare/Netlify/Vercel/custom domain; set VITE_BASE=/<repo>/ for GitHub Pages project sites.
     base: process.env.VITE_BASE ?? '/',
