@@ -163,8 +163,13 @@ export async function createAndStart(
     await p.waitForSelector('.ol-lobby', { timeout: 30_000 });
   }
   for (const [seat, p] of pages.entries()) {
-    await p.waitForSelector(`[data-k="sit-${seat}"]`, { timeout: 15_000 });
-    await p.click(`[data-k="sit-${seat}"]`);
+    // The lobby seats everyone on joining; only move a player that landed elsewhere.
+    await p.waitForFunction(`${CLIENT}.mySeat !== null`, null, { timeout: 15_000 });
+    if ((await p.evaluate(`${CLIENT}.mySeat`)) !== seat) {
+      await p.waitForSelector(`[data-k="sit-${seat}"]`, { timeout: 15_000 });
+      await p.click(`[data-k="sit-${seat}"]`);
+      await p.waitForFunction(`${CLIENT}.mySeat === ${seat}`, null, { timeout: 15_000 });
+    }
     await host.waitForFunction(`${CLIENT}.room.seats[${seat}].occupant !== null`, null, {
       timeout: 15_000,
     });
