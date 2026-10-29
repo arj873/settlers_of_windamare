@@ -257,7 +257,9 @@ length, a hand its size), sharing the unchanged parts, mutating nothing. Rules:
   Masks today: C&K `ck/engine/mask.ts` (progress hands, commodity split, progress decks; Spy /
   Master Merchant reveals), Seafarers `seafarers/engine/mask.ts` (fog stacks, face-down Forgotten
   Tribe dev-card gifts), T&B `tb/engine/mask.ts` (fish hands and pool, BA deck, commodity stacks,
-  Swift Journeys), E&P `ep/engine/mask.ts` (face-down hexes, disc stacks, lair tokens). Oil, Crop,
+  Swift Journeys), E&P `ep/engine/mask.ts` (face-down hexes, disc stacks, lair tokens). Crop `crop/engine/mask.ts` (face-down
+  event tokens: supply stack, tokens under unbuilt pieces, Longest Road / Largest Army tokens;
+  placeholders keep the counts). Oil,
   demo, seack, tbck, epck, eptb, back, twock hold no secrets of their own (their tests run the C&K, T&B and
   E&P masks in the combos; gold offers and fish uses are public).
 
