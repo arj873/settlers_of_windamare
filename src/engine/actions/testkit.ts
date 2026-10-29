@@ -7,7 +7,7 @@ import { RESOURCES } from '../constants';
 import { supplyOf } from '../mapLookup';
 import { applyAction } from '../engine';
 import { freshGame } from '../fixtures';
-import { Rng } from '../rng';
+import { Rng, expandState, type RngState } from '../rng';
 import type {
   Action,
   ActionResult,
@@ -67,10 +67,10 @@ export function setHand(s: GameState, p: PlayerId, bundle: ResourceBundle) {
 }
 
 /** An RNG state whose next two dice sum to `total`. */
-export function rngForRoll(total: number): number {
+export function rngForRoll(total: number): RngState {
   for (let seed = 0; seed < 100_000; seed++) {
     const rng = new Rng(seed);
-    if (rng.die() + rng.die() === total) return seed;
+    if (rng.die() + rng.die() === total) return expandState(seed);
   }
   throw new Error(`no seed rolls ${total}`);
 }

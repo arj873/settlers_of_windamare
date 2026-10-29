@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../../../engine/engine';
+import { expandState } from '../../../engine/rng';
 import { costOf, pieceLimit } from '../../../engine/expansions/hooks';
 import { bankTradeRatio } from '../../../engine/actions/trade';
 import { piecesLeft, victoryPoints } from '../../../engine/selectors';
@@ -105,7 +106,7 @@ describe('harbor settlements (§4.2)', () => {
     // Roll (5,0)'s number (9) by trying seeds.
     const token = s.board.hexes[H(5, 0)]?.token as number;
     for (let seed = 0; seed < 200; seed++) {
-      const r = applyAction({ ...s, rng: seed }, { type: 'rollDice', player: 0 });
+      const r = applyAction({ ...s, rng: expandState(seed) }, { type: 'rollDice', player: 0 });
       if (r.ok && r.state.dice && r.state.dice[0] + r.state.dice[1] === token) {
         const res = r.state.players[0]?.resources;
         const terrain = s.board.hexes[H(5, 0)]?.terrain as 'lumber';
@@ -120,7 +121,10 @@ describe('harbor settlements (§4.2)', () => {
 describe('gold (§3.2, §3.3)', () => {
   function rollTo(s: GameState, total: number): GameState {
     for (let seed = 0; seed < 500; seed++) {
-      const r = applyAction({ ...s, rng: seed }, { type: 'rollDice', player: s.turn.current });
+      const r = applyAction(
+        { ...s, rng: expandState(seed) },
+        { type: 'rollDice', player: s.turn.current },
+      );
       if (r.ok && r.state.dice && r.state.dice[0] + r.state.dice[1] === total) return r.state;
     }
     throw new Error(`no roll of ${total}`);

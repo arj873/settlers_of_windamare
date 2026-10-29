@@ -57,9 +57,11 @@ const mem = (): KeyStore => {
 };
 
 /** Ann (host, seat 0) and Bob (seat 1), 3 seats, started; Eve joins later as a spectator. */
-function table(config = {}) {
+/** `seed`: the game seed (default: the harness's `seed-1`). */
+function table(config = {}, seed?: string) {
   const clock = new FakeClock(1000);
-  const { session, hostToken } = GameSession.create('K3J9QX', clock.now(), fakeDeps(), {
+  const deps = seed === undefined ? fakeDeps() : { ...fakeDeps(), seed: () => seed };
+  const { session, hostToken } = GameSession.create('K3J9QX', clock.now(), deps, {
     graceMs: 5000,
     botDelayMs: 100,
   });
@@ -179,7 +181,9 @@ describe('NetGameController', () => {
   });
 
   it('build by clicking a spot: setup clicks act at once, main-phase builds ask first', () => {
-    const t = table({ seatCount: 3 });
+    // Humans only roll and end turns here, so they reach a build only on a kind seed (s15:
+    // the RNG change made the default seed-1 one where the bot wins first).
+    const t = table({ seatCount: 3 }, 'seed-4');
     const reqs: SpotPromptRequest[] = [];
     const prompt: SpotPromptLike = {
       show: (r) => void reqs.push(r),

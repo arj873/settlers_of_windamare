@@ -1,5 +1,5 @@
 /** Autosave: one session in localStorage. Every storage access is wrapped (private mode, quota...). */
-import { upgradeState, type GameState, type PlayerId } from '../engine';
+import { isRngState, upgradeState, type GameState, type PlayerId, type RngState } from '../engine';
 import { isBotLevel, type BotLevel } from '../bots/levels';
 import type { Controller } from '../ui';
 import { cleanLooks, type SeatLook } from '../ui/profile/model';
@@ -21,7 +21,8 @@ export interface SavedSession {
   /** Last human viewer (restores the hotseat screen without a pass-device cover). */
   viewer: PlayerId | null;
   /** The bots' private RNG state, so a resumed game keeps the same bot choices. */
-  botRng: number;
+  /** A plain uint32 in saves from before schema v6 (`new Rng` expands it). */
+  botRng: RngState | number;
   /** Chess clock (settings.timer) only: each player's bank in ms. */
   banks?: number[];
   /**
@@ -88,7 +89,7 @@ export function loadSession(store: KeyValueStore | null): SavedSession | null {
       state,
       seats: s.seats,
       viewer,
-      botRng: typeof s.botRng === 'number' ? s.botRng >>> 0 : 1,
+      botRng: isRngState(s.botRng) ? s.botRng : typeof s.botRng === 'number' ? s.botRng >>> 0 : 1,
       // Checked again by restoreBanks when the game resumes.
       ...(Array.isArray(s.banks) ? { banks: s.banks } : {}),
       ...(typeof s.playedMs === 'number' && Number.isFinite(s.playedMs) && s.playedMs >= 0

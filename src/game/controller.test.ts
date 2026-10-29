@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyAction,
   createGame,
+  expandState,
   legalActions,
   type Action,
   type GameState,
@@ -720,13 +721,26 @@ describe('GameController: autosave', () => {
       ...midGame(),
       schemaVersion: 1,
       settings: { seed: 'old', layout: 'beginner', vpToWin: 10 },
+      rng: 12345, // saves before schema v6 hold a uint32
     };
     const seats = ['human', 'bot', 'bot', 'bot'];
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: v1, seats, viewer: 0, botRng: 5 }));
     const saved = loadSession(store);
-    expect(saved?.state.schemaVersion).toBe(5);
+    expect(saved?.state.schemaVersion).toBe(6);
+    expect(saved?.state.rng).toEqual(expandState(12345));
+    expect(saved?.botRng).toBe(5);
     expect(saved?.state.settings).toMatchObject({ map: 'base', discardLimit: 7, vpToWin: 10 });
     expect(saved?.state.pieces).toEqual(midGame().pieces);
+  });
+
+  it('a v6 save keeps the 128-bit bot RNG; a malformed one falls back to 1', () => {
+    const seats = ['human', 'bot', 'bot', 'bot'];
+    const save = (botRng: unknown) =>
+      store.setItem(SAVE_KEY, JSON.stringify({ version: 1, state: midGame(), seats, botRng }));
+    save([1, 2, 3, 4]);
+    expect(loadSession(store)?.botRng).toEqual([1, 2, 3, 4]);
+    save([1, 2, 3]);
+    expect(loadSession(store)?.botRng).toBe(1);
   });
 
   it('ignores a corrupt save', () => {

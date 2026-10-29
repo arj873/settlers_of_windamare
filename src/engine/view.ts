@@ -12,7 +12,7 @@
  *  - eventDeck (Event Cards order, V1)            -> HIDDEN_EVENT_CARD x length
  * Public on purpose (V1): map-veto candidates and votes, event tasks, lastEvent, damagedRoads,
  * settings.seatOrder (the seating is visible at the table anyway).
- *  - rng                                          -> 0
+ *  - rng                                          -> [0, 0, 0, 0]
  *  - settings.seed and the seed in the "Game created" log line -> HIDDEN_SEED / removed
  *  - log entries' private texts (#32, `LogEntry.secret`: which card a steal took) -> only the
  *    ones naming the viewer (kept for good: the stats reveal the totals at game over anyway)
@@ -113,7 +113,7 @@ export function viewFor(state: GameState, viewer: Viewer): GameView {
     diceDeck: state.diceDeck.map(() => HIDDEN_DICE_CARD),
     ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => HIDDEN_EVENT_CARD) } : {}),
     log: state.log.map((e) => maskLogEntry(e, seat)),
-    rng: 0,
+    rng: [0, 0, 0, 0],
     view: {
       viewer: seat,
       handCounts: state.players.map((p) => totalResources(p.resources)),

@@ -98,7 +98,7 @@ GameSettings {
   options: Record<ExpansionId, Record<string, OptionValue>>   // all options of active modules
 }
 GameState {
-  schemaVersion: 5
+  schemaVersion: 6                // 5 = F1 (ext); 6 = 128-bit rng (s15)
   ...v4 fields
   ext: Record<ExpansionId, unknown>   // one JSON slice per active module, created by its init
 }

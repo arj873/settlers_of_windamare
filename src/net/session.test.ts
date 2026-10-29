@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HIDDEN_SEED, totalResources, type Action } from '../engine';
+import { expandState, HIDDEN_SEED, isRngState, totalResources, type Action } from '../engine';
 import { DEFAULT_ROOM_CONFIG, type RoomConfig } from './protocol';
 import { GameSession, type SessionOptions } from './session';
 import { fakeDeps, LocalNet } from './testHarness';
@@ -276,7 +276,8 @@ describe('GameSession game', () => {
     for (const a of ann.legal) expect(a.player).toBe(0);
     for (const a of bob.legal) expect(a.player).toBe(1);
     const cur = state.turn.current;
-    expect(cur === 2 ? ann.legal.length + bob.legal.length : 1).toBeGreaterThan(0);
+    // The seat to move (a human) has legal actions; with the bot first, the humans wait.
+    expect(cur === 2 ? 1 : ann.legal.length + bob.legal.length).toBeGreaterThan(0);
 
     net.connect('eve');
     net.send('eve', { type: 'hello', token: null, name: 'Eve' });
@@ -297,7 +298,7 @@ describe('GameSession game', () => {
     for (const g of net.messages('bob', 'game')) {
       expect(totalResources(g.view.players[0]!.resources)).toBe(0);
       expect(totalResources(g.view.players[2]!.resources)).toBe(0);
-      expect(g.view.rng).toBe(0);
+      expect(g.view.rng).toEqual([0, 0, 0, 0]);
     }
     const lastBob = net.last('bob', 'game')!;
     expect(lastBob.view.view.handCounts).toEqual(
@@ -448,6 +449,29 @@ describe('GameSession game', () => {
     net.session = restored;
     playUntil(net, ['host', 'bob'], () => restored.state!.turn.number >= 3);
     expect(restored.state!.turn.number).toBeGreaterThanOrEqual(3);
+  });
+
+  it('restores a snapshot stored before schema v6 (uint32 rng, bot RNGs) and keeps playing', () => {
+    const { net, session } = started({ map: 'base' });
+    playUntil(net, ['host', 'bob'], () => session.state!.turn.number >= 1);
+    const snap = JSON.parse(JSON.stringify(session.snapshot()));
+    snap.game.state = { ...snap.game.state, schemaVersion: 5, rng: 123456789 };
+    snap.game.botRng = 5;
+    snap.game.timeoutRng = 6;
+    const restored = GameSession.restore(snap, fakeDeps('r'), { graceMs: GRACE, botDelayMs: 500 });
+    expect(restored.state!.schemaVersion).toBe(6);
+    expect(restored.state!.rng).toEqual(expandState(123456789));
+    net.session = restored;
+    playUntil(net, ['host', 'bob'], () => restored.state!.turn.number >= 3);
+    expect(restored.state!.turn.number).toBeGreaterThanOrEqual(3);
+    expect(isRngState(restored.snapshot().game!.botRng)).toBe(true);
+  });
+
+  it('refuses a snapshot whose game state does not load', () => {
+    const { session } = started({ map: 'base' });
+    const snap = JSON.parse(JSON.stringify(session.snapshot()));
+    snap.game.state = { ...snap.game.state, rng: 'nope' };
+    expect(() => GameSession.restore(snap, fakeDeps('r'))).toThrow(/unreadable game state/);
   });
 
   it('reconcile drops connections the transport lost', () => {

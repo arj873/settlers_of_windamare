@@ -16,6 +16,7 @@ import {
   type Banks,
   type GameState,
   type PlayerId,
+  type RngState,
 } from '../engine';
 import { createRandomBot, DEFAULT_BOT_LEVEL, type Bot, type BotLevel } from '../bots';
 import { botForLevel } from '../bots/byLevel';
@@ -230,7 +231,7 @@ export class GameController {
     seats: Seats,
     opts: {
       viewer?: PlayerId | null;
-      botRng?: number;
+      botRng?: RngState | number;
       banks?: unknown;
       /** Time already played (a resumed save); null = unknown; absent = a game starting now. */
       playedMs?: number | null;

@@ -1,6 +1,13 @@
 /** #32: a steal's log line names the card only for thief and victim (`LogEntry.secret`). */
 import { describe, expect, it } from 'vitest';
-import { applyAction, legalActions, RESOURCES, viewFor, type GameState } from './index';
+import {
+  applyAction,
+  legalActions,
+  RESOURCES,
+  resourceWord,
+  viewFor,
+  type GameState,
+} from './index';
 import { moveRobberGame } from './fixtures';
 import { describeCards, stealSecret } from './rules/text';
 
@@ -26,12 +33,13 @@ describe('steal log secrets (#32)', () => {
     const { s, thief, victim } = afterSteal();
     const e = s.log.at(-1)!;
     expect(e.text).toMatch(/^Blue stole from \w+$/);
-    expect(RESOURCES.some((r) => e.text.includes(r))).toBe(false);
+    expect(RESOURCES.some((r) => e.text.includes(resourceWord(r)))).toBe(false);
     expect(e.secret).toHaveLength(1);
     expect(e.secret![0]!.to).toEqual([thief, victim]);
     const m = /^Blue stole 1 (\w+) from (\w+)$/.exec(e.secret![0]!.text);
     expect(m?.[2]).toBe(s.players[victim]!.name);
-    const card = RESOURCES.find((r) => r === m?.[1]);
+    // The text uses display words (#47: wool reads "sheep", grain "wheat").
+    const card = RESOURCES.find((r) => resourceWord(r) === m?.[1]);
     // The card really moved: the thief's hand holds it.
     expect(s.players[thief]!.resources[card!]).toBeGreaterThan(0);
   });

@@ -95,7 +95,7 @@ export function cloneState(s: GameState): GameState {
     diceDeck: [...s.diceDeck],
     awards: { ...s.awards },
     log: [...s.log],
-    rng: s.rng,
+    rng: [...s.rng],
     winner: s.winner,
     ext: cloneExt(s),
     // V1 variant fields exist only in games that use them; never add undefined keys.

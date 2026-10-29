@@ -16,7 +16,9 @@ describe('createGame', () => {
       expect(s.devDeck.filter((c) => c === type)).toHaveLength(n);
     }
     expect(s.phase).toEqual({ kind: 'setup', index: 0, step: 'settlement', lastSettlement: null });
-    expect(s.turn).toEqual({ number: 0, current: 0, devCardPlayed: false, tradeOffers: 0 });
+    // The starting seat is drawn from the seed (T14); setup begins with it.
+    const first = s.settings.startingPlayer;
+    expect(s.turn).toEqual({ number: 0, current: first, devCardPlayed: false, tradeOffers: 0 });
     for (const p of s.players) {
       expect(p.progressCardsPlayed).toEqual({ roadBuilding: 0, yearOfPlenty: 0, monopoly: 0 });
     }

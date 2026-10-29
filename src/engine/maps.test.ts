@@ -7,12 +7,13 @@ import { applyAction, legalActions } from './engine';
 import { generateBoard, redNumbersSeparated } from './board';
 import { DEV_CARD_TYPES, PLAYER_COLORS, RESOURCES } from './constants';
 import { createGame, resolveSettings } from './createGame';
-import { FIXTURE_PLAYERS, freshGame } from './fixtures';
+import { FIXTURE_PLAYERS, freshGame, midGame } from './fixtures';
+import { expectOk } from './actions/testkit';
 import { hexDistance, parseHexId } from './hex';
 import { supplyOf } from './mapLookup';
 import { MAPS, MAP_IDS, defaultMapFor } from './maps';
 import { upgradeState } from './migrate';
-import { Rng } from './rng';
+import { Rng, expandState, isRngState } from './rng';
 import { setupPlayerAt } from './selectors';
 import { TOPOLOGY, topologyFor, topologyOf } from './topology';
 import type { BaseMapId, GameState, MapId, Terrain } from './types';
@@ -279,7 +280,7 @@ describe('starting player (RULES.md 2.7, 2.13, 2.20)', () => {
     const b = createGame({ seed: 9, players: players(4), map: 'baseRandom', startingPlayer: 0 });
     expect(a.board).toEqual(b.board);
     expect(a.devDeck).toEqual(b.devDeck);
-    expect(a.rng).toBe(b.rng);
+    expect(a.rng).toEqual(b.rng);
   });
 
   it('logs who starts', () => {
@@ -313,7 +314,7 @@ describe('starting player (RULES.md 2.7, 2.13, 2.20)', () => {
 describe('settings v2', () => {
   it('defaults', () => {
     const s = createGame({ seed: 1, players: players(4), map: 'baseRandom' });
-    expect(s.schemaVersion).toBe(5);
+    expect(s.schemaVersion).toBe(6);
     expect(s.settings).toEqual({
       seed: 1,
       map: 'baseRandom',
@@ -387,15 +388,26 @@ describe('settings v2', () => {
 });
 
 describe('upgradeState (saves)', () => {
+  /** The uint32 rng every save before v6 held. */
+  const OLD_RNG = 0x9e3779b9;
+  /** `s` as upgraded from an older save: the old uint32 rng expanded (v5 -> v6). */
+  const upgraded = (s: GameState): GameState => ({ ...s, rng: expandState(OLD_RNG) });
+
   /** A v1 save as T7 wrote it: schemaVersion 1, settings.layout. */
   function v1Save(layout: 'beginner' | 'random'): unknown {
     const s = JSON.parse(JSON.stringify(freshGame())) as Record<string, unknown>;
-    return { ...s, schemaVersion: 1, settings: { seed: 'fixture', layout, vpToWin: 8 } };
+    return {
+      ...s,
+      schemaVersion: 1,
+      settings: { seed: 'fixture', layout, vpToWin: 8 },
+      rng: OLD_RNG,
+    };
   }
 
-  it('upgrades v1 -> v5 with defaults', () => {
+  it('upgrades v1 -> v6 with defaults', () => {
     const up = upgradeState(v1Save('beginner'));
-    expect(up?.schemaVersion).toBe(5);
+    expect(up?.schemaVersion).toBe(6);
+    expect(up?.rng).toEqual(expandState(OLD_RNG));
     expect(up?.diceDeck).toEqual([]);
     expect(up?.ext).toEqual({});
     expect(up?.settings).toEqual({
@@ -426,16 +438,16 @@ describe('upgradeState (saves)', () => {
   it('upgrades v3 -> v4: seat 0 started every earlier game', () => {
     const s = freshGame();
     const { startingPlayer: _, ...v3Settings } = s.settings;
-    const v3 = { ...s, schemaVersion: 3, settings: v3Settings };
-    expect(upgradeState(JSON.parse(JSON.stringify(v3)))).toEqual(s);
+    const v3 = { ...s, schemaVersion: 3, settings: v3Settings, rng: OLD_RNG };
+    expect(upgradeState(JSON.parse(JSON.stringify(v3)))).toEqual(upgraded(s));
   });
 
   it('upgrades v4 -> v5: base mode, no expansions, empty ext', () => {
     const s = freshGame();
     const { mode: _m, expansions: _e, scenario: _s, options: _o, ...v4Settings } = s.settings;
     const { ext: _x, ...rest } = s;
-    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings };
-    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
+    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings, rng: OLD_RNG };
+    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(upgraded(s));
   });
 
   it('keeps V1/V2 variant fields and stats through v4 -> v5 and in v5 (no schema bump)', () => {
@@ -460,8 +472,8 @@ describe('upgradeState (saves)', () => {
     expect(s.eventDeck).toBeDefined();
     const { mode: _m, expansions: _e, scenario: _s, options: _o, ...v4Settings } = s.settings;
     const { ext: _x, ...rest } = s;
-    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings };
-    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(s);
+    const v4 = { ...rest, schemaVersion: 4, settings: v4Settings, rng: OLD_RNG };
+    expect(upgradeState(JSON.parse(JSON.stringify(v4)))).toEqual(upgraded(s));
     expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
     // A v5 expansion save with variants and stats passes through as well.
     const oil = createGame({ seed: 3, players: players(4), mode: 'oil', robberMode: 'friendly' });
@@ -479,16 +491,60 @@ describe('upgradeState (saves)', () => {
     expect(upgradeState(noExt)).toBeNull();
   });
 
-  it('passes v5 through and rejects garbage', () => {
+  it('passes v6 through and rejects garbage', () => {
     const s = freshGame();
     expect(upgradeState(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(upgradeState(null)).toBeNull();
     expect(upgradeState({})).toBeNull();
-    expect(upgradeState({ ...s, schemaVersion: 6 })).toBeNull();
+    expect(upgradeState({ ...s, schemaVersion: 7 })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, startingPlayer: 4 } })).toBeNull();
     expect(upgradeState({ ...s, settings: { ...s.settings, map: 'moon' } })).toBeNull();
     expect(
       upgradeState({ ...s, schemaVersion: 1, settings: { seed: 1, layout: 'x', vpToWin: 10 } }),
     ).toBeNull();
+  });
+
+  it('upgrades v5 -> v6: the uint32 rng expands to a 128-bit state (splitmix32 x4)', () => {
+    const s = midGame();
+    const v5 = JSON.parse(JSON.stringify({ ...s, schemaVersion: 5, rng: OLD_RNG })) as unknown;
+    const up = upgradeState(v5) as GameState;
+    expect(up).toEqual(upgraded(s));
+    expect(up.schemaVersion).toBe(6);
+    expect(isRngState(up.rng)).toBe(true);
+    // Deterministic: the same old save always gives the same state, other numbers other ones.
+    expect(upgradeState(JSON.parse(JSON.stringify(v5)))).toEqual(up);
+    expect(upgradeState({ ...s, schemaVersion: 5, rng: OLD_RNG + 1 })?.rng).not.toEqual(up.rng);
+    // A v5 expansion save too.
+    const oil = createGame({ seed: 3, players: players(4), mode: 'oil' });
+    const oilV5 = JSON.parse(JSON.stringify({ ...oil, schemaVersion: 5, rng: 7 })) as unknown;
+    expect(upgradeState(oilV5)).toEqual({ ...oil, rng: expandState(7) });
+  });
+
+  it('an upgraded v5 game replays deterministically', () => {
+    const v5 = JSON.parse(JSON.stringify({ ...midGame(), schemaVersion: 5, rng: 42 })) as unknown;
+    const play = () => {
+      let s = upgradeState(JSON.parse(JSON.stringify(v5))) as GameState;
+      const rolls: unknown[] = [];
+      for (let i = 0; i < 200 && s.winner === null; i++) {
+        const [a] = legalActions(s);
+        if (!a) break;
+        s = expectOk(applyAction(s, a));
+        if (a.type === 'rollDice') rolls.push(s.dice);
+      }
+      return { rolls, state: s };
+    };
+    const a = play();
+    expect(a.rolls.length).toBeGreaterThan(0);
+    expect(play()).toEqual(a);
+  });
+
+  it('rejects a bad rng: v5 needs a uint32, v6 four of them', () => {
+    const s = freshGame();
+    expect(upgradeState({ ...s, schemaVersion: 5 })).toBeNull(); // a v6 tuple labelled v5
+    expect(upgradeState({ ...s, schemaVersion: 5, rng: 1.5 })).toBeNull();
+    expect(upgradeState({ ...s, schemaVersion: 4, rng: '7' })).toBeNull();
+    expect(upgradeState({ ...s, rng: 7 })).toBeNull(); // a uint32 labelled v6
+    expect(upgradeState({ ...s, rng: [1, 2, 3] })).toBeNull();
+    expect(upgradeState({ ...s, rng: [1, 2, 3, -4] })).toBeNull();
   });
 });

@@ -77,7 +77,7 @@ function scramble(state: GameState, viewer: Viewer, rng: Rng): GameState {
     devDeck: rng.shuffle(state.devDeck.map(() => rng.pick(DEV_CARD_TYPES))),
     diceDeck: state.diceDeck.map(() => rng.int(36)),
     ...(state.eventDeck ? { eventDeck: state.eventDeck.map(() => rng.int(36)) } : {}),
-    rng: rng.int(2 ** 32),
+    rng: new Rng(rng.nextU32()).state,
     // Stats (stolen card types, dev cards bought, hidden VP history) are secret until game over.
     ...(revealAll ? {} : { stats: emptyStats(state.players.length, false, rng.int(99)) }),
     log: state.log.map((e) => {
@@ -135,7 +135,7 @@ describe('online views leak nothing (property test over simulated games)', () =>
           const v = viewFor(state, viewer);
 
           // No secret fields.
-          expect(v.rng).toBe(0);
+          expect(v.rng).toEqual([0, 0, 0, 0]);
           expect(v.settings.seed).toBe(HIDDEN_SEED);
           expect(v.devDeck.every((c) => c === HIDDEN_DEV_CARD)).toBe(true);
           expect(v.diceDeck.every((c) => c === 0)).toBe(true);

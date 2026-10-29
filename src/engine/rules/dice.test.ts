@@ -68,7 +68,7 @@ describe('balanced dice', () => {
     const { reshuffled } = rollTwoDice(draft);
     expect(reshuffled).toBe(true);
     expect(draft.diceDeck).toHaveLength(35);
-    expect(draft.rng).not.toBe(s.rng);
+    expect(draft.rng).not.toEqual(s.rng);
   });
 
   it(`reshuffles exactly when ${DICE_DECK_RESHUFFLE_AT} or fewer cards remain (every ${CYCLE} rolls)`, () => {
@@ -162,9 +162,9 @@ describe('balanced dice: save / load', () => {
   it('a v2 save gets an empty deck; its next balanced roll shuffles a fresh one', () => {
     const s = game(true);
     const { diceDeck: _drop, ...rest } = s;
-    const v2 = { ...rest, schemaVersion: 2 };
+    const v2 = { ...rest, schemaVersion: 2, rng: 99 }; // a uint32 before schema v6
     const up = upgradeState(JSON.parse(JSON.stringify(v2)))!;
-    expect(up.schemaVersion).toBe(5);
+    expect(up.schemaVersion).toBe(6);
     expect(up.diceDeck).toEqual([]);
     const draft = structuredClone(up);
     expect(rollTwoDice(draft).reshuffled).toBe(true);
