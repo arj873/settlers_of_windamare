@@ -380,6 +380,14 @@ Bots read the full state (the random bot ignores hands anyway); a smarter bot mu
 - Known leaks by design (public in the physical game): hand sizes, dev card counts, discards,
   traded cards, monopoly/YoP takes. The steal log hides the card; only thief and victim can
   infer it from their own hands.
+- **Client page**: `index.html` carries a Content-Security-Policy meta tag. Scripts, styles,
+  fonts, workers and sockets may only come from the page's own origin (images, fonts and media
+  may also be inline `data:`; images and workers also `blob:`); no plugins, `<base>`, form targets
+  or frames. The UI never puts untrusted strings into HTML (`h()` makes text nodes), and the CSP
+  caps what a future regression could do. No `'unsafe-eval'`: Pixi runs on its eval-free
+  polyfills (`pixi.js/unsafe-eval`, imported first thing in `src/main.ts`). When the Worker is
+  hosted on another origin, build with `VITE_ROOM_SERVER=https://…` so `vite.config.ts` adds it
+  to `connect-src` (ONLINE-CLIENT.md).
 
 ## 13. Protocol (`src/net/protocol.ts`)
 

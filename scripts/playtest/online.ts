@@ -15,6 +15,19 @@ export const LOCAL_ORIGIN = 'http://localhost:8787';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Poll a JS expression (string) until it is truthy. `page.waitForFunction` with a string re-evals
+ * it in the page on every poll, which the page's Content-Security-Policy forbids (no
+ * 'unsafe-eval'); `page.evaluate` runs through DevTools and is allowed.
+ */
+async function waitUntil(page: Page, expr: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await page.evaluate(expr))) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for: ${expr}`);
+    await sleep(100);
+  }
+}
+
 /** Is a room server answering at `origin`? (A missing room is a 404 from the Worker.) */
 export async function serverUp(origin: string): Promise<boolean> {
   try {
@@ -148,10 +161,10 @@ export async function createAndStart(
     `(() => { const c = ${CLIENT}; return c.configure({ ...c.room.config, ...${patch} }); })()`,
   );
   if (sent !== true) throw new Error('The host could not send the table settings.');
-  await host.waitForFunction(
+  await waitUntil(
+    host,
     `${CLIENT}.room.config.seatCount === ${o.total} && ${CLIENT}.room.config.map === ${JSON.stringify(o.map)} && ${CLIENT}.room.config.mode === ${JSON.stringify(x?.mode ?? 'base')}`,
-    null,
-    { timeout: 15_000 },
+    15_000,
   );
 
   for (let seat = 1; seat < o.humans; seat++) {
@@ -164,21 +177,17 @@ export async function createAndStart(
   }
   for (const [seat, p] of pages.entries()) {
     // The lobby seats everyone on joining; only move a player that landed elsewhere.
-    await p.waitForFunction(`${CLIENT}.mySeat !== null`, null, { timeout: 15_000 });
+    await waitUntil(p, `${CLIENT}.mySeat !== null`, 15_000);
     if ((await p.evaluate(`${CLIENT}.mySeat`)) !== seat) {
       await p.waitForSelector(`[data-k="sit-${seat}"]`, { timeout: 15_000 });
       await p.click(`[data-k="sit-${seat}"]`);
-      await p.waitForFunction(`${CLIENT}.mySeat === ${seat}`, null, { timeout: 15_000 });
+      await waitUntil(p, `${CLIENT}.mySeat === ${seat}`, 15_000);
     }
-    await host.waitForFunction(`${CLIENT}.room.seats[${seat}].occupant !== null`, null, {
-      timeout: 15_000,
-    });
+    await waitUntil(host, `${CLIENT}.room.seats[${seat}].occupant !== null`, 15_000);
   }
   await host.click('[data-k="lobby-start"]');
   for (const p of pages) {
-    await p.waitForFunction('window.__catanDebug && window.__catanDebug.state() !== null', null, {
-      timeout: 30_000,
-    });
+    await waitUntil(p, 'window.__catanDebug && window.__catanDebug.state() !== null', 30_000);
   }
   return { code, pages };
 }

@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Content-Security-Policy (docs/MULTIPLAYER.md §12). Scripts, styles, fonts, workers and
+      sockets come from this origin only; a future HTML-injection bug cannot load or run foreign
+      code. 'unsafe-inline' styles: Vite's dev HMR and the SVG icons' style="fill:…" attributes.
+      data: images/fonts/media: inlined assets, avatars and Pixi's format probes. blob: images and
+      workers: the avatar uploader and Pixi's decode workers. When the Worker runs on another
+      origin (VITE_ROOM_SERVER), vite.config.ts adds it to the sockets directive at build time.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Colonizers of Windamere</title>
     <link
