@@ -41,6 +41,19 @@ async function shot(page: Page, name: string): Promise<void> {
 /** The page's RoomClient (main.ts exposes window.catan.online). */
 const clientExpr = '(window.catan && window.catan.online && window.catan.online.roomClient)';
 
+/**
+ * Poll a JS expression (string) until it is truthy. `page.waitForFunction` with a string re-evals
+ * it in the page on every poll, which the page's Content-Security-Policy forbids (no
+ * 'unsafe-eval'); `page.evaluate` runs through DevTools and is allowed.
+ */
+async function waitUntil(page: Page, expr: string, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await page.evaluate(expr))) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for: ${expr}`);
+    await page.waitForTimeout(100);
+  }
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   let server: Awaited<ReturnType<typeof preview>> | null = null;
@@ -298,7 +311,7 @@ async function main() {
     await host.click('[data-k="create"]');
     await host.waitForSelector('.ol-lobby');
     await host.click('.ol-config [data-k="chip-ck"]');
-    await host.waitForFunction(`${clientExpr}.room.config.mode === 'ck'`);
+    await waitUntil(host, `${clientExpr}.room.config.mode === 'ck'`);
     check(true, 'host picked Cities & Knights in the lobby (setup screen expansion chip)');
     const dan = await open(await host.inputValue('[data-k="invite"]'));
     await dan.fill('[data-k="nickname"]', 'Dan');

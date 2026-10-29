@@ -1,4 +1,7 @@
 import { Application } from 'pixi.js';
+// Pixi normally builds shader uniform/UBO sync code with `new Function`; the page's
+// Content-Security-Policy (index.html) has no 'unsafe-eval', so use Pixi's eval-free polyfills.
+import 'pixi.js/unsafe-eval';
 import {
   PLAYER_COLORS,
   createGame,
