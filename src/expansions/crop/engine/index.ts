@@ -27,6 +27,7 @@ import type {
   VertexId,
 } from '../../../engine/types';
 import { CROP_FIRST19, CROP_RANDOM19 } from './maps';
+import { cropMaskFor } from './mask';
 import {
   CROP,
   DEPOSIT,
@@ -682,5 +683,7 @@ export const cropModule: ExpansionModule = {
     },
 
     afterAction,
+
+    maskFor: cropMaskFor,
   },
 };

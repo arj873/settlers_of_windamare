@@ -874,3 +874,34 @@ describe('oil soundness', () => {
     ).toEqual([true, true, true, false, false]);
   });
 });
+
+describe('Oil Springs: the legal list leaks no hidden hands', () => {
+  it("an opponent's resource types do not change the mover's legal list", () => {
+    const a = mainGame(3);
+    oilSlice(a).oil[0] = 1;
+    oilSlice(a).oil[1] = 1;
+    const b = structuredClone(a);
+    setHand(a, 1, { brick: 3 });
+    setHand(b, 1, { ore: 3 });
+    expect(legalActions(b, 0)).toEqual(legalActions(a, 0));
+  });
+
+  it('offers to a partner who cannot pay are declinable, not acceptable', () => {
+    const s = mainGame(3);
+    oilSlice(s).oil[0] = 1;
+    setHand(s, 1, { brick: 1 });
+    const offered = expectOk(
+      applyAction(s, {
+        type: 'oil/offerTrade',
+        player: 0,
+        to: 1,
+        giveOil: 1,
+        wantOil: 0,
+        give: {},
+        want: { ore: 1 },
+      } as Action),
+    );
+    expectFail(applyAction(offered, { type: 'oil/acceptTrade', player: 1 } as Action));
+    expectOk(applyAction(offered, { type: 'oil/rejectTrade', player: 1 } as Action));
+  });
+});
