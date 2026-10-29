@@ -41,10 +41,16 @@ export function measureHudInsets(
   const floating =
     sideEl !== null && getComputedStyle(sideEl).getPropertyValue('--floating').trim() === '1';
   const sideLeft = side && !floating ? side.left : width;
+  // The tutorial coach panel (src/ui/tutorial): a left column, or a band on top on phones.
+  const coach = rectOf(root, '.tut-panel');
+  const coachEl = root.querySelector('.tut-panel');
+  const coachDock =
+    coach && coachEl ? getComputedStyle(coachEl).getPropertyValue('--coach-dock').trim() : '';
+  const coachTop = coach && coachDock === 'top' ? coach.bottom + 6 : 0;
   return {
     insets: {
-      top: clampTo(turn ? turn.bottom : 0, height),
-      left: 0,
+      top: clampTo(Math.max(turn ? turn.bottom : 0, coachTop), height),
+      left: coach && coachDock === 'left' ? clampTo(coach.right + 8, width) : 0,
       right: clampTo(width - sideLeft, width),
       bottom: clampTo(Math.max(height - bottom.top, controls ? height - controls.top : 0), height),
     },
