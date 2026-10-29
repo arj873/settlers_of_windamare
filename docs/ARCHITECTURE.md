@@ -613,7 +613,8 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   backdrop blur). Auto turns it on for weak hardware (`weakHardware`: ≤ 2 GB, ≤ 2 cores, or 4
   cores with ≤ 4 GB) or once `probeFrameRate` finds the board slow (remembered in
   `catan.performance.slow`; not under `navigator.webdriver`). Reduced motion also holds the
-  board still. High quality looks exactly like the game did before.
+  board still. High quality looks exactly like the game did before. Numbers, method and
+  screenshots: `docs/PERF.md` (`scripts/perf/measure.mjs`).
 - HUD rendering (s17): `patchChildren` (`ui/dom.ts`) keeps the DOM that did not change instead of
   replacing every panel on each render; the Game Events list (`LogList`, `ui/sidebar.ts`) stays
   on screen and rebuilds only changed turn groups. A kept element keeps its listeners, so a
