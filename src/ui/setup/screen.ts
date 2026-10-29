@@ -96,6 +96,8 @@ export interface SetupScreenOptions {
   onStart: (cfg: NewGameConfig) => void;
   /** Present when there is a game to go back to. */
   onBack?: () => void;
+  /** "Learn to play" (src/ui/tutorial): starts the tutorial game instead. Absent = no button. */
+  onTutorial?: () => void;
   /** Where the last-used settings live. Default: localStorage (null = don't remember). */
   storage?: SetupStorage | null;
   /** Also offer 'wip' / 'demo' modes. Default: the page URL has ?modes=all. */
@@ -260,6 +262,18 @@ export class SetupScreen {
           h('h1', {}, 'New game'),
           h('p', { class: 'muted' }, 'Colonizers of Windamere'),
         ),
+        this.opts.onTutorial &&
+          h(
+            'button',
+            {
+              class: 'btn su-learn',
+              title: 'A guided first game against two easy bots that teaches the rules',
+              attrs: { 'data-k': 'learn' },
+              on: { click: () => this.opts.onTutorial?.() },
+            },
+            h('span', { class: 'su-learn-q', attrs: { 'aria-hidden': 'true' } }, '?'),
+            h('span', {}, h('b', {}, 'Learn to play'), h('small', {}, 'New here? Start with this')),
+          ),
       ),
       this.modeSection(),
       this.mapSection(),

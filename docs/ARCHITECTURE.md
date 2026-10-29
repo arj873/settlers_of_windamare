@@ -580,6 +580,7 @@ hud.on('placeMode', (m: PlaceMode|null) => …);                // 'road'|'settl
 hud.showNewGame();                                            // open the new-game screen (also the winner screen's button)
 hud.isCovered();                                              // hotseat cover or new-game screen up (controller pauses the turn timer)
 hud.setTurnTimer({ remainingSec, totalSec } | null);          // between renders: redraws only the turn pill (T14)
+hud.setLearnToPlay(() => … | null);                           // hotseat: "Learn to play" in the menu (asks first while a game runs) and on the setup screen (§13e)
 ```
 
 - Turn pill (T14): the timer badge goes red and pulses, and the pill glows red, for the last
@@ -780,7 +781,7 @@ c.destroy();
   `?autoplay=4bots` (3–8 bots), `?hl=`, `?names=A,B,C` (names for param games), `?timer=20` (turn
   timer in s, also on fixtures), `?first=0` (starting seat), `?mode=demo` (F1: start an expansion
   mode), `?modes=all` (setup screen also offers wip / demo modes), `?sfx=1` (sound audition
-  panel, §13d), `?mute=1` (no sound). `window.catan` = `{ controller, board, hud }`.
+  panel, §13d), `?mute=1` (no sound). `window.catan` = `{ controller, board, hud, tutorial }`.
 - Playtest hook (`game/debug.ts`, only with `?debug=1`): read-only `window.__catanDebug` =
   `{ state(), legal(player?), viewer(), boardTargets(), screenPos(id), consoleErrors() }`.
   `screenPos` comes from `BoardView.screenPos(id)` (page CSS px). Used by `scripts/playtest`
@@ -864,6 +865,35 @@ seats)` after each render, `timer(remainingSec, mine)` when the shown second cha
   AudioContext, so nothing plays there.
 - **Audition:** `?sfx=1` adds a panel (`ui/sfxPanel.ts`) with a button per registered sound
   (base + modules), the level (you / others / bots), Play all and the volume control.
+
+## 13e. Learn to play (`src/ui/tutorial`, s16)
+
+A coach panel over a **normal** hotseat game; the engine and the controller are unchanged.
+
+- Game (`game.ts`): base game, beginner map, 10 VP, you (seat 0, places and plays first) + 2
+  Easy bots, fixed seed `learn-34` (`isTutorialGame(state)`). Nothing is rigged: the seed was
+  searched so the first roll is an 8, the learner rolls a 7 on their second turn and can usually
+  build / buy a card early. The rolls stay on that script until the first robber steal.
+- Lessons (`lessons.ts`, pure): `when(ctx)` (its moment), `doneWhen` (closes by itself: the
+  player did it / the moment passed), `stale` (skipped silently), `after` (order), `urgent`
+  (pushes a reading lesson aside), `recap` (event lessons: shown as a recap before the end if
+  their event never came up), `todo` (live "your move" line), `focus` (HUD element). Texts read
+  `settings.vpToWin` / `discardLimit`.
+- Progress (`machine.ts`, pure, saved): `TutorialRun` + `advance` (after every render), `next`,
+  `back`, `skip`, `panelView`. Wrap-up (`wrapUp`): game over, every event lesson done, or the
+  learner's 7th turn → recaps, then "You're ready".
+- `TutorialCoach` (`coach.ts`): `begin()` starts the game through `CoachHost.start`, `update()`
+  runs in the controller's `onRender` (before `fitBoard`). It draws `.tut-panel` inside the HUD
+  root (hidden with the covers), sets `data-tut-focus` on the HUD root (tutorial.css pulses
+  that element), and asks `CoachHost.pace(900)` for slower bots (null = the player's speed). A
+  different game on screen drops the run. `game/layout.ts` keeps the board clear of the panel
+  (`--coach-dock`: `left` column on wide screens, `top` band on phones, `none` when collapsed).
+- Storage: `localStorage['catan:tutorial:v1']` = `{ completed, offered, run }` (try/catch). A
+  reload resumes through the normal resume prompt ("Unfinished tutorial game …").
+- Entry: setup screen button (`SetupScreenOptions.onTutorial`), menu item
+  (`Hud.setLearnToPlay`), and once on a first visit a dismissible card over the home screen
+  (`offerTutorial`; not for players with a save or setup settings).
+- Screenshots: `node scripts/shots-tutorial.mjs <devUrl> <outDir>` (desktop + phone).
 
 ## 14. Decisions and open questions
 

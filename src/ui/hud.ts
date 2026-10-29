@@ -175,6 +175,10 @@ export class Hud {
   private buildConfirm: BuildConfirmControl | null = null;
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
+  /** "Learn to play" (src/ui/tutorial) in the menu and on the setup screen (null hides it). */
+  private learnToPlay: (() => void) | null = null;
+  /** The menu asks before leaving a running game for the tutorial. */
+  private learnAsk = false;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
   private chatSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
@@ -251,6 +255,12 @@ export class Hud {
   /** Online play: menu / winner-screen actions instead of "New game" (null = hotseat). */
   setSessionActions(actions: SessionAction[] | null): void {
     this.sessionActions = actions;
+    this.refresh();
+  }
+
+  /** Hotseat: offer "Learn to play" in the menu and on the setup screen (null hides it). */
+  setLearnToPlay(start: (() => void) | null): void {
+    this.learnToPlay = start;
     this.refresh();
   }
 
@@ -594,7 +604,10 @@ export class Hud {
       },
       glyph('menu', 22),
     );
-    if (!this.menuOpen) return [toggle];
+    if (!this.menuOpen) {
+      this.learnAsk = false;
+      return [toggle];
+    }
     const speed = this.botSpeed;
     const showSpeed = speed !== null && (view.bots?.some(Boolean) ?? true);
     return [
@@ -620,6 +633,7 @@ export class Hud {
               a.label,
             ),
         ),
+        this.sessionActions === null && this.learnMenuItem(),
         showSpeed &&
           h(
             'div',
@@ -667,6 +681,58 @@ export class Hud {
         ),
       ),
     ];
+  }
+
+  /** "Learn to play": starts the tutorial game; asks first while a game is running. */
+  private learnMenuItem(): HTMLElement | null {
+    const start = this.learnToPlay;
+    if (!start) return null;
+    const go = () => {
+      this.menuOpen = false;
+      this.refresh();
+      start();
+    };
+    if (!this.learnAsk) {
+      const running = this.state !== null && this.state.phase.kind !== 'gameOver';
+      return h(
+        'button',
+        {
+          class: 'menu-item',
+          attrs: { role: 'menuitem', 'data-k': 'learn-to-play' },
+          on: {
+            click: () => {
+              if (!running) return go();
+              this.learnAsk = true;
+              this.refresh();
+            },
+          },
+        },
+        'Learn to play',
+      );
+    }
+    return h(
+      'div',
+      { class: 'menu-sec', attrs: { 'data-k': 'learn-ask' } },
+      h('div', { class: 'menu-label' }, 'Leave this game and start the tutorial?'),
+      h(
+        'div',
+        { class: 'seg' },
+        h(
+          'button',
+          {
+            class: 'seg-btn',
+            on: {
+              click: () => {
+                this.learnAsk = false;
+                this.refresh();
+              },
+            },
+          },
+          'Cancel',
+        ),
+        h('button', { class: 'seg-btn is-on', on: { click: go } }, 'Start tutorial'),
+      ),
+    );
   }
 
   /** #51: Off / On for outlining the Longest Road holder's route on the board. */
@@ -2164,8 +2230,20 @@ export class Hud {
   }
 
   private newSetupScreen(): SetupScreen {
+    const learn = this.learnToPlay;
     return new SetupScreen({
       onBack: this.state ? () => this.hideNewGame() : undefined,
+      onTutorial: learn
+        ? () => {
+            this.newGameOpen = false;
+            this.setup = null;
+            this.unlockedViewer = null;
+            this.state = null;
+            this.view = null;
+            this.refresh();
+            learn();
+          }
+        : undefined,
       onStart: (cfg) => {
         this.newGameOpen = false;
         this.setup = null;

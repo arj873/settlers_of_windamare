@@ -39,6 +39,47 @@
   filter: drop-shadow(0 0 14px var(--accent-glow));
   display: grid;
 }
+/* "Learn to play" (src/ui/tutorial): top right of the header. */
+.su-learn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 8px;
+  text-align: left;
+}
+.su-learn-q {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 18px;
+}
+.su-learn b,
+.su-learn small {
+  display: block;
+}
+.su-learn b {
+  font-size: 15px;
+}
+.su-learn small {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+@media (max-width: 600px) {
+  .su-head {
+    flex-wrap: wrap;
+  }
+  .su-learn {
+    margin-left: 0;
+    width: 100%;
+  }
+}
 .su-ico {
   display: inline-grid;
   place-items: center;
