@@ -160,14 +160,27 @@ async function boot() {
   // Production cards (issue #29) fly from the hexes: hotseat and online share the HUD.
   hud.setHexLocator((id) => board.screenPos(id));
 
+  // Measure the HUD once per frame, in the frame (s17): measuring right after each render forced
+  // a second layout of the whole page per move. A change redraws the board in the same frame.
+  let fitQueued = false;
+  let fitKey = '';
   const fitBoard = () => {
-    const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
-    if (layout) board.setInsets(layout.insets, layout.avoid);
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => {
+      fitQueued = false;
+      const layout = measureHudInsets(uiRoot, window.innerWidth, window.innerHeight);
+      const key = JSON.stringify(layout);
+      if (!layout || key === fitKey) return;
+      fitKey = key;
+      board.setInsets(layout.insets, layout.avoid);
+      if (app.ticker.started) app.ticker.update();
+    });
   };
   uiRoot.after(createFitButton(() => board.fit()));
   window.addEventListener('resize', fitBoard);
   // The HUD re-renders on its own (cover dismissed, dialogs): re-measure after clicks too.
-  uiRoot.addEventListener('click', () => requestAnimationFrame(fitBoard));
+  uiRoot.addEventListener('click', fitBoard);
 
   // Online play (M3): `?room=CODE` joins a room; otherwise the home screen picks a mode.
   const online = (roomId: string, then: (app: OnlineApp) => void = (app) => void app.run()) => {

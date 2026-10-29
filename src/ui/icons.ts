@@ -3,6 +3,24 @@ import { RESOURCE_NAME, type DevCardType, type Resource } from '../engine';
 
 export const RESOURCE_LABEL: Record<Resource, string> = RESOURCE_NAME;
 
+const parsed = new Map<string, Node>();
+
+/**
+ * A fresh copy of static SVG markup, parsed once per `key` and cloned after that. The HUD
+ * rebuilds its icons on every render; parsing the markup each time was a large part of a render
+ * on slow phones (s17).
+ */
+export function staticSvg(key: string, markup: () => string): Node {
+  let node = parsed.get(key);
+  if (!node) {
+    const t = document.createElement('template');
+    t.innerHTML = markup();
+    node = t.content;
+    parsed.set(key, node);
+  }
+  return node.cloneNode(true);
+}
+
 const SVG: Record<Resource, string> = {
   brick: `<rect x="3" y="7" width="26" height="18" rx="2.5" fill="#c4532d"/>
     <path d="M3 13h26M3 19h26M12 7v6M22 13v6M12 19v6" stroke="#f3cdb8" stroke-width="1.6" fill="none"/>`,
@@ -38,7 +56,13 @@ export function resourceIcon(resource: Resource, size = 28): HTMLSpanElement {
   span.style.width = span.style.height = `${size}px`;
   span.setAttribute('role', 'img');
   span.setAttribute('aria-label', RESOURCE_LABEL[resource]);
-  span.innerHTML = `<svg viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true">${SVG[resource]}</svg>`;
+  span.append(
+    staticSvg(
+      `res:${resource}:${size}`,
+      () =>
+        `<svg viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true">${SVG[resource]}</svg>`,
+    ),
+  );
   return span;
 }
 
@@ -171,7 +195,12 @@ export function glyph(name: GlyphName, size = 20, label?: string): HTMLSpanEleme
     span.setAttribute('role', 'img');
     span.setAttribute('aria-label', label);
   } else span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = `<svg viewBox="0 0 32 32" width="${size}" height="${size}">${GLYPH[name]}</svg>`;
+  span.append(
+    staticSvg(
+      `glyph:${name}:${size}`,
+      () => `<svg viewBox="0 0 32 32" width="${size}" height="${size}">${GLYPH[name]}</svg>`,
+    ),
+  );
   return span;
 }
 
