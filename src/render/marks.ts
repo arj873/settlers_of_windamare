@@ -65,6 +65,9 @@ export function markFrame(t: number, soft: boolean): { rings: MarkRing[]; glow: 
   };
 }
 
+/** s17: a board without motion (low power, reduced motion) shows a mark as this one frame. */
+export const STILL_MARK_T = 0.25;
+
 /**
  * More new sites than this at once is a different position (a loaded game, a new board), not a
  * build: no marks then.

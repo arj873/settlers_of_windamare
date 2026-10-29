@@ -54,10 +54,11 @@ import {
   type PickCandidates,
   type ViewTransform,
 } from './geometry';
-import { FrameScheduler } from './frames';
+import { FrameRateProbe, FrameScheduler } from './frames';
 import {
   MAX_LIVE_MARKS,
   MAX_RECAP_MARKS,
+  STILL_MARK_T,
   markFrame,
   newSites,
   type PieceSite,
@@ -101,6 +102,8 @@ interface Glow {
 interface Mark {
   g: Graphics;
   t0: number;
+  /** Wall clock at the start (ms): a still board (`setStill`) times its marks with it. */
+  wall0: number;
   color: number;
   /** Ring radius at rest, design px. */
   r: number;
@@ -139,6 +142,7 @@ function label(
 
 const devicePixelRatio = () =>
   typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+const wallClock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 const easeOutBack = (t: number) => {
   const c1 = 1.70158;
@@ -212,6 +216,13 @@ export class BoardView {
   private clock = 0;
   /** False: animations jump to their end and glows hold still (headless playtest pages). */
   private animated = true;
+  /** s17 low power / reduced motion: like `animated` false, but just-built marks stay (still). */
+  private still = false;
+  /** s17 low power: the highest renderer resolution (Infinity: the device pixel ratio). */
+  private maxResolution = Infinity;
+  /** s17 "Performance: Auto": measures animated frames until it decides (`probeFrameRate`). */
+  private probe: { rate: FrameRateProbe; done: (slow: boolean) => void } | null = null;
+  private lastFrameMoved = false;
   private readonly frames: FrameScheduler;
   private readonly onResize = () => {
     this.resize();
@@ -219,9 +230,20 @@ export class BoardView {
     this.frames.invalidate();
   };
   private readonly tick = (ticker: { deltaMS: number }) => {
+    // Only back-to-back animated frames measure the frame rate (not the gap after an idle spell).
+    if (this.probe && this.lastFrameMoved) {
+      const verdict = this.probe.rate.add(ticker.deltaMS);
+      if (verdict) {
+        const { done } = this.probe;
+        this.probe = null;
+        done(verdict === 'slow');
+      }
+    }
     Ticker.system.update();
+    // A still board keeps its clock (the text re-raster still waits for the zoom to settle).
     this.update(this.animated ? ticker.deltaMS : 1e6);
-    this.frames.endFrame(this.animated && this.animating());
+    this.lastFrameMoved = this.animated && this.animating();
+    this.frames.endFrame(this.lastFrameMoved);
   };
 
   constructor(private readonly app: Application) {
@@ -373,6 +395,30 @@ export class BoardView {
     this.frames.invalidate();
   }
 
+  /**
+   * s17 low power or reduced motion: no motion. Glows hold still, pop-ins and robber travel jump
+   * to their end, a just-built mark shows as one still ring for its usual time. The board then
+   * draws a frame only when something changes.
+   */
+  setStill(on: boolean): void {
+    this.still = on;
+    this.frames.invalidate();
+  }
+
+  /** s17 low power: draw at most at this resolution (device px per CSS px); null = no cap. */
+  setMaxResolution(max: number | null): void {
+    this.maxResolution = max ?? Infinity;
+    this.syncResolution();
+  }
+
+  /**
+   * s17 "Performance: Auto": time the board's animated frames (glows, pop-ins) and call `done`
+   * once, with whether they were slow (median under ~35 fps). Nothing is measured while still.
+   */
+  probeFrameRate(done: (slow: boolean) => void): void {
+    this.probe = { rate: new FrameRateProbe(), done };
+  }
+
   on<K extends keyof BoardEvents>(type: K, cb: Listener<K>): () => void {
     const set = this.listeners.get(type) ?? new Set<Listener<never>>();
     this.listeners.set(type, set);
@@ -522,22 +568,27 @@ export class BoardView {
    */
   private watchPixelRatio() {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const sync = () => {
-      const dpr = devicePixelRatio();
-      const { width, height } = this.app.screen;
-      if (this.app.renderer.resolution !== dpr) this.app.renderer.resize(width, height, dpr);
-    };
     const arm = () => {
       const mq = window.matchMedia(`(resolution: ${devicePixelRatio()}dppx)`);
       const onChange = () => {
-        sync();
+        this.syncResolution();
         arm();
       };
       mq.addEventListener('change', onChange, { once: true });
       this.unwatchDpr = () => mq.removeEventListener('change', onChange);
     };
-    sync();
+    this.syncResolution();
     arm();
+  }
+
+  /** The renderer at the device pixel ratio, or at the low-power cap (s17) if that is lower. */
+  private syncResolution() {
+    const res = Math.min(devicePixelRatio(), this.maxResolution);
+    if (this.app.renderer.resolution === res) return;
+    const { width, height } = this.app.screen;
+    this.app.renderer.resize(width, height, res);
+    this.wantTextRes = this.textResFor(this.viewport.view.scale);
+    this.frames.invalidate();
   }
 
   // -------------------------------------------------------------------------
@@ -939,8 +990,10 @@ export class BoardView {
     const css = this.shown?.players[site.owner]?.color ?? '#ffffff';
     const color = new Color(css).toNumber();
     const r = (site.kind === 'road' || /ship/.test(site.kind) ? 0.36 : 0.42) * S;
-    this.marks.push({ g, t0: this.clock, color, r, soft });
+    this.marks.push({ g, t0: this.clock, wall0: wallClock(), color, r, soft });
     this.frames.invalidate();
+    // A still board draws no frames meanwhile: come back to take the mark away.
+    if (this.still) setTimeout(() => this.frames.invalidate(), soft ? RECAP_MS : MARK_MS);
   }
 
   private syncRobber(state: GameState) {
@@ -1069,6 +1122,7 @@ export class BoardView {
 
   /** Whether the next frame differs from this one with no further change. */
   private animating(): boolean {
+    if (this.still) return this.wantTextRes !== this.textRes;
     const r = this.robberPos;
     const t = this.robberTarget;
     return (
@@ -1085,7 +1139,8 @@ export class BoardView {
     if (this.wantTextRes !== this.textRes && this.clock - this.viewChangedAt >= RETEXT_DELAY) {
       this.retext();
     }
-    const pulse = this.animated ? 0.5 + 0.5 * Math.sin(this.clock / 260) : 1;
+    const moving = this.animated && !this.still;
+    const pulse = moving ? 0.5 + 0.5 * Math.sin(this.clock / 260) : 1;
     for (const g of this.glows) {
       g.glow.alpha = 0.55 + 0.45 * pulse;
       if (g.kind !== 'hex') g.node.scale.set(1 + 0.12 * pulse);
@@ -1093,7 +1148,7 @@ export class BoardView {
 
     if (this.pops.length > 0) {
       this.pops = this.pops.filter((p) => {
-        const t = Math.min(1, (this.clock - p.t0) / 280);
+        const t = moving ? Math.min(1, (this.clock - p.t0) / 280) : 1;
         if (p.node.destroyed) return false;
         p.node.scale.set(0.2 + 0.8 * easeOutBack(t));
         if (t >= 1) p.node.scale.set(1);
@@ -1103,7 +1158,13 @@ export class BoardView {
 
     if (this.marks.length > 0) {
       this.marks = this.marks.filter((m) => {
-        const t = (this.clock - m.t0) / (m.soft ? RECAP_MS : MARK_MS);
+        const life = m.soft ? RECAP_MS : MARK_MS;
+        // Still board: one frame of the rings until the mark's time is up (wall clock).
+        const t = this.still
+          ? wallClock() - m.wall0 >= life
+            ? 1
+            : STILL_MARK_T
+          : (this.clock - m.t0) / life;
         const { rings, glow } = markFrame(t, m.soft);
         m.g.clear();
         if (t >= 1) {
@@ -1123,7 +1184,7 @@ export class BoardView {
 
     const pos = this.robberPos;
     if (pos) {
-      const k = 1 - Math.exp(-dtMs / 55);
+      const k = moving ? 1 - Math.exp(-dtMs / 55) : 1;
       pos.x += (this.robberTarget.x - pos.x) * k;
       pos.y += (this.robberTarget.y - pos.y) * k;
       if (Math.hypot(this.robberTarget.x - pos.x, this.robberTarget.y - pos.y) < 0.3) {

@@ -61,6 +61,7 @@ import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
 import { loadAnimations, saveAnimations } from './motion';
+import { isLowPower, POWER_LABEL, POWER_SETTINGS, powerSetting, setPowerSetting } from './power';
 import { ProductionFx, type HexLocator } from './production/fx';
 import { soundControl } from './sound';
 import { feedbackMenuItems } from './feedback';
@@ -678,6 +679,7 @@ export class Hud {
             ),
           ),
         this.animationsToggle(),
+        this.powerToggle(),
         this.buildConfirmSec(),
         this.longestRoadMenu(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
@@ -810,6 +812,42 @@ export class Hud {
               },
             },
             v ? 'On' : 'Off',
+          ),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * s17: Performance Auto / High quality / Low power (ui/power.ts, saved like the theme). The
+   * page applies it at once (main wiring in app.ts); Auto's tooltip says what it picked.
+   */
+  private powerToggle(): HTMLElement {
+    const current = powerSetting();
+    const auto = `Auto: ${isLowPower() ? 'low power' : 'high quality'} on this device`;
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Performance'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Performance' } },
+        ...POWER_SETTINGS.map((v) =>
+          h(
+            'button',
+            {
+              class: `seg-btn${v === current ? ' is-on' : ''}`,
+              ...(v === 'auto' ? { title: auto } : {}),
+              attrs: { 'aria-pressed': String(v === current), 'data-power': v },
+              on: {
+                click: () => {
+                  setPowerSetting(v);
+                  if (isLowPower()) this.fx.clear();
+                  this.refresh();
+                },
+              },
+            },
+            POWER_LABEL[v],
           ),
         ),
       ),

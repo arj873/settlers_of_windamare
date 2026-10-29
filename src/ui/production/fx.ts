@@ -11,6 +11,7 @@ import { isResource, type GameState, type HexId, type PlayerId } from '../../eng
 import { h } from '../dom';
 import { hudExtensionsFor } from '../expansions';
 import { loadAnimations, prefersReducedMotion } from '../motion';
+import { isLowPower } from '../power';
 import type { HudView } from '../types';
 import { resCardFace } from '../widgets';
 import { Coalescer, FLIGHT_MS, productionPlan, timeline, type ProductionPlan } from './plan';
@@ -32,7 +33,7 @@ const BADGE_CARD_W = 15;
 export interface ProductionFxOptions {
   /** Clock in ms (default performance.now). */
   now?: () => number;
-  /** Flying is allowed (default: the Animations setting and no reduced-motion request). */
+  /** Flying is allowed (default: the Animations setting, no reduced motion, not low power). */
   motion?: () => boolean;
 }
 
@@ -51,7 +52,9 @@ export class ProductionFx {
     opts: ProductionFxOptions = {},
   ) {
     this.now = opts.now ?? (() => performance.now());
-    this.motion = opts.motion ?? (() => loadAnimations() && !prefersReducedMotion());
+    // Low power (s17): badges only, like Animations off.
+    this.motion =
+      opts.motion ?? (() => loadAnimations() && !prefersReducedMotion() && !isLowPower());
     this.layer = h('div', { class: 'prod-fx', attrs: { 'aria-hidden': 'true' } });
     root.append(this.layer);
   }

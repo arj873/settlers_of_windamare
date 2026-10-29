@@ -30,6 +30,14 @@ import { showNotice } from './game/noticeView';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import { SpotPrompt } from './ui/spotPrompt';
+import { prefersReducedMotion } from './ui/motion';
+import {
+  LOW_POWER_RESOLUTION,
+  initPower,
+  isLowPower,
+  onPowerChange,
+  reportSlowDevice,
+} from './ui/power';
 import { STORAGE_KEY as SETUP_KEY } from './ui/setup/model';
 import { TutorialCoach, isTutorialGame, offerTutorial } from './ui/tutorial';
 import {
@@ -125,19 +133,27 @@ export async function bootGame(): Promise<GameApp> {
   const sounds = new GameSounds({ play: (id, g) => sfx.play(id, g), extensions: extensionSounds });
   if (new URLSearchParams(location.search).get('sfx') === '1') document.body.append(sfxPanel());
 
+  // Performance (s17, ui/power.ts): low power skips antialiasing (fixed for the page's life) and
+  // caps the resolution; Auto decides from the hardware and, below, from the board's frames.
+  initPower();
+  const lowAtStart = isLowPower();
   const app = new Application();
   await app.init({
     // Transparent: the page background (a theme token) shows around the board.
     backgroundAlpha: 0,
     resizeTo: window,
-    antialias: true,
-    resolution: window.devicePixelRatio || 1,
+    antialias: !lowAtStart,
+    resolution: Math.min(
+      window.devicePixelRatio || 1,
+      lowAtStart ? LOW_POWER_RESOLUTION : Infinity,
+    ),
     autoDensity: true,
     preference: 'webgl',
   });
   document.getElementById('app')?.appendChild(app.canvas);
 
   const board = new BoardView(app);
+  wirePower(board);
   // PR1: piece-style previews in the profile dialogs; seat looks onto the board and the HUD.
   setStylePreview((style, color) => pieceStylePreview(style, color));
   const applyLooks = (looks: readonly SeatLook[]) => {
@@ -281,6 +297,27 @@ export async function bootGame(): Promise<GameApp> {
       return offerTutorial(document.body, prefs, returning, onLearn);
     },
   };
+}
+
+/**
+ * s17: low power and reduced motion hold the board still; low power also caps its resolution.
+ * Auto watches the board's first animated frames and turns low power on if they are slow.
+ */
+function wirePower(board: BoardView): void {
+  const motion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const apply = () => {
+    const low = isLowPower();
+    board.setStill(low || prefersReducedMotion());
+    board.setMaxResolution(low ? LOW_POWER_RESOLUTION : null);
+  };
+  apply();
+  onPowerChange(apply);
+  motion?.addEventListener?.('change', apply);
+  // Not under automation (playtests, e2e, screenshots on a busy machine must look the same).
+  if (navigator.webdriver) return;
+  board.probeFrameRate((slow) => {
+    if (slow) reportSlowDevice();
+  });
 }
 
 /** This page without query parameters (except an explicit `?server=`, kept for dev). */
