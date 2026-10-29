@@ -612,7 +612,9 @@ export const oilLegal: LegalGenerator = (state) => {
       for (const q of state.players) {
         if (q.id === p) continue;
         for (const r of RESOURCES) {
-          if ((s.oil[p] ?? 0) >= 1 && q.resources[r] >= 1 && hasRoom(state, q.id, 1)) {
+          // Never read q.resources here: the legal list is sent to the mover and would leak
+          // which resource types q holds. An unpayable offer is simply declined (or fails at accept).
+          if ((s.oil[p] ?? 0) >= 1 && hasRoom(state, q.id, 1)) {
             push({
               type: 'oil/offerTrade',
               player: p,
