@@ -30,6 +30,8 @@ Data flow: `ui/render/bot -> Action -> game controller -> applyAction(state, act
 Nobody but `applyAction` produces a new GameState (fixtures excepted).
 
 Import from `src/engine` (the barrel `index.ts`). Deep imports are fine inside the engine.
+Exception (s17): code in the home screen's chunk (`src/main.ts` and what it imports statically,
+see §13b "Boot") must not import the barrel; it deep-imports leaf modules (`engine/constants`).
 
 ## 2. IDs and geometry
 
@@ -496,7 +498,7 @@ Each returns a fresh, internally consistent state on the beginner board (map `ba
 | **T4 render**      | `src/render/**` (replace `proofBoard.ts`), board part of `src/main.ts` if needed                                                                                                                               |
 | **T5 bots + sim**  | `src/bots/**` (`index.ts` random bot, `sim.ts`, invariant checks)                                                                                                                                              |
 | T6 UI              | `src/ui/**`                                                                                                                                                                                                    |
-| T7 integration     | `src/game/**`, `src/main.ts`                                                                                                                                                                                   |
+| T7 integration     | `src/game/**`, `src/main.ts`, `src/app.ts`                                                                                                                                                                     |
 | F1 framework       | `src/engine/expansions/**`, `src/engine/mapLookup.ts`, `src/{render,ui,bots}/expansions.ts`, `docs/EXPANSIONS.md`, `src/expansions/demo/**`; expansion agents own `src/expansions/<id>/**` (EXPANSIONS.md §13) |
 
 T2 and T3 can work in parallel without touching each other's files. Small additions to shared T1
@@ -518,6 +520,9 @@ view.isFitted();                          // false once the user panned/zoomed, 
 view.screenPos(id);                       // page CSS px of a vertex/edge/hex id, or null (playtest harness)
 setFrameColors({ frame, frameDark, frameLight }); view.retheme();  // board frame colours (UI theme), redraws the sea only
 view.setAnimated(false);                  // no motion: glows hold still, pop-ins/robber jump to the end (headless playtests)
+view.setStill(true);                      // s17 low power / reduced motion: like setAnimated(false), but just-built marks show as a still ring
+view.setMaxResolution(1.5);               // s17 low power: renderer resolution cap (null = devicePixelRatio)
+view.probeFrameRate((slow) => …);         // s17 Auto: median of the first animated frames, once (render/frames.ts FrameRateProbe)
 view.setPieceStyles(['keep', undefined]); // PR1: piece style id per PlayerId (render/pieceStyles.ts; unknown = classic)
 view.setLongestRoad(show);                // #51: outline the Longest Road holder's counted route (longestRoadPath)
 view.setLongestRoadHover(on);             // #51: stronger outline while the badge is pointed at (shown even when off)
@@ -601,6 +606,21 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other
   place that shows a price.
 
+- Performance (s17, `ui/power.ts`, menu "Performance: Auto / High quality / Low power", saved as
+  `catan.performance`): low power = Pixi without antialiasing (decided at `app.init`, so a change
+  of it applies on the next load) and at most 1.5× resolution, a still board (`setStill`), no
+  flying production cards, and `html.is-low-power` (hud.css: no HUD animations / transitions, no
+  backdrop blur). Auto turns it on for weak hardware (`weakHardware`: ≤ 2 GB, ≤ 2 cores, or 4
+  cores with ≤ 4 GB) or once `probeFrameRate` finds the board slow (remembered in
+  `catan.performance.slow`; not under `navigator.webdriver`). Reduced motion also holds the
+  board still. High quality looks exactly like the game did before. Numbers, method and
+  screenshots: `docs/PERF.md` (`scripts/perf/measure.mjs`).
+- HUD rendering (s17): `patchChildren` (`ui/dom.ts`) keeps the DOM that did not change instead of
+  replacing every panel on each render; the Game Events list (`LogList`, `ui/sidebar.ts`) stays
+  on screen and rebuilds only changed turn groups. A kept element keeps its listeners, so a
+  region whose handlers read state the markup does not show must use `replaceChildren` (the
+  HUD does so for expansion hand bars and panels). Don't read layout (`scrollHeight`,
+  `getBoundingClientRect`) inside a render: read before the first write or in the next frame.
 - Production animation (#29, `ui/production/`): after a roll, cards fly (DOM, Web Animations)
   from each producing hex to the player's row (your own: your hand), then a "+2 wheat" badge
   pops on the row. `plan.ts` (pure, tested) reads the public log ("received" / "caught" / gold
@@ -691,6 +711,15 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   room members (`roomLooks`). main.ts sends looks to `board.setPieceStyles` + `setSeatLooks`.
 
 ## 13b. Game controller (`src/game`, T7)
+
+**Boot (s17).** `src/main.ts` is a small entry: theme, the home screen (`ui/online/home`), the
+profile chip. It imports `src/app.ts` (`bootGame()`: Pixi, board, HUD, hotseat, online wiring)
+dynamically at once, and `vite.config.ts` adds low-priority preload links for that chunk and the
+Pixi renderer, so the home screen paints from ~18 kB gz of JS while the game downloads beside it.
+Dev params and `?room=` wait for the game (`GameApp.direct`). The online client
+(`game/online/app`) is its own chunk. Keep the entry's static imports free of the engine barrel,
+`ui/model`, `net/protocol` and Pixi: anything statically reachable from it is loaded before the
+home screen (`build.rolldownOptions.treeshake` marks our modules side-effect free).
 
 ```ts
 const c = new GameController({ board, hud, storage, speed, toast, onRender });

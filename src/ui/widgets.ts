@@ -2,7 +2,7 @@
 import type { DevCardType, Player, Resource } from '../engine';
 import { h, type Child } from './dom';
 import { DEV_GLYPH, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
-import { DEV_CARD_INFO, inkFor } from './model';
+import { DEV_CARD_INFO, inkFor } from './cards';
 import { avatarPicture, seatAvatar } from './profile/looks';
 
 /** A resource card face (`.rcard-face`); `w` is the card width in px, height follows 5:7. */

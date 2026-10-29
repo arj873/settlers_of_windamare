@@ -1989,6 +1989,18 @@
     transition: none !important;
   }
 }
+/* Low power (s17, ui/power.ts): no decorative motion and no backdrop blur, so the page paints
+   only when something changes (the glowing Roll / End turn button alone repainted every frame). */
+:root.is-low-power .catan-hud *,
+:root.is-low-power .catan-hud *::before,
+:root.is-low-power .catan-hud *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root.is-low-power .scrim.is-modal,
+:root.is-low-power .pf-scrim {
+  backdrop-filter: none;
+}
 
 /* ---- responsive ------------------------------------------------------- */
 /* Short screens (1366×768 and below): tighter rows, smaller hand. */

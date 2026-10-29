@@ -35,7 +35,7 @@ import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { costLabel, costTip, missingCards, type Cost } from './costView';
-import { h, type Child } from './dom';
+import { h, patchChildren, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
   availability,
@@ -56,11 +56,12 @@ import {
   type Availability,
   type BuildKind,
 } from './model';
-import { bankPanel, logList, playersList } from './sidebar';
+import { bankPanel, LogList, playersList } from './sidebar';
 import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
 import { loadAnimations, saveAnimations } from './motion';
+import { isLowPower, POWER_LABEL, POWER_SETTINGS, powerSetting, setPowerSetting } from './power';
 import { ProductionFx, type HexLocator } from './production/fx';
 import { soundControl } from './sound';
 import { feedbackMenuItems } from './feedback';
@@ -82,6 +83,12 @@ type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
 /** Base sections, or `ext:<expansionId>` for an expansion panel. */
 type Section = 'log' | 'bank' | 'players' | 'chat' | `ext:${string}`;
 type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
+/** Game Events scroll position; `stick`: scroll to the newest entry. */
+type LogScroll = { atBottom: boolean; stick: boolean };
+
+/** Run `fn` in the next frame before it is painted (jsdom tests: after this task). */
+const beforePaint = (fn: () => void) =>
+  typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : queueMicrotask(fn);
 
 const BUILD_LABEL: Record<BuildKind, string> = {
   dev: 'Buy card',
@@ -158,6 +165,8 @@ export class Hud {
   private lastPillKey = '';
   private lastDialogKey = '';
   private lastLogLength = -1;
+  /** Log scroll read by a render whose list is not scrolled yet (see `logScroll`). */
+  private pendingLogScroll: LogScroll | null = null;
   private menuOpen = false;
   /** Phone layout: the sidebar is a drawer. */
   private drawerOpen = false;
@@ -181,6 +190,9 @@ export class Hud {
   private learnAsk = false;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
   private chatSec: HTMLElement | null = null;
+  /** Game Events: one list for the HUD's life, updated in place (s17). */
+  private readonly logList = new LogList();
+  private logSec: HTMLElement | null = null;
   /** Disabled build button whose reason was tapped open. */
   /** Build slot whose tooltip a tap / long-press opened (BuildKind or an expansion mode). */
   private whyKind: string | null = null;
@@ -473,6 +485,7 @@ export class Hud {
       this.root.classList.remove('is-covered');
       return;
     }
+    const scroll = this.logScroll(); // before any write
 
     const covered =
       state.phase.kind !== 'gameOver' &&
@@ -493,19 +506,24 @@ export class Hud {
       this.menuOpen &&
       r.menu.contains(document.activeElement) &&
       document.activeElement instanceof HTMLInputElement;
-    if (!sliding) r.menu.replaceChildren(...this.menu(view));
-    r.turn.replaceChildren(...this.turnPill(state, view));
-    this.renderSidebar(state, view);
+    // Unchanged panels stay as they are (s17, `patchChildren`); expansion cards in the hand and
+    // build bars may act on state their markup does not show, so those bars are always fresh.
+    const fresh = hudExtensionsFor(state).length > 0;
+    const put = (region: HTMLElement, nodes: Node[]) =>
+      fresh ? region.replaceChildren(...nodes) : patchChildren(region, nodes);
+    if (!sliding) patchChildren(r.menu, this.menu(view));
+    patchChildren(r.turn, this.turnPill(state, view));
+    this.renderSidebar(state, view, scroll);
     if (view.spectator) {
       // Public info only: no hand, no buttons, no dialogs; the dice stay visible. The build
       // costs stay readable (#35: a read-only bar with the cost tooltips).
-      r.bottom.replaceChildren(this.costBar(state));
-      r.controls.replaceChildren(this.diceBox(state));
+      put(r.bottom, [this.costBar(state)]);
+      patchChildren(r.controls, [this.diceBox(state)]);
       r.dialog.replaceChildren();
       this.lastDialogKey = '';
     } else {
-      r.bottom.replaceChildren(...this.handBar(state, view, av));
-      r.controls.replaceChildren(...this.controls(state, view, av));
+      put(r.bottom, this.handBar(state, view, av));
+      patchChildren(r.controls, this.controls(state, view, av));
       this.renderDialog(state, view, legal);
     }
     // Stats panel: keep the body's scroll position across re-renders of the same tab.
@@ -661,6 +679,7 @@ export class Hud {
             ),
           ),
         this.animationsToggle(),
+        this.powerToggle(),
         this.buildConfirmSec(),
         this.longestRoadMenu(),
         h('div', { class: 'menu-sec' }, h('div', { class: 'menu-label' }, 'Sound'), soundControl()),
@@ -799,6 +818,42 @@ export class Hud {
     );
   }
 
+  /**
+   * s17: Performance Auto / High quality / Low power (ui/power.ts, saved like the theme). The
+   * page applies it at once (main wiring in app.ts); Auto's tooltip says what it picked.
+   */
+  private powerToggle(): HTMLElement {
+    const current = powerSetting();
+    const auto = `Auto: ${isLowPower() ? 'low power' : 'high quality'} on this device`;
+    return h(
+      'div',
+      { class: 'menu-sec' },
+      h('div', { class: 'menu-label' }, 'Performance'),
+      h(
+        'div',
+        { class: 'seg', attrs: { role: 'group', 'aria-label': 'Performance' } },
+        ...POWER_SETTINGS.map((v) =>
+          h(
+            'button',
+            {
+              class: `seg-btn${v === current ? ' is-on' : ''}`,
+              ...(v === 'auto' ? { title: auto } : {}),
+              attrs: { 'aria-pressed': String(v === current), 'data-power': v },
+              on: {
+                click: () => {
+                  setPowerSetting(v);
+                  if (isLowPower()) this.fx.clear();
+                  this.refresh();
+                },
+              },
+            },
+            POWER_LABEL[v],
+          ),
+        ),
+      ),
+    );
+  }
+
   /** Menu: "Confirm before building" On / Off (off: a click on a spot with one build builds). */
   private buildConfirmSec(): HTMLElement | null {
     const c = this.buildConfirm;
@@ -905,30 +960,54 @@ export class Hud {
 
   // --- sidebar ---------------------------------------------------------------
 
-  private renderSidebar(state: GameState, view: HudView): void {
-    const side = this.regions.side;
-    const old = side.querySelector('.log-list');
-    const wasAtBottom = !old || old.scrollTop + old.clientHeight >= old.scrollHeight - 8;
-    const prevTop = old ? old.scrollTop : 0;
+  /**
+   * Whether the Game Events list is scrolled to the newest entry. Read before `refresh` writes
+   * anything: a read after the first write forces a layout of the whole HUD (s17, the biggest
+   * cost of a bot move).
+   */
+  private logScroll(): LogScroll {
+    // Another render before the list was scrolled (same frame): keep the first read.
+    if (this.pendingLogScroll) return this.pendingLogScroll;
+    const old = this.logList.element;
+    if (!old.isConnected) return { atBottom: true, stick: false };
+    return { atBottom: old.scrollTop + old.clientHeight >= old.scrollHeight - 8, stick: false };
+  }
 
-    const list = logList(state, view.viewer);
+  private renderSidebar(state: GameState, view: HudView, scroll: LogScroll): void {
+    const side = this.regions.side;
+    // The log stays on screen and updates in place (s17); the other panels are rebuilt and
+    // swapped in only when their markup changed.
+    this.logList.update(state, view.viewer);
+    const list = this.logList.element;
+    this.logSec ??= this.section('log', list, true);
     side.classList.toggle('is-open', this.drawerOpen);
     const extPanels = hudExtensionsFor(state).flatMap((x) => {
       const p = x.panel?.(state, view, (a) => this.send(a));
       return p ? [this.section(`ext:${x.id}`, p.body, false, p.title)] : [];
     });
-    side.replaceChildren(
-      this.section('log', list),
+    const panels = [
+      this.logSec,
       this.section('bank', bankPanel(state)),
       ...extPanels,
       this.section('players', playersList(state, view)),
-    );
-    if (this.chatSec) side.append(this.chatSec);
+      ...(this.chatSec ? [this.chatSec] : []),
+    ];
+    // Expansion panels may act on state their markup does not show: always fresh.
+    if (extPanels.length > 0) side.replaceChildren(...panels);
+    else patchChildren(side, panels);
     const grew = state.log.length !== this.lastLogLength;
     this.lastLogLength = state.log.length;
-    list.scrollTop = grew && wasAtBottom ? list.scrollHeight : prevTop;
+    // Scroll in the next frame, before it is painted: the frame lays the page out anyway, and
+    // reading `scrollHeight` now would force one more layout of the whole HUD per render.
+    scroll.stick ||= grew && scroll.atBottom;
+    this.pendingLogScroll = scroll;
+    // (Otherwise the list, which stays on screen, keeps its own scroll position.)
+    beforePaint(() => {
+      if (this.pendingLogScroll === scroll) this.pendingLogScroll = null;
+      if (scroll.stick && list.isConnected) list.scrollTop = list.scrollHeight;
+    });
 
-    this.regions.drawer.replaceChildren(
+    patchChildren(this.regions.drawer, [
       h(
         'button',
         {
@@ -944,7 +1023,7 @@ export class Hud {
         },
         glyph(this.drawerOpen ? 'close' : 'cards', 22),
       ),
-    );
+    ]);
   }
 
   /**

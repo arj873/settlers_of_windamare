@@ -2,7 +2,7 @@
 import { longestRoadName, type GameState, type PlayerId } from '../engine';
 import { h, type Child } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL } from './icons';
-import { groupLog, type LogToken } from './log';
+import { groupLog, secretText, type LogGroup, type LogToken } from './log';
 import { bankView, playerSummaries, type PlayerSummary } from './model';
 import type { HudView } from './types';
 import { avatar, devCardFace, miniCards, playerName, playerStyle, resCardFace } from './widgets';
@@ -61,51 +61,100 @@ function rowColor(state: GameState, player: PlayerId | null): Record<string, str
  * meant for them (#32: "You stole 1 wool from Blue"), marked with a lock.
  */
 export function logList(state: GameState, viewer: PlayerId | null = null): HTMLElement {
-  const groups = groupLog(state.log, state.players, viewer);
-  let lastRoll = -1;
-  state.log.forEach((e, i) => {
-    if (/ rolled \d+( \(\d\+\d\))?$/.test(e.text)) lastRoll = i;
+  const list = new LogList();
+  list.update(state, viewer);
+  return list.element;
+}
+
+/**
+ * The Game Events list kept on screen across renders (s17): each update rebuilds only the turn
+ * groups whose entries changed (usually the last one) and leaves the others in place, so a move
+ * no longer re-creates, restyles and lays out up to 200 entries. Same DOM as a fresh `logList`.
+ */
+export class LogList {
+  readonly element = h('div', {
+    class: 'log-list',
+    attrs: { role: 'log', 'aria-live': 'polite' },
   });
+  /** Group element by content key; `game`: what every group's look also depends on. */
+  private groups = new Map<string, HTMLElement>();
+  private game = '';
+
+  update(state: GameState, viewer: PlayerId | null = null): void {
+    const game = JSON.stringify([
+      viewer,
+      state.players.map((p) => [p.name, p.color]),
+      longestRoadName(state),
+    ]);
+    if (game !== this.game) {
+      this.game = game;
+      this.groups.clear();
+    }
+    const log = state.log;
+    const groups = groupLog(log, state.players, viewer);
+    let lastRoll = -1;
+    log.forEach((e, i) => {
+      if (/ rolled \d+( \(\d\+\d\))?$/.test(e.text)) lastRoll = i;
+    });
+    const next = new Map<string, HTMLElement>();
+    const els = groups.map((g, gi) => {
+      const end = groups[gi + 1]?.key ?? log.length;
+      let key = log
+        .slice(g.key, end)
+        .map((e) => `${e.turn}|${e.player}|${e.text}|${secretText(e, viewer) ?? ''}`)
+        .join('\n');
+      // Older logs borrow the latest roll's faces from state.dice.
+      if (lastRoll >= g.key && lastRoll < end) key += `\nd${String(state.dice)}`;
+      while (next.has(key)) key += '\n+'; // two groups with the same entries
+      const el = this.groups.get(key) ?? logGroup(state, g, lastRoll);
+      next.set(key, el);
+      return el;
+    });
+    this.groups = next;
+    const list = this.element;
+    const keep = new Set(els);
+    for (const child of [...list.children]) {
+      if (!keep.has(child as HTMLElement)) child.remove();
+    }
+    els.forEach((el, i) => {
+      if (list.children[i] !== el) list.insertBefore(el, list.children[i] ?? null);
+    });
+  }
+}
+
+function logGroup(state: GameState, g: LogGroup, lastRoll: number): HTMLElement {
   return h(
     'div',
-    { class: 'log-list', attrs: { role: 'log', 'aria-live': 'polite' } },
-    ...groups.map((g) =>
-      h(
-        'div',
-        { class: 'log-group' },
-        h('div', { class: 'log-sep' }, h('span', {}, g.turn === 0 ? 'Setup' : `Turn ${g.turn}`)),
-        ...g.items.map((item) => {
-          if (item.kind === 'production') {
-            return h(
+    { class: 'log-group' },
+    h('div', { class: 'log-sep' }, h('span', {}, g.turn === 0 ? 'Setup' : `Turn ${g.turn}`)),
+    ...g.items.map((item) => {
+      if (item.kind === 'production') {
+        return h(
+          'div',
+          { class: 'log-prod' },
+          h('div', { class: 'log-prod-title' }, 'Production:'),
+          ...item.rows.map((row) =>
+            h(
               'div',
-              { class: 'log-prod' },
-              h('div', { class: 'log-prod-title' }, 'Production:'),
-              ...item.rows.map((row) =>
-                h(
-                  'div',
-                  { class: 'log-row log-prod-row', style: rowColor(state, row.player) },
-                  playerName(state.players[row.player]),
-                  ': ',
-                  ...row.tokens.map((t) => tokenNode(state, t, null)),
-                ),
-              ),
-            );
-          }
-          const dice = item.index === lastRoll ? state.dice : null;
-          return h(
-            'div',
-            {
-              class: `log-row${item.player === null ? ' is-system' : ''}${item.secret ? ' is-secret' : ''}`,
-              style: rowColor(state, item.player),
-              ...(item.secret
-                ? { attrs: { title: 'Only you and the other player see this' } }
-                : {}),
-            },
-            ...item.tokens.map((t) => tokenNode(state, t, dice)),
-          );
-        }),
-      ),
-    ),
+              { class: 'log-row log-prod-row', style: rowColor(state, row.player) },
+              playerName(state.players[row.player]),
+              ': ',
+              ...row.tokens.map((t) => tokenNode(state, t, null)),
+            ),
+          ),
+        );
+      }
+      const dice = item.index === lastRoll ? state.dice : null;
+      return h(
+        'div',
+        {
+          class: `log-row${item.player === null ? ' is-system' : ''}${item.secret ? ' is-secret' : ''}`,
+          style: rowColor(state, item.player),
+          ...(item.secret ? { attrs: { title: 'Only you and the other player see this' } } : {}),
+        },
+        ...item.tokens.map((t) => tokenNode(state, t, dice)),
+      );
+    }),
   );
 }
 

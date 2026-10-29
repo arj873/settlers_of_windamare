@@ -3,15 +3,19 @@
 // Usage: node scripts/cpu-idle.mjs <baseUrl> [seconds] [query] [--no-css-anim]
 //   default query: a mid-game fixture, a human to act (rolled, nothing highlighted).
 //   --no-css-anim: pause HUD CSS animations (the glowing End turn button), to see the board alone.
+//   --perf auto|high|low: the "Performance" menu setting (s17, ui/power.ts).
 import { readFileSync, readdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
+const argv = process.argv.slice(2);
+const flags = argv.filter((a) => a.startsWith('--'));
+const perfAt = argv.indexOf('--perf');
+const perf = perfAt >= 0 ? argv[perfAt + 1] : null;
 const [
   base = 'http://localhost:4173',
   secs = '10',
   query = 'fixture=midGame&seats=hhhh&debug=1&theme=sunfired',
-] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+] = argv.filter((a, i) => !a.startsWith('--') && (perfAt < 0 || i !== perfAt + 1));
 const noCssAnim = flags.includes('--no-css-anim');
 
 const TICK = 100; // USER_HZ (clock ticks per second) on Linux
@@ -47,6 +51,9 @@ const pid = server.process().pid;
 if (!pid) throw new Error('no browser pid');
 const browser = await chromium.connect(server.wsEndpoint());
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+if (perf) {
+  await page.addInitScript((p) => localStorage.setItem('catan.performance', p), perf);
+}
 await page.addInitScript(() => {
   const raf = window.requestAnimationFrame.bind(window);
   window.__frames = 0;
@@ -85,7 +92,7 @@ const [f1, draws, phase] = await page.evaluate(() => [
 ]);
 const s = Number(secs);
 console.log(
-  `${query}${noCssAnim ? ' --no-css-anim' : ''} (${phase}): ${(((c1 - c0) / s) * 100).toFixed(1)}% CPU (one core = 100%), ` +
+  `${query}${noCssAnim ? ' --no-css-anim' : ''}${perf ? ` --perf ${perf}` : ''} (${phase}): ${(((c1 - c0) / s) * 100).toFixed(1)}% CPU (one core = 100%), ` +
     `${((f1 - f0) / s).toFixed(1)} animation frames/s, ${(draws / s).toFixed(1)} board draws/s ` +
     `over ${s}s`,
 );

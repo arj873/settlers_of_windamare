@@ -4,6 +4,7 @@
  * every HUD render, since a look is cosmetic and changes rarely.
  */
 import { h } from '../dom';
+import { staticSvg } from '../icons';
 import { AVATAR_ART } from './gallery';
 import { avatarError, isAvatarId, type AvatarRef, type SeatLook } from './model';
 import './profile.css';
@@ -40,7 +41,8 @@ export function avatarPicture(ref: AvatarRef | null | undefined): HTMLElement | 
   if (!ref || avatarError(ref) !== null) return null;
   if (isAvatarId(ref)) {
     const el = h('span', { class: 'avatar-pic', attrs: { 'aria-hidden': 'true' } });
-    el.innerHTML = AVATAR_ART[ref].svg; // our own markup (gallery.ts), never user input
+    // Our own markup (gallery.ts), never user input.
+    el.append(staticSvg(`avatar:${ref}`, () => AVATAR_ART[ref].svg));
     return el;
   }
   const img = h('img', {
