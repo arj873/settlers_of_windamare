@@ -94,7 +94,8 @@ export class ProductionFx {
     // Web Animations missing (jsdom, very old browsers): badges only.
     const canFly = fly && typeof this.layer.animate === 'function';
     const tl = timeline(plan, canFly);
-    const dice = this.diceCenter();
+    // Only flights start at the dice: badges-only (low power, s17) reads no layout here.
+    const dice = tl.flights.length > 0 ? this.diceCenter() : null;
 
     for (const f of tl.flights) {
       const from = (f.from && this.locate?.(f.from)) || dice;
