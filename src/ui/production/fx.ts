@@ -4,8 +4,9 @@
  * a "+2 grain +1 ore" badge pops on the row and fades. The robber's hex bounces its cards off.
  *
  * Plain DOM over the board (one fixed layer, Web Animations on transforms and opacity), so the
- * Pixi board renders nothing for it and stays idle. Plans come from plan.ts; a new plan cancels
- * the running one at once, and rolls in quick succession (fast bots) show badges only.
+ * Pixi board renders nothing for it and stays idle. Plans come from plan.ts and start in the next
+ * frame (s18); a new plan cancels the running one, and rolls in quick succession (fast bots) show
+ * badges only.
  */
 import { isResource, type GameState, type HexId, type PlayerId } from '../../engine';
 import { h } from '../dom';
@@ -35,6 +36,17 @@ export interface ProductionFxOptions {
   now?: () => number;
   /** Flying is allowed (default: the Animations setting, no reduced motion, not low power). */
   motion?: () => boolean;
+  /** Run `fn` before the next frame; returns a cancel function (default requestAnimationFrame). */
+  frame?: (fn: () => void) => () => void;
+}
+
+function nextFrame(fn: () => void): () => void {
+  if (typeof requestAnimationFrame !== 'function') {
+    const t = setTimeout(fn, 16);
+    return () => clearTimeout(t);
+  }
+  const id = requestAnimationFrame(fn);
+  return () => cancelAnimationFrame(id);
 }
 
 export class ProductionFx {
@@ -46,12 +58,16 @@ export class ProductionFx {
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
   private readonly now: () => number;
   private readonly motion: () => boolean;
+  private readonly frame: (fn: () => void) => () => void;
+  /** Cancels the plan waiting for the next frame. */
+  private pending: (() => void) | null = null;
 
   constructor(
     private readonly root: HTMLElement,
     opts: ProductionFxOptions = {},
   ) {
     this.now = opts.now ?? (() => performance.now());
+    this.frame = opts.frame ?? nextFrame;
     // Low power (s17): badges only, like Animations off.
     this.motion =
       opts.motion ?? (() => loadAnimations() && !prefersReducedMotion() && !isLowPower());
@@ -72,11 +88,20 @@ export class ProductionFx {
     const plan = productionPlan(this.prev, state);
     this.prev = state;
     if (!plan || covered) return;
-    this.play(plan, state, view, this.coalescer.next(this.now(), this.motion()));
+    const fly = this.coalescer.next(this.now(), this.motion());
+    // s18: start in the next frame. Placing cards and badges reads where the dice, rows and hand
+    // are; right after the HUD's render that forced a second layout of the page per roll.
+    this.pending?.();
+    this.pending = this.frame(() => {
+      this.pending = null;
+      this.play(plan, state, view, fly);
+    });
   }
 
   /** Stop everything at once (a new plan, a new game). */
   clear(): void {
+    this.pending?.();
+    this.pending = null;
     for (const a of this.running) a.cancel();
     this.running.clear();
     for (const t of this.timers) clearTimeout(t);
@@ -90,27 +115,34 @@ export class ProductionFx {
   }
 
   private play(plan: ProductionPlan, state: GameState, view: HudView, fly: boolean): void {
-    this.clear();
     // Web Animations missing (jsdom, very old browsers): badges only.
     const canFly = fly && typeof this.layer.animate === 'function';
     const tl = timeline(plan, canFly);
-    // Only flights start at the dice: badges-only (low power, s17) reads no layout here.
+    // s18: every position is read before anything is written, so the whole plan costs one
+    // layout (a read after a write lays the page out again). Only flights start at the dice.
     const dice = tl.flights.length > 0 ? this.diceCenter() : null;
-
-    for (const f of tl.flights) {
+    const flights = tl.flights.flatMap((f) => {
       const from = (f.from && this.locate?.(f.from)) || dice;
       const to = this.target(f.player, f.kind, view);
-      if (!from || !to) continue;
+      return from && to ? [{ f, from, to }] : [];
+    });
+    const blocked = plan.blocked && canFly ? (this.locate?.(plan.blocked) ?? null) : null;
+    const rowsNow = new Map(
+      tl.badges.filter((b) => b.at <= 0).map((b) => [b.player, this.rowRect(b.player)]),
+    );
+
+    this.clear(); // the previous plan's cards and badges
+    for (const { f, from, to } of flights) {
       this.fly(this.face(state, f.kind, CARD_W), from, to, f.delay);
     }
     for (const b of tl.badges) {
       const gain = plan.gains.find((g) => g.player === b.player);
-      if (gain) this.later(b.at, () => this.badge(state, gain.player, gain.items));
+      if (!gain) continue;
+      const row = rowsNow.get(b.player);
+      if (row !== undefined) this.badge(state, gain.player, gain.items, row);
+      else this.later(b.at, () => this.badge(state, gain.player, gain.items));
     }
-    if (plan.blocked && canFly) {
-      const at = this.locate?.(plan.blocked);
-      if (at) this.bounce(at);
-    }
+    if (blocked) this.bounce(blocked);
   }
 
   private later(ms: number, fn: () => void): void {
@@ -213,11 +245,17 @@ export class ProductionFx {
     this.track(a, mark);
   }
 
-  /** "+2 [grain] +1 [ore]" on the player's row; it pops, holds, and fades (CSS). */
-  private badge(state: GameState, player: PlayerId, items: ProductionPlan['gains'][0]['items']) {
-    const row = this.row(player);
-    if (!row) return;
-    const r = row.getBoundingClientRect();
+  /**
+   * "+2 [grain] +1 [ore]" on the player's row; it pops, holds, and fades (CSS). `r`: the row's
+   * box when already read (null: not shown), else it is read now.
+   */
+  private badge(
+    state: GameState,
+    player: PlayerId,
+    items: ProductionPlan['gains'][0]['items'],
+    r: DOMRect | null = this.rowRect(player),
+  ) {
+    if (!r) return;
     const el = h(
       'div',
       {
@@ -240,6 +278,10 @@ export class ProductionFx {
   private row(player: PlayerId): HTMLElement | null {
     const el = this.root.querySelector<HTMLElement>(`.hud-players .pp[data-player="${player}"]`);
     return el && visible(el) && inScrollView(el) ? el : null;
+  }
+
+  private rowRect(player: PlayerId): DOMRect | null {
+    return this.row(player)?.getBoundingClientRect() ?? null;
   }
 
   /** Your own cards land on their card in the hand; everyone else's on their row. */

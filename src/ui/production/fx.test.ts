@@ -69,9 +69,47 @@ describe('ProductionFx in the HUD', () => {
     vi.spyOn(performance, 'now').mockImplementation(() => now);
   });
 
-  const render = (s: GameState) =>
+  /** Render a state, then let the next frame come (the animation starts there, s18). */
+  const render = (s: GameState) => {
     hud.render(s, { viewer: 3, legal: fakeLegal(s, 3), isBotTurn: false });
+    vi.advanceTimersToNextFrame();
+  };
   const badges = () => [...root.querySelectorAll('.prod-badge')];
+
+  it('starts in the next frame: no layout read right after the render', () => {
+    const { prev, next } = rolls();
+    render(prev);
+    const rects = vi.mocked(Element.prototype.getBoundingClientRect);
+    rects.mockClear();
+    hud.render(next, { viewer: 3, legal: fakeLegal(next, 3), isBotTurn: false });
+    expect(rects).not.toHaveBeenCalled();
+    expect(animations).toHaveLength(0);
+    vi.advanceTimersToNextFrame();
+    expect(rects).toHaveBeenCalled();
+    expect(animations.length).toBeGreaterThan(0);
+  });
+
+  it('a second roll before the frame replaces the waiting plan', () => {
+    const { prev, next } = rolls();
+    render(prev);
+    const show = (s: GameState) =>
+      hud.render(s, { viewer: 3, legal: fakeLegal(s, 3), isBotTurn: false });
+    show(next);
+    // A move that pays nothing keeps the waiting plan; the next paying roll replaces it.
+    const after = run(next, { type: 'endTurn', player: next.turn.current });
+    const again = [8, 6, 5, 9, 10, 4]
+      .map((r) => rollTotal(after, r))
+      .find((s) => productionPlan(after, s)?.gains.length);
+    if (!again) throw new Error('no paying roll');
+    show(after);
+    show(again);
+    vi.advanceTimersToNextFrame();
+    // Rolls this close together show badges only: nothing of the first roll flies.
+    expect(animations).toHaveLength(0);
+    expect(badges().map((b) => b.getAttribute('data-player'))).toEqual(
+      productionPlan(after, again)?.gains.map((g) => String(g.player)),
+    );
+  });
 
   it('flies cards after a roll, then pops one badge per receiving player', () => {
     const { prev, next } = rolls();
@@ -160,7 +198,7 @@ describe('ProductionFx without a board locator', () => {
       [0, 1, 2, 3].map((p) => `<div class="pp" data-player="${p}"></div>`).join('') +
       '</div>';
     document.body.append(root);
-    const fx = new ProductionFx(root, { motion: () => true });
+    const fx = new ProductionFx(root, { motion: () => true, frame: (fn) => (fn(), () => {}) });
     const { prev, next } = rolls();
     fx.update(prev, { viewer: -1, legal: [], isBotTurn: true, spectator: true }, false);
     fx.update(next, { viewer: -1, legal: [], isBotTurn: true, spectator: true }, false);
