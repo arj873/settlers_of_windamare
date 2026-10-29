@@ -31,6 +31,8 @@ import { showNotice } from './game/noticeView';
 import { SPEED_PRESETS, showResumePrompt, showToast } from './game/overlays';
 import { parseParams, type DevParams } from './game/params';
 import { SpotPrompt } from './ui/spotPrompt';
+import { STORAGE_KEY as SETUP_KEY } from './ui/setup/model';
+import { TutorialCoach, isTutorialGame, offerTutorial } from './ui/tutorial';
 import {
   CONFIRM_BUILD_KEY,
   LONGEST_ROAD_KEY,
@@ -207,8 +209,21 @@ async function boot() {
   }
 
   // Hotseat: everything below is the offline game, unchanged.
-  const offline = (dev: { state: GameState; seats: Controller[] } | null) =>
-    startOffline({ board, hud, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds });
+  const offline = (dev: { state: GameState; seats: Controller[] } | null, tutorial = false) =>
+    startOffline({
+      board,
+      hud,
+      uiRoot,
+      params,
+      dev,
+      storage,
+      prefs,
+      fitBoard,
+      applyLooks,
+      spots,
+      sounds,
+      tutorial,
+    });
   if (dev) {
     offline(dev);
     return;
@@ -217,10 +232,12 @@ async function boot() {
     name: browserKeyStore.get(NAME_KEY) ?? '',
     profile: profileStore,
     onOffline: () => {
+      hint?.remove();
       home.element.remove();
       offline(null);
     },
     onCreate: async (name) => {
+      hint?.remove();
       const backend = await pickBackend(location.search);
       const room = await backend.api.create();
       tokenStoreFor(backend.kind).set(tokenKey(room.roomId), room.hostToken);
@@ -232,6 +249,7 @@ async function boot() {
       });
     },
     onJoin: async (code, name) => {
+      hint?.remove();
       const backend = await pickBackend(location.search);
       if (!(await backend.api.check(code))) throw new Error(`There is no room “${code}”.`);
       profileStore.save({ ...profileStore.load(), name });
@@ -243,6 +261,12 @@ async function boot() {
     },
   });
   document.body.append(home.element);
+  // First visit: a small "New here? Learn to play" card over the home screen, offered once.
+  const returning = loadSession(storage) !== null || prefs?.getItem(SETUP_KEY) != null;
+  const hint = offerTutorial(document.body, prefs, returning, () => {
+    home.element.remove();
+    offline(null, true);
+  });
 }
 
 /** This page without query parameters (except an explicit `?server=`, kept for dev). */
@@ -285,6 +309,7 @@ function wireLongestRoad(board: BoardView, hud: Hud, prefs: KeyValueStore | null
 function startOffline(o: {
   board: BoardView;
   hud: Hud;
+  uiRoot: HTMLElement;
   params: DevParams;
   dev: { state: GameState; seats: Controller[] } | null;
   storage: KeyValueStore | null;
@@ -293,9 +318,13 @@ function startOffline(o: {
   applyLooks: (looks: readonly SeatLook[]) => void;
   spots: { prompt: SpotPrompt; confirmBuild: () => boolean };
   sounds: GameSounds;
+  /** Start the "Learn to play" game right away (first-visit hint). */
+  tutorial: boolean;
 }): void {
-  const { board, hud, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds } = o;
-  const speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
+  const { board, hud, uiRoot, params, dev, storage, prefs, fitBoard, applyLooks, spots, sounds } =
+    o;
+  let speed = params.speed ?? loadNumber(prefs, SPEED_KEY) ?? DEFAULT_SPEED;
+  let coach: TutorialCoach | null = null;
   const controller = new GameController({
     board,
     hud,
@@ -303,7 +332,11 @@ function startOffline(o: {
     speed,
     toast: showToast,
     notice: showNotice,
-    onRender: fitBoard,
+    // The tutorial panel first: the board keeps clear of it.
+    onRender: () => {
+      coach?.update();
+      fitBoard();
+    },
     onLooks: applyLooks,
     ...spots,
     sounds,
@@ -315,13 +348,34 @@ function startOffline(o: {
       ? SPEED_PRESETS
       : [...SPEED_PRESETS, { label: `${speed} ms`, ms: speed }],
     onChange: (ms) => {
+      speed = ms;
       controller.setSpeed(ms);
       saveNumber(prefs, SPEED_KEY, ms);
     },
   });
+  // "Learn to play" (src/ui/tutorial): a coach panel over a normal game with two Easy bots.
+  const tutorial = new TutorialCoach(
+    uiRoot,
+    {
+      game: () => {
+        const state = controller.state;
+        return state ? { state, legal: controller.legalActions } : null;
+      },
+      start: (state, seats, botLevels) => controller.start(state, seats, { botLevels }),
+      newGame: () => hud.showNewGame(),
+      pace: (ms) => controller.setSpeed(ms === null ? speed : Math.max(speed, ms)),
+    },
+    prefs,
+  );
+  coach = tutorial;
+  hud.setLearnToPlay(() => tutorial.begin());
   // Debug handle for the console.
-  (window as unknown as { catan: unknown }).catan = { controller, board, hud };
+  (window as unknown as { catan: unknown }).catan = { controller, board, hud, tutorial };
   if (params.debug) installDebugHook(controller, board);
+  if (o.tutorial) {
+    tutorial.begin();
+    return;
+  }
 
   if (dev) {
     const levels = params.levels?.length === dev.seats.length ? params.levels : undefined;
@@ -348,7 +402,9 @@ function startOffline(o: {
     const names = s.players.map((p) => p.name).join(', ');
     const when = s.turn.number === 0 ? 'setup' : `turn ${s.turn.number}`;
     showResumePrompt(
-      `Unfinished game (${names}) at ${when}.`,
+      isTutorialGame(s)
+        ? `Unfinished tutorial game at ${when}.`
+        : `Unfinished game (${names}) at ${when}.`,
       () => controller.resume(saved),
       () => {
         clearSession(storage);
