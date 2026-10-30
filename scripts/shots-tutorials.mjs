@@ -1,10 +1,10 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights, Seafarers, Traders & Barbarians, Oil Springs and Crop Trust
-// courses. The learner's moves are the Normal bot's (through the controller); bots play on at
-// 60 ms a move.
+// moments of the Cities & Knights, Seafarers, Traders & Barbarians, Explorers & Pirates, Oil
+// Springs and Crop Trust courses. The learner's moves are the Normal bot's (through the
+// controller; E&P's turn 1 follows the coach); bots play on at 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
-// SHOTS=picker,ck,sea,tb,oil,crop (default: all) takes only those sections.
+// SHOTS=picker,ck,sea,tb,ep,oil,crop (default: all) takes only those sections.
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -74,10 +74,36 @@ async function learnerMove(page) {
 const current = (page) => page.evaluate(() => window.catan.tutorial.record?.run?.current ?? null);
 
 /**
- * Play on until the panel shows `id` (or one of several: returns which): Next on every other
- * lesson, the learner's moves when they have one, bots on their timers.
+ * E&P: on turn 1 the learner does what the coach says (start moving, sail to the fog, land the
+ * settler on what turned up); otherwise the Normal bot's move.
  */
-async function playTo(page, id, ms = 240_000) {
+async function epLearnerMove(page) {
+  await page.evaluate(async () => {
+    const { botForLevel } = await import('/src/bots/byLevel.ts');
+    const { Rng } = await import('/src/engine/index.ts');
+    const { graph, touchesFog } = await import('/src/expansions/ep/engine/geometry.ts');
+    const { epBoard } = await import('/src/expansions/ep/engine/maps.ts');
+    const c = window.catan.controller;
+    const s = c.state;
+    const legal = c.legalActions.filter((a) => a.player === 0);
+    const region = epBoard(s).region;
+    const newLand = (v) => (graph(s).hexesAt.get(v) ?? []).some((h) => region[h] !== undefined);
+    const coached =
+      s.turn.number === 1 &&
+      (legal.find((a) => a.type === 'ep/land' && newLand(a.vertex)) ??
+        legal.find((a) => a.type === 'ep/startMovement') ??
+        legal.find((a) => a.type === 'ep/moveShip' && touchesFog(s, a.edge)));
+    const a = coached || botForLevel('normal')(s, 0, new Rng(s.turn.number + 7), legal);
+    if (a) c.dispatch(a);
+  });
+}
+
+/**
+ * Play on until the panel shows `id` (or one of several: returns which): Next on every other
+ * lesson, the learner's moves (`move`, default the Normal bot's) when they have one, bots on
+ * their timers.
+ */
+async function playTo(page, id, ms = 240_000, move = learnerMove) {
   const ids = [id].flat();
   const end = Date.now() + ms;
   while (Date.now() < end) {
@@ -95,7 +121,7 @@ async function playTo(page, id, ms = 240_000) {
     const mine = await page.evaluate(
       () => window.catan.controller.legalActions.filter((a) => a.player === 0).length,
     );
-    if (mine > 0) await learnerMove(page);
+    if (mine > 0) await move(page);
     else await page.waitForTimeout(80);
   }
   throw new Error(`timed out waiting for lesson ${id}`);
@@ -220,7 +246,29 @@ for (const width of want('tb') ? [1440, 412] : []) {
   await ctx.close();
 }
 
-// 5. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
+// 5. Explorers & Pirates (Land Ho!): intro, landing the settler on the land the learner just
+// discovered (turn 1), the later scenarios (their picture) while the bots play.
+for (const width of want('ep') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `ep-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-ep"]');
+  await page.click('.setup [data-k="learn-ep"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  if (width >= 600) await shot(page, `ep-${tag}-1-intro`);
+  await playTo(page, 'land', 240_000, epLearnerMove);
+  await shot(page, `ep-${tag}-2-land`);
+  await playTo(page, 'next', 240_000, epLearnerMove);
+  await shot(page, `ep-${tag}-3-next`);
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 6. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
 // track pulsing), a disaster; the oil lesson at phone width.
 for (const width of want('oil') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
@@ -245,7 +293,7 @@ for (const width of want('oil') ? [1440, 412] : []) {
   await ctx.close();
 }
 
-// 6. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
+// 7. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
 // turn and the first event token (whichever comes first); the fields lesson at phone width.
 for (const width of want('crop') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';

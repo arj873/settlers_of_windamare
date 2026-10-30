@@ -7,9 +7,9 @@ tutorials; the coach only reads the game.
 
 There is one tutorial per **course**: the base game (`src/ui/tutorial/`, since s16) and one per
 expansion module that has one (`src/expansions/<id>/tutorial.ts`). Built: base, Cities & Knights
-(`ck`), Seafarers (`seafarers`), Traders & Barbarians (`tb`), Oil Springs (`oil`), Crop Trust
-(`crop`). Expansion courses assume the player knows the base game: they teach only what is new,
-and their first lesson offers the base tutorial until it is done.
+(`ck`), Seafarers (`seafarers`), Traders & Barbarians (`tb`), Explorers & Pirates (`ep`), Oil
+Springs (`oil`), Crop Trust (`crop`). Expansion courses assume the player knows the base game:
+they teach only what is new, and their first lesson offers the base tutorial until it is done.
 
 ## 1. Pieces
 
@@ -150,6 +150,23 @@ are on the setup screen). The seed: a 7 on turn 3 (a bot's), the learner loads o
 turn (Easy: first) and delivers on their sixth (Easy: fourth, Hard: eighth); no learner needs a
 recap. Drive-off and Swift Journey show only if they come up (the Easy bots seldom upgrade).
 
+**Explorers & Pirates** (`learn-ep-221`, Land Ho!, 3 players, 8 VP). Why Land Ho!: it is the
+rulebook's first scenario and has no setup to place (printed pieces: a settlement and road, a
+harbor settlement, a ship with a settler), so the first turn is already about what is new:
+harbor settlements, the Movement phase, ships, exploring, settlers and gold. Each later scenario
+adds one layer (crews and the pirate, then the Council's missions); they get one lesson and a
+picture, and the finish points to Pirate Lairs. A second course for them would need more than one
+course per module (a framework change; card idea). Lessons: intro (what is gone), your start (the
+fleet pulsing), Action then Movement (the phase line pulsing; it waits for an Action phase), gold
+(picture: the gold trades), sailing (a "sail to the fog" todo), exploring, land ho (urgent, a
+"found a settlement there" todo), settlers and ships (picture: costs), harbor settlements, a 7
+(discards only), pirates and missions (picture: the five scenarios), you're ready. The seed: the
+learner's first roll pays nothing (1 gold); the first 7 is Blue's on turn 5. Land Ho! draws
+nothing else from the game's RNG, so these are the dice in every game. Both fog hexes the starting
+ship reaches on turn 1 hide land (with an 8), and the settler can land there at once: a learner
+who follows the coach sails, explores and settles new land on turn 1. Every learner sees every
+lesson live (the bots, though, settle the home coast first).
+
 **Oil Springs** (`learn-oil-288`, the rulebook board, 3 players, 12 VP). Lessons: intro (springs,
 pollution, the win at the end of your turn), setting up (a spring's corner pays oil), oil (first
 turn; picture: what oil is for, a "turn 1 oil into 2 cards" todo when the learner holds oil),
@@ -170,7 +187,7 @@ the Easy learner gets the event lesson as a recap.
 ## 5. Screenshots
 
 `node scripts/shots-tutorials.mjs <devUrl> docs/design/tutorials` (Vite dev server; the
-learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb,oil,crop` takes only those
+learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb,ep,oil,crop` takes only those
 sections):
 
 - Picker: `picker-desktop.png` (base done: its tick, over the setup screen), `picker-phone.png`
@@ -186,6 +203,9 @@ sections):
   `-3-pirate.png` (the learner's own 7).
 - Traders & Barbarians: `tb-{desktop,phone}-1-wagon.png` (the Wagon card pulsing),
   `-2-load.png` (where each commodity goes); `tb-desktop-3-baggage.png` (the five cards).
+- Explorers & Pirates (`SHOTS=ep`; on turn 1 the learner follows the coach):
+  `ep-desktop-1-intro.png`, `ep-{desktop,phone}-2-land.png` (the settler next to the land just
+  discovered), `-3-next.png` (the scenario ladder, while the bots play).
 - Oil Springs (`SHOTS=oil`): `oil-{desktop,phone}-1-oil.png` (the uses picture, the panel
   pulsing), `oil-desktop-2-pollution.png` (the track pulsing), `oil-desktop-3-disaster.png`.
 - Crop Trust (`SHOTS=crop`): `crop-{desktop,phone}-1-fields.png` (the crops picture),

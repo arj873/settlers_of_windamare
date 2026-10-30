@@ -67,7 +67,12 @@ const ICON: Record<Cargo | 'gold' | 'ship', string> = {
   ship: '<path d="M5 19 H27 L23 25 H9 Z" fill="currentColor" stroke="#1c1c24" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 19 V5 L25 17 H16" fill="#f3ead2" stroke="#1c1c24" stroke-width="1.4" stroke-linejoin="round"/>',
 };
 
-function icon(name: keyof typeof ICON, size: number, color?: string, label?: string): HTMLElement {
+export function icon(
+  name: keyof typeof ICON,
+  size: number,
+  color?: string,
+  label?: string,
+): HTMLElement {
   const span = document.createElement('span');
   span.className = `ep-ico ep-ico-${name}`;
   span.style.width = span.style.height = `${size}px`;
