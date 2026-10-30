@@ -15,7 +15,7 @@ import {
   type Resource,
 } from '../../engine';
 import { h, type Child } from '../../ui/dom';
-import type { HudDialog, HudExtension } from '../../ui/expansions';
+import type { HandCard, HandCardPlay, HudDialog, HudExtension } from '../../ui/expansions';
 import { RESOURCE_LABEL } from '../../ui/icons';
 import type { HudView } from '../../ui/types';
 import { playerStyle, resCardFace } from '../../ui/widgets';
@@ -65,6 +65,7 @@ import {
   type ProgressCard,
   type Track,
 } from './engine';
+import { COMMODITY_TEXT, handLimitNotes, progressStatus } from './hand';
 import { ckSounds } from './sounds';
 import './ck.css';
 
@@ -470,11 +471,18 @@ function offerForm(state: GameState, view: HudView, send: Send): HTMLElement | n
   );
 }
 
+/** The Alchemist's dice as last picked: the form is rebuilt on every render. */
+const alchemistDice = { yellow: '1', red: '1' };
+
 function alchemistForm(view: HudView, send: Send): HTMLElement | null {
   if (mine(view, 'ck/alchemist').length === 0) return null;
   const faces = [1, 2, 3, 4, 5, 6].map((n): [string, string] => [String(n), String(n)]);
   const yellow = select(faces, 'Alchemist: yellow die');
   const red = select(faces, 'Alchemist: red die');
+  yellow.value = alchemistDice.yellow;
+  red.value = alchemistDice.red;
+  yellow.addEventListener('change', () => (alchemistDice.yellow = yellow.value));
+  red.addEventListener('change', () => (alchemistDice.red = red.value));
   return h(
     'div',
     { class: 'ck-form' },
@@ -939,6 +947,79 @@ function knightDialog(state: GameState, view: HudView, send: Send): HudDialog | 
 }
 
 // ---------------------------------------------------------------------------
+// Hand cards (#cardinfo)
+// ---------------------------------------------------------------------------
+
+/** The Alchemist card's play: its dice in a dialog (the sidebar has the same form). */
+function alchemistDialog(view: HudView, send: Send, close: () => void): HudDialog | null {
+  const form = alchemistForm(view, send);
+  if (!form) return null;
+  return {
+    key: 'ck-alchemist',
+    title: 'Alchemist',
+    modal: false,
+    body: [
+      h('p', { class: 'sub' }, CARD_TEXT.alchemist),
+      form,
+      h(
+        'div',
+        { class: 'dialog-actions' },
+        h('button', { class: 'btn btn-ghost', on: { click: close } }, 'Cancel'),
+      ),
+    ],
+  };
+}
+
+/**
+ * The viewer's commodities (always, like resources) and one card per kind of progress card held
+ * (the hand holds 4, so at most 5 kinds). A progress card is playable only when a legal action
+ * of the viewer plays it; the status line says why not (hand.ts).
+ */
+export function ckHandCards(state: GameState, view: HudView, send: Send): HandCard[] {
+  const cp = ckSlice(state).players[view.viewer];
+  if (!cp || view.spectator) return [];
+  const goods = COMMODITIES.map((c): HandCard => ({
+    key: `ck/${c}`,
+    name: COMMODITY_LABEL[c],
+    count: cp.commodities[c],
+    produced: c,
+    face: (w) => commodityFace(c, w),
+    text: COMMODITY_TEXT[c],
+    kind: 'good',
+    play: null,
+    notes: [`At the bank you give ${giveRatio(state, view.viewer, c)} for 1 card now.`],
+    cls: 'ck-hc',
+  }));
+  const plays = mine(view, 'ck/play');
+  const alchemist = mine(view, 'ck/alchemist').length > 0;
+  const limit = handLimitNotes(state, view.viewer);
+  const progress = [...new Set(cp.progress)].map((card): HandCard => {
+    const action = plays.find((a) => field(a, 'card') === card);
+    const play: HandCardPlay | null =
+      card === 'alchemist'
+        ? alchemist
+          ? { dialog: (close) => alchemistDialog(view, send, close) }
+          : null
+        : action
+          ? { action }
+          : null;
+    return {
+      key: `ck/${card}`,
+      name: CARD_NAMES[card],
+      count: cp.progress.filter((c) => c === card).length,
+      face: (w) => progressFace(card, w),
+      text: CARD_TEXT[card],
+      kind: 'play',
+      play,
+      status: progressStatus(state, view.viewer, card, play !== null),
+      notes: limit,
+      cls: `ck-hp ck-hp-${CARD_TRACK[card]}`,
+    };
+  });
+  return [...goods, ...progress];
+}
+
+// ---------------------------------------------------------------------------
 // The extension
 // ---------------------------------------------------------------------------
 
@@ -1042,46 +1123,7 @@ export const ckHud: HudExtension = {
     return null;
   },
 
-  handCards(state, view, send) {
-    const cp = ckSlice(state).players[view.viewer];
-    if (!cp || view.spectator) return [];
-    const plays = mine(view, 'ck/play');
-    const commodityCards = COMMODITIES.map((c) => {
-      const n = cp.commodities[c];
-      return h(
-        'div',
-        {
-          class: `hcard rcard ck-hc${n === 0 ? ' is-zero' : n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}`,
-          title: `${COMMODITY_LABEL[c]}: ${n}`,
-          attrs: { 'data-card': c },
-        },
-        commodityFace(c, 46),
-        h('span', { class: 'count-badge' }, String(n)),
-      );
-    });
-    // Progress cards: one stack (the panel lists them with Play buttons); a click plays the
-    // first playable one when only one kind is playable.
-    const n = cp.progress.length;
-    const playable = [...new Set(plays.map((a) => field(a, 'card') as ProgressCard))];
-    const only = playable.length === 1 ? plays[0] : undefined;
-    const top = cp.progress[n - 1];
-    const stack =
-      top === undefined
-        ? null
-        : h(
-            'button',
-            {
-              class: `hcard dcard ck-hp${n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}${playable.length > 0 ? ' can-play' : ''}`,
-              disabled: !only,
-              title: `Progress cards: ${cp.progress.map((c) => CARD_NAMES[c]).join(', ')}${n > PROGRESS_HAND_MAX ? ` (keep ${PROGRESS_HAND_MAX})` : ''}`,
-              attrs: { 'aria-label': `${n} progress cards` },
-              on: { click: () => only && send(only) },
-            },
-            progressFace(top, 46),
-            h('span', { class: 'count-badge' }, String(n)),
-          );
-    return [h('span', { class: 'hand-sep' }), ...commodityCards, stack];
-  },
+  handCardInfo: (state, view, send) => ckHandCards(state, view, send),
 
   offerExtras(state, side) {
     const t = ckSlice(state).trade;

@@ -362,9 +362,43 @@ function clothStealDialog(state: GameState, view: HudView, send: Send): HudDialo
   };
 }
 
+/** A cloth chit as a card face (Cloth for Catan, #cardinfo). */
+const clothFace = (w: number): HTMLElement =>
+  h(
+    'span',
+    {
+      class: 'card-face sea-cloth-face',
+      style: { '--cw': `${w}px` },
+      attrs: { role: 'img', 'aria-label': 'Cloth' },
+    },
+    h('span', { class: 'sea-cloth' }),
+  );
+
+const CLOTH_TEXT =
+  'Cloth for Catan: link a ship route to a village and take 1 cloth, then 1 more each time its number is rolled. Every 2 cloth are 1 victory point. Not a resource card: never discarded on a 7 or traded, but a pirate may take one instead of a card.';
+
 export const seafarersHud: HudExtension = {
   id: 'seafarers',
   sounds: seafarersSounds,
+
+  // #cardinfo: cloth chits next to the resources (Cloth for Catan).
+  handCardInfo(state, view) {
+    const cloth = seaSlice(state).cloth;
+    if (!cloth || view.spectator) return [];
+    const n = cloth.held[view.viewer] ?? 0;
+    return [
+      {
+        key: 'seafarers/cloth',
+        name: 'Cloth',
+        count: n,
+        face: clothFace,
+        text: CLOTH_TEXT,
+        kind: 'good',
+        play: null,
+        notes: [`Worth ${Math.floor(n / 2)} VP now.`],
+      },
+    ];
+  },
 
   panel(state, view, send) {
     const body = h(

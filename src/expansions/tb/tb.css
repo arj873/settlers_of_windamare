@@ -9,6 +9,10 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* Swift Journey in the hand (#cardinfo): a development card face. */
+.tb-swift-face {
+  background: var(--df-face);
+}
 .tb-panel {
   display: flex;
   flex-direction: column;

@@ -113,6 +113,45 @@ describe('T&B HUD', () => {
     hud.render(s, { viewer, legal: legalActions(s), isBotTurn: false });
   const panel = () => root.querySelector('.sec-ext-tb');
 
+  it('Swift Journey is a hand card with its info card (#cardinfo)', () => {
+    const s = main(SC_TRADERS);
+    const swift = tradersOf(s).swift;
+    swift.held[1] = 1;
+    swift.deck -= 1;
+    const card = () => root.querySelector<HTMLButtonElement>('.hcard[data-info="tb/swift"]')!;
+    const info = () => root.querySelector('.hud-pop-layer .dev-info')?.textContent ?? '';
+    show(s, 1);
+    expect(card().getAttribute('aria-disabled')).toBe('true');
+    card().click();
+    expect(info()).toContain('the wagon moves again');
+    expect(info()).toContain(
+      'Not your turn. You can play this on your turn, right after your wagon moves.',
+    );
+
+    // Player 1's turn: first the wagon moves, then the card plays.
+    s.turn = { ...s.turn, current: 1 };
+    show(s, 1);
+    expect(info()).toContain('Move your wagon first (Move wagon), then play this');
+    s.phase = { kind: 'tb/wagon' } as unknown as GameState['phase'];
+    tradersOf(s).move.steps = 1;
+    show(s, 1);
+    expect(card().classList.contains('can-play')).toBe(true);
+    card().click();
+    expect(actions).toEqual([{ type: 'tb/swiftJourney', player: 1 }]);
+  });
+
+  it('coins and fish say what they are for (#cardinfo)', () => {
+    const s = main(SC_FISH);
+    show(s);
+    const fish = root.querySelector<HTMLButtonElement>('.hcard[data-info="tb/fish"]')!;
+    expect(fish.dataset.card).toBe('fish');
+    fish.click();
+    const info = root.querySelector('.hud-pop-layer .dev-info')?.textContent ?? '';
+    expect(info).toContain('2 to chase the robber off the board');
+    expect(info).toContain('7 to draw a development card');
+    expect(actions).toEqual([]);
+  });
+
   it('Rivers: gold per player with the Wealthiest / Poor Settler marks', () => {
     const s = main(SC_RIVERS);
     tbSlice(s).gold = [3, 1, 0, 0];

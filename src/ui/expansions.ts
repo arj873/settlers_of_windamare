@@ -54,6 +54,56 @@ export interface ExtBuildCard {
   blocker?(state: GameState, player: PlayerId): string | null;
 }
 
+/**
+ * One kind of module card in the viewer's hand (#cardinfo, `handCardInfo`). The HUD draws it like
+ * a base card and opens its info card (face, name, count, `text`, `status`, `notes`) on a click
+ * when it can't be played, or on a right-click / long-press when it can. It never sends an action
+ * from a card without `play`.
+ */
+export interface HandCard {
+  /** Unique in the hand, namespaced: 'ck/alchemist', 'ck/paper'. */
+  key: string;
+  name: string;
+  /** How many the viewer holds: > 0, or 0 for a good shown greyed like an empty resource. */
+  count: number;
+  /** A good's kind as the log names it ('paper', 'gold'): the production animation lands on it. */
+  produced?: string;
+  /** The card art, `w` px wide (46 in the hand, 34 in the info card). */
+  face(w: number): HTMLElement;
+  /** What the card does (a card one plays) or what it is for (a good), in plain words. */
+  text: string;
+  /**
+   * 'play': a card one plays (progress card, Swift Journey): after the separator with the dev
+   * cards, dimmed (`.is-off`, aria-disabled) while it can't be played.
+   * 'good': a card one spends or trades (commodity, gold): after the resources; the click only
+   * opens the info card.
+   */
+  kind: 'play' | 'good';
+  /**
+   * What a click does now, set only from the viewer's legal actions (`view.legal`), never
+   * re-derived from the rules: send that action, or open a dialog for a play that needs choices
+   * first (like base Year of Plenty). null: the click opens the info card.
+   */
+  play: HandCardPlay | null;
+  /**
+   * The "can I play it" line: how to play it now, or why not and when. It may be derived from the
+   * module's rules (only `play` decides "playable"). Omit for a good.
+   */
+  status?: string;
+  /** More lines under the status (C&K: the hand limit). */
+  notes?: readonly string[];
+  /** A tag on the card ('new'). */
+  tag?: string;
+  /** More classes on the hand card (module styling, `<id>-` prefixed). */
+  cls?: string;
+}
+
+/**
+ * A playable hand card's click: an action (one of `view.legal`), or a dialog the HUD opens and
+ * rebuilds on every render (`close` closes it; a send closes it too; null = gone).
+ */
+export type HandCardPlay = { action: Action } | { dialog(close: () => void): HudDialog | null };
+
 export interface HudExtension {
   id: ExpansionId;
   /** A sidebar section between Bank and Players (null = none right now). */
@@ -68,7 +118,18 @@ export interface HudExtension {
   ): HudDialog | null;
   /** Turn-pill text for this module's phases (the viewer can act). */
   hint?(state: GameState, view: HudView): string | null;
-  /** Extra cards in the viewer's hand bar, after the resource cards (C&K commodities). */
+  /**
+   * The cards of this module the viewer holds (#cardinfo), one per kind held: the HUD draws them
+   * in the hand bar and gives each the dev cards' info card. Not called for spectators.
+   */
+  handCardInfo?(state: GameState, view: HudView, send: (a: Action) => void): HandCard[];
+  /**
+   * A combination's word on another module's hand card whose rules it changes (#cardinfo; Barbarian
+   * Attack + C&K's progress cards): the status line of card `key` while it can't be played, or
+   * null to keep the card's own.
+   */
+  handCardStatus?(state: GameState, view: HudView, key: string): string | null;
+  /** Extra non-card items in the viewer's hand bar, after the resource cards. */
   handCards?(state: GameState, view: HudView, send: (a: Action) => void): Child[];
   /** Extra items shown in the open trade offer's `give` / `want` row (C&K commodities). */
   offerExtras?(state: GameState, side: 'give' | 'want'): Child[];
@@ -124,6 +185,30 @@ export function hiddenBaseCards(state: Pick<GameState, 'settings'>): ReadonlySet
       typeof x.hideBaseCards === 'function' ? x.hideBaseCards(state) : (x.hideBaseCards ?? []),
     ),
   );
+}
+
+/** The viewer's module cards (#cardinfo `handCardInfo`) of the expansions active in `state`. */
+export function handCardsFor(
+  state: GameState,
+  view: HudView,
+  send: (a: Action) => void,
+): HandCard[] {
+  if (view.spectator) return [];
+  return hudExtensionsFor(state).flatMap((x) => x.handCardInfo?.(state, view, send) ?? []);
+}
+
+/**
+ * The status line of a module hand card (#cardinfo): while it can't be played, a combination's
+ * word first (`handCardStatus`), else the card's own; null for a good without one.
+ */
+export function handCardLine(state: GameState, view: HudView, card: HandCard): string | null {
+  if (card.kind === 'play' && !card.play) {
+    for (const x of hudExtensionsFor(state)) {
+      const s = x.handCardStatus?.(state, view, card.key);
+      if (s) return s;
+    }
+  }
+  return card.status ?? (card.play ? 'Playable now: click the card to play it.' : null);
 }
 
 /** First non-null hint of the active extensions. */

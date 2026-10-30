@@ -53,6 +53,15 @@
   border: 1.5px solid #2a1708;
   vertical-align: middle;
 }
+/* Cloth chits in the hand (#cardinfo): a chit on a card. */
+.sea-cloth-face {
+  background: var(--surface-pop);
+}
+.sea-cloth-face > .sea-cloth {
+  width: calc(var(--cw) * 0.36);
+  height: calc(var(--cw) * 0.52);
+  border-radius: calc(var(--cw) * 0.06);
+}
 .sea-wonders {
   display: flex;
   flex-direction: column;

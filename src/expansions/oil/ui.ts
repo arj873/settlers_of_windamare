@@ -468,17 +468,44 @@ function tradeDialog(state: GameState, view: HudView, send: Send): HudDialog | n
   };
 }
 
+const oilFace = (w: number): HTMLElement =>
+  h(
+    'span',
+    { class: 'card-face oil-card-face', style: { '--cw': `${w}px` } },
+    drop(Math.round(w * 0.72)),
+  );
+
+/** What oil is for (the hand's info card, #cardinfo). */
+function oilText(state: GameState): string {
+  return `Springs pay oil: 1 per settlement, 2 per city, 3 per metropolis. On your turn, use 1 oil for 2 cards of one other resource, or 2 oil (with 1 brick, 1 wheat, 1 ore) to make a city a metropolis; each use moves the pollution marker, and at ${DISASTER_AT} a disaster strikes. Once per turn, if you used none, sequester 1 oil: every 3 sequestered is 1 VP. You hold at most ${oilScale(state).cap}; oil counts on a 7, can be stolen and traded with players, never with the bank.`;
+}
+
 export const oilHud: HudExtension = {
   id: OIL,
 
-  cardFace: (kind, w) =>
-    kind === 'oil'
-      ? h(
-          'span',
-          { class: 'card-face oil-card-face', style: { '--cw': `${w}px` } },
-          drop(Math.round(w * 0.72)),
-        )
-      : null,
+  cardFace: (kind, w) => (kind === 'oil' ? oilFace(w) : null),
+
+  // #cardinfo: oil next to the resources, with what it is for.
+  handCardInfo(state, view) {
+    if (view.spectator) return [];
+    const saved = sequesteredOf(state, view.viewer);
+    return [
+      {
+        key: 'oil/oil',
+        name: 'Oil',
+        count: oilOf(state, view.viewer),
+        produced: 'oil',
+        face: oilFace,
+        text: oilText(state),
+        kind: 'good',
+        play: null,
+        notes: [
+          `Pollution marker: ${oilSlice(state).marker} of ${DISASTER_AT}.`,
+          ...(saved > 0 ? [`Sequestered: ${saved}.`] : []),
+        ],
+      },
+    ];
+  },
 
   panel(state, view, send) {
     const s = oilSlice(state);

@@ -193,14 +193,18 @@ describe('C&K HUD', () => {
     expect(actions.at(-1)).toEqual({ type: 'ck/play', player: 0, card: 'mining' });
   });
 
-  it('the hand bar shows commodities and the progress stack', () => {
+  it('the hand bar shows commodities and one card per kind of progress card', () => {
     const s = main();
     setGoods(s, 0, { coin: 2, paper: 1 });
-    giveCards(s, 0, 'spy', 'crane');
+    giveCards(s, 0, 'spy', 'crane', 'spy');
     show(s);
     const hand = root.querySelector('.hand');
     expect(hand?.querySelectorAll('.ck-cf')).toHaveLength(3);
-    expect(hand?.querySelector('.ck-hp .count-badge')?.textContent).toBe('2');
+    const badge = (key: string) =>
+      hand?.querySelector(`.ck-hp[data-info="${key}"] .count-badge`)?.textContent;
+    expect(badge('ck/spy')).toBe('2');
+    expect(badge('ck/crane')).toBe('1');
+    expect(hand?.querySelector('[data-info="ck/coin"] .count-badge')?.textContent).toBe('2');
   });
 
   it('Knight / Command / City wall build cards drive the board', () => {
