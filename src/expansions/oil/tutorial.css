@@ -1,0 +1,32 @@
+/* "Learn Oil Springs" (tutorial.ts): what the coach points at, and its picture. */
+.catan-hud[data-tut-focus='oil-panel'] .oil-panel,
+.catan-hud[data-tut-focus='oil-track'] .oil-head,
+.catan-hud[data-tut-focus='oil-actions'] .oil-actions,
+.catan-hud[data-tut-focus='oil-metro'] .bcard[data-actions^='oil/metropolis'] {
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catan-hud[data-tut-focus='oil-panel'] .oil-panel,
+  .catan-hud[data-tut-focus='oil-track'] .oil-head,
+  .catan-hud[data-tut-focus='oil-actions'] .oil-actions,
+  .catan-hud[data-tut-focus='oil-metro'] .bcard[data-actions^='oil/metropolis'] {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+
+.tut-oil-uses {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+.tut-oil-uses li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  line-height: 1.25;
+}

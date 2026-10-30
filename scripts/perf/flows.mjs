@@ -3,11 +3,13 @@
 // the setup screen, resume of the Seafarers save after a reload, an online Seafarers room on the
 // in-browser server (host + a guest joining by the invite link), the tutorials (base from the
 // picker, C&K from its chip link and resumed after a reload, Seafarers from the in-game menu,
-// Explorers & Pirates from its chip link), and a short bot game of every mode (`?mode=`).
+// Traders & Barbarians, Explorers & Pirates and Oil Springs from their chip links, Crop Trust from
+// the setup screen's picker), and a short bot game of every mode (`?mode=`).
 //
 //   pnpm build && pnpm preview --port 4173 &
 //   node scripts/perf/flows.mjs [--base http://localhost:4173]
-//     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-ep,modes]
+//     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-tb,tutorial-ep,
+//             tutorial-oil,tutorial-crop,modes]
 //
 // Exits non-zero when a flow fails, the page throws or logs an error, or a CSP violation fires.
 import { execSync } from 'node:child_process';
@@ -21,7 +23,7 @@ const flag = (name, def) => {
 const BASE = flag('--base', 'http://localhost:4173').replace(/\/$/, '');
 const ONLY = flag(
   '--only',
-  'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-ep,modes',
+  'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-tb,tutorial-ep,tutorial-oil,tutorial-crop,modes',
 ).split(',');
 
 const browser = await chromium.launch({
@@ -296,6 +298,69 @@ async function tutorialEp() {
   await ctx.close();
 }
 
+/** "New to Traders & Barbarians? Learn it" under the chip: the title scenario's course. */
+async function tutorialTb() {
+  const { ctx, open } = await profile('tutorial-tb');
+  const page = await open(`${BASE}/`);
+  await page.click('[data-k="offline"]');
+  await page.click('.setup [data-k="chip-tb"]');
+  await page.click('.setup [data-k="learn-tb"]');
+  const s = await coachShows(page);
+  const scenario = await page.evaluate(() => window.catan.controller.state.settings.scenario);
+  check(
+    s.mode === 'tb' &&
+      s.course === 'tb' &&
+      scenario === 'tb/traders' &&
+      s.title === 'Traders & Barbarians',
+    'T&B tutorial started (the Traders & Barbarians scenario)',
+  );
+  check(await page.$('[data-k="tut-base"]'), 'its intro offers the base tutorial');
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
+  check(
+    await page.$('.tut-panel:not([hidden]) .tut-head'),
+    'the coach follows the T&B tutorial game',
+  );
+  await ctx.close();
+}
+
+/** "New to Oil Springs? Learn it" under the chip: its course, then its HUD panel in play. */
+async function tutorialOil() {
+  const { ctx, open } = await profile('tutorial-oil');
+  const page = await open(`${BASE}/`);
+  await page.click('[data-k="offline"]');
+  await page.click('.setup [data-k="chip-oil"]');
+  await page.click('.setup [data-k="learn-oil"]');
+  const s = await coachShows(page);
+  check(
+    s.mode === 'oil' && s.course === 'oil' && s.title === 'Oil Springs',
+    'Oil Springs tutorial started',
+  );
+  check(await page.$('[data-k="tut-base"]'), 'its intro offers the base tutorial');
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
+  check(await page.$('.sec-ext-oil'), 'Oil Springs HUD panel shown');
+  await ctx.close();
+}
+
+/** The setup screen's "Learn to play" → the picker → Crop Trust (its module not loaded yet). */
+async function tutorialCrop() {
+  const { ctx, open } = await profile('tutorial-crop');
+  const page = await open(`${BASE}/`);
+  await page.click('[data-k="offline"]');
+  await page.click('.setup [data-k="learn"]');
+  await page.click('.tut-pick [data-k="tut-pick-crop"]');
+  const s = await coachShows(page);
+  check(
+    s.mode === 'crop' && s.course === 'crop' && s.title === 'Crop Trust',
+    'Crop Trust tutorial started from the picker',
+  );
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
+  check(await page.$('.sec-ext-crop'), 'Crop Trust HUD panel shown');
+  await ctx.close();
+}
+
 /** Every mode (its modules load on demand): a dev all-bot game plays a few seconds. */
 async function modes() {
   const list = JSON.parse(
@@ -328,7 +393,10 @@ const FLOWS = {
   tutorial,
   'tutorial-ck': tutorialCk,
   'tutorial-sea': tutorialSea,
+  'tutorial-tb': tutorialTb,
   'tutorial-ep': tutorialEp,
+  'tutorial-oil': tutorialOil,
+  'tutorial-crop': tutorialCrop,
   modes,
 };
 let failed = false;

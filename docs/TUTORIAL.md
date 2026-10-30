@@ -7,8 +7,9 @@ tutorials; the coach only reads the game.
 
 There is one tutorial per **course**: the base game (`src/ui/tutorial/`, since s16) and one per
 expansion module that has one (`src/expansions/<id>/tutorial.ts`). Built: base, Cities & Knights
-(`ck`), Seafarers (`seafarers`), Explorers & Pirates (`ep`). Expansion courses assume the player knows the base game: they
-teach only what is new, and their first lesson offers the base tutorial until it is done.
+(`ck`), Seafarers (`seafarers`), Traders & Barbarians (`tb`), Explorers & Pirates (`ep`), Oil
+Springs (`oil`), Crop Trust (`crop`). Expansion courses assume the player knows the base game:
+they teach only what is new, and their first lesson offers the base tutorial until it is done.
 
 ## 1. Pieces
 
@@ -136,6 +137,19 @@ a 7 on their second turn (Normal and Hard learners; a development card draw can 
 Normal learner settles an island on their sixth turn. The Easy learner gets the island and route
 lessons as recaps; gold shows only if the learner reaches a gold field.
 
+**Traders & Barbarians** (`learn-tb-77`, the Traders & Barbarians scenario, 3 players, 13 VP).
+T&B is a box of scenarios and variants, all one mode (`tb`); a module has one course, so it
+teaches the title scenario: the most new rules (a side-panel line can't teach them), and its gold
+and city-in-setup rules carry over to Rivers and Barbarian Attack. Lessons: intro (target, wagon,
+deliveries), trade hexes and barbarians (no robber, no desert, 2 and 12 rolled again), setting
+up, a city and a wagon, your wagon (the gate: movement points, the Wagon card pulsing), roads
+and tolls (a "points left" todo), gold, loading a commodity (picture: where each one goes),
+delivered, baggage train (picture: the five cards), barbarians instead of the robber (on a 7 or a
+Knight), drive a barbarian off, Swift Journey, you're ready (no Longest Road; the other scenarios
+are on the setup screen). The seed: a 7 on turn 3 (a bot's), the learner loads on their second
+turn (Easy: first) and delivers on their sixth (Easy: fourth, Hard: eighth); no learner needs a
+recap. Drive-off and Swift Journey show only if they come up (the Easy bots seldom upgrade).
+
 **Explorers & Pirates** (`learn-ep-221`, Land Ho!, 3 players, 8 VP). Why Land Ho!: it is the
 rulebook's first scenario and has no setup to place (printed pieces: a settlement and road, a
 harbor settlement, a ship with a settler), so the first turn is already about what is new:
@@ -153,10 +167,28 @@ ship reaches on turn 1 hide land (with an 8), and the settler can land there at 
 who follows the coach sails, explores and settles new land on turn 1. Every learner sees every
 lesson live (the bots, though, settle the home coast first).
 
+**Oil Springs** (`learn-oil-288`, the rulebook board, 3 players, 12 VP). Lessons: intro (springs,
+pollution, the win at the end of your turn), setting up (a spring's corner pays oil), oil (first
+turn; picture: what oil is for, a "turn 1 oil into 2 cards" todo when the learner holds oil),
+pollution (live marker), sequestering (shows when the learner can, or anyone did), metropolis
+(when a city stands), disaster (names the disaster roll), you're ready. The seed: a bot uses oil
+by turn 12 and a disaster strikes by turn 25 for every learner; all three learners see every
+lesson live. The bots don't seek springs, so the scripted learners rarely hold oil; a reader of
+the setup lesson may.
+
+**Crop Trust** (`learn-crop-52`, the first-game board, 3 players, 10 VP). Lessons: intro (the
+collapse ending, food), fields and crops (picture: the five crops), harvest (urgent, the pick to
+make), the seed vault (first turn, with a "store a seed" todo), replanting (urgent, seeds left),
+effects of growth (names the revealed event), when the crops run out (shows when a field is down
+to its last crop), you're ready. The seed: every learner harvests within their first three turns
+and the crops hold out through the coached turns; Normal and Hard learners see every lesson live,
+the Easy learner gets the event lesson as a recap.
+
 ## 5. Screenshots
 
 `node scripts/shots-tutorials.mjs <devUrl> docs/design/tutorials` (Vite dev server; the
-learner's moves are the Normal bot's):
+learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb,ep,oil,crop` takes only those
+sections):
 
 - Picker: `picker-desktop.png` (base done: its tick, over the setup screen), `picker-phone.png`
   (412 px, fresh: the "start with the base game" hint), and `picker-phone-<theme>.png` for wood,
@@ -169,6 +201,12 @@ learner's moves are the Normal bot's):
   `ck-phone-4-attack.png`.
 - Seafarers: `sea-{desktop,phone}-1-intro.png`, `-2-ships.png` (the Ship card pulsing),
   `-3-pirate.png` (the learner's own 7).
-- Explorers & Pirates (on turn 1 the learner follows the coach): `ep-desktop-1-intro.png`,
-  `ep-{desktop,phone}-2-land.png` (the settler next to the land just discovered),
-  `-3-next.png` (the scenario ladder, while the bots play).
+- Traders & Barbarians: `tb-{desktop,phone}-1-wagon.png` (the Wagon card pulsing),
+  `-2-load.png` (where each commodity goes); `tb-desktop-3-baggage.png` (the five cards).
+- Explorers & Pirates (`SHOTS=ep`; on turn 1 the learner follows the coach):
+  `ep-desktop-1-intro.png`, `ep-{desktop,phone}-2-land.png` (the settler next to the land just
+  discovered), `-3-next.png` (the scenario ladder, while the bots play).
+- Oil Springs (`SHOTS=oil`): `oil-{desktop,phone}-1-oil.png` (the uses picture, the panel
+  pulsing), `oil-desktop-2-pollution.png` (the track pulsing), `oil-desktop-3-disaster.png`.
+- Crop Trust (`SHOTS=crop`): `crop-{desktop,phone}-1-fields.png` (the crops picture),
+  `crop-desktop-2-vault.png`, `crop-desktop-3-events.png` (the revealed event named).

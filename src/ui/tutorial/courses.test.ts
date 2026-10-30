@@ -201,8 +201,7 @@ describe('picker', () => {
     saveTutorial(store, { completed: true, offered: true, run: null });
     const entries = pickerEntries((id) => tutorialCompleted(store, id));
     expect(entries.map((e) => e.id)).toEqual(['base', ...TUTORIAL_MODULES]);
-    // Every module course adds a row: check the first ones by name, the rest by count.
-    expect(entries.slice(0, 3).map((e) => e.name)).toEqual([
+    expect(entries.map((e) => e.name).slice(0, 3)).toEqual([
       'Base game',
       'Cities & Knights',
       'Seafarers',
