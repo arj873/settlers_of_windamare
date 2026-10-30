@@ -91,8 +91,8 @@
   cursor: pointer;
 }
 .su-learn-link b {
-  color: var(--accent);
-  text-decoration: underline;
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 3px;
 }
 .su-learn-link .su-learn-q {
   width: 20px;

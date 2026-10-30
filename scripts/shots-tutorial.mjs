@@ -63,8 +63,10 @@ for (const width of WIDTHS) {
   await page.waitForSelector('.su-learn');
   await shot('02-setup-entry-button');
 
-  // 3. Learn to play -> goal, board, first settlement (board highlights the legal corners).
+  // 3. Learn to play -> the picker (s19) -> base: goal, board, first settlement (board highlights
+  // the legal corners).
   await page.click('.su-learn');
+  await page.click('[data-k="tut-pick-base"]');
   await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
   await shot('03-goal');
   await page.click('[data-k="tut-next"]');

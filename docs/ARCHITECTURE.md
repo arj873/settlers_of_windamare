@@ -916,9 +916,14 @@ seats)` after each render, `timer(remainingSec, mine)` when the shown second cha
 - **Audition:** `?sfx=1` adds a panel (`ui/sfxPanel.ts`) with a button per registered sound
   (base + modules), the level (you / others / bots), Play all and the volume control.
 
-## 13e. Learn to play (`src/ui/tutorial`, s16)
+## 13e. Learn to play (`src/ui/tutorial`, s16; expansion courses s19)
 
 A coach panel over a **normal** hotseat game; the engine and the controller are unchanged.
+s19 made it a framework of **courses** (docs/TUTORIAL.md): the base game below (`base.ts`) and
+one per module that has one (`src/expansions/<id>/tutorial.ts` in its pack: C&K, Seafarers).
+`machine.ts` / `store.ts` take the course (default: base), the coach follows whichever course's
+game is on screen, and "Learn to play" opens a picker (`picker.ts`). What follows is the base
+course; the rest holds for every course.
 
 - Game (`game.ts`): base game, beginner map, 10 VP, you (seat 0, places and plays first) + 2
   Easy bots, fixed seed `learn-34` (`isTutorialGame(state)`). Nothing is rigged: the seed was
@@ -938,12 +943,15 @@ A coach panel over a **normal** hotseat game; the engine and the controller are 
   that element), and asks `CoachHost.pace(900)` for slower bots (null = the player's speed). A
   different game on screen drops the run. `game/layout.ts` keeps the board clear of the panel
   (`--coach-dock`: `left` column on wide screens, `top` band on phones, `none` when collapsed).
-- Storage: `localStorage['catan:tutorial:v1']` = `{ completed, offered, run }` (try/catch). A
-  reload resumes through the normal resume prompt ("Unfinished tutorial game …").
-- Entry: setup screen button (`SetupScreenOptions.onTutorial`), menu item
-  (`Hud.setLearnToPlay`), and once on a first visit a dismissible card over the home screen
-  (`offerTutorial`; not for players with a save or setup settings).
-- Screenshots: `node scripts/shots-tutorial.mjs <devUrl> <outDir>` (desktop + phone).
+- Storage: `localStorage['catan:tutorial:v1']` = `{ completed, offered, run }` (try/catch); a
+  module's course uses `catan:tutorial:<id>:v1`. A reload resumes through the normal resume
+  prompt ("Unfinished tutorial game …", `looksLikeTutorial`).
+- Entry: setup screen button (`SetupScreenOptions.onTutorial()`) and menu item
+  (`Hud.setLearnToPlay`) → the picker; "New to <expansion>? Learn it" under the setup screen's
+  expansion chips (`onTutorial(id)`) → that course; once on a first visit a dismissible card over
+  the home screen (`offerTutorial`; not for players with a save or setup settings) → base.
+- Screenshots: `node scripts/shots-tutorial.mjs <devUrl> <outDir>` (base, desktop + phone),
+  `node scripts/shots-tutorials.mjs <devUrl> <outDir>` (picker, C&K, Seafarers).
 
 ## 14. Decisions and open questions
 

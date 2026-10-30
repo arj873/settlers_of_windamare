@@ -162,10 +162,11 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--ink);
   font: inherit;
   font-weight: 700;
-  text-decoration: underline;
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 

@@ -453,15 +453,22 @@ function startOffline(o: {
       });
       return;
     }
+    // From the setup screen (the HUD closed it and shows no game): it stays behind the picker,
+    // with the game it covered (if any) back under it. From the menu: over the running game.
+    const fromSetup = uiRoot.querySelector('.hud-side .sec-players') === null;
+    if (fromSetup) {
+      const game = controller.snapshot();
+      if (game) controller.resume(game);
+      hud.showNewGame();
+    }
     openTutorialPicker(uiRoot, {
       isDone: (id) => tutorial.isCompleted(id),
-      onPick: startCourse,
-      // Back to the game left for the picker (redrawn), or to the setup screen.
-      onCancel: () => {
-        const game = controller.snapshot();
-        if (game) controller.resume(game);
-        else hud.showNewGame();
+      onPick: async (id) => {
+        if (id !== 'base') await ensureModules(id);
+        if (fromSetup) hud.hideNewGame();
+        tutorial.begin(id);
       },
+      onCancel: () => undefined,
     });
   });
   // Debug handle for the console.
