@@ -1,13 +1,16 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights and Seafarers courses. The learner's moves are the Normal
-// bot's (through the controller); bots play on at 60 ms a move.
+// moments of the Cities & Knights, Seafarers, Oil Springs and Crop Trust courses. The learner's
+// moves are the Normal bot's (through the controller); bots play on at 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
+// (SHOTS_ONLY=oil,crop for some sections: picker, ck, sea, oil, crop).
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const [base = 'http://localhost:5173', out = 'docs/design/tutorials'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
+const only = process.env.SHOTS_ONLY?.split(',');
+const want = (section) => !only || only.includes(section);
 const THEMES = ['sunfired', 'wood', 'parlour', 'chartroom', 'materialdark', 'githubdark'];
 
 const browser = await chromium.launch({
@@ -70,15 +73,17 @@ async function learnerMove(page) {
 const current = (page) => page.evaluate(() => window.catan.tutorial.record?.run?.current ?? null);
 
 /**
- * Play on until the panel shows `id`: Next on every other lesson, the learner's moves when they
- * have one, bots on their timers.
+ * Play on until the panel shows `id` (or one of several, returned): Next on every other lesson,
+ * the learner's moves when they have one, bots on their timers.
  */
 async function playTo(page, id, ms = 240_000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const now = await current(page);
-    if (now === id) return;
-    if (now !== null && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
+    if ([id].flat().includes(now)) return now;
+    // A modal dialog (a discard, a steal) covers the panel: the learner's move first.
+    const modal = await page.$('.scrim.is-modal');
+    if (now !== null && !modal && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
       await page.click('[data-k="tut-next"]');
       continue;
     }
@@ -95,7 +100,7 @@ const fast = (page) => page.evaluate(() => window.catan.controller.setSpeed(60))
 
 // 1. The picker: desktop (base done: a tick), phone (fresh: the "start with base" hint), and
 // every theme at phone width.
-{
+if (want('picker')) {
   const { ctx, page } = await newPage(1440, 'picker');
   await page.evaluate(() =>
     localStorage.setItem(
@@ -114,7 +119,7 @@ const fast = (page) => page.evaluate(() => window.catan.controller.setSpeed(60))
   await shot(page, 'setup-learn-link-desktop');
   await ctx.close();
 }
-for (const theme of THEMES) {
+for (const theme of want('picker') ? THEMES : []) {
   const { ctx, page } = await newPage(412, `picker-${theme}`, `&theme=${theme}`);
   await openSetup(page);
   if (theme === 'sunfired') {
@@ -131,7 +136,7 @@ for (const theme of THEMES) {
 
 // 2. Cities & Knights: intro (base link), the first roll's event die, improvements (tracks),
 // the barbarians' attack (turn 15).
-for (const width of [1440, 412]) {
+for (const width of want('ck') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
   const { ctx, page } = await newPage(width, `ck-${tag}`);
   await openSetup(page);
@@ -162,7 +167,7 @@ for (const width of [1440, 412]) {
 }
 
 // 3. Seafarers: intro, ships on the first turn, the learner's own 7 (robber or pirate).
-for (const width of [1440, 412]) {
+for (const width of want('sea') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
   const { ctx, page } = await newPage(width, `sea-${tag}`);
   await openSetup(page);
@@ -176,6 +181,56 @@ for (const width of [1440, 412]) {
   await shot(page, `sea-${tag}-2-ships`);
   await playTo(page, 'pirate');
   await shot(page, `sea-${tag}-3-pirate`);
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 4. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
+// track pulsing), a disaster; the oil lesson at phone width.
+for (const width of want('oil') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `oil-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-oil"]');
+  await page.click('.setup [data-k="learn-oil"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'oil');
+  await shot(page, `oil-${tag}-1-oil`);
+  if (width >= 600) {
+    await playTo(page, 'pollution', 600_000);
+    await shot(page, `oil-${tag}-2-pollution`);
+    await playTo(page, 'disaster', 600_000);
+    await shot(page, `oil-${tag}-3-disaster`);
+  }
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 5. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
+// turn and the first event token (whichever comes first); the fields lesson at phone width.
+for (const width of want('crop') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `crop-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-crop"]');
+  await page.click('.setup [data-k="learn-crop"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'fields');
+  await shot(page, `crop-${tag}-1-fields`);
+  const moments = width >= 600 ? ['vault', 'events'] : [];
+  while (moments.length > 0) {
+    const id = await playTo(page, moments, 600_000);
+    await shot(page, `crop-${tag}-${id === 'vault' ? 2 : 3}-${id}`);
+    moments.splice(moments.indexOf(id), 1);
+  }
   console.log(
     tag,
     JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),

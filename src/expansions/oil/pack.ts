@@ -4,10 +4,12 @@ import { oilModule } from './engine';
 import { oilBots } from './bots';
 import { oilHud } from './ui';
 import { oilDrawer } from './render';
+import { oilTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: oilModule,
   bots: oilBots,
   hud: oilHud,
   drawer: oilDrawer,
+  tutorial: oilTutorial,
 };
