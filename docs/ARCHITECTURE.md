@@ -614,9 +614,23 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   card: face, name, `DEV_CARD_INFO[type].text` (ui/cards.ts), the reason. A playable card keeps
   one-click play; right-click, the context-menu key or a 450 ms touch long-press opens the same
   card. Closes on Esc, a click outside, the card again, or when the card leaves the hand / the
-  viewer changes. The info card is one node (`Hud.devPop`, `.why.dev-info` in `.hud-pop-layer`)
+  viewer changes. The info card is one node (`Hud.infoPop`, `.why.dev-info` in `.hud-pop-layer`)
   patched in place across renders and placed above its card in the next frame (`--x` / `--y`).
-  C&K's progress stack still uses `disabled` (its panel lists the card texts).
+- Module hand cards (#cardinfo): every card-like thing a module puts in the hand comes from the
+  extension hook `handCardInfo` (docs/EXPANSIONS.md §8, `HandCard`: key, name, count, face, text,
+  kind, play, status, notes) and is drawn by the HUD with the dev cards' button and info card
+  (`Hud.infoCardButton`, `cardInfoCard`; open card = `Hud.cardInfo`, a dev card type or a module
+  key such as `ck/alchemist`, every such card carries `data-info`). `kind: 'play'` cards (C&K
+  progress cards, one per kind held; T&B Swift Journey) sit after the separator with the dev cards
+  and play on click only when the module set `play` from a legal action (an action, or a dialog
+  for choices first: the Alchemist's dice, dialog state `'card'`); `kind: 'good'` cards (C&K
+  commodities, E&P gold, T&B coins / fish / old boot / trade tokens, oil, Seafarers cloth) sit
+  after the resources and only open their info card (`.is-info`, `aria-expanded`). A
+  combination that changes another module's card words the refusal with `handCardStatus`
+  (Barbarian Attack + C&K, E&P + C&K); `handCardLine` picks the line. Texts live in the module
+  (lazy pack chunk): C&K `CARD_TEXT` (also the sidebar list) and `ck/hand.ts`, `tb/hand.ts`, the
+  module `ui.ts`. Test: `src/ui/cardInfo.test.ts` (bot games per mode: playable = engine, no
+  generic refusal).
 
 - Performance (s17, `ui/power.ts`, menu "Performance: Auto / High quality / Low power", saved as
   `catan.performance`): low power = Pixi without antialiasing (decided at `app.init`, so a change
@@ -641,7 +655,8 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   motion show badges only. `Hud.setHexLocator(id => board.screenPos(id))`; the board draws nothing for it.
 - Expansions (F1): active modules' `HudExtension`s (`ui/expansions.ts`) add a sidebar panel,
   build cards (namespaced place modes), dialogs for their phases, turn-pill hints, cards in the
-  hand bar (`handCards`), items in the trade offer rows (`offerExtras`) and card art for the
+  hand bar with their info card (`handCardInfo`, #cardinfo above; `handCards` for anything that
+  is not a card), items in the trade offer rows (`offerExtras`) and card art for the
   production animation (`cardFace`). The setup
   screen's expansion chips (U7: chip set -> mode, `ExpansionModule.icon`), scenario tiles
   (grouped by mode when one chip set stands for several) and option tiles come from the engine

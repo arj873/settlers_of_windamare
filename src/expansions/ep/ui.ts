@@ -29,6 +29,7 @@ import {
   citiesInPlay,
   epSlice,
   GOLD_BUYS,
+  GOLD_PER_BUY,
   isHarborStep,
   ITEM,
   LIMIT,
@@ -92,6 +93,9 @@ export function goldFace(w: number): HTMLElement {
     icon('gold', Math.round(w * 0.72)),
   );
 }
+
+/** What gold is for (the hand's info card, #cardinfo). */
+const GOLD_TEXT = `A roll that gives you nothing pays 1 gold; a gold field pays 2 gold per building on its number. In your Action phase, ${GOLD_PER_BUY} gold buy 1 resource of your choice (at most ${GOLD_BUYS} times per turn), 3 cards of one resource buy 1 gold, and you can trade gold with players. A ship passing an opponent's pirate pays 1 gold. Gold never counts on a 7.`;
 
 const CARGO_NAME: Record<Cargo, string> = {
   settler: 'settler',
@@ -653,21 +657,24 @@ export const epHud: HudExtension = {
     }
   },
 
-  handCards(state, view) {
+  // #cardinfo: gold next to the resources, with what it is for.
+  handCardInfo(state, view) {
     if (view.spectator) return [];
-    const n = epSlice(state).gold[view.viewer] ?? 0;
+    const s = epSlice(state);
+    const mineNow = state.turn.current === view.viewer;
     return [
-      h('span', { class: 'hand-sep' }),
-      h(
-        'div',
-        {
-          class: `hcard rcard ep-hc${n === 0 ? ' is-zero' : n >= 3 ? ' stack-3' : n === 2 ? ' stack-2' : ''}`,
-          title: `Gold: ${n}`,
-          attrs: { 'data-card': 'gold' },
-        },
-        goldFace(46),
-        h('span', { class: 'count-badge' }, String(n)),
-      ),
+      {
+        key: 'ep/gold',
+        name: 'Gold',
+        count: s.gold[view.viewer] ?? 0,
+        produced: 'gold',
+        face: goldFace,
+        text: GOLD_TEXT,
+        kind: 'good',
+        play: null,
+        notes: mineNow ? [`Gold purchases this turn: ${s.turn.goldBuys} of ${GOLD_BUYS}.`] : [],
+        cls: 'ep-hc',
+      },
     ];
   },
 

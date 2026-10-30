@@ -10,10 +10,11 @@ import { h } from '../../ui/dom';
 import type { HudExtension } from '../../ui/expansions';
 import { RESOURCE_LABEL } from '../../ui/icons';
 import type { HudView } from '../../ui/types';
-import { COMMODITIES, phaseOf, type Commodity } from '../ck/engine';
+import { COMMODITIES, isProgressCard, mainTurn, phaseOf, type Commodity } from '../ck/engine';
 import { COMMODITY_LABEL, commodityFace } from '../ck/ui';
+import { inMovement } from '../ep/engine/actions';
 import { offerForm } from '../ep/ui';
-import { EPCK, EPCK_VP_BONUS, MEDICINE_HARBOR_ITEM } from './engine';
+import { EPCK, EPCK_VP_BONUS, MEDICINE_HARBOR_ITEM, cardBlocker } from './engine';
 import './epck.css';
 
 type Send = (a: Action) => void;
@@ -120,6 +121,18 @@ export const epckHud: HudExtension = {
       available: inMedicine,
     },
   ],
+
+  // #cardinfo: progress cards wait for the Action phase; Medicine, Bishop, Inventor work here.
+  handCardStatus(state, view, key) {
+    const card = key.slice('ck/'.length);
+    if (!key.startsWith('ck/') || !isProgressCard(card) || card === 'alchemist') return null;
+    if (mainTurn(state, view.viewer) !== null) return null;
+    if (inMovement(state)) {
+      return 'Progress cards are played in the Action phase, before your ships move: play it on a later turn.';
+    }
+    const why = cardBlocker(state, view.viewer, card);
+    return why ? `Not now: ${why}.` : null;
+  },
 
   hint(state, view) {
     if (state.phase.kind === 'setup' && state.turn.current === view.viewer) {
