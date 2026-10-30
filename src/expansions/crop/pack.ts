@@ -4,10 +4,12 @@ import { cropModule } from './engine';
 import { cropBots } from './bots';
 import { cropHud } from './ui';
 import { cropDrawer } from './render';
+import { cropTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: cropModule,
   bots: cropBots,
   hud: cropHud,
   drawer: cropDrawer,
+  tutorial: cropTutorial,
 };

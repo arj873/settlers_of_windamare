@@ -7,8 +7,9 @@ tutorials; the coach only reads the game.
 
 There is one tutorial per **course**: the base game (`src/ui/tutorial/`, since s16) and one per
 expansion module that has one (`src/expansions/<id>/tutorial.ts`). Built: base, Cities & Knights
-(`ck`), Seafarers (`seafarers`), Traders & Barbarians (`tb`). Expansion courses assume the player knows the base game: they
-teach only what is new, and their first lesson offers the base tutorial until it is done.
+(`ck`), Seafarers (`seafarers`), Traders & Barbarians (`tb`), Oil Springs (`oil`), Crop Trust
+(`crop`). Expansion courses assume the player knows the base game: they teach only what is new,
+and their first lesson offers the base tutorial until it is done.
 
 ## 1. Pieces
 
@@ -149,10 +150,28 @@ are on the setup screen). The seed: a 7 on turn 3 (a bot's), the learner loads o
 turn (Easy: first) and delivers on their sixth (Easy: fourth, Hard: eighth); no learner needs a
 recap. Drive-off and Swift Journey show only if they come up (the Easy bots seldom upgrade).
 
+**Oil Springs** (`learn-oil-288`, the rulebook board, 3 players, 12 VP). Lessons: intro (springs,
+pollution, the win at the end of your turn), setting up (a spring's corner pays oil), oil (first
+turn; picture: what oil is for, a "turn 1 oil into 2 cards" todo when the learner holds oil),
+pollution (live marker), sequestering (shows when the learner can, or anyone did), metropolis
+(when a city stands), disaster (names the disaster roll), you're ready. The seed: a bot uses oil
+by turn 12 and a disaster strikes by turn 25 for every learner; all three learners see every
+lesson live. The bots don't seek springs, so the scripted learners rarely hold oil; a reader of
+the setup lesson may.
+
+**Crop Trust** (`learn-crop-52`, the first-game board, 3 players, 10 VP). Lessons: intro (the
+collapse ending, food), fields and crops (picture: the five crops), harvest (urgent, the pick to
+make), the seed vault (first turn, with a "store a seed" todo), replanting (urgent, seeds left),
+effects of growth (names the revealed event), when the crops run out (shows when a field is down
+to its last crop), you're ready. The seed: every learner harvests within their first three turns
+and the crops hold out through the coached turns; Normal and Hard learners see every lesson live,
+the Easy learner gets the event lesson as a recap.
+
 ## 5. Screenshots
 
 `node scripts/shots-tutorials.mjs <devUrl> docs/design/tutorials` (Vite dev server; the
-learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb` takes only those sections):
+learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb,oil,crop` takes only those
+sections):
 
 - Picker: `picker-desktop.png` (base done: its tick, over the setup screen), `picker-phone.png`
   (412 px, fresh: the "start with the base game" hint), and `picker-phone-<theme>.png` for wood,
@@ -167,3 +186,7 @@ learner's moves are the Normal bot's; `SHOTS=picker,ck,sea,tb` takes only those 
   `-3-pirate.png` (the learner's own 7).
 - Traders & Barbarians: `tb-{desktop,phone}-1-wagon.png` (the Wagon card pulsing),
   `-2-load.png` (where each commodity goes); `tb-desktop-3-baggage.png` (the five cards).
+- Oil Springs (`SHOTS=oil`): `oil-{desktop,phone}-1-oil.png` (the uses picture, the panel
+  pulsing), `oil-desktop-2-pollution.png` (the track pulsing), `oil-desktop-3-disaster.png`.
+- Crop Trust (`SHOTS=crop`): `crop-{desktop,phone}-1-fields.png` (the crops picture),
+  `crop-desktop-2-vault.png`, `crop-desktop-3-events.png` (the revealed event named).

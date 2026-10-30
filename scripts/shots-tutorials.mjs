@@ -1,9 +1,10 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights, Seafarers and Traders & Barbarians courses. The learner's
-// moves are the Normal bot's (through the controller); bots play on at 60 ms a move.
+// moments of the Cities & Knights, Seafarers, Traders & Barbarians, Oil Springs and Crop Trust
+// courses. The learner's moves are the Normal bot's (through the controller); bots play on at
+// 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
-// SHOTS=picker,ck,sea,tb (default: all) takes only those sections.
+// SHOTS=picker,ck,sea,tb,oil,crop (default: all) takes only those sections.
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -82,7 +83,9 @@ async function playTo(page, id, ms = 240_000) {
   while (Date.now() < end) {
     const now = await current(page);
     if (ids.includes(now)) return now;
-    if (now !== null && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
+    // A modal dialog (a discard, a steal) covers the panel: the learner's move first.
+    const modal = await page.$('.scrim.is-modal');
+    if (now !== null && !modal && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
       // The lesson may close by itself meanwhile (Next goes disabled): just look again.
       await page
         .click('[data-k="tut-next"]:not([disabled])', { timeout: 1000 })
@@ -209,6 +212,56 @@ for (const width of want('tb') ? [1440, 412] : []) {
     const id = await playTo(page, moments);
     moments.splice(moments.indexOf(id), 1);
     await shot(page, `tb-${tag}-${id === 'load' ? 2 : 3}-${id}`);
+  }
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 5. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
+// track pulsing), a disaster; the oil lesson at phone width.
+for (const width of want('oil') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `oil-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-oil"]');
+  await page.click('.setup [data-k="learn-oil"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'oil');
+  await shot(page, `oil-${tag}-1-oil`);
+  if (width >= 600) {
+    await playTo(page, 'pollution', 600_000);
+    await shot(page, `oil-${tag}-2-pollution`);
+    await playTo(page, 'disaster', 600_000);
+    await shot(page, `oil-${tag}-3-disaster`);
+  }
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 6. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
+// turn and the first event token (whichever comes first); the fields lesson at phone width.
+for (const width of want('crop') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `crop-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-crop"]');
+  await page.click('.setup [data-k="learn-crop"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'fields');
+  await shot(page, `crop-${tag}-1-fields`);
+  const moments = width >= 600 ? ['vault', 'events'] : [];
+  while (moments.length > 0) {
+    const id = await playTo(page, moments, 600_000);
+    await shot(page, `crop-${tag}-${id === 'vault' ? 2 : 3}-${id}`);
+    moments.splice(moments.indexOf(id), 1);
   }
   console.log(
     tag,

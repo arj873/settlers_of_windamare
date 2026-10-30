@@ -1,0 +1,31 @@
+/* "Learn Crop Trust" (tutorial.ts): what the coach points at, and its picture. */
+.catan-hud[data-tut-focus='crop-fields'] .crop-fields,
+.catan-hud[data-tut-focus='crop-vault'] .crop-list,
+.catan-hud[data-tut-focus='crop-vault'] .crop-deposit,
+.catan-hud[data-tut-focus='crop-facts'] .crop-facts {
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catan-hud[data-tut-focus='crop-fields'] .crop-fields,
+  .catan-hud[data-tut-focus='crop-vault'] .crop-list,
+  .catan-hud[data-tut-focus='crop-vault'] .crop-deposit,
+  .catan-hud[data-tut-focus='crop-facts'] .crop-facts {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+
+.tut-crop-kinds {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+.tut-crop-kinds li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

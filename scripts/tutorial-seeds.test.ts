@@ -15,6 +15,8 @@ import { LEARNERS, drive, firstTurn as turnOf, type Drive } from '../src/ui/tuto
 import { ckTutorialSpec } from '../src/expansions/ck/tutorial';
 import { seaTutorialSpec } from '../src/expansions/seafarers/tutorial';
 import { tbTutorialSpec } from '../src/expansions/tb/tutorial';
+import { oilTutorialSpec } from '../src/expansions/oil/tutorial';
+import { cropTutorialSpec } from '../src/expansions/crop/tutorial';
 
 const which = process.env.TUTORIAL_SEEDS ?? '';
 const count = Number(process.env.TUTORIAL_SEED_COUNT ?? 40);
@@ -112,6 +114,49 @@ const tbScore: Scorer = (runs) => {
   return { score, notes: notes.join(' | ') };
 };
 
+/** The learner's turn index of the first log entry of theirs matching `re`, or null. */
+const mineFirst = (d: Drive, re: RegExp) =>
+  learnerTurn(d.log.find((e) => e.player === 0 && re.test(e.text))?.turn ?? null);
+
+/**
+ * Oil Springs: few recaps (pollution, sequestering, a metropolis, a disaster) for every learner;
+ * the Normal learner's springs pay early (the bots don't seek springs, a reader may).
+ */
+const oilScore: Scorer = (runs) => {
+  let score = 0;
+  const notes: string[] = [];
+  for (const { name, d } of runs) {
+    const recaps = recapsOf(d);
+    const oil = mineFirst(d, / received \d+ oil/);
+    score += recaps.length * 2;
+    if (name === 'normal' && (oil === null || oil > 3)) score += 2;
+    if (!d.run.over) score += 10;
+    notes.push(`${name}: oil L${oil} ${recaps.join(',') || '-'}`);
+  }
+  return { score, notes: notes.join(' | ') };
+};
+
+/** Crop Trust: a harvest and a seed deposit early, the game not over too soon, few recaps. */
+const cropScore: Scorer = (runs) => {
+  let score = 0;
+  const notes: string[] = [];
+  for (const { name, d } of runs) {
+    const recaps = recapsOf(d);
+    const harvest = mineFirst(d, / harvested /);
+    const stored = mineFirst(d, / stored .* in the seed vault/);
+    const end = learnerTurn(turnOf(d, /^Crop collapse/));
+    score += recaps.length * 2;
+    if (harvest === null || harvest > 3) score += 2;
+    if (stored === null || stored > 5) score += 1;
+    if (end !== null && end < 6) score += 3;
+    if (!d.run.over) score += 10;
+    notes.push(
+      `${name}: harvest L${harvest} store L${stored} end L${end} ${recaps.join(',') || '-'}`,
+    );
+  }
+  return { score, notes: notes.join(' | ') };
+};
+
 describe.skipIf(!which)('tutorial seed search', () => {
   it(`searches ${which}`, () => {
     const rows =
@@ -119,7 +164,11 @@ describe.skipIf(!which)('tutorial seed search', () => {
         ? search(ckTutorialSpec, 'learn-ck-', ckScore)
         : which === 'tb'
           ? search(tbTutorialSpec, 'learn-tb-', tbScore)
-          : search(seaTutorialSpec, 'learn-sea-', seaScore);
+          : which === 'oil'
+            ? search(oilTutorialSpec, 'learn-oil-', oilScore)
+            : which === 'crop'
+              ? search(cropTutorialSpec, 'learn-crop-', cropScore)
+              : search(seaTutorialSpec, 'learn-sea-', seaScore);
     for (const r of rows.slice(0, 15)) console.log(`${r.seed}\t${r.score}\t${r.notes}`);
   }, 3_600_000);
 });
