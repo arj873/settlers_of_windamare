@@ -1,11 +1,13 @@
 // Production-build smoke test of the flows that load expansion modules on demand (s18), with the
 // page's Content-Security-Policy watched: base hotseat, C&K and Seafarers hotseat games picked on
 // the setup screen, resume of the Seafarers save after a reload, an online Seafarers room on the
-// in-browser server (host + a guest joining by the invite link), the tutorial, and a short bot
-// game of every mode (`?mode=`).
+// in-browser server (host + a guest joining by the invite link), the tutorials (base from the
+// picker, C&K from its chip link and resumed after a reload, Seafarers from the in-game menu),
+// and a short bot game of every mode (`?mode=`).
 //
 //   pnpm build && pnpm preview --port 4173 &
-//   node scripts/perf/flows.mjs [--base http://localhost:4173] [--only base,ck,sea,online,tutorial,modes]
+//   node scripts/perf/flows.mjs [--base http://localhost:4173]
+//     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,modes]
 //
 // Exits non-zero when a flow fails, the page throws or logs an error, or a CSP violation fires.
 import { execSync } from 'node:child_process';
@@ -17,7 +19,9 @@ const flag = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 const BASE = flag('--base', 'http://localhost:4173').replace(/\/$/, '');
-const ONLY = flag('--only', 'base,ck,sea,online,tutorial,modes').split(',');
+const ONLY = flag('--only', 'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,modes').split(
+  ',',
+);
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome-stable',
@@ -172,15 +176,94 @@ async function online() {
   await ctx.close();
 }
 
+/** The coach's course and its first lesson title, once its panel shows. */
+async function coachShows(page) {
+  await page.waitForSelector('.hud-side .sec-players');
+  // The head is always drawn; the title only while a lesson is up (not when idle).
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-head');
+  return page.evaluate(() => ({
+    course: window.catan.tutorial.courseId,
+    mode: window.catan.controller.state.settings.mode,
+    title: document.querySelector('.tut-title')?.textContent,
+  }));
+}
+
+/** "Learn to play" on the setup screen → the picker → the base game. */
 async function tutorial() {
   const { ctx, open } = await profile('tutorial');
   const page = await open(`${BASE}/`);
   await page.click('[data-k="offline"]');
   await page.waitForSelector('.setup [data-k="learn"]');
   await page.click('.setup [data-k="learn"]');
-  await page.waitForSelector('.hud-side .sec-players');
-  await page.waitForSelector('.tut-head');
-  check((await hotseatMode(page)) === 'base', 'tutorial game started');
+  await page.waitForSelector('.tut-pick [data-k="tut-pick-base"]');
+  check(await page.$('.setup [data-k="start"]'), 'the setup screen stays behind the picker');
+  await page.click('.tut-pick [data-k="tut-pick-cancel"]');
+  check(
+    !(await page.$('.tut-pick')) && (await page.$('.setup [data-k="start"]')),
+    'Cancel: back on the setup screen',
+  );
+  await page.click('.setup [data-k="learn"]');
+  await page.click('.tut-pick [data-k="tut-pick-base"]');
+  const s = await coachShows(page);
+  check(s.mode === 'base' && s.course === 'base', 'base tutorial started from the picker');
+  check(!(await page.$('.setup')), 'the setup screen closed');
+  await ctx.close();
+}
+
+/** "New to Cities & Knights? Learn it" under the chip; its module loads; a reload resumes it. */
+async function tutorialCk() {
+  const { ctx, open } = await profile('tutorial-ck');
+  const page = await open(`${BASE}/`);
+  await page.click('[data-k="offline"]');
+  await page.click('.setup [data-k="chip-ck"]');
+  await page.click('.setup [data-k="learn-ck"]');
+  const s = await coachShows(page);
+  check(
+    s.mode === 'ck' && s.course === 'ck' && s.title === 'Cities & Knights',
+    'C&K tutorial started',
+  );
+  check(await page.$('[data-k="tut-base"]'), 'its intro offers the base tutorial');
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
+  await page.reload();
+  await page.click('[data-k="offline"]');
+  await page.waitForSelector('.game-resume .btn-primary');
+  check(
+    (await page.textContent('.game-resume p'))?.includes('tutorial'),
+    'resume prompt names the tutorial',
+  );
+  await page.click('.game-resume .btn-primary');
+  const again = await coachShows(page);
+  check(again.course === 'ck' && again.mode === 'ck', 'C&K tutorial resumed after a reload');
+  await ctx.close();
+}
+
+/** The menu's "Learn to play" in a running game → the picker → Seafarers. */
+async function tutorialSea() {
+  const { ctx, open } = await profile('tutorial-sea');
+  const page = await open(`${BASE}/`);
+  await newHotseat(page, null);
+  const ask = async () => {
+    await page.click('.menu-btn');
+    await page.click('[data-k="learn-to-play"]');
+    await page.click('[data-k="learn-ask"] .seg-btn.is-on');
+    await page.waitForSelector('.tut-pick [data-k="tut-pick-seafarers"]');
+  };
+  await ask();
+  await page.click('.tut-pick [data-k="tut-pick-cancel"]');
+  check(
+    (await page.$('.hud-side .sec-players')) && (await hotseatMode(page)) === 'base',
+    'Cancel: the running game goes on',
+  );
+  await ask();
+  await page.click('.tut-pick [data-k="tut-pick-seafarers"]');
+  const s = await coachShows(page);
+  check(
+    s.mode === 'seafarers' && s.course === 'seafarers' && s.title === 'Seafarers',
+    'Seafarers tutorial started from the menu picker',
+  );
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
   await ctx.close();
 }
 
@@ -208,7 +291,16 @@ async function modes() {
   await ctx.close();
 }
 
-const FLOWS = { base, ck, sea, online, tutorial, modes };
+const FLOWS = {
+  base,
+  ck,
+  sea,
+  online,
+  tutorial,
+  'tutorial-ck': tutorialCk,
+  'tutorial-sea': tutorialSea,
+  modes,
+};
 let failed = false;
 for (const name of ONLY) {
   try {

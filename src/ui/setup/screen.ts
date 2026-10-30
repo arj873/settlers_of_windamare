@@ -16,8 +16,10 @@ import {
   pickScenario,
   scenarioGroups,
   toggleChip,
+  type ChipState,
   type ScenarioEntry,
 } from './modePicker';
+import { TUTORIAL_MODULES } from '../tutorial/registry';
 import {
   addSeat,
   buildConfig,
@@ -97,8 +99,11 @@ export interface SetupScreenOptions {
   onStart: (cfg: NewGameConfig) => void;
   /** Present when there is a game to go back to. */
   onBack?: () => void;
-  /** "Learn to play" (src/ui/tutorial): starts the tutorial game instead. Absent = no button. */
-  onTutorial?: () => void;
+  /**
+   * "Learn to play" (src/ui/tutorial): the header button (no course: the picker) and, under the
+   * expansion chips, "New to <expansion>? Learn it" (that module's course). Absent = neither.
+   */
+  onTutorial?: (course?: string) => void;
   /** Where the last-used settings live. Default: localStorage (null = don't remember). */
   storage?: SetupStorage | null;
   /** Also offer 'wip' / 'demo' modes. Default: the page URL has ?modes=all. */
@@ -409,6 +414,32 @@ export class SetupScreen {
         'ul',
         { class: 'su-mode-notes' },
         ...chipNotes(chips).map((n) => h('li', {}, `${n.names.join(', ')}: ${n.reason}`)),
+      ),
+      this.learnLinks(chips),
+    );
+  }
+
+  /** "New to Cities & Knights? Learn it": a tutorial for each chip on that has one. */
+  private learnLinks(chips: readonly ChipState[]): HTMLElement | null {
+    const learn = this.opts.onTutorial;
+    const on = chips.filter((c) => c.on && TUTORIAL_MODULES.includes(c.id));
+    if (!learn || on.length === 0) return null;
+    return h(
+      'p',
+      { class: 'su-learn-x' },
+      ...on.map((c) =>
+        h(
+          'button',
+          {
+            class: 'su-learn-link',
+            title: `A guided game that teaches what ${c.name} adds to Catan`,
+            attrs: { 'data-k': `learn-${c.id}` },
+            on: { click: () => learn(c.id) },
+          },
+          h('span', { class: 'su-learn-q', attrs: { 'aria-hidden': 'true' } }, '?'),
+          `New to ${c.name}? `,
+          h('b', {}, 'Learn it'),
+        ),
       ),
     );
   }

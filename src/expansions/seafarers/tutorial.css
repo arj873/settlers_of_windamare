@@ -1,0 +1,12 @@
+/* "Learn Seafarers" (tutorial.ts): what the coach points at. */
+.catan-hud[data-tut-focus='sea-ship'] .bcard[data-actions^='seafarers/buildShip'],
+.catan-hud[data-tut-focus='sea-move'] .bcard[data-actions^='seafarers/pickShip'] {
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catan-hud[data-tut-focus='sea-ship'] .bcard[data-actions^='seafarers/buildShip'],
+  .catan-hud[data-tut-focus='sea-move'] .bcard[data-actions^='seafarers/pickShip'] {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}

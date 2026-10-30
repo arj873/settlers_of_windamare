@@ -1,0 +1,51 @@
+/* "Learn Cities & Knights" (tutorial.ts): what the coach points at, and its pictures. */
+.catan-hud[data-tut-focus='ck-dice'] .dice,
+.catan-hud[data-tut-focus='ck-dice'] .ck-barb .ck-facts,
+.catan-hud[data-tut-focus='ck-tracks'] .ck-tracks,
+.catan-hud[data-tut-focus='ck-barb'] .ck-barb,
+.catan-hud[data-tut-focus='ck-progress'] .hand .ck-hp,
+.catan-hud[data-tut-focus='ck-knight'] .bcard[data-actions^='ck/buildKnight'],
+.catan-hud[data-tut-focus='ck-command'] .bcard[data-actions^='ck/selectKnight'],
+.catan-hud[data-tut-focus='ck-wall'] .bcard[data-actions^='ck/buildWall'] {
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catan-hud[data-tut-focus='ck-dice'] .dice,
+  .catan-hud[data-tut-focus='ck-dice'] .ck-barb .ck-facts,
+  .catan-hud[data-tut-focus='ck-tracks'] .ck-tracks,
+  .catan-hud[data-tut-focus='ck-barb'] .ck-barb,
+  .catan-hud[data-tut-focus='ck-progress'] .hand .ck-hp,
+  .catan-hud[data-tut-focus='ck-knight'] .bcard[data-actions^='ck/buildKnight'],
+  .catan-hud[data-tut-focus='ck-command'] .bcard[data-actions^='ck/selectKnight'],
+  .catan-hud[data-tut-focus='ck-wall'] .bcard[data-actions^='ck/buildWall'] {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+
+.tut-ck-goods,
+.tut-ck-tracks {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+.tut-ck-goods li,
+.tut-ck-tracks li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1.25;
+}
+.tut-ck-goods li > span:first-child {
+  min-width: 82px;
+}
+.tut-ck-tracks .ck-trk-ico {
+  width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  color: #fff;
+}

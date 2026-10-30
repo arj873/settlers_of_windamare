@@ -74,7 +74,8 @@ src/expansions/<id>/        ONE FOLDER PER EXPANSION, owned by that expansion's 
   render.ts                 BoardDrawer  (Pixi)
   ui.ts, <id>.css           HudExtension (DOM)
   bots.ts                   BotExtension
-  pack.ts                   { module, bots, hud, drawer? }: what the browser loads on demand
+  tutorial.ts, tutorial.css "Learn <expansion>" course (optional, docs/TUTORIAL.md)
+  pack.ts                   { module, bots, hud, drawer?, tutorial? }: what the browser loads on demand
   *.test.ts                 UI / sim tests (outside engine/, may import bots, ui, game)
 ```
 
@@ -112,10 +113,14 @@ load when a game needs them; until then the app knows the module from its **cata
   retries.
 - **Browser** (`src/expansions/load.ts`): `useBrowserLoader()` (app boot) makes `ensureModules`
   fetch `src/expansions/<id>/pack.ts`, one chunk per module (vite.config.ts `CHUNK_GROUPS`), and
-  register its parts (`installExpansion`, `registerBots`, `registerHud`, `registerDrawer`; the app
-  registers the HUD's sound recipes). Callers: the setup screen (the picked mode, every mode whose
-  scenarios it shows, a chip on hover / press; Start stays off while loading), hotseat resume, dev
-  `?mode=`, the online lobby / game (`OnlineApp.onRoom`, `NetGameController.render` waits).
+  register its parts (`installExpansion`, `registerBots`, `registerHud`, `registerDrawer`,
+  `registerCourse` for its tutorial; the app registers the HUD's sound recipes). Callers: the setup
+  screen (the picked mode, every mode whose scenarios it shows, a chip on hover / press; Start
+  stays off while loading), hotseat resume, dev `?mode=`, the online lobby / game
+  (`OnlineApp.onRoom`, `NetGameController.render` waits), starting a module's tutorial (s19).
+- **Tutorials** (s19, docs/TUTORIAL.md): a module's "Learn to play" course is `pack.tutorial`, so
+  its lessons ship in the module's chunk, never in the game chunk. The module id is also listed in
+  `TUTORIAL_MODULES` (`src/ui/tutorial/registry.ts`) so the picker can offer it before it loads.
 - **Headless** (`src/expansions/headless.ts`, `installHeadless()`): the room server (`RoomCore`),
   the in-browser room server (`DevServer`), `pnpm sim` / `bench` and the catalog generator import
   every module statically. **Tests**: `src/testSetup.ts` (vitest setup) installs every pack, so
@@ -560,7 +565,9 @@ Use `src/expansions/demo` as the template: each step has a demo counterpart.
    until clean (§9). See `demo/bots.test.ts`.
 10. **Play it**: `pnpm dev`, open `/?mode=<id>` (or `/?modes=all` → setup screen); `&scenario=<id>/<s>`
     picks a scenario, `&autoplay=4bots&speed=20` watches bots play.
-11. **Ship**: flip the mode to `'ready'`, write the engine status per rule into
+11. **Tutorial** (optional, can come later): `src/expansions/<id>/tutorial.ts` → a `Course`, listed
+    in your `pack.ts` and in `TUTORIAL_MODULES`; the checklist is docs/TUTORIAL.md §3.
+12. **Ship**: flip the mode to `'ready'`, write the engine status per rule into
     `docs/rules/<id>.md`, run `nice -n 19 pnpm typecheck && nice -n 19 pnpm lint && nice -n 19 pnpm test`,
     commit on your branch. List framework needs (new hooks, core changes) in your report.
 

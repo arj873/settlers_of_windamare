@@ -10,19 +10,11 @@ import {
   handSize,
   longestRoadLength,
   roadsOf,
-  type Action,
   type ActionType,
-  type GameState,
-  type PlayerId,
 } from '../../engine';
+import { myTurnsStarted, sevenNow, type LessonDef, type TutorialCtx } from './course';
 
-export interface TutorialCtx {
-  readonly state: GameState;
-  /** The learner's seat. */
-  readonly me: PlayerId;
-  /** The learner's legal actions right now. */
-  readonly legal: readonly Action[];
-}
+export { myTurnsStarted, sevenNow, type TutorialCtx };
 
 export type LessonId =
   | 'goal'
@@ -49,25 +41,8 @@ export type Focus = 'roll' | 'end' | 'build' | 'dev' | 'trade' | 'hand' | 'playe
 /** Pictures under the text: the terrain → resource row or the five development cards. */
 export type Visual = 'terrain' | 'devCards';
 
-export interface Lesson {
-  id: LessonId;
-  title: string;
-  /** 1-3 short sentences. `live` = about the current moment (false when paging back). */
-  text: (c: TutorialCtx, live: boolean) => string;
-  /** Lessons that must be finished first. */
-  after?: readonly LessonId[];
-  /** Its moment: it may show now. */
-  when: (c: TutorialCtx) => boolean;
-  /** Closes by itself once this holds (the player did it, or the moment passed). Else: Next. */
-  doneWhen?: (c: TutorialCtx) => boolean;
-  /** Not shown yet and no longer useful: finished without showing (no recap). */
-  stale?: (c: TutorialCtx) => boolean;
-  /** The player must act now: it pushes a reading lesson off the panel. */
-  urgent?: boolean;
-  /** Event lesson: if its event never comes up, it shows as a recap before the end. */
-  recap?: boolean;
-  /** A live "your move" line while the lesson is up. */
-  todo?: (c: TutorialCtx) => string | null;
+/** A base lesson (course.ts `LessonDef`, with the base focus / visual names). */
+export interface Lesson extends LessonDef<LessonId> {
   focus?: Focus;
   visual?: Visual;
 }
@@ -86,30 +61,6 @@ const setupStep = (c: TutorialCtx) => {
 const settlements = (c: TutorialCtx) => buildingsOf(c.state, c.me).length;
 const roads = (c: TutorialCtx) => roadsOf(c.state, c.me).length;
 const dice = (c: TutorialCtx) => (c.state.dice ? c.state.dice[0] + c.state.dice[1] : null);
-
-/** How many of the learner's turns have started (setup is turn 0). */
-export function myTurnsStarted(c: TutorialCtx): number {
-  const n = c.state.players.length;
-  const first = 1 + ((c.me - c.state.settings.startingPlayer + n) % n);
-  const t = c.state.turn.number;
-  return t < first ? 0 : Math.floor((t - first) / n) + 1;
-}
-
-/** A rolled 7 is being resolved (discards, robber, steal), not a Knight. */
-export function sevenNow(c: TutorialCtx): boolean {
-  const kind = phaseOf(c);
-  if (kind === 'discard') return true;
-  if (kind !== 'moveRobber' && kind !== 'steal') return false;
-  const turn = c.state.turn.number;
-  for (let i = c.state.log.length - 1; i >= 0; i--) {
-    const e = c.state.log[i];
-    if (!e || e.turn !== turn) break;
-    const roll = / rolled (\d+)\b/.exec(e.text);
-    if (roll) return roll[1] === '7';
-    if (/ played /.test(e.text)) return false;
-  }
-  return false;
-}
 
 /** A player trade offer is waiting for the learner's answer. */
 export function offerToMe(c: TutorialCtx): boolean {

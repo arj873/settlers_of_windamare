@@ -45,7 +45,7 @@ import {
   reportSlowDevice,
 } from './ui/power';
 import { STORAGE_KEY as SETUP_KEY } from './ui/setup/model';
-import { TutorialCoach, isTutorialGame, offerTutorial } from './ui/tutorial';
+import { TutorialCoach, looksLikeTutorial, offerTutorial, openTutorialPicker } from './ui/tutorial';
 import {
   CONFIRM_BUILD_KEY,
   LONGEST_ROAD_KEY,
@@ -439,7 +439,38 @@ function startOffline(o: {
     prefs,
   );
   coach = tutorial;
-  hud.setLearnToPlay(() => tutorial.begin());
+  // An expansion's course comes with its module (docs/TUTORIAL.md): load it, then start.
+  const startCourse = async (id: string) => {
+    if (id !== 'base') await ensureModules(id);
+    tutorial.begin(id);
+  };
+  hud.setLearnToPlay((course) => {
+    if (course) {
+      startCourse(course).catch((e: unknown) => {
+        console.error(e);
+        showToast('Could not load this tutorial. Check the connection.', 'error');
+        hud.showNewGame();
+      });
+      return;
+    }
+    // From the setup screen (the HUD closed it and shows no game): it stays behind the picker,
+    // with the game it covered (if any) back under it. From the menu: over the running game.
+    const fromSetup = uiRoot.querySelector('.hud-side .sec-players') === null;
+    if (fromSetup) {
+      const game = controller.snapshot();
+      if (game) controller.resume(game);
+      hud.showNewGame();
+    }
+    openTutorialPicker(uiRoot, {
+      isDone: (id) => tutorial.isCompleted(id),
+      onPick: async (id) => {
+        if (id !== 'base') await ensureModules(id);
+        if (fromSetup) hud.hideNewGame();
+        tutorial.begin(id);
+      },
+      onCancel: () => undefined,
+    });
+  });
   // Debug handle for the console.
   (window as unknown as { catan: unknown }).catan = { controller, board, hud, tutorial };
   if (params.debug) installDebugHook(controller, board);
@@ -475,7 +506,7 @@ function startOffline(o: {
     // s18: an expansion game needs its modules; fetch them while the prompt shows.
     ensureModules(s.settings.expansions).catch(() => undefined);
     showResumePrompt(
-      isTutorialGame(s)
+      looksLikeTutorial(s)
         ? `Unfinished tutorial game at ${when}.`
         : `Unfinished game (${names}) at ${when}.`,
       () => {

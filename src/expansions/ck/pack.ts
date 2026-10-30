@@ -4,10 +4,12 @@ import { ckModule } from './engine';
 import { ckBots } from './bots';
 import { ckHud } from './ui';
 import { ckDrawer } from './render';
+import { ckTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: ckModule,
   bots: ckBots,
   hud: ckHud,
   drawer: ckDrawer,
+  tutorial: ckTutorial,
 };
