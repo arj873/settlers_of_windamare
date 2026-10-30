@@ -206,7 +206,8 @@
       controls.push({
         id: tag(btn, 'b'),
         label: labelFor(btn, dialog),
-        enabled: !btn.disabled,
+        // Dev cards that can't be played stay focusable (they open an info card): aria-disabled.
+        enabled: !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
         on: btn.classList.contains('is-on') || btn.classList.contains('is-selected'),
         inDialog: !!(dialog && dialog.contains(btn)),
         why: btn.getAttribute('data-why'),

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, GameState, VertexId } from '../engine';
+import type { Action, DevCardType, GameState, VertexId } from '../engine';
+import { createRandomBot } from '../bots';
+import { newGame, runGame } from '../bots/runner';
 import {
   applyAction,
   cornerVertex,
@@ -13,6 +15,7 @@ import {
 import {
   discardGame,
   freshGame,
+  gameOverGame,
   midGame,
   moveRobberGame as moveRobberGameState,
   tradeOfferGame,
@@ -30,6 +33,7 @@ import {
   inkFor,
   turnInfo,
   devCardRows,
+  devCardStatus,
   findBankTrade,
   findYearOfPlenty,
   hintFor,
@@ -113,6 +117,130 @@ describe('legal lookups', () => {
     expect(findBankTrade(legal, 'brick', 'ore')).toBeUndefined();
     expect(findYearOfPlenty(legal, 'wool', 'brick')?.resources).toEqual(['brick', 'wool']);
     expect(findYearOfPlenty(legal, 'wool', 'ore')).toBeUndefined();
+  });
+});
+
+describe('devCardStatus: why a dev card can or cannot be played now (#devinfo)', () => {
+  /** The status of `viewer`'s `type` card, with the engine's legal actions. */
+  const status = (s: GameState, viewer: number, type: DevCardType, legal = legalActions(s)) => {
+    const row = devCardRows(s, viewer, viewerLegal(view(viewer, legal))).find(
+      (r) => r.type === type,
+    );
+    if (!row) throw new Error(`player ${viewer} holds no ${type}`);
+    return devCardStatus(s, viewer, row);
+  };
+
+  it('a playable card says so', () => {
+    expect(status(midGame(), 1, 'knight')).toEqual({
+      playable: true,
+      reason: 'Playable now: click the card to play it.',
+      fresh: null,
+    });
+  });
+
+  it('a Victory Point card is never played', () => {
+    expect(status(midGame(), 1, 'victoryPoint')).toMatchObject({
+      playable: false,
+      reason: 'Victory Point: counts automatically, keep it hidden.',
+    });
+  });
+
+  it('off-turn: playable on your turn, before or after rolling (no "before" in rush mode)', () => {
+    const s = midGame(); // Blue's turn; Orange holds Road Building
+    expect(status(s, 3, 'roadBuilding')).toMatchObject({
+      playable: false,
+      reason: 'Not your turn. You can play this on your turn, before or after rolling.',
+    });
+    s.settings = { ...s.settings, rushMode: true };
+    expect(status(s, 3, 'roadBuilding').reason).toBe(
+      'Not your turn. You can play this on your turn.',
+    );
+  });
+
+  it('bought this turn: playable from the next turn; a mixed stack notes the new ones', () => {
+    const s = midGame(); // Blue bought the Monopoly this turn
+    expect(status(s, 1, 'monopoly').reason).toBe('Bought this turn: playable from your next turn.');
+    s.players[1]!.newDevCards.knight = 1;
+    expect(status(s, 1, 'knight')).toMatchObject({
+      playable: true,
+      fresh: '1 of them bought this turn: playable from your next turn.',
+    });
+  });
+
+  it('one development card per turn', () => {
+    const s = midGame();
+    s.turn.devCardPlayed = true;
+    expect(status(s, 1, 'knight').reason).toBe(
+      'You already played a development card this turn (one per turn). Play this one on a later turn.',
+    );
+  });
+
+  it('a rolled 7 and an open trade offer come first', () => {
+    expect(status(discardGame(), 1, 'knight').reason).toBe(
+      'Finish the robber first, then you can play this.',
+    );
+    const robber = midGame();
+    robber.phase = { kind: 'moveRobber', resume: 'main' };
+    expect(status(robber, 1, 'knight').reason).toBe(
+      'Finish the robber first, then you can play this.',
+    );
+    expect(status(tradeOfferGame(), 1, 'knight').reason).toBe(
+      'Close your trade offer first, then you can play this.',
+    );
+  });
+
+  it('special building phase: no dev cards (without the 5-6 player rule set)', () => {
+    const s = midGame();
+    s.phase = { kind: 'specialBuild', builder: 3, owner: 1 };
+    s.turn.current = 3;
+    expect(status(s, 3, 'roadBuilding').reason).toBe(
+      'No development cards in the special building phase: play it on your own turn.',
+    );
+  });
+
+  it('card limits: no road to place, a bank without 2 cards', () => {
+    const s = midGame();
+    s.turn.current = 3;
+    // Orange's turn, but no legal Road Building (as when no edge is free).
+    expect(status(s, 3, 'roadBuilding', []).reason).toBe('No road can be placed right now.');
+    s.players[3]!.devCards.yearOfPlenty = 1;
+    s.bank = { ...s.bank, brick: 1, lumber: 0, wool: 0, grain: 0, ore: 0 };
+    expect(status(s, 3, 'yearOfPlenty').reason).toBe('The bank has fewer than 2 cards to give.');
+  });
+
+  it('game over', () => {
+    expect(status(gameOverGame(), 1, 'knight')).toMatchObject({
+      playable: false,
+      reason: 'The game is over.',
+    });
+  });
+
+  it('every refusal in bot games has a specific reason, and "playable" matches the engine', () => {
+    const generic = /^Can't be played right now/;
+    const seen = new Set<string>();
+    for (const seed of [3, 11]) {
+      runGame({
+        initial: newGame({ seed, players: 4 }),
+        maxSteps: 1200,
+        bot: createRandomBot({ progressBias: 0.5 }),
+        onStep: ({ state }) => {
+          const legal = legalActions(state);
+          for (const p of state.players) {
+            const mine = legal.filter((a) => a.player === p.id);
+            for (const row of devCardRows(state, p.id, mine)) {
+              const st = devCardStatus(state, p.id, row);
+              expect(st.playable).toBe(row.canPlay);
+              expect(st.reason).not.toMatch(generic);
+              seen.add(st.reason.split('.')[0]!);
+            }
+          }
+        },
+      });
+    }
+    // The games went through the common cases.
+    expect(seen).toContain('Playable now: click the card to play it');
+    expect(seen).toContain('Not your turn');
+    expect(seen).toContain('Victory Point: counts automatically, keep it hidden');
   });
 });
 

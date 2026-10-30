@@ -949,11 +949,28 @@
 .dcard {
   cursor: default;
 }
-.dcard:disabled .card-face {
+/* Base dev cards that can't be played now stay clickable (they open their info card, hud.ts
+   `devInfo`): `is-off` is their "can't play" look. Expansion stacks still use `disabled`. */
+.dcard.is-off {
+  cursor: help;
+}
+.dcard:disabled .card-face,
+.dcard.is-off .card-face {
   filter: saturate(0.6) brightness(0.85);
 }
-.dcard.is-vp:disabled .card-face {
+.dcard.is-vp:disabled .card-face,
+.dcard.is-vp.is-off .card-face {
   filter: none;
+}
+.dcard.is-open {
+  z-index: 2;
+  transform: translateY(-5px);
+}
+.dcard.is-open .card-face {
+  box-shadow:
+    inset 0 0 0 2px var(--card-inner),
+    0 0 0 2px var(--accent-2),
+    var(--card-shadow);
 }
 .dcard.can-play {
   cursor: pointer;
@@ -1153,6 +1170,73 @@
   .bslot:hover .why {
     display: flex;
   }
+}
+
+/* Dev card info card (hud.ts `devInfo`): the `.why` bubble's look (themes restyle it too), put
+   above its card by hud.ts (`--x` / `--y`, inside the window). */
+.hud-pop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.why.dev-info {
+  display: flex;
+  top: var(--y, 0px);
+  bottom: auto;
+  left: var(--x, 0px);
+  transform: none;
+  gap: 6px;
+  width: min(270px, calc(100vw - 16px));
+  max-width: none;
+  padding: 10px 12px 11px;
+  font-size: 13px;
+  line-height: 1.3;
+  pointer-events: auto;
+}
+.dev-info.is-placing {
+  visibility: hidden;
+}
+.dev-info:not(.is-placing) {
+  animation: dev-info-in 0.12s ease-out;
+}
+@keyframes dev-info-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.dev-info .di-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dev-info .di-head > .card-face {
+  flex: none;
+}
+.dev-info .di-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dev-info .di-title b {
+  font-size: 15px;
+}
+.dev-info .di-title .muted {
+  font-size: 12px;
+}
+.dev-info .di-when {
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+.dev-info .di-when + .di-when {
+  padding-top: 0;
+  border-top: 0;
+}
+.dev-info .di-when.is-ok {
+  color: var(--good);
 }
 
 /* ---- bottom-right: dice and turn buttons ------------------------------ */
