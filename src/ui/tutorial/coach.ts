@@ -1,22 +1,16 @@
 /**
- * The "Learn to play" coach: starts the tutorial game, follows it after every render (the pure
- * steps in machine.ts), draws the panel and points at HUD elements. The game itself is a normal
- * hotseat game; the coach only reads it. main.ts wires it to the GameController (`CoachHost`).
+ * The "Learn to play" coach: starts a tutorial game (a course: base or an expansion's), follows
+ * it after every render (the pure steps in machine.ts), draws the panel and points at HUD
+ * elements. The game itself is a normal hotseat game; the coach only reads it. app.ts wires it
+ * to the GameController (`CoachHost`).
  */
 import type { Action, GameState } from '../../engine';
 import type { BotLevel } from '../../bots/levels';
 import { h } from '../dom';
 import type { Controller } from '../types';
-import {
-  TUTORIAL_BOT_LEVELS,
-  TUTORIAL_ME,
-  TUTORIAL_PACE_MS,
-  TUTORIAL_SEATS,
-  TUTORIAL_SEED,
-  isTutorialGame,
-  tutorialGame,
-} from './game';
-import type { TutorialCtx } from './lessons';
+import { BASE_COURSE } from './base';
+import type { Course, TutorialCtx } from './course';
+import { TUTORIAL_PACE_MS } from './game';
 import {
   advance,
   back,
@@ -28,7 +22,14 @@ import {
   type TutorialRun,
 } from './machine';
 import { renderPanel } from './panel';
-import { loadTutorial, saveTutorial, type TutorialRecord, type TutorialStorage } from './store';
+import { courseById, courseOfGame } from './registry';
+import {
+  loadTutorial,
+  saveTutorial,
+  tutorialCompleted,
+  type TutorialRecord,
+  type TutorialStorage,
+} from './store';
 import './tutorial.css';
 
 export interface CoachHost {
@@ -47,6 +48,8 @@ export const FOCUS_ATTR = 'data-tut-focus';
 
 export class TutorialCoach {
   readonly panel: HTMLElement;
+  /** The course followed (or last followed); its record below. */
+  private course: Course = BASE_COURSE;
   private record: TutorialRecord;
   private paced = false;
 
@@ -71,37 +74,68 @@ export class TutorialCoach {
     return run !== null && !run.over && game !== null && this.belongs(run, game.state);
   }
 
-  /** The learner finished or skipped the tutorial once. */
+  /** The learner finished or skipped the base tutorial once. */
   get completed(): boolean {
-    return this.record.completed;
+    return this.isCompleted(BASE_COURSE.id);
   }
 
-  /** "Learn to play": a fresh tutorial game with the coach from the first lesson. */
-  begin(): void {
-    this.save({ ...this.record, offered: true, run: newRun(TUTORIAL_SEED, TUTORIAL_ME) });
+  /** The id of the course followed (or last followed). */
+  get courseId(): string {
+    return this.course.id;
+  }
+
+  /** The learner finished or skipped this course once ('base', 'ck', …). */
+  isCompleted(courseId: string): boolean {
+    return courseId === this.course.id
+      ? this.record.completed
+      : tutorialCompleted(this.store, courseId);
+  }
+
+  /**
+   * "Learn to play": a fresh tutorial game with the coach from the first lesson. A module's
+   * course must be loaded first (`ensureModules(id)` registers it with the pack).
+   */
+  begin(courseId: string = BASE_COURSE.id): void {
+    const course = courseById(courseId);
+    if (!course) throw new Error(`no tutorial "${courseId}": load its module first`);
+    if (course !== this.course) {
+      // The run of the course left behind is over with its game.
+      if (this.record.run) this.save({ ...this.record, run: null });
+      this.switchTo(course);
+    }
+    const offered = course === BASE_COURSE || this.record.offered;
+    this.save({ ...this.record, offered, run: newRun(course.seed, course.me) });
     this.setPace(true);
     // The controller renders the new game, which calls update().
-    this.host.start(tutorialGame(), TUTORIAL_SEATS, TUTORIAL_BOT_LEVELS);
+    this.host.start(course.game(), course.seats, course.botLevels);
   }
 
   /** After every render of the game (and after resuming a saved one). */
   update(): void {
-    const run = this.record.run;
     const game = this.host.game();
-    if (!run || run.over || !game) {
-      this.hide();
-      return;
-    }
-    if (!this.belongs(run, game.state)) {
+    let run = this.record.run;
+    if (game && run && !run.over && !this.belongs(run, game.state)) {
       // Another game replaced the tutorial game (and its autosave): the run is gone.
       this.save({ ...this.record, run: null });
       this.setPace(false);
+      run = null;
+    }
+    if (game && !run) {
+      // A saved game of another course (resumed after a reload) brings its run back.
+      const other = courseOfGame(game.state);
+      if (other && other !== this.course) {
+        this.switchTo(other);
+        run = this.record.run;
+        if (run && !this.belongs(run, game.state)) run = null;
+      }
+    }
+    if (!run || run.over || !game) {
       this.hide();
       return;
     }
     this.setPace(true);
     const ctx = this.ctx(run, game);
-    this.set(advance(run, ctx), ctx);
+    this.set(advance(run, ctx, this.course), ctx);
   }
 
   /** Remove the coach from the screen (the run stays saved). */
@@ -111,8 +145,13 @@ export class TutorialCoach {
     this.root.removeAttribute(FOCUS_ATTR);
   }
 
+  private switchTo(course: Course): void {
+    this.course = course;
+    this.record = loadTutorial(this.store, course);
+  }
+
   private belongs(run: TutorialRun, state: GameState): boolean {
-    return isTutorialGame(state) && String(state.settings.seed) === run.seed;
+    return this.course.isGame(state) && String(state.settings.seed) === run.seed;
   }
 
   private ctx(run: TutorialRun, game: { state: GameState; legal: readonly Action[] }): TutorialCtx {
@@ -124,12 +163,12 @@ export class TutorialCoach {
   }
 
   /** Apply a panel button to the run, with the current game. */
-  private press(step: (run: TutorialRun, ctx: TutorialCtx) => TutorialRun): void {
+  private press(step: (run: TutorialRun, ctx: TutorialCtx, course: Course) => TutorialRun): void {
     const run = this.record.run;
     const game = this.host.game();
     if (!run || !game) return;
     const ctx = this.ctx(run, game);
-    this.set(step(run, ctx), ctx);
+    this.set(step(run, ctx, this.course), ctx);
   }
 
   private set(run: TutorialRun, ctx: TutorialCtx): void {
@@ -140,18 +179,30 @@ export class TutorialCoach {
       return;
     }
     if (run !== this.record.run) this.save({ ...this.record, run });
-    const view = panelView(run, ctx);
+    const course = this.course;
+    const view = panelView(run, ctx, course);
+    const offerBase =
+      course !== BASE_COURSE && view.live && view.lesson?.offerBase === true && !this.completed;
     this.panel.hidden = false;
-    renderPanel(this.panel, view, {
-      next: () => this.press(next),
-      back: () => this.press((r) => back(r)),
-      skip: () => this.press((r) => skip(r)),
-      collapse: (c) => this.press((r) => setCollapsed(r, c)),
-      newGame: () => {
-        this.press(next);
-        this.host.newGame();
+    renderPanel(
+      this.panel,
+      view,
+      {
+        next: () => this.press(next),
+        back: () => this.press((r) => back(r)),
+        skip: () => this.press((r) => skip(r)),
+        collapse: (c) => this.press((r) => setCollapsed(r, c)),
+        newGame: () => {
+          this.press(next);
+          this.host.newGame();
+        },
+        ...(offerBase ? { base: () => this.begin(BASE_COURSE.id) } : {}),
       },
-    });
+      {
+        badge: course === BASE_COURSE ? 'Learn to play' : course.name,
+        ...(course.visuals ? { visuals: course.visuals } : {}),
+      },
+    );
     if (view.focus && !view.collapsed) this.root.setAttribute(FOCUS_ATTR, view.focus);
     else this.root.removeAttribute(FOCUS_ATTR);
   }
@@ -164,7 +215,7 @@ export class TutorialCoach {
 
   private save(rec: TutorialRecord): void {
     this.record = rec;
-    saveTutorial(this.store, rec);
+    saveTutorial(this.store, rec, this.course);
   }
 }
 

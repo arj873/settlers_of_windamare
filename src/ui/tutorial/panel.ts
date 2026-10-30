@@ -14,6 +14,15 @@ export interface PanelHandlers {
   collapse: (collapsed: boolean) => void;
   /** The last lesson's "New game" button. */
   newGame: () => void;
+  /** "Base game tutorial" under an expansion's intro (absent: no link). */
+  base?: () => void;
+}
+
+/** What the course adds to the panel. */
+export interface PanelCourse {
+  /** The badge over the title ("Learn to play" / the expansion's name). */
+  badge: string;
+  visuals?: Readonly<Record<string, () => HTMLElement>>;
 }
 
 const TERRAIN: Record<Resource, string> = {
@@ -32,8 +41,10 @@ const DEV_TYPES: readonly DevCardType[] = [
   'monopoly',
 ];
 
-function visual(kind: Visual): HTMLElement {
-  if (kind === 'terrain') {
+function visual(kind: string, own?: Readonly<Record<string, () => HTMLElement>>): HTMLElement {
+  const made = own?.[kind];
+  if (made) return made();
+  if ((kind as Visual) === 'terrain') {
     return h(
       'ul',
       { class: 'tut-terrain', attrs: { 'aria-label': 'Tiles and what they produce' } },
@@ -62,7 +73,12 @@ function visual(kind: Visual): HTMLElement {
 }
 
 /** The panel's content for `view` (the element itself stays; main.ts measures it). */
-export function renderPanel(el: HTMLElement, view: PanelView, on: PanelHandlers): void {
+export function renderPanel(
+  el: HTMLElement,
+  view: PanelView,
+  on: PanelHandlers,
+  course: PanelCourse = { badge: 'Learn to play' },
+): void {
   el.classList.toggle('is-collapsed', view.collapsed);
   el.classList.toggle('is-idle', view.lesson === null);
   if (view.collapsed) {
@@ -92,7 +108,7 @@ export function renderPanel(el: HTMLElement, view: PanelView, on: PanelHandlers)
     h(
       'div',
       { class: 'tut-head' },
-      h('span', { class: 'tut-badge' }, view.recap ? 'Recap' : 'Learn to play'),
+      h('span', { class: 'tut-badge' }, view.recap ? 'Recap' : course.badge),
       !view.live && h('span', { class: 'tut-badge is-back' }, 'Earlier tip'),
       h(
         'button',
@@ -107,8 +123,19 @@ export function renderPanel(el: HTMLElement, view: PanelView, on: PanelHandlers)
     ),
     view.lesson && h('h2', { class: 'tut-title' }, view.title),
     h('p', { class: 'tut-text' }, view.text),
-    view.lesson?.visual && visual(view.lesson.visual),
+    view.lesson?.visual && visual(view.lesson.visual, course.visuals),
     view.todo && h('p', { class: 'tut-todo', attrs: { role: 'status' } }, view.todo),
+    on.base &&
+      h(
+        'p',
+        { class: 'tut-base' },
+        'New to Catan? ',
+        h(
+          'button',
+          { class: 'tut-link', attrs: { 'data-k': 'tut-base' }, on: { click: on.base } },
+          'Start with the base game tutorial',
+        ),
+      ),
     h(
       'div',
       { class: 'tut-actions' },

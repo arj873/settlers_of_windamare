@@ -197,7 +197,7 @@ export class Hud {
   /** Online: replaces "New game" in the menu and on the winner screen. */
   private sessionActions: SessionAction[] | null = null;
   /** "Learn to play" (src/ui/tutorial) in the menu and on the setup screen (null hides it). */
-  private learnToPlay: (() => void) | null = null;
+  private learnToPlay: ((course?: string) => void) | null = null;
   /** The menu asks before leaving a running game for the tutorial. */
   private learnAsk = false;
   /** Online: chat panel kept as one node across refreshes (typing must survive re-renders). */
@@ -314,8 +314,11 @@ export class Hud {
     this.refresh();
   }
 
-  /** Hotseat: offer "Learn to play" in the menu and on the setup screen (null hides it). */
-  setLearnToPlay(start: (() => void) | null): void {
+  /**
+   * Hotseat: offer "Learn to play" in the menu and on the setup screen (null hides it). `course`:
+   * a tutorial picked on the setup screen; absent = let the player pick.
+   */
+  setLearnToPlay(start: ((course?: string) => void) | null): void {
     this.learnToPlay = start;
     this.refresh();
   }
@@ -2520,14 +2523,14 @@ export class Hud {
     return new SetupScreen({
       onBack: this.state ? () => this.hideNewGame() : undefined,
       onTutorial: learn
-        ? () => {
+        ? (course?: string) => {
             this.newGameOpen = false;
             this.setup = null;
             this.unlockedViewer = null;
             this.state = null;
             this.view = null;
             this.refresh();
-            learn();
+            learn(course);
           }
         : undefined,
       onStart: (cfg) => {

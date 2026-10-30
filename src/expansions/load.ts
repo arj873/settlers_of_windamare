@@ -15,6 +15,8 @@ import {
 import { registerBots, type BotExtension } from '../bots/expansions';
 import { registerDrawer, type BoardDrawer } from '../render/expansions';
 import { registerHud, type HudExtension } from '../ui/expansions';
+import { registerCourse } from '../ui/tutorial/registry';
+import type { Course } from '../ui/tutorial/course';
 
 /** One module's parts for every layer. */
 export interface ExpansionPack {
@@ -22,6 +24,8 @@ export interface ExpansionPack {
   bots: BotExtension;
   hud: HudExtension;
   drawer?: BoardDrawer;
+  /** Its "Learn to play" course (docs/TUTORIAL.md; the module is listed in TUTORIAL_MODULES). */
+  tutorial?: Course;
 }
 
 type PackFile = Promise<{ pack: ExpansionPack }>;
@@ -51,6 +55,7 @@ export function installPack(pack: ExpansionPack): void {
   registerBots(pack.bots);
   registerHud(pack.hud);
   if (pack.drawer) registerDrawer(pack.drawer);
+  if (pack.tutorial) registerCourse(pack.tutorial);
 }
 
 /** Fetch a module's pack (rejects for an unknown id or a failed download). */

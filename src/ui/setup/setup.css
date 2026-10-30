@@ -71,6 +71,34 @@
   font-weight: 400;
   opacity: 0.8;
 }
+/* "New to Cities & Knights? Learn it" under the expansion chips. */
+.su-learn-x {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.su-learn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.su-learn-link b {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.su-learn-link .su-learn-q {
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+}
 @media (max-width: 600px) {
   .su-head {
     flex-wrap: wrap;
