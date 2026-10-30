@@ -60,6 +60,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
 - (#51) a board-settings group in the menu
 - (security) tbck "7 fish" progress pick reads the hidden deck into the legal list: split into pay-then-pick; scramble `ext.ck.decks` in `legalLeak.test.ts` · special-build auto-skip leaks affordability · Commercial Harbor `phase.offered` visible to all
 - (perf2) setup screen renders in place (`patchChildren`, explicit input values) · keep the clicked Roll / End turn button across HUD renders · prefetch the remembered mode's pack on the home screen · re-measure online create → lobby on a quiet machine · cache piece previews across sessions · trace the home DOM → first paint gap (~0.6 s at 6× CPU)
+- (tutorials) more than one course per module (`pack.tutorials[]`), then T&B Fishermen / Rivers / Caravans / Barbarian Attack / Catan for Two courses and an E&P "Pirates & missions" course · a coach-following learner in the testkit · compress `docs/design` PNGs (~50 MB) · online lobby "New to <expansion>? Learn it offline" hint
+- (cardinfo) discard from the info card when over the C&K hand limit · combo-aware fish text · base resource cards get info cards · info cards for VP counters in player rows
 - (perf2) a stale tab after a deploy can't fetch an expansion chunk: offer a reload instead of only the error
 - (C1) T&B + Seafarers (needs scenario-id seam) · Barbarian Attack + C&K · Catan for Two + C&K · T&B×T&B sheets · E&P + C&K / T&B
 - (E4) gold in player trades · 2025 T&B×T&B combination sheets · BA 5-6 SBP details · Caravans coalition vote
@@ -144,6 +146,8 @@ Legend: 🟦 Opus · 🟩 Sonnet
   - **Security:** Oil Springs legal list leak (#61) · Crop Trust event-token mask (#62) · 128-bit game RNG, schema v6 (#64) · Content-Security-Policy, no `unsafe-eval` (#66) · `pt:serve --online` auto-seat fix (#63)
   - **Tutorial:** guided "Learn to play" first game (#65)
   - **Perf round 1** (#67): HUD patched in place, small entry chunk, Low power mode; home ready 5.4 → 2.0 s, Low power tap 700 → 150 ms (6× CPU, slow 4G)
+  - **Card info:** tap a dev card for what it does and why it can't be played now (#70) · same for every expansion hand card, C&K progress cards per type (#71)
+  - **Expansion tutorials:** framework + C&K + Seafarers (#72) · T&B title scenario (#73) · Oil Springs + Crop Trust (#74) · E&P Land Ho! (#75)
   - **Perf round 2** (#68): expansions load on demand (base game JS 447 → 282 kB gz), glow without repaints (idle CPU 108 % → 2 %), Pixi trimmed, production animation in the next frame · details in `docs/PERF.md`
 
 - **Stage 6 (Oct 26–27)**, all squash-merged to `main` via PRs:
