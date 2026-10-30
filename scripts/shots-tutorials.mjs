@@ -1,13 +1,16 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights and Seafarers courses. The learner's moves are the Normal
-// bot's (through the controller); bots play on at 60 ms a move.
+// moments of the Cities & Knights, Seafarers and Traders & Barbarians courses. The learner's
+// moves are the Normal bot's (through the controller); bots play on at 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
+// SHOTS=picker,ck,sea,tb (default: all) takes only those sections.
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const [base = 'http://localhost:5173', out = 'docs/design/tutorials'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
+const ONLY = process.env.SHOTS ? process.env.SHOTS.split(',') : null;
+const want = (section) => !ONLY || ONLY.includes(section);
 const THEMES = ['sunfired', 'wood', 'parlour', 'chartroom', 'materialdark', 'githubdark'];
 
 const browser = await chromium.launch({
@@ -70,16 +73,20 @@ async function learnerMove(page) {
 const current = (page) => page.evaluate(() => window.catan.tutorial.record?.run?.current ?? null);
 
 /**
- * Play on until the panel shows `id`: Next on every other lesson, the learner's moves when they
- * have one, bots on their timers.
+ * Play on until the panel shows `id` (or one of several: returns which): Next on every other
+ * lesson, the learner's moves when they have one, bots on their timers.
  */
 async function playTo(page, id, ms = 240_000) {
+  const ids = [id].flat();
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const now = await current(page);
-    if (now === id) return;
+    if (ids.includes(now)) return now;
     if (now !== null && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
-      await page.click('[data-k="tut-next"]');
+      // The lesson may close by itself meanwhile (Next goes disabled): just look again.
+      await page
+        .click('[data-k="tut-next"]:not([disabled])', { timeout: 1000 })
+        .catch(() => undefined);
       continue;
     }
     const mine = await page.evaluate(
@@ -95,7 +102,7 @@ const fast = (page) => page.evaluate(() => window.catan.controller.setSpeed(60))
 
 // 1. The picker: desktop (base done: a tick), phone (fresh: the "start with base" hint), and
 // every theme at phone width.
-{
+if (want('picker')) {
   const { ctx, page } = await newPage(1440, 'picker');
   await page.evaluate(() =>
     localStorage.setItem(
@@ -114,7 +121,7 @@ const fast = (page) => page.evaluate(() => window.catan.controller.setSpeed(60))
   await shot(page, 'setup-learn-link-desktop');
   await ctx.close();
 }
-for (const theme of THEMES) {
+for (const theme of want('picker') ? THEMES : []) {
   const { ctx, page } = await newPage(412, `picker-${theme}`, `&theme=${theme}`);
   await openSetup(page);
   if (theme === 'sunfired') {
@@ -131,7 +138,7 @@ for (const theme of THEMES) {
 
 // 2. Cities & Knights: intro (base link), the first roll's event die, improvements (tracks),
 // the barbarians' attack (turn 15).
-for (const width of [1440, 412]) {
+for (const width of want('ck') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
   const { ctx, page } = await newPage(width, `ck-${tag}`);
   await openSetup(page);
@@ -162,7 +169,7 @@ for (const width of [1440, 412]) {
 }
 
 // 3. Seafarers: intro, ships on the first turn, the learner's own 7 (robber or pirate).
-for (const width of [1440, 412]) {
+for (const width of want('sea') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
   const { ctx, page } = await newPage(width, `sea-${tag}`);
   await openSetup(page);
@@ -176,6 +183,33 @@ for (const width of [1440, 412]) {
   await shot(page, `sea-${tag}-2-ships`);
   await playTo(page, 'pirate');
   await shot(page, `sea-${tag}-3-pirate`);
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 4. Traders & Barbarians: the wagon on the first turn (the Wagon card pulsing), the first
+// commodity loaded (where each one goes), the baggage train (its five cards, desktop only).
+for (const width of want('tb') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `tb-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-tb"]');
+  await page.click('.setup [data-k="learn-tb"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'wagon');
+  await fast(page);
+  await shot(page, `tb-${tag}-1-wagon`);
+  // The load and baggage lessons come in either order (the learner's wagon decides).
+  const moments = width < 600 ? ['load'] : ['load', 'baggage'];
+  while (moments.length > 0) {
+    const id = await playTo(page, moments);
+    moments.splice(moments.indexOf(id), 1);
+    await shot(page, `tb-${tag}-${id === 'load' ? 2 : 3}-${id}`);
+  }
   console.log(
     tag,
     JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
