@@ -4,16 +4,41 @@
  */
 import type { DevCardType } from '../engine';
 
-export const DEV_CARD_INFO: Record<DevCardType, { name: string; blurb: string; icon: string }> = {
-  knight: { name: 'Knight', blurb: 'Move the robber and steal a card.', icon: '⚔️' },
-  victoryPoint: { name: 'Victory Point', blurb: 'Counts 1 VP. Stays hidden.', icon: '🏆' },
-  roadBuilding: { name: 'Road Building', blurb: 'Build 2 roads for free.', icon: '🛣️' },
+/** `blurb`: one short line; `text`: what the card does in plain words (the hand's info card). */
+export const DEV_CARD_INFO: Record<
+  DevCardType,
+  { name: string; blurb: string; text: string; icon: string }
+> = {
+  knight: {
+    name: 'Knight',
+    blurb: 'Move the robber and steal a card.',
+    text: 'Move the robber to another hex, then steal 1 random resource card from a player with a settlement or city next to it. Played Knights stay in front of you and count toward Largest Army.',
+    icon: '⚔️',
+  },
+  victoryPoint: {
+    name: 'Victory Point',
+    blurb: 'Counts 1 VP. Stays hidden.',
+    text: 'Worth 1 victory point for as long as you hold it, even on the turn you buy it. You never play it.',
+    icon: '🏆',
+  },
+  roadBuilding: {
+    name: 'Road Building',
+    blurb: 'Build 2 roads for free.',
+    text: 'Place 2 roads for free, following the normal building rules.',
+    icon: '🛣️',
+  },
   yearOfPlenty: {
     name: 'Year of Plenty',
     blurb: 'Take any 2 resources from the bank.',
+    text: 'Take any 2 resource cards from the bank: two of the same kind or two different ones.',
     icon: '🎁',
   },
-  monopoly: { name: 'Monopoly', blurb: 'Take every card of one resource.', icon: '💰' },
+  monopoly: {
+    name: 'Monopoly',
+    blurb: 'Take every card of one resource.',
+    text: 'Name one resource. Every other player gives you all of their cards of that resource.',
+    icon: '💰',
+  },
 };
 
 /** Dark or light text for a player colour (`#rgb` / `#rrggbb`; anything else gets light text). */

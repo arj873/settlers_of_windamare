@@ -12,6 +12,7 @@ import {
   RESOURCES,
   victoryPoints,
   type Action,
+  type DevCardType,
   type GameState,
   type PlayerId,
   type Resource,
@@ -35,7 +36,7 @@ import { hiddenBaseCards, hudExtensionsFor } from './expansions';
 import { boardPreviewSvg } from './setup/mapPreviews';
 import { SetupScreen } from './setup/screen';
 import { costLabel, costTip, missingCards, type Cost } from './costView';
-import { h, patchChildren, type Child } from './dom';
+import { h, patchChildren, type Child, type Props } from './dom';
 import { dieFace, glyph, RESOURCE_LABEL, resourceIcon } from './icons';
 import {
   availability,
@@ -44,6 +45,7 @@ import {
   tradeBlockReason,
   buildCards,
   devCardRows,
+  devCardStatus,
   DEV_CARD_INFO,
   diceTotal,
   findBankTrade,
@@ -82,7 +84,8 @@ type Listeners = { [E in HudEventName]: ((payload: HudEvents[E]) => void)[] };
 type Dialog = null | 'bank' | 'trade' | 'yop' | 'monopoly';
 /** Base sections, or `ext:<expansionId>` for an expansion panel. */
 type Section = 'log' | 'bank' | 'players' | 'chat' | `ext:${string}`;
-type Region = 'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'dialog' | 'overlay';
+type Region =
+  'menu' | 'turn' | 'side' | 'drawer' | 'bottom' | 'controls' | 'pop' | 'dialog' | 'overlay';
 /** Game Events scroll position; `stick`: scroll to the newest entry. */
 type LogScroll = { atBottom: boolean; stick: boolean };
 
@@ -134,7 +137,16 @@ const WHY_MS = 3500;
 const LONG_PRESS_MS = 450;
 
 /** Regions emptied while a full-screen cover is up. */
-const GAME_REGIONS = ['menu', 'turn', 'side', 'drawer', 'bottom', 'controls', 'dialog'] as const;
+const GAME_REGIONS = [
+  'menu',
+  'turn',
+  'side',
+  'drawer',
+  'bottom',
+  'controls',
+  'pop',
+  'dialog',
+] as const;
 
 export class Hud {
   private readonly root: HTMLElement;
@@ -200,11 +212,28 @@ export class Hud {
   private pressTimer: ReturnType<typeof setTimeout> | null = null;
   private pressFired = false;
   private whyTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Dev card whose info card is open (what it does, why it can or can't be played now): a click
+   * on a card that can't be played, or a right-click / long-press on one that can.
+   */
+  private devInfo: DevCardType | null = null;
+  /** The viewer whose card it is (hotseat: the next player starts with it closed). */
+  private devInfoFor: PlayerId | null = null;
+  /** The info card: one node while the HUD lives, so re-renders patch it instead of swapping it. */
+  private readonly devPop = h('div', {
+    class: 'why dev-info',
+    id: 'dev-info',
+    attrs: { role: 'tooltip' },
+  });
+  /** Where the info card was last put (`x/y`), so an unmoved card is not written to again. */
+  private devPopAt = '';
+  private devPopQueued = false;
   /** Issue #29: cards flying from the producing hexes after a roll, gain badges on the rows. */
   private readonly fx: ProductionFx;
   private onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
-    if (this.menuOpen) {
+    if (this.devInfo !== null) this.closeDevInfo();
+    else if (this.menuOpen) {
       this.menuOpen = false;
       this.refresh();
     } else if (this.placeMode) this.setPlaceMode(null);
@@ -214,6 +243,17 @@ export class Hud {
       this.menuOpen = false;
       this.refresh();
     }
+    // A dev card's own click toggles or switches its info card.
+    const t = e.target;
+    if (
+      this.devInfo !== null &&
+      !(t instanceof Element && (this.devPop.contains(t) || t.closest('.dcard[data-dev]')))
+    ) {
+      this.closeDevInfo();
+    }
+  };
+  private onResize = () => {
+    if (this.devInfo !== null) this.queuePlaceDevInfo();
   };
 
   constructor(root: HTMLElement) {
@@ -227,6 +267,7 @@ export class Hud {
       drawer: mk('hud-drawer'),
       bottom: mk('hud-bottom'),
       controls: mk('hud-controls'),
+      pop: mk('hud-pop-layer'),
       dialog: mk('hud-dialog-layer'),
       overlay: mk('hud-overlay-layer'),
     };
@@ -234,14 +275,17 @@ export class Hud {
     this.fx = new ProductionFx(root);
     document.addEventListener('keydown', this.onKey);
     document.addEventListener('click', this.onDocClick, true);
+    window.addEventListener('resize', this.onResize);
   }
 
   /** Remove listeners and DOM. */
   destroy(): void {
     if (this.whyTimer !== null) clearTimeout(this.whyTimer);
+    if (this.pressTimer !== null) clearTimeout(this.pressTimer);
     this.fx.destroy();
     document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('click', this.onDocClick, true);
+    window.removeEventListener('resize', this.onResize);
     this.root.replaceChildren();
     this.root.classList.remove('catan-hud');
   }
@@ -371,6 +415,13 @@ export class Hud {
     if (this.dialog !== 'yop') this.yopFirst = null;
     if (state.phase.kind !== 'event') this.eventTo = null;
 
+    // The info card closes with its card: played, another viewer, a spectator.
+    if (this.devInfo !== null) {
+      const me = view.spectator ? undefined : state.players[view.viewer];
+      const held = me ? me.devCards[this.devInfo] + me.newDevCards[this.devInfo] : 0;
+      if (held === 0 || this.devInfoFor !== view.viewer) this.devInfo = null;
+    }
+
     // Fresh draft per turn / viewer; recipients default to everyone else.
     const others = state.players.filter((p) => p.id !== view.viewer).map((p) => p.id);
     if (this.dialog !== 'trade') this.draft = emptyDraft(others);
@@ -453,6 +504,71 @@ export class Hud {
     this.refresh();
   }
 
+  /**
+   * A dev card in the hand (#devinfo): a click plays it when it can be played, else toggles its
+   * info card; a right-click or a touch long-press opens the info card either way, to read before
+   * playing. The button stays focusable (aria-disabled, never `disabled`), so the keyboard gets
+   * the same: Enter on a card that can't be played, the context-menu key on any card.
+   */
+  private devCardOn(type: DevCardType, play: (() => void) | null): Props['on'] {
+    const cancel = () => {
+      if (this.pressTimer !== null) clearTimeout(this.pressTimer);
+      this.pressTimer = null;
+    };
+    return {
+      pointerdown: (e) => {
+        cancel();
+        this.pressFired = false;
+        if (e.pointerType !== 'touch') return;
+        this.pressTimer = setTimeout(() => {
+          this.pressTimer = null;
+          this.pressFired = true;
+          this.openDevInfo(type);
+        }, LONG_PRESS_MS);
+      },
+      pointerup: cancel,
+      pointercancel: cancel,
+      pointerleave: cancel,
+      contextmenu: (e) => {
+        e.preventDefault();
+        // Android follows a long-press with contextmenu: the timer already opened it.
+        if (!this.pressFired) this.toggleDevInfo(type);
+      },
+      click: () => {
+        if (this.pressFired) {
+          this.pressFired = false;
+          return;
+        }
+        if (!play) {
+          this.toggleDevInfo(type);
+          return;
+        }
+        this.closeDevInfo();
+        play();
+      },
+    };
+  }
+
+  private openDevInfo(type: DevCardType): void {
+    if (this.devInfo === type) return;
+    this.devInfo = type;
+    this.devInfoFor = this.view?.viewer ?? null;
+    // Hidden until placed above its card (before the next paint).
+    this.devPop.classList.add('is-placing');
+    this.refresh();
+  }
+
+  private toggleDevInfo(type: DevCardType): void {
+    if (this.devInfo === type) this.closeDevInfo();
+    else this.openDevInfo(type);
+  }
+
+  private closeDevInfo(): void {
+    if (this.devInfo === null) return;
+    this.devInfo = null;
+    this.refresh();
+  }
+
   private send(a: Action): void {
     this.dialog = null;
     this.emit('action', a);
@@ -522,10 +638,20 @@ export class Hud {
       r.dialog.replaceChildren();
       this.lastDialogKey = '';
     } else {
+      // A dev card whose markup changed (its info card opened) is a new node: keep the focus on it.
+      const focus = document.activeElement;
+      const focusDev =
+        focus instanceof HTMLElement && r.bottom.contains(focus) ? focus.dataset.dev : undefined;
       put(r.bottom, this.handBar(state, view, av));
+      if (focusDev && !r.bottom.contains(document.activeElement)) {
+        r.bottom
+          .querySelector<HTMLElement>(`.dcard[data-dev="${focusDev}"]`)
+          ?.focus({ preventScroll: true });
+      }
       patchChildren(r.controls, this.controls(state, view, av));
       this.renderDialog(state, view, legal);
     }
+    patchChildren(r.pop, this.devInfoCard(state, view));
     // Stats panel: keep the body's scroll position across re-renders of the same tab.
     const prevBody = r.overlay.querySelector<HTMLElement>('.gs-body');
     const keep = prevBody ? { tab: prevBody.dataset.tab, top: prevBody.scrollTop } : null;
@@ -1114,17 +1240,26 @@ export class Hud {
           : type === 'yearOfPlenty'
             ? () => this.open('yop')
             : () => this.open('monopoly');
+    // #devinfo: a card that can't be played stays focusable and opens its info card instead.
     const devCards = devCardRows(state, view.viewer, legal).map((row) => {
       const info = DEV_CARD_INFO[row.type];
       const n = row.ready + row.fresh;
+      const play = row.canPlay && !over && row.type !== 'victoryPoint';
+      const open = this.devInfo === row.type;
+      const why = play ? null : devCardStatus(state, view.viewer, row).reason;
       return h(
         'button',
         {
-          class: `hcard dcard${stackCls(n)}${row.canPlay ? ' can-play' : ''}${row.type === 'victoryPoint' ? ' is-vp' : ''}`,
-          disabled: !row.canPlay || over,
-          title: `${info.name}: ${info.blurb}${row.fresh > 0 ? ` (${row.fresh} new: playable next turn)` : ''}`,
-          attrs: { 'aria-label': `${info.name} ×${n}` },
-          on: { click: row.type === 'victoryPoint' ? () => undefined : devOpen(row.type) },
+          class: `hcard dcard${stackCls(n)}${play ? ' can-play' : ' is-off'}${row.type === 'victoryPoint' ? ' is-vp' : ''}${open ? ' is-open' : ''}`,
+          attrs: {
+            'aria-label': `${info.name} ×${n}${play ? '' : ", can't play now"}`,
+            'data-dev': row.type,
+            ...(why === null ? {} : { 'aria-disabled': 'true', 'aria-expanded': String(open) }),
+            ...(open ? { 'aria-describedby': this.devPop.id } : {}),
+            // The playtest CLI reads data-why (scripts/playtest/inpage.js).
+            ...(why === null ? {} : { 'data-why': why }),
+          },
+          on: this.devCardOn(row.type, play ? devOpen(row.type) : null),
         },
         devCardFace(row.type, 46),
         row.fresh > 0 && h('span', { class: 'new-tag' }, 'new'),
@@ -1293,6 +1428,78 @@ export class Hud {
     // CSS `order` shows hand | trade | build from left to right.
     build.style.setProperty('--build-n', String(build.childElementCount));
     return [build, trade, hand];
+  }
+
+  /**
+   * The open dev card's info card (#devinfo): face, name, what it does, and whether it can be
+   * played now (or why not, and when). One node for the HUD's life with its content patched, so
+   * a re-render under it (a bot moving) changes only text that changed.
+   */
+  private devInfoCard(state: GameState, view: HudView): HTMLElement[] {
+    const type = this.devInfo;
+    const row =
+      type === null || view.spectator
+        ? undefined
+        : devCardRows(state, view.viewer, viewerLegal(view)).find((r) => r.type === type);
+    if (!row) {
+      this.devInfo = null;
+      return [];
+    }
+    const info = DEV_CARD_INFO[row.type];
+    const status = devCardStatus(state, view.viewer, row);
+    const n = row.ready + row.fresh;
+    patchChildren(this.devPop, [
+      h(
+        'div',
+        { class: 'di-head' },
+        devCardFace(row.type, 34),
+        h(
+          'span',
+          { class: 'di-title' },
+          h('b', {}, info.name),
+          h('span', { class: 'muted' }, n === 1 ? 'You have 1' : `You have ${n}`),
+        ),
+      ),
+      h('p', { class: 'di-text' }, info.text),
+      h('p', { class: `di-when${status.playable ? ' is-ok' : ''}` }, status.reason),
+      ...(status.fresh ? [h('p', { class: 'di-when' }, status.fresh)] : []),
+    ]);
+    this.queuePlaceDevInfo();
+    return [this.devPop];
+  }
+
+  private queuePlaceDevInfo(): void {
+    if (this.devPopQueued) return;
+    this.devPopQueued = true;
+    beforePaint(() => {
+      this.devPopQueued = false;
+      this.placeDevInfo();
+    });
+  }
+
+  /** Put the info card above its card, inside the window: layout reads first, then the writes. */
+  private placeDevInfo(): void {
+    const pop = this.devPop;
+    const card =
+      this.devInfo === null
+        ? null
+        : this.regions.bottom.querySelector<HTMLElement>(`.dcard[data-dev="${this.devInfo}"]`);
+    if (!card || !pop.isConnected) return;
+    const at = card.getBoundingClientRect();
+    const box = this.regions.pop.getBoundingClientRect();
+    const w = pop.offsetWidth;
+    const ht = pop.offsetHeight;
+    const MARGIN = 8;
+    const left = at.left - box.left + at.width / 2 - w / 2;
+    const x = Math.round(Math.max(MARGIN, Math.min(left, box.width - w - MARGIN)));
+    const y = Math.round(Math.max(MARGIN, at.top - box.top - ht - 12));
+    const key = `${x}/${y}`;
+    if (key !== this.devPopAt) {
+      this.devPopAt = key;
+      pop.style.setProperty('--x', `${x}px`);
+      pop.style.setProperty('--y', `${y}px`);
+    }
+    pop.classList.remove('is-placing');
   }
 
   /**

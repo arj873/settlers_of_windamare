@@ -607,6 +607,16 @@ hud.setLearnToPlay(() => … | null);                           // hotseat: "Lea
   click that ends the press is swallowed). The cost pieces are the shared component
   `ui/costView.ts` (`costCards`, `costTip`, `missingCards`, `costLabel`; own CSS) for any other
   place that shows a price.
+- Dev card info card (#devinfo): a base dev card in the hand is never `disabled`. One that can't
+  be played now (`devCardStatus(state, viewer, row)`, model.ts: not your turn, bought this turn,
+  one per turn, robber / trade offer first, special build, game over, Victory Point …) has
+  `aria-disabled` + `.is-off` and the reason in `data-why`; a click (tap, Enter) toggles its info
+  card: face, name, `DEV_CARD_INFO[type].text` (ui/cards.ts), the reason. A playable card keeps
+  one-click play; right-click, the context-menu key or a 450 ms touch long-press opens the same
+  card. Closes on Esc, a click outside, the card again, or when the card leaves the hand / the
+  viewer changes. The info card is one node (`Hud.devPop`, `.why.dev-info` in `.hud-pop-layer`)
+  patched in place across renders and placed above its card in the next frame (`--x` / `--y`).
+  C&K's progress stack still uses `disabled` (its panel lists the card texts).
 
 - Performance (s17, `ui/power.ts`, menu "Performance: Auto / High quality / Low power", saved as
   `catan.performance`): low power = Pixi without antialiasing (decided at `app.init`, so a change

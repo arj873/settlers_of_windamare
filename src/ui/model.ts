@@ -25,6 +25,8 @@ import {
   MAX_TRADE_OFFERS_PER_TURN,
   RESOURCES,
   routeName,
+  rules56On,
+  totalResources,
   victoryPoints,
   visibleSpecialBuildQueue,
   type Action,
@@ -175,6 +177,79 @@ export function devCardRows(
       canPlay: type !== 'victoryPoint' && legal.some((a) => a.type === PLAY_TYPE[type]),
     }))
     .filter((r) => r.ready + r.fresh > 0);
+}
+
+/** What a dev card's info card (HUD hand) says about playing it now. */
+export interface DevCardStatus {
+  playable: boolean;
+  /** One line: how to play it now, or why not and when it can be played. */
+  reason: string;
+  /** A second line when some cards of the stack were bought this turn (and others are ready). */
+  fresh: string | null;
+}
+
+/**
+ * Why the viewer can or cannot play a card of `row` right now, in plain words. The engine has the
+ * last word: `row.canPlay` (a legal play action) decides "playable"; the rest only explains a
+ * refusal, checked in the order the engine checks (dev.ts `canPlay`).
+ */
+export function devCardStatus(state: GameState, viewer: PlayerId, row: DevCardRow): DevCardStatus {
+  const off = (reason: string): DevCardStatus => ({ playable: false, reason, fresh: null });
+  if (row.type === 'victoryPoint')
+    return off('Victory Point: counts automatically, keep it hidden.');
+  if (state.phase.kind === 'gameOver') return off('The game is over.');
+  const fresh =
+    row.fresh > 0 && row.ready > 0
+      ? `${row.fresh} of them bought this turn: playable from your next turn.`
+      : null;
+  if (row.canPlay)
+    return { playable: true, reason: 'Playable now: click the card to play it.', fresh };
+  // With rushMode the dice roll as the turn starts: there is no "before rolling".
+  const when = state.settings.rushMode ? 'on your turn' : 'on your turn, before or after rolling';
+  const kind = state.phase.kind;
+  if (kind === 'specialBuild' && !rules56On(state.settings) && state.turn.current === viewer) {
+    return off('No development cards in the special building phase: play it on your own turn.');
+  }
+  if (state.turn.current !== viewer) return off(`Not your turn. You can play this ${when}.`);
+  if (row.ready === 0) return off('Bought this turn: playable from your next turn.');
+  if (state.turn.devCardPlayed) {
+    return off(
+      'You already played a development card this turn (one per turn). Play this one on a later turn.',
+    );
+  }
+  const later = (first: string) => off(`${first}, then you can play this.`);
+  switch (kind) {
+    case 'preRoll':
+    case 'main':
+    case 'specialBuild':
+      break;
+    case 'discard':
+    case 'moveRobber':
+    case 'steal':
+      return later('Finish the robber first');
+    case 'trade':
+      return later('Close your trade offer first');
+    case 'roadBuilding':
+      return later('Place your free roads first');
+    case 'event':
+      return later('Finish the event first');
+    case 'setup':
+    case 'mapVeto':
+      return off('Development cards can be played once the game has started.');
+    default:
+      return later('Finish the current step first');
+  }
+  if (row.type === 'roadBuilding') {
+    return off(
+      piecesLeft(state, viewer).road === 0
+        ? 'You have no roads left to place.'
+        : 'No road can be placed right now.',
+    );
+  }
+  if (row.type === 'yearOfPlenty' && totalResources(state.bank) < 2) {
+    return off('The bank has fewer than 2 cards to give.');
+  }
+  return off(`Can't be played right now. You can play this ${when}.`);
 }
 
 export interface PlayerSummary {
