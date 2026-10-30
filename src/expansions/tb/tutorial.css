@@ -1,0 +1,52 @@
+/* "Learn Traders & Barbarians" (tutorial.ts): what the coach points at, and its pictures. */
+.catan-hud[data-tut-focus='tb-gold'] .hand [data-card='gold'],
+.catan-hud[data-tut-focus='tb-wagon'] .bcard[data-actions^='tb/startWagon'],
+.catan-hud[data-tut-focus='tb-table'] .tb-list,
+.catan-hud[data-tut-focus='tb-baggage'] .tb-baggage,
+.catan-hud[data-tut-focus='tb-actions'] .tb-actions {
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .catan-hud[data-tut-focus='tb-gold'] .hand [data-card='gold'],
+  .catan-hud[data-tut-focus='tb-wagon'] .bcard[data-actions^='tb/startWagon'],
+  .catan-hud[data-tut-focus='tb-table'] .tb-list,
+  .catan-hud[data-tut-focus='tb-baggage'] .tb-baggage,
+  .catan-hud[data-tut-focus='tb-actions'] .tb-actions {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+}
+
+.tut-tb-goods {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+.tut-tb-goods li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1.25;
+}
+.tut-tb-baggage {
+  margin: 8px 0 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.tut-tb-baggage th,
+.tut-tb-baggage td {
+  padding: 2px 8px 2px 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.tut-tb-baggage th {
+  font-weight: 600;
+}
+.tut-tb-baggage th .tb-ico {
+  vertical-align: -2px;
+}

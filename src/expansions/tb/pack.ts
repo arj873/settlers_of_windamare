@@ -4,10 +4,12 @@ import { tbModule } from './engine';
 import { tbBots } from './bots';
 import { tbHud } from './ui';
 import { tbDrawer } from './render';
+import { tbTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: tbModule,
   bots: tbBots,
   hud: tbHud,
   drawer: tbDrawer,
+  tutorial: tbTutorial,
 };

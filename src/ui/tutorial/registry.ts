@@ -10,7 +10,7 @@ import { BASE_COURSE } from './base';
 import type { Course } from './course';
 
 /** Modules with a tutorial (their id is the course id and the mode id), picker order. */
-export const TUTORIAL_MODULES: readonly ExpansionId[] = ['ck', 'seafarers'];
+export const TUTORIAL_MODULES: readonly ExpansionId[] = ['ck', 'seafarers', 'tb'];
 
 const courses = new Map<string, Course>([[BASE_COURSE.id, BASE_COURSE]]);
 
