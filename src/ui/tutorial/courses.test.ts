@@ -201,8 +201,13 @@ describe('picker', () => {
     saveTutorial(store, { completed: true, offered: true, run: null });
     const entries = pickerEntries((id) => tutorialCompleted(store, id));
     expect(entries.map((e) => e.id)).toEqual(['base', ...TUTORIAL_MODULES]);
-    expect(entries.map((e) => e.name)).toEqual(['Base game', 'Cities & Knights', 'Seafarers']);
-    expect(entries.map((e) => e.done)).toEqual([true, false, false]);
+    // Every module course adds a row: check the first ones by name, the rest by count.
+    expect(entries.slice(0, 3).map((e) => e.name)).toEqual([
+      'Base game',
+      'Cities & Knights',
+      'Seafarers',
+    ]);
+    expect(entries.map((e) => e.done)).toEqual([true, ...TUTORIAL_MODULES.map(() => false)]);
   });
 
   it('starts the picked course, or cancels (Escape too)', async () => {
@@ -215,7 +220,7 @@ describe('picker', () => {
         onCancel: () => cancels++,
       });
     const el = open();
-    expect(el.querySelectorAll('.tut-pick-row')).toHaveLength(3);
+    expect(el.querySelectorAll('.tut-pick-row')).toHaveLength(1 + TUTORIAL_MODULES.length);
     expect(el.querySelector('[data-k="tut-pick-base"] .tut-pick-done')).not.toBe(null);
     expect(el.querySelector('.tut-pick-hint')).toBe(null); // base done: no "start with base"
     click('tut-pick-ck', el);

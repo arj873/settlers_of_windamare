@@ -14,6 +14,13 @@ import { defineCourse, type Course, type CourseSpec } from '../src/ui/tutorial/c
 import { LEARNERS, drive, firstTurn as turnOf, type Drive } from '../src/ui/tutorial/testkit';
 import { ckTutorialSpec } from '../src/expansions/ck/tutorial';
 import { seaTutorialSpec } from '../src/expansions/seafarers/tutorial';
+import { epTutorialSpec } from '../src/expansions/ep/tutorial';
+import { epSlice } from '../src/expansions/ep/engine';
+import { fogAtEnds, graph as epGraph } from '../src/expansions/ep/engine/geometry';
+import { epBoard } from '../src/expansions/ep/engine/maps';
+import { reachable } from '../src/expansions/ep/engine/ships';
+import { isResource } from '../src/engine/resources';
+import type { HexId, VertexId } from '../src/engine';
 
 const which = process.env.TUTORIAL_SEEDS ?? '';
 const count = Number(process.env.TUTORIAL_SEED_COUNT ?? 40);
@@ -88,12 +95,58 @@ const seaScore: Scorer = (runs) => {
   return { score, notes: notes.join(' | ') };
 };
 
+/**
+ * E&P (Land Ho!): every learner explores, lands a settler on land they discovered and sees the
+ * later scenarios live, in their first turns; the game should not end before the wrap-up.
+ */
+const epScore: Scorer = (runs) => {
+  let score = 0;
+  const notes: string[] = [];
+  // A learner who follows the coach sails to the fog on turn 1: it should hide land there.
+  const seed = String(runs[0]?.d.state.settings.seed);
+  const start = defineCourse({ ...epTutorialSpec, seed }).game();
+  const ship = epSlice(start).ships.find((x) => x.owner === 0);
+  const fog = new Set<HexId>();
+  for (const e of ship ? reachable(start, ship).keys() : []) {
+    for (const h of fogAtEnds(start, e)) fog.add(h);
+  }
+  const land = [...fog].filter((h) => isResource(epSlice(start).hidden[h]?.terrain)).length;
+  score += land === 0 ? 4 : ((fog.size - land) / fog.size) * 2;
+  notes.push(`T1 fog ${land}/${fog.size} land`);
+  for (const { name, d } of runs) {
+    const recaps = recapsOf(d);
+    score += recaps.length * 2;
+    if (recaps.includes('land')) score += 4;
+    if (!d.run.over) score += 10;
+    const land = learnerTurn(turnOf(d, /^Red’s settler founded a settlement/));
+    const found = learnerTurn(turnOf(d, /^Red discovered (?!open sea)/));
+    score += land === null ? 4 : Math.max(0, land - 2) / 2;
+    score += found === null ? 2 : Math.max(0, found - 1) / 4;
+    // A settler should found a settlement on discovered land, not only on the home coast.
+    const region = epBoard(d.state).region;
+    const onNew = Object.entries(d.state.pieces.buildings).some(
+      ([v, b]) =>
+        b.owner === 0 &&
+        (epGraph(d.state).hexesAt.get(v as VertexId) ?? []).some((h) => region[h] !== undefined),
+    );
+    if (!onNew) score += 1;
+    const ended = d.state.phase.kind === 'gameOver';
+    if (ended) score += 1;
+    notes.push(
+      `${name}: ${recaps.join(',') || '-'} found L${found} land L${land}${onNew ? '' : ' (home)'}${ended ? ' END' : ''}`,
+    );
+  }
+  return { score, notes: notes.join(' | ') };
+};
+
 describe.skipIf(!which)('tutorial seed search', () => {
   it(`searches ${which}`, () => {
     const rows =
       which === 'ck'
         ? search(ckTutorialSpec, 'learn-ck-', ckScore)
-        : search(seaTutorialSpec, 'learn-sea-', seaScore);
+        : which === 'ep'
+          ? search(epTutorialSpec, 'learn-ep-', epScore)
+          : search(seaTutorialSpec, 'learn-sea-', seaScore);
     for (const r of rows.slice(0, 15)) console.log(`${r.seed}\t${r.score}\t${r.notes}`);
   }, 3_600_000);
 });

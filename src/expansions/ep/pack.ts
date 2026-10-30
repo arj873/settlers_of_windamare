@@ -4,10 +4,12 @@ import { epModule } from './engine';
 import { epBots } from './bots';
 import { epHud } from './ui';
 import { epDrawer } from './render';
+import { epTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: epModule,
   bots: epBots,
   hud: epHud,
   drawer: epDrawer,
+  tutorial: epTutorial,
 };

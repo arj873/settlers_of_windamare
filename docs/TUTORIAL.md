@@ -7,7 +7,7 @@ tutorials; the coach only reads the game.
 
 There is one tutorial per **course**: the base game (`src/ui/tutorial/`, since s16) and one per
 expansion module that has one (`src/expansions/<id>/tutorial.ts`). Built: base, Cities & Knights
-(`ck`), Seafarers (`seafarers`). Expansion courses assume the player knows the base game: they
+(`ck`), Seafarers (`seafarers`), Explorers & Pirates (`ep`). Expansion courses assume the player knows the base game: they
 teach only what is new, and their first lesson offers the base tutorial until it is done.
 
 ## 1. Pieces
@@ -136,6 +136,23 @@ a 7 on their second turn (Normal and Hard learners; a development card draw can 
 Normal learner settles an island on their sixth turn. The Easy learner gets the island and route
 lessons as recaps; gold shows only if the learner reaches a gold field.
 
+**Explorers & Pirates** (`learn-ep-221`, Land Ho!, 3 players, 8 VP). Why Land Ho!: it is the
+rulebook's first scenario and has no setup to place (printed pieces: a settlement and road, a
+harbor settlement, a ship with a settler), so the first turn is already about what is new:
+harbor settlements, the Movement phase, ships, exploring, settlers and gold. Each later scenario
+adds one layer (crews and the pirate, then the Council's missions); they get one lesson and a
+picture, and the finish points to Pirate Lairs. A second course for them would need more than one
+course per module (a framework change; card idea). Lessons: intro (what is gone), your start (the
+fleet pulsing), Action then Movement (the phase line pulsing; it waits for an Action phase), gold
+(picture: the gold trades), sailing (a "sail to the fog" todo), exploring, land ho (urgent, a
+"found a settlement there" todo), settlers and ships (picture: costs), harbor settlements, a 7
+(discards only), pirates and missions (picture: the five scenarios), you're ready. The seed: the
+learner's first roll pays nothing (1 gold); the first 7 is Blue's on turn 5. Land Ho! draws
+nothing else from the game's RNG, so these are the dice in every game. Both fog hexes the starting
+ship reaches on turn 1 hide land (with an 8), and the settler can land there at once: a learner
+who follows the coach sails, explores and settles new land on turn 1. Every learner sees every
+lesson live (the bots, though, settle the home coast first).
+
 ## 5. Screenshots
 
 `node scripts/shots-tutorials.mjs <devUrl> docs/design/tutorials` (Vite dev server; the
@@ -152,3 +169,6 @@ learner's moves are the Normal bot's):
   `ck-phone-4-attack.png`.
 - Seafarers: `sea-{desktop,phone}-1-intro.png`, `-2-ships.png` (the Ship card pulsing),
   `-3-pirate.png` (the learner's own 7).
+- Explorers & Pirates (on turn 1 the learner follows the coach): `ep-desktop-1-intro.png`,
+  `ep-{desktop,phone}-2-land.png` (the settler next to the land just discovered),
+  `-3-next.png` (the scenario ladder, while the bots play).

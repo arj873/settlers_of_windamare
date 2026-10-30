@@ -2,12 +2,12 @@
 // page's Content-Security-Policy watched: base hotseat, C&K and Seafarers hotseat games picked on
 // the setup screen, resume of the Seafarers save after a reload, an online Seafarers room on the
 // in-browser server (host + a guest joining by the invite link), the tutorials (base from the
-// picker, C&K from its chip link and resumed after a reload, Seafarers from the in-game menu),
-// and a short bot game of every mode (`?mode=`).
+// picker, C&K from its chip link and resumed after a reload, Seafarers from the in-game menu,
+// Explorers & Pirates from its chip link), and a short bot game of every mode (`?mode=`).
 //
 //   pnpm build && pnpm preview --port 4173 &
 //   node scripts/perf/flows.mjs [--base http://localhost:4173]
-//     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,modes]
+//     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-ep,modes]
 //
 // Exits non-zero when a flow fails, the page throws or logs an error, or a CSP violation fires.
 import { execSync } from 'node:child_process';
@@ -19,9 +19,10 @@ const flag = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 const BASE = flag('--base', 'http://localhost:4173').replace(/\/$/, '');
-const ONLY = flag('--only', 'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,modes').split(
-  ',',
-);
+const ONLY = flag(
+  '--only',
+  'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-ep,modes',
+).split(',');
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome-stable',
@@ -267,6 +268,34 @@ async function tutorialSea() {
   await ctx.close();
 }
 
+/** "New to Explorers & Pirates? Learn it": Land Ho!, its course's pulse styled from the ep chunk. */
+async function tutorialEp() {
+  const { ctx, open } = await profile('tutorial-ep');
+  const page = await open(`${BASE}/`);
+  await page.click('[data-k="offline"]');
+  await page.click('.setup [data-k="chip-ep"]');
+  await page.click('.setup [data-k="learn-ep"]');
+  const s = await coachShows(page);
+  check(
+    s.mode === 'ep' && s.course === 'ep' && s.title === 'Explorers & Pirates',
+    'E&P tutorial started',
+  );
+  check(
+    (await page.evaluate(() => window.catan.controller.state.settings.scenario)) === 'ep/landHo',
+    'it is Land Ho!',
+  );
+  check(await page.$('[data-k="tut-base"]'), 'its intro offers the base tutorial');
+  await page.click('[data-k="tut-next"]');
+  await page.waitForSelector('.catan-hud[data-tut-focus="ep-fleet"] .ep-fleet');
+  check(
+    (await page.$eval('.ep-fleet', (el) => getComputedStyle(el).animationName)) === 'tut-pulse',
+    'the next lesson pulses the fleet (course CSS from the ep chunk)',
+  );
+  await page.click('[data-k="tut-next"]');
+  await playHotseat(page, 12);
+  await ctx.close();
+}
+
 /** Every mode (its modules load on demand): a dev all-bot game plays a few seconds. */
 async function modes() {
   const list = JSON.parse(
@@ -299,6 +328,7 @@ const FLOWS = {
   tutorial,
   'tutorial-ck': tutorialCk,
   'tutorial-sea': tutorialSea,
+  'tutorial-ep': tutorialEp,
   modes,
 };
 let failed = false;

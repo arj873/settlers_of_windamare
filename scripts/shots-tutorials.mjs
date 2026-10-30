@@ -1,7 +1,7 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights and Seafarers courses. The learner's moves are the Normal
-// bot's (through the controller); bots play on at 60 ms a move.
+// moments of the Cities & Knights, Seafarers and Explorers & Pirates courses. The learner's moves
+// are the Normal bot's (through the controller); bots play on at 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -70,10 +70,35 @@ async function learnerMove(page) {
 const current = (page) => page.evaluate(() => window.catan.tutorial.record?.run?.current ?? null);
 
 /**
+ * E&P: on turn 1 the learner does what the coach says (start moving, sail to the fog, land the
+ * settler on what turned up); otherwise the Normal bot's move.
+ */
+async function epLearnerMove(page) {
+  await page.evaluate(async () => {
+    const { botForLevel } = await import('/src/bots/byLevel.ts');
+    const { Rng } = await import('/src/engine/index.ts');
+    const { graph, touchesFog } = await import('/src/expansions/ep/engine/geometry.ts');
+    const { epBoard } = await import('/src/expansions/ep/engine/maps.ts');
+    const c = window.catan.controller;
+    const s = c.state;
+    const legal = c.legalActions.filter((a) => a.player === 0);
+    const region = epBoard(s).region;
+    const newLand = (v) => (graph(s).hexesAt.get(v) ?? []).some((h) => region[h] !== undefined);
+    const coached =
+      s.turn.number === 1 &&
+      (legal.find((a) => a.type === 'ep/land' && newLand(a.vertex)) ??
+        legal.find((a) => a.type === 'ep/startMovement') ??
+        legal.find((a) => a.type === 'ep/moveShip' && touchesFog(s, a.edge)));
+    const a = coached || botForLevel('normal')(s, 0, new Rng(s.turn.number + 7), legal);
+    if (a) c.dispatch(a);
+  });
+}
+
+/**
  * Play on until the panel shows `id`: Next on every other lesson, the learner's moves when they
  * have one, bots on their timers.
  */
-async function playTo(page, id, ms = 240_000) {
+async function playTo(page, id, ms = 240_000, move = learnerMove) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const now = await current(page);
@@ -85,7 +110,7 @@ async function playTo(page, id, ms = 240_000) {
     const mine = await page.evaluate(
       () => window.catan.controller.legalActions.filter((a) => a.player === 0).length,
     );
-    if (mine > 0) await learnerMove(page);
+    if (mine > 0) await move(page);
     else await page.waitForTimeout(80);
   }
   throw new Error(`timed out waiting for lesson ${id}`);
@@ -176,6 +201,28 @@ for (const width of [1440, 412]) {
   await shot(page, `sea-${tag}-2-ships`);
   await playTo(page, 'pirate');
   await shot(page, `sea-${tag}-3-pirate`);
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 4. Explorers & Pirates (Land Ho!): intro, landing the settler on the land the learner just
+// discovered (turn 1), the later scenarios (their picture) while the bots play.
+for (const width of [1440, 412]) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `ep-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-ep"]');
+  await page.click('.setup [data-k="learn-ep"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  if (width >= 600) await shot(page, `ep-${tag}-1-intro`);
+  await playTo(page, 'land', 240_000, epLearnerMove);
+  await shot(page, `ep-${tag}-2-land`);
+  await playTo(page, 'next', 240_000, epLearnerMove);
+  await shot(page, `ep-${tag}-3-next`);
   console.log(
     tag,
     JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
