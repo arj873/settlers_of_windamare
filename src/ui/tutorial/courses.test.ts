@@ -206,7 +206,7 @@ describe('picker', () => {
       'Cities & Knights',
       'Seafarers',
     ]);
-    expect(entries.map((e) => e.done)).toEqual(entries.map((e) => e.id === 'base'));
+    expect(entries.map((e) => e.done)).toEqual([true, ...TUTORIAL_MODULES.map(() => false)]);
   });
 
   it('starts the picked course, or cancels (Escape too)', async () => {

@@ -1,16 +1,17 @@
 // Expansion tutorial screenshots (s19, docs/TUTORIAL.md): the "Learn to play" picker (desktop,
 // phone, every theme at phone width), the setup screen's "New to …? Learn it" link, and lesson
-// moments of the Cities & Knights, Seafarers, Oil Springs and Crop Trust courses. The learner's
-// moves are the Normal bot's (through the controller); bots play on at 60 ms a move.
+// moments of the Cities & Knights, Seafarers, Traders & Barbarians, Oil Springs and Crop Trust
+// courses. The learner's moves are the Normal bot's (through the controller); bots play on at
+// 60 ms a move.
 // Needs the Vite dev server. Usage: node scripts/shots-tutorials.mjs <devUrl> <outDir>
-// (SHOTS_ONLY=oil,crop for some sections: picker, ck, sea, oil, crop).
+// SHOTS=picker,ck,sea,tb,oil,crop (default: all) takes only those sections.
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const [base = 'http://localhost:5173', out = 'docs/design/tutorials'] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
-const only = process.env.SHOTS_ONLY?.split(',');
-const want = (section) => !only || only.includes(section);
+const ONLY = process.env.SHOTS ? process.env.SHOTS.split(',') : null;
+const want = (section) => !ONLY || ONLY.includes(section);
 const THEMES = ['sunfired', 'wood', 'parlour', 'chartroom', 'materialdark', 'githubdark'];
 
 const browser = await chromium.launch({
@@ -73,18 +74,22 @@ async function learnerMove(page) {
 const current = (page) => page.evaluate(() => window.catan.tutorial.record?.run?.current ?? null);
 
 /**
- * Play on until the panel shows `id` (or one of several, returned): Next on every other lesson,
- * the learner's moves when they have one, bots on their timers.
+ * Play on until the panel shows `id` (or one of several: returns which): Next on every other
+ * lesson, the learner's moves when they have one, bots on their timers.
  */
 async function playTo(page, id, ms = 240_000) {
+  const ids = [id].flat();
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const now = await current(page);
-    if ([id].flat().includes(now)) return now;
+    if (ids.includes(now)) return now;
     // A modal dialog (a discard, a steal) covers the panel: the learner's move first.
     const modal = await page.$('.scrim.is-modal');
     if (now !== null && !modal && (await page.$('[data-k="tut-next"]:not([disabled])'))) {
-      await page.click('[data-k="tut-next"]');
+      // The lesson may close by itself meanwhile (Next goes disabled): just look again.
+      await page
+        .click('[data-k="tut-next"]:not([disabled])', { timeout: 1000 })
+        .catch(() => undefined);
       continue;
     }
     const mine = await page.evaluate(
@@ -188,7 +193,34 @@ for (const width of want('sea') ? [1440, 412] : []) {
   await ctx.close();
 }
 
-// 4. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
+// 4. Traders & Barbarians: the wagon on the first turn (the Wagon card pulsing), the first
+// commodity loaded (where each one goes), the baggage train (its five cards, desktop only).
+for (const width of want('tb') ? [1440, 412] : []) {
+  const tag = width < 600 ? 'phone' : 'desktop';
+  const { ctx, page } = await newPage(width, `tb-${tag}`);
+  await openSetup(page);
+  await page.click('.setup [data-k="chip-tb"]');
+  await page.click('.setup [data-k="learn-tb"]');
+  await page.waitForSelector('.tut-panel:not([hidden]) .tut-title');
+  await fast(page);
+  await playTo(page, 'wagon');
+  await fast(page);
+  await shot(page, `tb-${tag}-1-wagon`);
+  // The load and baggage lessons come in either order (the learner's wagon decides).
+  const moments = width < 600 ? ['load'] : ['load', 'baggage'];
+  while (moments.length > 0) {
+    const id = await playTo(page, moments);
+    moments.splice(moments.indexOf(id), 1);
+    await shot(page, `tb-${tag}-${id === 'load' ? 2 : 3}-${id}`);
+  }
+  console.log(
+    tag,
+    JSON.stringify((await page.evaluate(() => window.catan.tutorial.record.run))?.shown),
+  );
+  await ctx.close();
+}
+
+// 5. Oil Springs: the first turn's oil lesson (its picture, the panel pulsing), pollution (the
 // track pulsing), a disaster; the oil lesson at phone width.
 for (const width of want('oil') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';
@@ -213,7 +245,7 @@ for (const width of want('oil') ? [1440, 412] : []) {
   await ctx.close();
 }
 
-// 5. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
+// 6. Crop Trust: the fields and their crops (picture) during setup, the seed vault on the first
 // turn and the first event token (whichever comes first); the fields lesson at phone width.
 for (const width of want('crop') ? [1440, 412] : []) {
   const tag = width < 600 ? 'phone' : 'desktop';

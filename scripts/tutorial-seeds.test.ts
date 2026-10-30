@@ -14,6 +14,7 @@ import { defineCourse, type Course, type CourseSpec } from '../src/ui/tutorial/c
 import { LEARNERS, drive, firstTurn as turnOf, type Drive } from '../src/ui/tutorial/testkit';
 import { ckTutorialSpec } from '../src/expansions/ck/tutorial';
 import { seaTutorialSpec } from '../src/expansions/seafarers/tutorial';
+import { tbTutorialSpec } from '../src/expansions/tb/tutorial';
 import { oilTutorialSpec } from '../src/expansions/oil/tutorial';
 import { cropTutorialSpec } from '../src/expansions/crop/tutorial';
 
@@ -90,6 +91,29 @@ const seaScore: Scorer = (runs) => {
   return { score, notes: notes.join(' | ') };
 };
 
+/**
+ * Traders & Barbarians: every learner loads a commodity by their third turn and delivers it by
+ * their sixth; a 7 (a barbarian moved) early; few recaps.
+ */
+const tbScore: Scorer = (runs) => {
+  let score = 0;
+  const d0 = runs[0]?.d;
+  const seven = d0 ? learnerTurn(turnOf(d0, / rolled 7\b/)) : null;
+  if (seven === null || seven > 4) score += 2;
+  const notes = [`first 7 L${seven}`];
+  for (const { name, d } of runs) {
+    const loaded = learnerTurn(turnOf(d, /^Red loaded /));
+    const delivered = learnerTurn(turnOf(d, /^Red delivered /));
+    if (loaded === null || loaded > 3) score += 2;
+    if (delivered === null || delivered > 6) score += 3;
+    const recaps = recapsOf(d);
+    score += recaps.length * 2;
+    if (!d.run.over) score += 10;
+    notes.push(`${name}: load L${loaded} deliver L${delivered} ${recaps.join(',') || '-'}`);
+  }
+  return { score, notes: notes.join(' | ') };
+};
+
 /** The learner's turn index of the first log entry of theirs matching `re`, or null. */
 const mineFirst = (d: Drive, re: RegExp) =>
   learnerTurn(d.log.find((e) => e.player === 0 && re.test(e.text))?.turn ?? null);
@@ -138,11 +162,13 @@ describe.skipIf(!which)('tutorial seed search', () => {
     const rows =
       which === 'ck'
         ? search(ckTutorialSpec, 'learn-ck-', ckScore)
-        : which === 'oil'
-          ? search(oilTutorialSpec, 'learn-oil-', oilScore)
-          : which === 'crop'
-            ? search(cropTutorialSpec, 'learn-crop-', cropScore)
-            : search(seaTutorialSpec, 'learn-sea-', seaScore);
+        : which === 'tb'
+          ? search(tbTutorialSpec, 'learn-tb-', tbScore)
+          : which === 'oil'
+            ? search(oilTutorialSpec, 'learn-oil-', oilScore)
+            : which === 'crop'
+              ? search(cropTutorialSpec, 'learn-crop-', cropScore)
+              : search(seaTutorialSpec, 'learn-sea-', seaScore);
     for (const r of rows.slice(0, 15)) console.log(`${r.seed}\t${r.score}\t${r.notes}`);
   }, 3_600_000);
 });
