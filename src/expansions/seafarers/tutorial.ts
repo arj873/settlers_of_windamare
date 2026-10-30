@@ -113,7 +113,7 @@ const LESSONS: readonly LessonDef<Id>[] = [
     id: 'ships',
     title: 'Ships',
     text: () =>
-      'A ship (1 lumber + 1 wool) goes on a sea edge next to your settlement or the end of your ships. Roads and ships join only at a settlement: a road can’t go on from a ship. Sail to an island’s coast, then build a settlement there.',
+      'A ship (1 Lumber + 1 Sheep) goes on a sea edge next to your settlement or the end of your ships. Roads and ships join only at a settlement: a road can’t go on from a ship. Sail to an island’s coast, then build a settlement there.',
     after: ['intro'],
     when: myMain,
     doneWhen: turnOver,

@@ -178,7 +178,7 @@ const LESSONS: readonly LessonDef<Id>[] = [
     id: 'knights',
     title: 'Knights',
     text: () =>
-      'Knights defend Catan. Build one (1 sheep + 1 ore) on an empty corner along your roads; it starts inactive. Activate it with 1 grain: only active knights fight the barbarians.',
+      'Knights defend Catan. Build one (1 Sheep + 1 Ore) on an empty corner along your roads; it starts inactive. Activate it with 1 Wheat: only active knights fight the barbarians.',
     after: ['dice'],
     when: (c) =>
       myMain(c) && (can(c, 'ck/buildKnight') || myKnights(c).length > 0 || myTurnsStarted(c) >= 2),
@@ -209,7 +209,7 @@ const LESSONS: readonly LessonDef<Id>[] = [
       myMain(c) && activeStrength(c.state, c.me) === 0
         ? can(c, 'ck/buildKnight') || myKnights(c).length > 0
           ? 'Build or activate a knight to defend your cities.'
-          : 'Collect 1 sheep + 1 ore for a knight, and 1 grain to activate it.'
+          : 'Collect 1 Sheep + 1 Ore for a knight, and 1 Wheat to activate it.'
         : null,
     focus: 'ck-barb',
   },
@@ -250,7 +250,7 @@ const LESSONS: readonly LessonDef<Id>[] = [
     id: 'knightUse',
     title: 'Using knights',
     text: () =>
-      'Command, then a knight: an active knight may move along your roads, displace a weaker enemy knight, or chase the robber from a tile it touches; then it is inactive. A knight activated this turn must wait. Promote a knight for 1 sheep + 1 ore (mighty needs Politics level 3).',
+      'Command, then a knight: an active knight may move along your roads, displace a weaker enemy knight, or (once the robber is awake) chase him from a tile it touches; then it is inactive. A knight activated this turn must wait. Promote a knight for 1 Sheep + 1 Ore (mighty needs Politics level 3).',
     after: ['knights'],
     when: (c) => myMain(c) && myKnights(c).length > 0,
     recap: true,
@@ -277,7 +277,7 @@ const LESSONS: readonly LessonDef<Id>[] = [
     id: 'walls',
     title: 'City walls',
     text: () =>
-      'A city wall (2 brick) goes under one of your cities. Each wall lets you hold 2 more cards when a 7 is rolled (3 walls at most). If the barbarians pillage that city, its wall is lost too.',
+      'A city wall (2 Brick) goes under one of your cities. Each wall lets you hold 2 more cards when a 7 is rolled (3 walls at most). If the barbarians pillage that city, its wall is lost too.',
     after: ['knights'],
     when: (c) =>
       myMain(c) &&
