@@ -144,8 +144,13 @@ describe('E&P HUD', () => {
     const s = blank('full');
     epSlice(s).gold[0] = 4;
     show(s);
-    const card = root.querySelector('.ep-hc');
+    const card = root.querySelector<HTMLButtonElement>('.ep-hc');
     expect(card?.textContent).toContain('4');
+    // #cardinfo: a tap says what gold is for.
+    card!.click();
+    const info = root.querySelector('.hud-pop-layer .dev-info')?.textContent ?? '';
+    expect(info).toContain('2 gold buy 1 resource of your choice (at most 2 times per turn)');
+    expect(info).toContain('Gold purchases this turn: 0 of 2.');
   });
 
   it('movement: ships are clicked to select, edges to sail; the fleet lists cargo and buttons', () => {

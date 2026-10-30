@@ -949,9 +949,11 @@
 .dcard {
   cursor: default;
 }
-/* Base dev cards that can't be played now stay clickable (they open their info card, hud.ts
-   `devInfo`): `is-off` is their "can't play" look. Expansion stacks still use `disabled`. */
-.dcard.is-off {
+/* Hand cards that can't be played now stay clickable (they open their info card, hud.ts
+   `cardInfo`): `is-off` is their "can't play" look; `is-info` marks a module good (commodity,
+   gold) whose click only opens it. */
+.dcard.is-off,
+.hcard.is-info {
   cursor: help;
 }
 .dcard:disabled .card-face,
@@ -962,11 +964,11 @@
 .dcard.is-vp.is-off .card-face {
   filter: none;
 }
-.dcard.is-open {
+.hcard.is-open {
   z-index: 2;
   transform: translateY(-5px);
 }
-.dcard.is-open .card-face {
+.hcard.is-open .card-face {
   box-shadow:
     inset 0 0 0 2px var(--card-inner),
     0 0 0 2px var(--accent-2),
@@ -1411,7 +1413,7 @@
 .seg-btn:focus-visible,
 .chip:focus-visible,
 .swatch:focus-visible,
-.dcard:focus-visible,
+.hcard:focus-visible,
 .victim:focus-visible,
 .input:focus-visible {
   outline: 2px solid var(--accent-2);

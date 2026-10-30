@@ -18,7 +18,7 @@ import {
 } from '../../engine';
 import { RESOURCES } from '../../engine/constants';
 import { h, type Child } from '../../ui/dom';
-import type { HudDialog, HudExtension } from '../../ui/expansions';
+import type { HandCard, HudDialog, HudExtension } from '../../ui/expansions';
 import { RESOURCE_LABEL, glyph } from '../../ui/icons';
 import type { HudView } from '../../ui/types';
 import { playerStyle, resCardFace } from '../../ui/widgets';
@@ -63,6 +63,7 @@ import {
   type TbPhase,
   sheetRules,
 } from './engine';
+import { BOOT_TEXT, SWIFT_TEXT, TOKEN_TEXT, fishText, goldText, swiftStatus } from './hand';
 import { tbSounds } from './sounds';
 import './tb.css';
 
@@ -866,6 +867,108 @@ function hint(state: GameState, view: HudView): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Hand cards (#cardinfo)
+// ---------------------------------------------------------------------------
+
+/** A T&B component as a card face (gold, fish, the old boot, tokens, Swift Journey). */
+function tbFace(kind: TbIcon, w: number, cls = ''): HTMLElement {
+  return h(
+    'span',
+    { class: `card-face tb-card-face ${cls}`.trim(), style: { '--cw': `${w}px` } },
+    tbIcon(kind, Math.round(w * 0.72)),
+  );
+}
+
+/**
+ * What the viewer holds of this module, scenario by scenario: coins, fish tokens, the old boot,
+ * Catan for Two trade tokens, and Swift Journey cards (the only one played: playable only when
+ * a legal `tb/swiftJourney` of the viewer exists).
+ */
+export function tbHandCards(state: GameState, view: HudView): HandCard[] {
+  if (view.spectator) return [];
+  const me = view.viewer;
+  const s = tbSlice(state);
+  const mineNow = state.turn.current === me;
+  const out: HandCard[] = [];
+  if (usesGold(state)) {
+    out.push({
+      key: 'tb/gold',
+      name: 'Coins',
+      count: goldOf(state, me),
+      produced: 'gold',
+      face: (w) => tbFace('gold', w),
+      text: goldText(state),
+      kind: 'good',
+      play: null,
+      notes: mineNow ? [`Resources bought with coins this turn: ${s.goldBuys} of 2.`] : [],
+    });
+  }
+  if (s.fish) {
+    const hand = [...(s.fish.hands[me] ?? [])].sort((a, b) => a - b);
+    out.push({
+      key: 'tb/fish',
+      name: 'Fish',
+      count: fishTotal(hand),
+      produced: 'fish',
+      face: (w) => tbFace('fish', w),
+      text: fishText(state, me),
+      kind: 'good',
+      play: null,
+      notes: hand.length > 0 ? [`Your tokens: ${hand.join(', ')}.`] : [],
+    });
+    if (s.fish.boot === me) {
+      out.push({
+        key: 'tb/boot',
+        name: 'Old boot',
+        count: 1,
+        face: (w) => tbFace('boot', w),
+        text: BOOT_TEXT,
+        kind: 'good',
+        play: null,
+        notes:
+          mine(view, 'tb/giveBoot').length > 0
+            ? ['You can give it away now, in the Traders & Barbarians panel.']
+            : [],
+      });
+    }
+  }
+  if (s.two && me < 2 && !has(state, 'fish')) {
+    out.push({
+      key: 'tb/tokens',
+      name: 'Trade tokens',
+      count: s.two.tokens[me] ?? 0,
+      face: (w) => tbFace('token', w),
+      text: TOKEN_TEXT,
+      kind: 'good',
+      play: null,
+      notes: [`A token action costs you ${tokenPrice(state, me)} now.`],
+    });
+  }
+  const swift = s.traders?.swift;
+  const held = swift?.held[me] ?? 0;
+  const fresh = swift?.fresh[me] ?? 0;
+  if (held + fresh > 0) {
+    const action = mine(view, 'tb/swiftJourney')[0];
+    out.push({
+      key: 'tb/swift',
+      name: 'Swift Journey',
+      count: held + fresh,
+      face: (w) => tbFace('wagon', w, 'tb-swift-face'),
+      text: SWIFT_TEXT,
+      kind: 'play',
+      play: action ? { action } : null,
+      status: swiftStatus(state, me, action !== undefined),
+      notes:
+        fresh > 0 && held > 0
+          ? [`${fresh} of them bought this turn: playable from your next turn.`]
+          : [],
+      ...(fresh > 0 ? { tag: 'new' } : {}),
+    });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // The extension
 // ---------------------------------------------------------------------------
 
@@ -873,14 +976,9 @@ export const tbHud: HudExtension = {
   id: TB,
   sounds: tbSounds,
 
-  cardFace: (kind, w) =>
-    kind === 'gold' || kind === 'fish'
-      ? h(
-          'span',
-          { class: 'card-face tb-card-face', style: { '--cw': `${w}px` } },
-          tbIcon(kind, Math.round(w * 0.72)),
-        )
-      : null,
+  cardFace: (kind, w) => (kind === 'gold' || kind === 'fish' ? tbFace(kind, w) : null),
+
+  handCardInfo: (state, view) => tbHandCards(state, view),
 
   panel(state, view, send) {
     const scenario = state.settings.scenario ?? SC_BASE;

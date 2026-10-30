@@ -15,10 +15,14 @@ import {
   KNIGHT_NAMES,
   KNIGHTS_PER_LEVEL,
   PROMOTE_ITEM,
+  isProgressCard,
+  mainTurn,
 } from '../ck/engine';
 import {
   ACTIVE_STEPS,
   BACK,
+  CHANGED_CARDS,
+  cardBlocker,
   DISPLACE_STEPS,
   INACTIVE_STEPS,
   PRISONERS_PER_TOKEN,
@@ -202,6 +206,17 @@ export const backHud: HudExtension = {
   dialog(state, view, _legal, send) {
     if (view.spectator) return null;
     return deserterDialog(state, view, send) ?? smithDialog(state, view, send);
+  },
+
+  // #cardinfo: the progress cards this pair changes say why with its rules.
+  handCardStatus(state, view, key) {
+    const card = key.slice('ck/'.length);
+    if (!key.startsWith('ck/') || !isProgressCard(card) || !CHANGED_CARDS.includes(card)) {
+      return null;
+    }
+    if (mainTurn(state, view.viewer) !== null) return null;
+    const why = cardBlocker(state, view.viewer, card);
+    return why ? `Not now: ${why}.` : null;
   },
 
   hint,

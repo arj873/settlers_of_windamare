@@ -400,7 +400,9 @@ interface HudExtension {
   dialog?(state, view, legal, send): { key; title; body; modal } | null; // after base forced dialogs
   hint?(state, view): string | null; // turn pill text in your phases
   impliedActions?: string[]; // clicked on the board, no button
-  handCards?(state, view, send): Child[]; // extra cards in the hand bar (C&K commodities)
+  handCardInfo?(state, view, send): HandCard[]; // your cards in the hand bar, with their info card (below)
+  handCardStatus?(state, view, key): string | null; // a combo's "why not now" for another module's card
+  handCards?(state, view, send): Child[]; // extra non-card items in the hand bar
   offerExtras?(state, side): Child[]; // extra items in the open trade offer's give / want row
   cardFace?(kind, w): HTMLElement | null; // art for a card kind the log names ('paper', 'gold', 'fish'): production animation
   sounds?: {
@@ -409,8 +411,39 @@ interface HudExtension {
     cues?(prev, next, ctx): SoundCue[]; // one state change → cues; ctx.levelOf(actor) / isLocal(p)
   };
 }
+
+interface HandCard {
+  key: '<id>/<kind>'; // unique in the hand ('ck/alchemist', 'ck/paper')
+  name;
+  count; // > 0; a good may show 0 (greyed, like an empty resource)
+  produced?: string; // a good's kind as the log names it: production cards land on it
+  face(w): HTMLElement; // card art, w px wide
+  text; // what it does / what it is for
+  kind: 'play' | 'good'; // played (progress card, Swift Journey) or spent / traded (commodity, gold)
+  play: { action } | { dialog(close): HudDialog | null } | null; // ONLY from view.legal
+  status?; // "Playable now: …" or why not and when (your rules); omit for a good
+  notes?: string[]; // more lines (hand limit, price now)
+  tag?; // 'new'
+  cls?; // '<id>-' classes on the card
+}
 ```
 
+- **Hand cards (#cardinfo)**: anything a player holds of your module goes through `handCardInfo`,
+  one `HandCard` per kind held; the HUD draws it like a base card and gives it the dev cards'
+  info card (one popover, same placement, Esc / outside click / card gone closes it, keyboard,
+  long-press / right-click on a playable card). Rules:
+  - `play` comes from the viewer's legal actions only (`view.legal`), never from your rules: the
+    click sends that action, or opens your dialog for a play that needs choices first (C&K
+    Alchemist's dice; the HUD rebuilds it every render, a send or `close` closes it). A card
+    without `play` is `aria-disabled` + `.is-off`, and its click only opens the info card: it
+    never sends anything.
+  - `status` may be derived from your rules (an engine blocker, worded as a sentence); say when
+    it can be played. Start it with "Playable now" exactly when `play` is set (tested).
+  - A combination that changes another module's card answers `handCardStatus(state, view, key)`
+    while that card can't be played (Barbarian Attack + C&K: `back/ui.ts`).
+  - Texts live in your module folder (they load with your pack, never in the base chunks); one
+    source shared with your panel (C&K: `CARD_TEXT`).
+  - Add your mode to `src/ui/cardInfo.test.ts` (bot games: playable = engine, no generic line).
 - Sounds (A1): put them in `src/expansions/<id>/sounds.ts` (C&K barbarians, Seafarers ships,
   E&P ships, T&B wagons are examples). Read your slice defensively (`Partial<…>`, absent fields)
   from public state only, so online views sound the same; levels come from `ctx.levelOf(player)`.

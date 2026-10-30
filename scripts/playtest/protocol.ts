@@ -99,7 +99,7 @@ export interface UiScan {
   toasts: string[];
   /** Resource counts shown in the HUD hand (lowercase resource -> count); null if hidden. */
   hand: Record<string, number> | null;
-  /** Other hand-bar cards by their tooltip ("Cloth: 1", "Progress cards: Smith"). */
+  /** Other hand-bar cards by their tooltip or label ("Cloth: 1", "Smith ×1, can't play now"). */
   handExtras?: string[];
   /** Expansion sidebar sections, as text lines (gold, commodities, knights, wagons...). */
   extPanels?: { title: string; lines: string[] }[];
