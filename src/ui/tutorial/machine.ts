@@ -80,8 +80,7 @@ export function advance(run: TutorialRun, c: TutorialCtx, course = BASE_COURSE):
 
   if (current !== null && !recapped.includes(current)) {
     const l = lessonOf(course, current);
-    const pushed =
-      !l.urgent && ready(course, c, done).some((x) => x.urgent && x.id !== current);
+    const pushed = !l.urgent && ready(course, c, done).some((x) => x.urgent && x.id !== current);
     if (l.doneWhen?.(c) || pushed) {
       done.add(current);
       current = null;

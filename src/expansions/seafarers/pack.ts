@@ -4,10 +4,12 @@ import { seafarersModule } from './engine';
 import { seafarersBots } from './bots';
 import { seafarersHud } from './ui';
 import { seafarersDrawer } from './render';
+import { seaTutorial } from './tutorial';
 
 export const pack: ExpansionPack = {
   module: seafarersModule,
   bots: seafarersBots,
   hud: seafarersHud,
   drawer: seafarersDrawer,
+  tutorial: seaTutorial,
 };

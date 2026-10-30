@@ -45,12 +45,7 @@ import {
   reportSlowDevice,
 } from './ui/power';
 import { STORAGE_KEY as SETUP_KEY } from './ui/setup/model';
-import {
-  TutorialCoach,
-  looksLikeTutorial,
-  offerTutorial,
-  openTutorialPicker,
-} from './ui/tutorial';
+import { TutorialCoach, looksLikeTutorial, offerTutorial, openTutorialPicker } from './ui/tutorial';
 import {
   CONFIRM_BUILD_KEY,
   LONGEST_ROAD_KEY,
