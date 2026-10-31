@@ -173,7 +173,9 @@ gen:catalog`, checked by a test) and `ensureModules(mode | ids)` fetches a modul
    `contain: strict`.
 5. **Piece-style previews** (`render/stylePreview.ts`): the board's renderer instead of a
    second WebGL context, the extracted canvas instead of a PNG data URL, one preview per frame
-   after the dialog painted.
+   after the dialog painted. Fix after release: the board's context can be lost unseen (phones,
+   GPU resets) and its read-back is then blank; previews then use Pixi's Canvas 2D renderer
+   (also before the board exists, instead of an own WebGL context).
 
 ## Looked at, not changed
 
