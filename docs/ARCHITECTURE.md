@@ -532,7 +532,9 @@ view.markSince(earlierState);             // #33 recap: faint rings on the piece
 - Piece styles (PR1, cosmetic): `PIECE_STYLES` in `render/pieceStyles.ts` (classic, timber,
   longhouse, keep, adobe, pagoda) paint settlements and cities with the classic footprint, so
   expansion overlays (C&K walls/metropolis) still fit; expansion drawers keep `ctx.art` (classic).
-  `render/stylePreview.ts` renders previews for the dialogs on one shared offscreen renderer.
+  `render/stylePreview.ts` renders previews for the dialogs with the board's renderer, or Pixi's
+  Canvas 2D renderer before the board exists and while its WebGL context is lost; a preview
+  that comes out blank warns once and is not cached (`scripts/perf/flows.mjs --only previews`).
   Dev galleries: `styles-dev.html`, `avatars-dev.html`; `?looks=fox:keep,owl:adobe` on dev games.
 - Just-built marks (#33, `render/marks.ts`): every `render` diffs the board's pieces (`allSites`:
   buildings, roads, and each active drawer's `sites` hook: Seafarers ships, C&K knights / walls)

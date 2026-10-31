@@ -4,14 +4,16 @@
 // in-browser server (host + a guest joining by the invite link), the tutorials (base from the
 // picker, C&K from its chip link and resumed after a reload, Seafarers from the in-game menu,
 // Traders & Barbarians, Explorers & Pirates and Oil Springs from their chip links, Crop Trust from
-// the setup screen's picker), and a short bot game of every mode (`?mode=`).
+// the setup screen's picker), a short bot game of every mode (`?mode=`), and the piece-style
+// previews (PR1) on every screen that shows them, also with the board's WebGL context lost.
 //
 //   pnpm build && pnpm preview --port 4173 &
 //   node scripts/perf/flows.mjs [--base http://localhost:4173]
 //     [--only base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-tb,tutorial-ep,
-//             tutorial-oil,tutorial-crop,modes]
+//             tutorial-oil,tutorial-crop,modes,previews]
 //
-// Exits non-zero when a flow fails, the page throws or logs an error, or a CSP violation fires.
+// Exits non-zero when a flow fails, the page throws or logs an error, a CSP violation fires, or
+// a piece-style preview fails (its one console warning).
 import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
@@ -23,7 +25,7 @@ const flag = (name, def) => {
 const BASE = flag('--base', 'http://localhost:4173').replace(/\/$/, '');
 const ONLY = flag(
   '--only',
-  'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-tb,tutorial-ep,tutorial-oil,tutorial-crop,modes',
+  'base,ck,sea,online,tutorial,tutorial-ck,tutorial-sea,tutorial-tb,tutorial-ep,tutorial-oil,tutorial-crop,modes,previews',
 ).split(',');
 
 const browser = await chromium.launch({
@@ -45,7 +47,11 @@ async function profile(name) {
     page.on('pageerror', (e) => problems.push(`${name}: page error: ${e.message}`));
     page.on('console', (m) => {
       const t = m.text();
-      if (m.type() === 'error' || /Content.Security.Policy/i.test(t)) {
+      if (
+        m.type() === 'error' ||
+        /Content.Security.Policy/i.test(t) ||
+        t.startsWith('Piece style previews failed')
+      ) {
         problems.push(`${name}: console ${m.type()}: ${t}`);
       }
     });
@@ -385,6 +391,82 @@ async function modes() {
   await ctx.close();
 }
 
+/** Opaque pixels of each piece-style preview canvas under a selector (0: blank or not yet). */
+const OPAQUE = `(sel) => [...document.querySelectorAll(sel)].map((box) => {
+  const c = box.querySelector('canvas');
+  if (!c || c.width === 0) return 0;
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+  return n;
+})`;
+
+/** All `count` previews under `sel` show a picture (they fill in one per frame). */
+async function previewsDrawn(page, sel, count, what) {
+  let seen = [];
+  for (let i = 0; i < 60; i++) {
+    seen = await page.evaluate(`(${OPAQUE})(${JSON.stringify(sel)})`);
+    if (seen.length === count && seen.every((n) => n > 0)) break;
+    await page.waitForTimeout(250);
+  }
+  check(
+    seen.length === count && seen.every((n) => n > 0),
+    `${what}: ${count} piece previews drawn (opaque px: ${seen.join(' ')})`,
+  );
+}
+
+/**
+ * Piece-style previews (PR1) on every screen that shows them. s18 drew them with the board's
+ * renderer; with its WebGL context lost (phones drop it for background tabs; the board is unseen
+ * behind these screens) they came out blank and stayed blank: names only.
+ */
+async function previews() {
+  const { ctx, open } = await profile('previews');
+  const DIALOG = '.pf-scrim .pf-style-art';
+  const cancel = (page) => page.click('.pf-scrim .btn-ghost');
+
+  const home = await open(`${BASE}/?server=local`);
+  await home.click('[data-k="profile"]');
+  await previewsDrawn(home, DIALOG, 6, 'home screen Profile');
+  await cancel(home);
+  await home.fill('[data-k="nickname"]', 'Ann');
+  await home.click('[data-k="create"]');
+  await home.waitForSelector('.ol-seat.is-mine');
+  await previewsDrawn(home, '.ol-seats .pf-style-art', 1, 'online lobby seat');
+  await home.click('.ol-lobby [data-k="profile"]');
+  await previewsDrawn(home, DIALOG, 6, 'online lobby Profile');
+  const guest = await open(await home.inputValue('[data-k="invite"]'));
+  await guest.waitForSelector('[data-k="join"]');
+  await guest.click('[data-k="profile"]');
+  await previewsDrawn(guest, DIALOG, 6, '"Join the game" screen (?room=) Profile');
+  await guest.close();
+  await home.close();
+
+  const lost = await open(`${BASE}/`);
+  await lost.waitForSelector('#app canvas');
+  const gone = await lost.evaluate(() => {
+    const c = document.querySelector('#app canvas');
+    const gl = c.getContext('webgl2') ?? c.getContext('webgl');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return gl?.isContextLost() ?? false;
+  });
+  check(gone, "the board's WebGL context is lost");
+  await lost.click('[data-k="profile"]');
+  await previewsDrawn(lost, DIALOG, 6, "home screen Profile, board's WebGL context lost");
+  await lost.close();
+
+  // First asked for after the board drew a game: the menu's New game → the setup screen.
+  const game = await open(`${BASE}/?fixture=midGame`);
+  await game.waitForSelector('.hud-side .sec-players');
+  await game.click('.menu-btn');
+  await game.click('.menu-item:has-text("New game")');
+  await game.waitForSelector('.setup [data-k="look-0"]');
+  await previewsDrawn(game, '.pf-seat-look .pf-style-art', 4, 'setup screen seat looks');
+  await game.click('.setup [data-k="look-1"]');
+  await previewsDrawn(game, DIALOG, 6, 'seat look dialog');
+  await ctx.close();
+}
+
 const FLOWS = {
   base,
   ck,
@@ -398,6 +480,7 @@ const FLOWS = {
   'tutorial-oil': tutorialOil,
   'tutorial-crop': tutorialCrop,
   modes,
+  previews,
 };
 let failed = false;
 for (const name of ONLY) {
