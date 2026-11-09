@@ -54,6 +54,78 @@ async function waitUntil(page: Page, expr: string, timeoutMs = 10_000): Promise<
   }
 }
 
+/** Drag the host's Points to win slider to `vp` (one input event, like a drag step). */
+async function setVp(page: Page, vp: number): Promise<void> {
+  await page.evaluate((v) => {
+    const el = document.querySelector<HTMLInputElement>('.ol-config input[data-k="vp"]');
+    if (!el) throw new Error('no Points to win slider');
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, vp);
+}
+
+/**
+ * Room 823DDM: the host's Points to win must reach the game. A full 4-seat table; the host moves
+ * the slider while a 5th player joins (the room grows to 5 seats, board base -> base56), then
+ * changes it again and presses Start inside the 250 ms debounce.
+ */
+async function vpRace(open: (url: string) => Promise<Page>, base: string): Promise<void> {
+  const host = await open(REMOTE ? base : `${base}?server=local`);
+  await host.fill('[data-k="nickname"]', 'Vee');
+  await host.click('[data-k="create"]');
+  await host.waitForSelector('.ol-lobby');
+  const invite = await host.inputValue('[data-k="invite"]');
+  const guests: Page[] = [];
+  for (const name of ['Bea', 'Cal', 'Dee']) {
+    const g = await open(invite);
+    await g.fill('[data-k="nickname"]', name);
+    await g.click('[data-k="join"]');
+    await g.waitForSelector('.ol-lobby');
+    guests.push(g);
+  }
+  await waitUntil(host, `${clientExpr}.room.seats.every(s => s.occupant !== null)`);
+  check(true, 'race: 4 seats full');
+  const john = await open(invite);
+  await john.fill('[data-k="nickname"]', 'John');
+  // The edit and the join cross.
+  await Promise.all([setVp(host, 11), john.click('[data-k="join"]')]);
+  await waitUntil(
+    host,
+    `(() => { const r = ${clientExpr}.room; return r.seats.length === 5 && r.config.vpToWin === 11; })()`,
+  );
+  const room = (await host.evaluate(`${clientExpr}.room`)) as {
+    config: { map: string };
+    seats: { occupant: string | null }[];
+  };
+  check(
+    room.config.map === 'base56' && room.seats.every((s) => s.occupant !== null),
+    'race: a 5th player joined during the edit: 5 seats (base56), John seated, Points to win 11',
+  );
+  check(
+    (await host.textContent('.ol-config [data-v="vp"]')) === '11',
+    'race: the host still sees 11',
+  );
+  // Start inside the debounce of the next edit.
+  await setVp(host, 12);
+  await host.click('[data-k="lobby-start"]');
+  await host.waitForSelector('.hud-side .sec-players');
+  const settings = (await host.evaluate(`${clientExpr}.game.view.settings`)) as {
+    vpToWin: number;
+  };
+  const players = (await host.evaluate(`${clientExpr}.game.view.players.length`)) as number;
+  check(
+    settings.vpToWin === 12 && players === 5,
+    `race: Start 0 ms after the edit -> game at ${settings.vpToWin} VP with ${players} players`,
+  );
+  check(
+    (await host.textContent('.sec-players [data-k="vp-goal"]')) === 'First to 12' &&
+      (await host.textContent('[data-k="log-goal"]'))?.includes('First to 12'),
+    'race: the game shows "First to 12" (Players header, Game Events)',
+  );
+  await shot(host, '10-race-game-target');
+  for (const p of [john, ...guests, host]) await p.close();
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   let server: Awaited<ReturnType<typeof preview>> | null = null;
@@ -352,6 +424,8 @@ async function main() {
     check(await host.$('.ck-stat, .ck-die'), 'C&K HUD panel renders');
     await shot(host, '9-game-ck-ann');
     await shot(dan, '9-game-ck-dan');
+
+    await vpRace(open, base);
 
     check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);
     console.log(`\nAll checks passed. Screenshots in ${OUT}`);

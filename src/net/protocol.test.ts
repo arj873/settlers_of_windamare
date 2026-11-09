@@ -203,7 +203,23 @@ describe('parseClientMessage', () => {
       config: DEFAULT_ROOM_CONFIG,
     });
     expect(parseOk({ v, type: 'kick', member: 'm2' }).type).toBe('kick');
-    expect(parseOk({ v, type: 'start' }).type).toBe('start');
+    expect(parseOk({ v, type: 'configure', config: DEFAULT_ROOM_CONFIG, seats: 5 })).toEqual({
+      v,
+      type: 'configure',
+      config: DEFAULT_ROOM_CONFIG,
+      seats: 5,
+    });
+    expect(() =>
+      parseOk({ v, type: 'configure', config: DEFAULT_ROOM_CONFIG, seats: 0 }),
+    ).toThrow();
+    expect(parseOk({ v, type: 'start' })).toEqual({ v, type: 'start' });
+    const twelve = { ...DEFAULT_ROOM_CONFIG, vpToWin: 12 };
+    expect(parseOk({ v, type: 'start', config: twelve })).toEqual({
+      v,
+      type: 'start',
+      config: twelve,
+    });
+    expect(() => parseOk({ v, type: 'start', config: { ...twelve, vpToWin: 99 } })).toThrow();
     expect(parseOk({ v, type: 'rematch' }).type).toBe('rematch');
     expect(parseOk({ v, type: 'intent', action: { type: 'endTurn', player: 0 }, seq: 4 })).toEqual({
       v,

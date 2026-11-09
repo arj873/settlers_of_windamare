@@ -10,7 +10,7 @@ import { botLevelSelect } from '../botLevel';
 import { append, h } from '../dom';
 import { glyph } from '../icons';
 import { themePicker } from '../theme';
-import { RoomConfigPanel, withSeatCount } from './configPanel';
+import { RoomConfigPanel } from './configPanel';
 import { profileAvatar, profileChip, stylePreviewImg } from '../profile/dialog';
 import { PIECE_STYLE_LABEL, pieceStyleOr, type AvatarRef } from '../profile/model';
 import { lobbyView, type LobbyView, type SeatView } from './lobbyModel';
@@ -23,8 +23,10 @@ export interface LobbyActions {
   setColor(color: string): void;
   /** Host (B1): difficulty of the bot on an open seat. */
   setBotLevel(seat: number, level: BotLevel): void;
-  configure(config: RoomConfig): void;
-  start(): void;
+  /** `seats`: the room's seat count the edit was made on (the server refuses it if that changed). */
+  configure(config: RoomConfig, seats?: number): void;
+  /** `config`: the settings the host's screen shows; the game starts with exactly these. */
+  start(config?: RoomConfig): void;
   leave(): void;
 }
 
@@ -234,7 +236,7 @@ export class LobbyScreen {
       this.config = new RoomConfigPanel({
         config: room.config,
         editable: v.isHost,
-        onChange: (cfg) => this.opts.actions.configure(cfg),
+        onChange: (cfg, seats) => this.opts.actions.configure(cfg, seats),
       });
       this.configHost.replaceChildren(this.config.element);
     } else {
@@ -248,6 +250,18 @@ export class LobbyScreen {
   /** Put the chat panel back here (after a game). */
   attachChat(chat: HTMLElement): void {
     this.chatBox.append(chat);
+  }
+
+  /** The server refused a message (`ref` = its type): the settings panel re-sends or reverts. */
+  serverError(code: string, ref?: string): void {
+    this.config?.serverError(code, ref);
+  }
+
+  /** Add / Remove seat: from the settings the host sees (pending edits included). */
+  private setSeats(n: number): void {
+    const room = this.room;
+    if (!room || !this.config) return;
+    this.opts.actions.configure(this.config.withSeats(n), room.seats.length);
   }
 
   destroy(): void {
@@ -313,7 +327,6 @@ export class LobbyScreen {
   }
 
   private renderSeats(v: LobbyView): void {
-    const a = this.opts.actions;
     const room = this.room;
     this.seatsBox.replaceChildren(...v.seats.map((s) => this.seatCard(s, v)));
     append(this.seatsBox, [
@@ -325,7 +338,7 @@ export class LobbyScreen {
             class: 'ol-seat ol-seat-add',
             attrs: { 'data-k': 'add-bot' },
             title: 'Add a seat; a bot plays it unless someone sits down',
-            on: { click: () => a.configure(withSeatCount(room.config, room.seats.length + 1)) },
+            on: { click: () => this.setSeats(room.seats.length + 1) },
           },
           h('span', { class: 'ol-add-plus' }, '+'),
           h('span', {}, 'Add bot'),
@@ -372,7 +385,7 @@ export class LobbyScreen {
             class: 'btn btn-sm btn-ghost',
             attrs: { 'data-k': 'remove-bot' },
             title: 'Remove this seat',
-            on: { click: () => a.configure(withSeatCount(room.config, room.seats.length - 1)) },
+            on: { click: () => this.setSeats(room.seats.length - 1) },
           },
           'Remove',
         ),
@@ -489,7 +502,7 @@ export class LobbyScreen {
               disabled: v.startBlocked !== null,
               title: v.startBlocked ?? 'Start the game; open seats get bots',
               attrs: { 'data-k': 'lobby-start' },
-              on: { click: () => a.start() },
+              on: { click: () => a.start(this.config?.takeForStart()) },
             },
             'Start game',
           )

@@ -289,12 +289,19 @@ export type ClientMessage = V &
     | { type: 'setColor'; color: string }
     /** Host, lobby (B1): the difficulty of the bot playing `seat` when no human does. */
     | { type: 'setBotLevel'; seat: PlayerId; level: BotLevel }
-    /** Host, lobby. */
-    | { type: 'configure'; config: RoomConfig }
+    /**
+     * Host, lobby. `seats`: the room's seat count the host's screen showed when the edit was made;
+     * when given and a join has changed the seats since, the server refuses (`stale_state`) instead
+     * of dropping the newcomer's seat, and the client re-sends its edit on the new seat count.
+     */
+    | { type: 'configure'; config: RoomConfig; seats?: number }
     /** Host. Removes a member; their token stops working. */
     | { type: 'kick'; member: MemberId }
-    /** Host, lobby. */
-    | { type: 'start' }
+    /**
+     * Host, lobby. `config`: the settings the host's screen shows; the game starts with exactly
+     * these (applied like `configure`), or not at all (`stale_state` if the seats changed).
+     */
+    | { type: 'start'; config?: RoomConfig }
     /** Host, after game over: back to the lobby with the same seats. */
     | { type: 'rematch' }
     /** A game action. `action.player` must be the sender's seat. `seq` = last game seq seen. */
@@ -830,9 +837,20 @@ const CLIENT: ClientParsers = {
     seat: field(o, 'seat', PLAYER_ID, p),
     level: field(o, 'level', oneOf(BOT_LEVELS), p),
   }),
-  configure: (o, p) => ({ v, type: 'configure', config: field(o, 'config', parseRoomConfig, p) }),
+  configure: (o, p) => {
+    const seats = optional(o, 'seats', int(1, MAPS.base78.maxPlayers), p);
+    return {
+      v,
+      type: 'configure',
+      config: field(o, 'config', parseRoomConfig, p),
+      ...(seats === undefined ? {} : { seats }),
+    };
+  },
   kick: (o, p) => ({ v, type: 'kick', member: field(o, 'member', str(16), p) }),
-  start: () => ({ v, type: 'start' }),
+  start: (o, p) => {
+    const config = optional(o, 'config', parseRoomConfig, p);
+    return { v, type: 'start', ...(config === undefined ? {} : { config }) };
+  },
   rematch: () => ({ v, type: 'rematch' }),
   intent: (o, p) => {
     const seq = optional(o, 'seq', int(0, Number.MAX_SAFE_INTEGER), p);

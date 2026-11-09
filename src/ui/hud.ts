@@ -63,7 +63,7 @@ import {
   type Availability,
   type BuildKind,
 } from './model';
-import { bankPanel, LogList, playersList } from './sidebar';
+import { bankPanel, LogList, playersList, vpGoalChip } from './sidebar';
 import { statsFor, type StatsTab } from './stats/model';
 import { statsPanel } from './stats/panel';
 import { themePicker } from './theme';
@@ -1153,7 +1153,7 @@ export class Hud {
       this.logSec,
       this.section('bank', bankPanel(state)),
       ...extPanels,
-      this.section('players', playersList(state, view)),
+      this.section('players', playersList(state, view), false, undefined, vpGoalChip(state)),
       ...(this.chatSec ? [this.chatSec] : []),
     ];
     // Expansion panels may act on state their markup does not show: always fresh.
@@ -1199,6 +1199,8 @@ export class Hud {
     body: HTMLElement,
     persistent = false,
     title?: string,
+    /** A small note at the header's left (Players: "First to 12"). */
+    aside?: HTMLElement,
   ): HTMLElement {
     const closed = this.collapsed.has(key);
     const heading = title ?? (key.startsWith('ext:') ? key : SECTION_TITLE[key as 'log' | 'chat']);
@@ -1210,6 +1212,7 @@ export class Hud {
       h(
         'header',
         { class: 'sec-head' },
+        aside ?? null,
         h('h2', { class: 'plaque' }, heading),
         h(
           'button',

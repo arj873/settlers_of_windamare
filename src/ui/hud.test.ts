@@ -506,3 +506,19 @@ describe('Hud', () => {
     expect(root.querySelector('.pp-name')!.textContent).toContain('<img');
   });
 });
+
+describe('the game target (823DDM)', () => {
+  it('Players header, VP badges and the first Game Events group say the points to win', () => {
+    const base = freshGame();
+    const s = { ...base, settings: { ...base.settings, vpToWin: 12 } };
+    hud.render(s, { viewer: 0, legal: [], isBotTurn: false });
+    const chip = root.querySelector('.sec-players [data-k="vp-goal"]')!;
+    expect(chip.textContent).toBe('First to 12');
+    expect(chip.getAttribute('title')).toBe('First to 12 victory points wins');
+    expect(root.querySelector('.vp-badge')!.getAttribute('title')).toContain('first to 12 wins');
+    const lines = [...root.querySelectorAll('.log-group')][0]!.querySelectorAll('.log-row');
+    expect(lines[0]!.textContent).toMatch(/^Game created/);
+    expect(lines[1]!.textContent).toBe('First to 12 victory points wins.');
+    expect(root.querySelectorAll('[data-k="log-goal"]')).toHaveLength(1);
+  });
+});

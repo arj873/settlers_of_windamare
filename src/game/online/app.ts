@@ -215,6 +215,8 @@ export class OnlineApp {
           break;
         }
         case 'error': {
+          // The host's settings panel re-sends (or reverts) an edit the server refused.
+          if (client.room?.phase === 'lobby') this.lobby?.serverError(e.code, e.ref);
           const text = errorText(e.code, e.message, e.ref);
           if (text && !client.fatal) env.toast(text, 'error');
           break;
@@ -326,8 +328,8 @@ export class OnlineApp {
             setColor: (color) => this.sendOrWarn(c.send({ type: 'setColor', color })),
             setBotLevel: (seat, level) =>
               this.sendOrWarn(c.send({ type: 'setBotLevel', seat, level })),
-            configure: (config) => this.sendOrWarn(c.configure(config)),
-            start: () => this.sendOrWarn(c.send({ type: 'start' })),
+            configure: (config, seats) => this.sendOrWarn(c.configure(config, seats)),
+            start: (config) => this.sendOrWarn(c.startGame(config)),
             leave: () => this.leave(),
           },
         });

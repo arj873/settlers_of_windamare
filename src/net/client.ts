@@ -279,8 +279,16 @@ export class RoomClient {
     return this.send({ type: 'react', reaction });
   }
 
-  configure(config: RoomConfig): boolean {
-    return this.send({ type: 'configure', config });
+  /** `seats`: the seat count the edit was made on (the server refuses it if a join changed it). */
+  configure(config: RoomConfig, seats?: number): boolean {
+    return this.send(
+      seats === undefined ? { type: 'configure', config } : { type: 'configure', config, seats },
+    );
+  }
+
+  /** `config`: the settings the host's screen shows; the game starts with exactly these. */
+  startGame(config?: RoomConfig): boolean {
+    return this.send(config ? { type: 'start', config } : { type: 'start' });
   }
 
   // -------------------------------------------------------------------------

@@ -471,11 +471,11 @@ export class GameSession {
       case 'setBotLevel':
         return this.setBotLevel(m, msg.seat, msg.level);
       case 'configure':
-        return this.configure(m, msg.config);
+        return this.configure(m, msg.config, msg.seats);
       case 'kick':
         return this.kick(m, msg.member);
       case 'start':
-        return this.start(m);
+        return this.start(m, msg.config);
       case 'rematch':
         return this.rematch(m);
       case 'intent':
@@ -676,9 +676,17 @@ export class GameSession {
     return null;
   }
 
-  private configure(m: MemberRec, config: RoomConfig): Failure | null {
+  /**
+   * `seats`: the seat count the host's edit was made on. A join that grew the room meanwhile
+   * (autoSeat) must not be undone by an edit that crossed it on the wire: refuse, the host's
+   * client re-sends the edit on the new seat count.
+   */
+  private configure(m: MemberRec, config: RoomConfig, seats?: number): Failure | null {
     if (m.id !== this.d.host) return ['not_host', 'only the host can change the game'];
     if (this.d.phase !== 'lobby') return ['wrong_phase', 'the game has started'];
+    if (seats !== undefined && seats !== this.d.seats.length) {
+      return ['stale_state', 'the seats changed; settings not applied'];
+    }
     this.setConfig(config);
     return null;
   }
@@ -720,12 +728,21 @@ export class GameSession {
     return null;
   }
 
-  private start(m: MemberRec): Failure | null {
+  /**
+   * `config`: the settings on the host's screen. The game uses exactly these (an edit still in the
+   * client's debounce, or refused earlier, cannot be lost), or does not start when the seats
+   * changed under the host (stale_state: they look again and press Start).
+   */
+  private start(m: MemberRec, config?: RoomConfig): Failure | null {
     if (m.id !== this.d.host) return ['not_host', 'only the host can start'];
     if (this.d.phase !== 'lobby') return ['wrong_phase', 'the game has already started'];
+    if (config && config.seatCount !== this.d.seats.length) {
+      return ['stale_state', 'the seats changed; check the settings and start again'];
+    }
     if (!this.d.seats.some((s) => s.occupant !== null)) {
       return ['not_seated', 'at least one person must take a seat'];
     }
+    if (config) this.setConfig(config);
     const taken = new Set<string>();
     const players: SeatConfig[] = this.d.seats.map((s, i) => {
       const member = s.occupant === null ? undefined : this.member(s.occupant);

@@ -85,6 +85,7 @@ export class LogList {
       viewer,
       state.players.map((p) => [p.name, p.color]),
       longestRoadName(state),
+      state.settings.vpToWin,
     ]);
     if (game !== this.game) {
       this.game = game;
@@ -123,38 +124,52 @@ export class LogList {
 }
 
 function logGroup(state: GameState, g: LogGroup, lastRoll: number): HTMLElement {
+  // The game's first group says what wins, right after "Game created".
+  const goal =
+    g.key === 0
+      ? h(
+          'div',
+          { class: 'log-row is-system log-goal', attrs: { 'data-k': 'log-goal' } },
+          `${vpGoalText(state)}.`,
+        )
+      : null;
   return h(
     'div',
     { class: 'log-group' },
     h('div', { class: 'log-sep' }, h('span', {}, g.turn === 0 ? 'Setup' : `Turn ${g.turn}`)),
-    ...g.items.map((item) => {
-      if (item.kind === 'production') {
-        return h(
-          'div',
-          { class: 'log-prod' },
-          h('div', { class: 'log-prod-title' }, 'Production:'),
-          ...item.rows.map((row) =>
-            h(
-              'div',
-              { class: 'log-row log-prod-row', style: rowColor(state, row.player) },
-              playerName(state.players[row.player]),
-              ': ',
-              ...row.tokens.map((t) => tokenNode(state, t, null)),
-            ),
-          ),
-        );
-      }
-      const dice = item.index === lastRoll ? state.dice : null;
-      return h(
-        'div',
-        {
-          class: `log-row${item.player === null ? ' is-system' : ''}${item.secret ? ' is-secret' : ''}`,
-          style: rowColor(state, item.player),
-          ...(item.secret ? { attrs: { title: 'Only you and the other player see this' } } : {}),
-        },
-        ...item.tokens.map((t) => tokenNode(state, t, dice)),
-      );
+    ...g.items.flatMap((item, i) => {
+      const el = logItem(state, item, lastRoll);
+      return i === 0 && goal ? [el, goal] : [el];
     }),
+  );
+}
+
+function logItem(state: GameState, item: LogGroup['items'][number], lastRoll: number): HTMLElement {
+  if (item.kind === 'production') {
+    return h(
+      'div',
+      { class: 'log-prod' },
+      h('div', { class: 'log-prod-title' }, 'Production:'),
+      ...item.rows.map((row) =>
+        h(
+          'div',
+          { class: 'log-row log-prod-row', style: rowColor(state, row.player) },
+          playerName(state.players[row.player]),
+          ': ',
+          ...row.tokens.map((t) => tokenNode(state, t, null)),
+        ),
+      ),
+    );
+  }
+  const dice = item.index === lastRoll ? state.dice : null;
+  return h(
+    'div',
+    {
+      class: `log-row${item.player === null ? ' is-system' : ''}${item.secret ? ' is-secret' : ''}`,
+      style: rowColor(state, item.player),
+      ...(item.secret ? { attrs: { title: 'Only you and the other player see this' } } : {}),
+    },
+    ...item.tokens.map((t) => tokenNode(state, t, dice)),
   );
 }
 
@@ -200,6 +215,7 @@ function playerBar(
   viewer: PlayerId,
   away: boolean,
   roadCard: string,
+  goal: number,
 ): HTMLElement {
   const you = p.id === viewer;
   return h(
@@ -213,7 +229,11 @@ function playerBar(
       p,
       p.isBot,
       34,
-      h('span', { class: 'vp-badge', title: 'Victory points (public)' }, String(p.publicVp)),
+      h(
+        'span',
+        { class: 'vp-badge', title: `Victory points (public) · first to ${goal} wins` },
+        String(p.publicVp),
+      ),
     ),
     h(
       'div',
@@ -280,7 +300,27 @@ export function playersList(state: GameState, view: HudView): HTMLElement {
     'div',
     { class: `hud-players${list.length > 4 ? ' is-compact' : ''}` },
     ...list.map((p) =>
-      playerBar(p, view.viewer, view.away?.[p.id] === true, longestRoadName(state)),
+      playerBar(
+        p,
+        view.viewer,
+        view.away?.[p.id] === true,
+        longestRoadName(state),
+        state.settings.vpToWin,
+      ),
     ),
+  );
+}
+
+/** The game's target (823DDM: show it, so a wrong target is seen before the end). */
+export function vpGoalText(state: GameState): string {
+  return `First to ${state.settings.vpToWin} victory points wins`;
+}
+
+/** Players header chip: "First to 12". */
+export function vpGoalChip(state: GameState): HTMLElement {
+  return h(
+    'span',
+    { class: 'sec-goal', title: vpGoalText(state), attrs: { 'data-k': 'vp-goal' } },
+    `First to ${state.settings.vpToWin}`,
   );
 }
