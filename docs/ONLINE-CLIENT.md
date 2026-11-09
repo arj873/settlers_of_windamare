@@ -62,7 +62,11 @@ Dev params (`?fixture`, `?seats`, `?autoplay`, ...) still start a hotseat game d
 - Settings: the hotseat `SetupScreen` wrapped unchanged. Its `storage` option is a bridge: the
   draft it loads comes from the room config, every save becomes a (debounced 250 ms)
   `configure`. CSS hides its seats, seed and footer. Non-hosts get it `inert` and dimmed, rebuilt
-  on every config change. New setup-screen rule options flow through as long as `buildConfig`
+  on every config change. Host edits are a patch over the latest server config
+  (`rebaseConfig`): a room update (a join grows the room 4 → 5, board base → base56) keeps them,
+  and they are re-sent (`configure.seats`, rate-limit / stale retries) until the server's config
+  has them. Add / Remove seat build on the shown settings; Start sends them (`start.config`).
+  Leaving the screen sends a pending edit. New setup-screen rule options flow through as long as `buildConfig`
   emits them and `parseRoomConfig` (server) accepts them.
 
 ## HUD additions (`src/ui`)

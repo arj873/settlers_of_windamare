@@ -396,23 +396,30 @@ frame `ping` → `pong` (not JSON; the Durable Object auto-responds without waki
 
 **Client → server**
 
-| type          | fields                           | who / when           | errors                                                              |
-| ------------- | -------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `hello`       | `token: string \| null`, `name?` | first frame          | room_full, room_expired, version_mismatch                           |
-| `setName`     | `name`                           | any member           | name_required                                                       |
-| `setProfile`  | `avatar`, `pieceStyle` (PR1)     | any member, any time | bad_message, rate_limited (`profile` bucket)                        |
-| `takeSeat`    | `seat`                           | named member, lobby  | wrong_phase, name_required, bad_seat, seat_taken                    |
-| `leaveSeat`   | —                                | seated, lobby        | wrong_phase, not_seated                                             |
-| `setColor`    | `color` (one of `ROOM_COLORS`)   | seated, lobby        | wrong_phase, not_seated, color_taken                                |
-| `setBotLevel` | `seat`, `level` (`BOT_LEVELS`)   | host, lobby          | not_host, wrong_phase, bad_message (B1)                             |
-| `configure`   | `config: RoomConfig`             | host, lobby          | not_host, wrong_phase, bad_message                                  |
-| `kick`        | `member`                         | host                 | not_host, bad_message                                               |
-| `start`       | —                                | host, lobby          | not_host, wrong_phase, not_seated, bad_config                       |
-| `rematch`     | —                                | host, over           | not_host, wrong_phase                                               |
-| `intent`      | `action: Action`, `seq?`         | seated, playing      | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
-| `chat`        | `text`                           | named member         | name_required, rate_limited                                         |
-| `react`       | `reaction`                       | any member           | rate_limited                                                        |
-| `sync`        | —                                | any member           | — (resends `room` + `game`)                                         |
+| type          | fields                           | who / when           | errors                                                             |
+| ------------- | -------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `hello`       | `token: string \| null`, `name?` | first frame          | room_full, room_expired, version_mismatch                          |
+| `setName`     | `name`                           | any member           | name_required                                                      |
+| `setProfile`  | `avatar`, `pieceStyle` (PR1)     | any member, any time | bad_message, rate_limited (`profile` bucket)                       |
+| `takeSeat`    | `seat`                           | named member, lobby  | wrong_phase, name_required, bad_seat, seat_taken                   |
+| `leaveSeat`   | —                                | seated, lobby        | wrong_phase, not_seated                                            |
+| `setColor`    | `color` (one of `ROOM_COLORS`)   | seated, lobby        | wrong_phase, not_seated, color_taken                               |
+| `setBotLevel` | `seat`, `level` (`BOT_LEVELS`)   | host, lobby          | not_host, wrong_phase, bad_message (B1)                            |
+| `configure`   | `config: RoomConfig`, `seats?`   | host, lobby          | not_host, wrong_phase, bad_message, stale_state (`seats` ≠ room's) |
+| `kick`        | `member`                         | host                 | not_host, bad_message                                              |
+| `start`       | `config?: RoomConfig`            | host, lobby          | not_host, wrong_phase, not_seated, bad_config, stale_state         |
+| `rematch`     | —                                | host, over           | not_host, wrong_phase                                              |
+
+`configure.seats` is the seat count the host's edit was made on: a join that grew the room
+meanwhile (autoSeat) is not undone by an edit that crossed it; the server refuses with
+`stale_state` and the host's client re-sends the edit on the new seats. `start.config` is the
+settings on the host's screen: the game uses exactly these (applied like `configure`), or the start
+is refused with `stale_state` when `config.seatCount` is not the room's seat count any more.
+Both fields are optional (older clients).
+| `intent` | `action: Action`, `seq?` | seated, playing | wrong_phase, not_seated, not_your_seat, stale_state, illegal_action |
+| `chat` | `text` | named member | name_required, rate_limited |
+| `react` | `reaction` | any member | rate_limited |
+| `sync` | — | any member | — (resends `room` + `game`) |
 
 Any frame before `hello` → `not_joined`. `RoomConfig` = `NewGameConfig` without `players`/`seed`
 plus `seatCount` (`mode` (any registered mode, X1), `scenario?` (one of the mode's), `options?`

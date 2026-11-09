@@ -593,3 +593,69 @@ describe('GameSession identity and safety', () => {
     expect(net.last('host2', 'welcome')!.you.member).toBe('m1');
   });
 });
+
+describe('GameSession: host settings vs joins (823DDM)', () => {
+  /** Host + 3 friends: the 4 seats of the default room are full. */
+  function full() {
+    const r = room();
+    for (const n of ['B', 'C', 'D']) {
+      r.net.connect(n);
+      r.net.send(n, { type: 'hello', token: null, name: n });
+    }
+    return r;
+  }
+  const config = (net: LocalNet) => net.last('host', 'room')!.room.config;
+
+  it('a join grows the room and keeps the host settings', () => {
+    const { net } = full();
+    net.send('host', { type: 'configure', config: { ...DEFAULT_ROOM_CONFIG, vpToWin: 12 } });
+    net.connect('john');
+    net.send('john', { type: 'hello', token: null, name: 'John' });
+    expect(config(net)).toMatchObject({ seatCount: 5, map: 'base56', vpToWin: 12 });
+  });
+
+  it('configure made on fewer seats than the room now has is refused (the newcomer keeps the seat)', () => {
+    const { net } = full();
+    net.connect('john');
+    net.send('john', { type: 'hello', token: null, name: 'John' });
+    net.send('host', {
+      type: 'configure',
+      config: { ...DEFAULT_ROOM_CONFIG, vpToWin: 12 },
+      seats: 4,
+    });
+    expect(net.last('host', 'error')).toMatchObject({ code: 'stale_state', ref: 'configure' });
+    const room5 = net.last('host', 'room')!.room;
+    expect(room5.seats).toHaveLength(5);
+    expect(room5.seats[4]!.occupant).not.toBeNull();
+    // Made on the 5 seats, it goes through.
+    net.send('host', {
+      type: 'configure',
+      config: { ...config(net), vpToWin: 12 },
+      seats: 5,
+    });
+    expect(config(net)).toMatchObject({ seatCount: 5, vpToWin: 12 });
+  });
+
+  it('start carries the settings on the host screen; the game uses exactly those', () => {
+    const { net } = full();
+    net.send('host', { type: 'start', config: { ...DEFAULT_ROOM_CONFIG, vpToWin: 12 } });
+    expect(net.last('host', 'game')!.view.settings.vpToWin).toBe(12);
+    expect(config(net).vpToWin).toBe(12);
+  });
+
+  it('start on a seat count the room no longer has is refused', () => {
+    const { net } = full();
+    net.connect('john');
+    net.send('john', { type: 'hello', token: null, name: 'John' });
+    net.send('host', { type: 'start', config: { ...DEFAULT_ROOM_CONFIG, vpToWin: 12 } });
+    expect(net.last('host', 'error')).toMatchObject({ code: 'stale_state', ref: 'start' });
+    expect(net.last('host', 'room')!.room.phase).toBe('lobby');
+    expect(config(net).vpToWin).toBe(10);
+  });
+
+  it('start without a config (older clients) uses the room config', () => {
+    const { net } = full();
+    net.send('host', { type: 'start' });
+    expect(net.last('host', 'game')!.view.settings.vpToWin).toBe(10);
+  });
+});

@@ -5,6 +5,8 @@ import type { ErrorCode } from '../../net/protocol';
 export function errorText(code: ErrorCode, message: string, ref?: string): string | null {
   switch (code) {
     case 'stale_state':
+      // configure: the settings panel re-sends on the new seats by itself.
+      return ref === 'start' ? 'Someone just joined: check the settings, then press Start.' : null;
     case 'not_joined':
       return null;
     case 'not_host':
